@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rare Candy Reserve - Website Editor Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🍬 Rare Candy Reserve - Editor Dashboard</h1>
+            <p class="subtitle">Track and manage edits for rarecandyreserve.org</p>
+        </header>
+
+        <div class="main-content">
+            <!-- Input Section -->
+            <div class="input-section">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        id="taskInput" 
+                        placeholder="What needs to be edited? (e.g., 'Change hero image', 'Update product description')"
+                        class="task-input"
+                    >
+                    <select id="categorySelect" class="category-select">
+                        <option value="images">📸 Images</option>
+                        <option value="text">✏️ Text</option>
+                        <option value="styling">🎨 Styling</option>
+                        <option value="layout">📐 Layout/Centering</option>
+                        <option value="other">⚙️ Other</option>
+                    </select>
+                    <button id="addBtn" class="add-btn">Add Task</button>
+                </div>
+            </div>
+
+            <!-- Stats Section -->
+            <div class="stats-section">
+                <div class="stat-card">
+                    <span class="stat-label">Total Tasks</span>
+                    <span class="stat-value" id="totalCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Completed</span>
+                    <span class="stat-value completed" id="completedCount">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Remaining</span>
+                    <span class="stat-value pending" id="pendingCount">0</span>
+                </div>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div class="filter-section">
+                <button class="filter-btn active" data-filter="all">All Tasks</button>
+                <button class="filter-btn" data-filter="active">⏳ Pending</button>
+                <button class="filter-btn" data-filter="completed">✅ Completed</button>
+                <button class="filter-btn" data-filter="images">📸 Images</button>
+                <button class="filter-btn" data-filter="text">✏️ Text</button>
+                <button class="filter-btn" data-filter="styling">🎨 Styling</button>
+                <button class="filter-btn" data-filter="layout">📐 Layout</button>
+            </div>
+
+            <!-- Tasks List -->
+            <div class="tasks-section">
+                <ul id="taskList" class="task-list"></ul>
+                <div id="emptyState" class="empty-state">
+                    <p>No tasks yet. Start by adding what you need to edit!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="action-buttons">
+            <button id="clearCompletedBtn" class="action-btn secondary">Clear Completed</button>
+            <button id="exportBtn" class="action-btn primary">📥 Export Tasks</button>
+            <button id="clearAllBtn" class="action-btn danger">🗑️ Clear All</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

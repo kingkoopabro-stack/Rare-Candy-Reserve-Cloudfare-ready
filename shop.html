@@ -100,7 +100,8 @@
         Checkout runs on Stripe and PayPal (static site + payment links — no backend needed).
         Until payment links are wired, orders route to Contact and Cash App / BTC stay available as manual options. No card is charged here.
       </div>
-      <p style="margin-top:14px"><b>Pay with Stripe:</b> use the “Buy with Stripe →” button on any item. <b>Pay with PayPal:</b> choose PayPal below and send the order — we’ll send you a PayPal invoice.</p>
+      <div id="paypalCartBox" style="margin-top:14px"></div>
+      <p style="margin-top:14px"><b>Pay with Stripe:</b> use the “Buy with Stripe →” button on any item — Stripe takes the payment automatically, no invoice. <b>Pay with PayPal:</b> use the PayPal button above when it appears — PayPal takes the payment automatically, no invoice.</p>
       <form onsubmit="return submitOrder(event)" style="margin-top:16px">
         <label>Name</label><input id="oName" required>
         <label>Email</label><input id="oEmail" type="email" required>

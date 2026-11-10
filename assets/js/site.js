@@ -4,7 +4,9 @@
    (localStorage). No backend, no real payments.
    ============================================================ */
 const STRIPE_PUBLISHABLE_KEY = "pk_live_51U2qoIQpMlvNGy77xhL3IChHqa8IbKKalGIkIkdbP5dBZTnGULeHtYxOXTnIse5uu0OHBLtPmjikPGxhgmeSgnxV00CBibaT2E"; // LIVE publishable key — public by design, safe in frontend code
-const SHOP_CONTACT_EMAIL = "asteadyheartmusic@gmail.com"; // <-- CONFIRM WITH ASH: shop contact email (alt: kingkoopabro@gmail.com)
+const SHOP_CONTACT_EMAIL = "asteadyheartmusic@gmail.com"; // shop contact email
+// PAYPAL: set this to the PayPal Business email once Ash gives it — then PayPal cart checkout is fully automated (buyer pays on PayPal, PayPal notifies the shop, no invoice from Ash). Do NOT put a password or secret here.
+const PAYPAL_EMAIL = "7acrewoodnursery@gmail.com"; // PayPal Business email, given by Chris 2026-11-10 — automated PayPal cart checkout
 const ALLMYLINKS_URL = "https://allmylinks.com/Ashmusic";
 
 /* Verified music/social links (from Ash's AllMyLinks page, 2026-11-06).
@@ -299,6 +301,22 @@ function renderCart(){
         `<div class="cart-line" style="border-bottom:0"><div><b>Subtotal</b></div><div></div><div><b>${money(cartTotal())}</b></div></div>
          <p style="color:var(--muted);font-size:13px">Shipping is by location unless the item says free shipping — calculated at checkout. No charge is made until you pay with Stripe or PayPal.</p>`;
       document.getElementById("checkoutBox").style.display = "block";
+      const pp = document.getElementById("paypalCartBox");
+      if(pp){
+        if(PAYPAL_EMAIL){
+          pp.innerHTML = `<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
+            <input type="hidden" name="cmd" value="_xclick">
+            <input type="hidden" name="business" value="${PAYPAL_EMAIL}">
+            <input type="hidden" name="item_name" value="Rare Candy Reserve order">
+            <input type="hidden" name="amount" value="${cartTotal().toFixed(2)}">
+            <input type="hidden" name="currency_code" value="USD">
+            <input type="hidden" name="no_shipping" value="2">
+            <button class="btn" type="submit">Pay $${cartTotal().toFixed(2)} with PayPal →</button>
+          </form><p style="font-size:13px;color:var(--muted)">PayPal checkout is automated — PayPal takes the payment and notifies the shop. No invoice needed.</p>`;
+        } else {
+          pp.innerHTML = `<p style="font-size:13px;color:var(--muted)">PayPal checkout is being wired up — Stripe checkout works now.</p>`;
+        }
+      }
     }
   }
 }

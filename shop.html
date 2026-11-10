@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop — Rare Candy Reserve</title>
+<meta name="description" content="Cards, comics, collectibles and custom prints — the full Rare Candy Reserve catalog. ">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="shop">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="kicker">The shop</div>
+  <h1>Cards, comics, <span class="grad-text">collectibles &amp; more.</span></h1>
+  <p style="color:var(--muted)">The full storefront is coming online as we finish moving off third-party marketplaces. Click any item for its own detail view — every item has 3 photos (placeholders until real photos are uploaded).</p>
+
+  <div id="detailView" style="display:none"></div>
+
+  <section id="featuredSection">
+    <h2>Featured <span class="grad-text">from the shop floor.</span></h2>
+    <div class="grid" id="productGrid"></div>
+  </section>
+
+  <section id="catalogSection">
+    <h2>Full catalog — <span class="grad-text">14 live listings.</span></h2>
+    <p style="color:var(--muted)">Every live listing from the shop's eBay inventory, on the site at the same prices. <b style="color:var(--ink)">14 live listings · $662.97 total list value</b> (eBay's total: Beholder counted at its $60 top variation, extender both styles $36). Gengar and Rayquaza are out of stock and not counted. Click any item for its detail view.</p>
+    <div class="grid" id="catalogGrid"></div>
+    <div class="note" style="margin-top:16px">Photos are placeholders for now — eBay blocked the image pull for all 16 listings, so upload photos via the Drive folder or chat (3 per item). Killer Klown photos already exist in the workspace and can be wired in first.</div>
+  </section>
+
+  <section>
+    <h2>More stock, <span class="grad-text">loading soon.</span></h2>
+    <div class="grid" id="soonGrid"></div>
+  </section>
+
+  <section>
+    <div class="kicker">Custom print pricing</div>
+    <h2>Priced by size first, <span class="grad-text">material second.</span></h2>
+    <p style="color:var(--muted)">General starting prices from the supplied shop files. Exact custom work gets quoted from the reference pictures and requirements.</p>
+    <div id="pricingTableServices"></div>
+    <p style="color:var(--muted);font-size:14px"><b>+$3</b> per extra color beyond the first · <b>+25%</b> 48-hour rush · <b>PETG</b> for outdoor / high-handling pieces · <b>PLA+</b> tougher everyday upgrade</p>
+  </section>
+
+  <section>
+    <div class="kicker">Quick estimator</div>
+    <h2>Ballpark your print.</h2>
+    <p style="color:var(--muted)">Use the same general starting tiers before sending the real project for a quote.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;align-items:end">
+      <div><label>Size tier</label><select id="estSize" onchange="estimate()"><option value="small">Small — charms / small minis (≤15g)</option><option value="medium">Medium — 2–4in / display pieces (15–60g)</option><option value="large">Large — 4–7in / terrain / vases (60–150g)</option><option value="xl">XL — 7in+ / statues / large props (150g+)</option></select></div>
+      <div><label>Material</label><select id="estMat" onchange="estimate()"><option value="pla">PLA Basic</option><option value="pla+">PLA+</option><option value="petg">PETG</option></select></div>
+      <div><label>Colors</label><select id="estColors" onchange="estimate()"><option value="1">1 color</option><option value="2">2 colors</option><option value="3">3 colors</option><option value="4">4 colors</option></select></div>
+      <div><label><input type="checkbox" id="estRush" style="width:auto" onchange="estimate()"> 48-hour rush (+25%)</label></div>
+    </div>
+    <p style="font-size:26px;font-weight:900;margin-top:16px">Estimated starting price: <span class="grad-text" id="estOut">$8.00</span></p>
+  </section>
+
+  <section>
+    <div class="kicker">Custom orders</div>
+    <h2>Send pictures + a description <span class="grad-text">for a real quote.</span></h2>
+    <p style="color:var(--muted)">Upload reference pictures, explain what you want, and the request is sent to the shop for review.</p>
+    <div class="steps">
+      <div class="step"><div class="n grad-text">1</div><h3>Upload your pictures.</h3></div>
+      <div class="step"><div class="n grad-text">2</div><h3>Tell us what you're trying to make.</h3></div>
+      <div class="step"><div class="n grad-text">3</div><h3>We check size, material, colors and complexity.</h3></div>
+      <div class="step"><div class="n grad-text">4</div><h3>You receive the actual price before the job starts.</h3></div>
+    </div>
+    <form onsubmit="return submitQuote(event)" style="margin-top:18px">
+      <label>Name</label><input id="qName"><div class="field-msg" id="qNameMsg"></div>
+      <label>Email</label><input id="qEmail" type="email"><div class="field-msg" id="qEmailMsg"></div>
+      <label>Project details</label><textarea id="qDetails" placeholder="Size, colors, material, deadline, or what needs to be recreated…"></textarea><div class="field-msg" id="qDetailsMsg"></div>
+      <label>Reference pictures</label>
+      <input id="qPhotos" placeholder="e.g. 3 photos in the Drive folder, or 'will send via chat'">
+      <p style="margin-top:16px"><button class="btn" type="submit">Send quote request →</button></p>
+      <p id="quoteMsg" style="color:var(--green);font-weight:700"></p>
+    </form>
+    <div class="note" style="margin-top:18px">♻ <b>Every print starts with less waste.</b> Filament gets recycled and reused wherever it can be — failed prints, purge lines, and scraps go back into the loop instead of the trash. Same positive-vibes message as the music: build good things, and build them responsibly.</div>
+  </section>
+
+  <section id="checkout">
+    <div class="kicker">Your cart</div>
+    <h2>Checkout</h2>
+    <div id="cartPageBody"></div>
+    <div id="checkoutBox" style="display:none">
+      <div class="note stripe">
+        <b>⚠ CHECKOUT IS NOT CONNECTED YET.</b><br>
+        The publishable key in this file is <code>pk_test_REPLACE_WITH_REAL_PUBLISHABLE_KEY</code> — it is a placeholder, not a real key. No card is charged here.
+        At launch, checkout runs on Stripe and Square (Phase 1: static site + payment links — no backend needed).
+        Until Stripe and Square are connected, orders route to Contact and Cash App / BTC stay available as manual options.
+        <b>Real payments cannot work until Ash provides his real Stripe publishable key (and Square is connected).</b>
+      </div>
+      <p style="margin-top:14px"><button class="btn" disabled>Pay with Stripe or Square — disabled — checkout not connected yet</button></p>
+      <form onsubmit="return submitOrder(event)" style="margin-top:16px">
+        <label>Name</label><input id="oName" required>
+        <label>Email</label><input id="oEmail" type="email" required>
+        <label>Shipping address</label><textarea id="oAddr" required></textarea>
+        <label>Payment preference</label>
+        <select id="oPay"><option>Stripe card (when connected)</option><option>Square card (when connected)</option><option>PayPal</option><option>Cash App (manual)</option><option>BTC (manual)</option></select>
+        <p style="margin-top:16px"><button class="btn" type="submit">Place order (no charge yet) →</button></p>
+        <p id="orderMsg" style="color:var(--green);font-weight:700"></p>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="note">
+      <b>Payment methods at launch:</b> Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
+      Checkout runs on Stripe and Square at launch (Phase 1: static site + payment links — no backend needed to start). Cash App and BTC stay available as manual options.<br>
+      <b>Cart items route to Contact until Stripe and Square are connected.</b>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About — Rare Candy Reserve</title>
+<meta name="description" content="What Rare Candy Reserve is: graded cards, mint comics, and one-of-one 3D prints from Starke, Florida. ">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="about">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="kicker">About the Reserve</div>
+  <h1>One shop. <span class="grad-text">Every corner of the hobby.</span></h1>
+  <p style="color:var(--muted);font-size:17px">Rare Candy Reserve is a one-person shop out of Starke, Florida — graded and hard-to-find Pokémon and other trading cards, mint comics, custom 3D printing, tech builds, cosplay gear, and antiques. Thousands of cards in stock, from out-of-print sets to fresh slabs. Every graded card is professionally authenticated before it ships, and every print comes off the same tuned production setup in the shop.</p>
+  <p style="color:var(--muted)">The shop is a Vita Nova Records property. The idea is simple: collect from the best of the best — fair prices, honest descriptions, and a little something extra in every order.</p>
+
+  <section>
+    <div class="kicker">The studio</div>
+    <h2>Where it all <span class="grad-text">gets recorded.</span></h2>
+    <div class="studio-spot">
+      <figure>
+        <img src="images/studio-room.jpg" alt="Ash's studio room — monitor, MIDI keyboard, microphone and mushroom tapestry">
+        <figcaption>The studio room — where the podcasts and the music get recorded.</figcaption>
+      </figure>
+      <div>
+        <p style="color:var(--muted)">This is the room where it happens — the podcasts and the music, recorded in the same space, under the same pink-and-purple light.</p>
+        <p style="margin-top:14px"><a class="btn" href="podcast.html">Listen to the podcast →</a> <a class="btn ghost" href="music.html">Hear the music</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">What we do</div>
+    <h2>From graded slabs to <span class="grad-text">freshly sliced filament.</span></h2>
+    <div class="grid" id="servicesGrid"></div>
+  </section>
+
+  <section>
+    <div class="kicker">Stuck on a project?</div>
+    <h2>We'll help you get it finished.</h2>
+    <p style="color:var(--muted)">Hands-on skills in-house, backed by trusted third parties when a job needs a specialist. Tell us where the project stalled — we'll pick it up from there.</p>
+    <div class="grid">
+      <div class="card"><h3>🖨 3D printing &amp; rendering</h3><p>From a rough model to a finished, painted-ready print — cleanup, supports, and renders included.</p></div>
+      <div class="card"><h3>🎬 Animation</h3><p>Short-form animation and motion work to bring a character or scene to life.</p></div>
+      <div class="card"><h3>🎵 Music production</h3><p>Mixing, mastering, and production help for tracks that need a finishing pass.</p></div>
+      <div class="card"><h3>🎥 Video production</h3><p>Editing, effects, and assembly for content that's shot but not shipped.</p></div>
+      <div class="card"><h3>♟ Custom minis &amp; terrain</h3><p>Send your design or your character sheet — we print, clean, and ship it.</p></div>
+      <div class="card"><h3>🗡 Cosplay &amp; LARP builds</h3><p>Props and weapons built for actual use, not just the shelf.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Print gallery</div>
+    <h2>Actual work <span class="grad-text">from the shop files.</span></h2>
+    <p style="color:var(--muted)">Shop photography slots — real photos get dropped in here from the Drive folder at go-live.</p>
+    <div class="grid" id="galleryGrid"></div>
+  </section>
+
+  <section>
+    <div class="kicker">Hardware check</div>
+    <h2>The Resident Evil-themed printer.</h2>
+    <p style="color:var(--muted)">Every piece in this shop comes off the same production setup shown here, tuned for detailed, high-speed printing with the shop's PLA and PETG materials.</p>
+    <div class="grid">
+      <div class="card"><h3>ENCLOSURE</h3><p>Enclosed, ventilated production setup</p></div>
+      <div class="card"><h3>MATERIALS</h3><p>PLA Basic, PLA+, and PETG</p></div>
+      <div class="card"><h3>MULTI-COLOR</h3><p>AMS-fed, up to 4 colors per print</p></div>
+      <div class="card"><h3>DETAIL</h3><p>Tuned for high-definition production</p></div>
+      <div class="card"><h3>DRYING</h3><p>Dedicated filament dryer keeps spools ready</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Graded card shop</div>
+    <h2>PSA &amp; CGC examples.</h2>
+    <p style="color:var(--muted)">Graded cards move with grade and market comps, so individual listings are priced separately.</p>
+    <div class="grid" id="slabGrid"></div>
+    <div class="card" style="margin-top:16px">
+      <h3>🛡 Fitted slab holders</h3>
+      <p>Standard PLA+ holder <b style="color:var(--ink)">$7</b> · PETG reinforced holder <b style="color:var(--ink)">$10</b> · Name/set engraving <b style="color:var(--ink)">+$3</b>.</p>
+      <p>Every graded card sold through the shop can be paired with a fitted 3D-printed display holder.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Vendor &amp; display supply</div>
+    <h2>Gear for the show floor.</h2>
+    <p style="color:var(--muted)">Display parts, booth organizers and replacement pieces can be made around your existing setup. A photo of the original is enough to start a conversation.</p>
+    <div class="grid" id="vendorGrid"></div>
+    <div class="card" style="margin-top:16px"><h3>Collector display gear</h3><p>Slab stands, booster risers, top-loader organizers, signs and price-tag clips.</p>
+    <p>■ Booster box &amp; pack risers · ■ Graded slab stands · ■ Spinner racks &amp; peg hooks · ■ Toploader organizers · ■ Paint / airbrush caddies · ■ Custom sign holders · ■ Legacy replacement parts · ■ Mini &amp; terrain trays</p></div>
+  </section>
+
+  <section>
+    <div class="note">♻ <b>Every print starts with less waste.</b> Filament gets recycled and reused wherever it can be — failed prints, purge lines, and scraps go back into the loop instead of the trash. Same positive-vibes message as the music: build good things, and build them responsibly.</div>
+    <p style="margin-top:16px"><a class="btn" href="shop.html">Browse the shop →</a> <a class="btn ghost" href="contact.html">Get in touch</a></p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

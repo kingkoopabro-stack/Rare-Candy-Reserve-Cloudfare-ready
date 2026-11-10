@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Contact — Rare Candy Reserve</title>
+<meta name="description" content="Questions about an order, a card, or a custom job — send it to the Reserve. ">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="contact">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="kicker">Contact</div>
+  <h1>Talk to the <span class="grad-text">Reserve.</span></h1>
+  <p style="color:var(--muted)">Questions about an order, a card, or a custom job — send it here and we'll get back to you. The form opens a pre-addressed email draft to the shop in your own email app — nothing is sent until you hit send there.</p>
+
+  <form onsubmit="return submitContact(event)" novalidate>
+    <label for="cName">Name</label>
+    <input id="cName" autocomplete="name"><div class="field-msg" id="cNameMsg"></div>
+    <label for="cEmail">Email</label>
+    <input id="cEmail" type="email" autocomplete="email"><div class="field-msg" id="cEmailMsg"></div>
+    <label for="cMsg">Message</label>
+    <textarea id="cMsg"></textarea><div class="field-msg" id="cMsgMsg"></div>
+    <p style="margin-top:16px"><button class="btn" type="submit">Send message →</button></p>
+    <p id="contactMsg" style="color:var(--green);font-weight:700"></p>
+  </form>
+
+  <section>
+    <div class="note"><b>Payment methods at launch:</b> Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
+    Cash App and BTC stay available as manual options.</div>
+    <p style="margin-top:16px"><a class="btn ghost" href="shop.html">Back to the shop →</a></p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

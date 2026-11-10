@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Music — a steady heart · Rare Candy Reserve</title>
+<meta name="description" content="Check out my music — for those who never stop growing as people. A steady heart, from Rare Candy Reserve. ">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="music">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">♪ A Steady Heart · Vita Nova Records</div>
+    <h1>Check out my music — <span class="grad-text">for those who never stop growing as people.</span></h1>
+    <p class="lede">Every song is another day written out — how I handled it, bad or good. A diary in songs, made to help people heal and grow.</p>
+    <p style="margin-top:18px">
+      <a class="aml-btn large" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks — every link in one place</span></a>
+    </p>
+  </div>
+
+  <section>
+    <div class="cassette" id="cassette">
+      <div class="tape-window">
+        <div class="reels">
+          <div class="reel"></div>
+          <div class="label">
+            <img id="coverArt" src="images/allison-album-artwork.png" alt="End of the year — album artwork">
+            <div class="t-title" id="nowTitle">Sweet BBgirl</div>
+            <div class="t-note" id="nowNote">Headliner</div>
+          </div>
+          <div class="reel"></div>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="t-btn small" type="button" onclick="prevTrack()" aria-label="Previous track">⏮</button>
+        <button class="t-btn" type="button" id="playBtn" onclick="togglePlay()" aria-label="Play or pause">▶</button>
+        <button class="t-btn small" type="button" onclick="nextTrack()" aria-label="Next track">⏭</button>
+      </div>
+      <div class="progress">
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="1" aria-label="Seek">
+        <div class="time-row"><span id="timeCur">0:00</span><span id="timeTot">0:00</span></div>
+      </div>
+      <div class="tracklist" id="trackList"></div>
+      <p id="playerMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">6 tracks from the ASH folder — the folder holds 22 audio files total; these 6 are the starter set. Tap a track to play it.</p>
+  </section>
+
+  <section>
+    <div class="kicker">Listen everywhere</div>
+    <h2>Find <span class="grad-text">a steady heart</span> on your platform.</h2>
+    <div class="follow-row" id="followRowMusic" style="margin-top:14px"></div>
+    <p style="color:var(--muted);font-size:14px">Links verified from Ash's AllMyLinks page. There is no Pandora link on that page, so none is listed here. New album “End of the year” — 14 tracks — is on the way, with live shows this winter.</p>
+    <p style="margin-top:14px"><a class="btn" href="shop.html">Shop the Reserve →</a></p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+<script src="assets/js/player.js"></script>
+</body>
+</html>

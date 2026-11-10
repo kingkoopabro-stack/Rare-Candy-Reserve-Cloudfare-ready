@@ -1,83 +1,135 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rare Candy Reserve - Website Editor Dashboard</title>
-    <link rel="stylesheet" href="styles.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rare Candy Reserve — Level Up Your Collection</title>
+<meta name="description" content="Graded cards, mint comics, and one-of-one 3D prints — plus a forge for your next tabletop character. ">
+<link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🍬 Rare Candy Reserve - Editor Dashboard</h1>
-            <p class="subtitle">Track and manage edits for rarecandyreserve.org</p>
-        </header>
+<body data-page="home">
 
-        <div class="main-content">
-            <!-- Input Section -->
-            <div class="input-section">
-                <div class="input-group">
-                    <input 
-                        type="text" 
-                        id="taskInput" 
-                        placeholder="What needs to be edited? (e.g., 'Change hero image', 'Update product description')"
-                        class="task-input"
-                    >
-                    <select id="categorySelect" class="category-select">
-                        <option value="images">📸 Images</option>
-                        <option value="text">✏️ Text</option>
-                        <option value="styling">🎨 Styling</option>
-                        <option value="layout">📐 Layout/Centering</option>
-                        <option value="other">⚙️ Other</option>
-                    </select>
-                    <button id="addBtn" class="add-btn">Add Task</button>
-                </div>
-            </div>
-
-            <!-- Stats Section -->
-            <div class="stats-section">
-                <div class="stat-card">
-                    <span class="stat-label">Total Tasks</span>
-                    <span class="stat-value" id="totalCount">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Completed</span>
-                    <span class="stat-value completed" id="completedCount">0</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-label">Remaining</span>
-                    <span class="stat-value pending" id="pendingCount">0</span>
-                </div>
-            </div>
-
-            <!-- Filter Buttons -->
-            <div class="filter-section">
-                <button class="filter-btn active" data-filter="all">All Tasks</button>
-                <button class="filter-btn" data-filter="active">⏳ Pending</button>
-                <button class="filter-btn" data-filter="completed">✅ Completed</button>
-                <button class="filter-btn" data-filter="images">📸 Images</button>
-                <button class="filter-btn" data-filter="text">✏️ Text</button>
-                <button class="filter-btn" data-filter="styling">🎨 Styling</button>
-                <button class="filter-btn" data-filter="layout">📐 Layout</button>
-            </div>
-
-            <!-- Tasks List -->
-            <div class="tasks-section">
-                <ul id="taskList" class="task-list"></ul>
-                <div id="emptyState" class="empty-state">
-                    <p>No tasks yet. Start by adding what you need to edit!</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Action Buttons -->
-        <div class="action-buttons">
-            <button id="clearCompletedBtn" class="action-btn secondary">Clear Completed</button>
-            <button id="exportBtn" class="action-btn primary">📥 Export Tasks</button>
-            <button id="clearAllBtn" class="action-btn danger">🗑️ Clear All</button>
-        </div>
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
     </div>
+  </div>
+</header>
 
-    <script src="script.js"></script>
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">Comics · Cards · Custom Prints · Tabletop</div>
+    <h1>Level up your <span class="grad-text">collection</span>.</h1>
+    <p class="lede">Graded cards, mint comics, and one-of-one 3D prints — plus a forge for your next tabletop character and a crew to help finish the project you've been stuck on.</p>
+    <p style="margin-top:20px">
+      <a class="btn" href="shop.html">Browse the shop →</a>
+      <a class="btn ghost" href="index.html#forge">Forge a character</a>
+    </p>
+    <p style="margin-top:18px">
+      <a class="aml-btn large" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks — music, socials &amp; more</span></a>
+    </p>
+    <p style="margin-top:18px">
+      <span class="pill">♻ Eco-friendly PLA+ / PETG</span>
+      <span class="pill"><b>PSA &amp; CGC 8.5–10</b> graded</span>
+      <span class="pill">Every major TCG in stock</span>
+    </p>
+    <figure class="radio-banner">
+      <img data-radio-banner src="images/radio-afternoon.jpg" alt="Steady Heart Radio art">
+      <figcaption><span data-radio-banner-caption>Steady Heart Radio</span> · changes with the time of day</figcaption>
+    </figure>
+  </div>
+
+  <section>
+    <div class="kicker">What we do</div>
+    <h2>One shop. <span class="grad-text">Every corner of the hobby.</span></h2>
+    <p style="color:var(--muted)">From graded slabs to freshly sliced filament, Rare Candy Reserve covers the whole nerd stack — and if we don't stock it, we can probably print it.</p>
+    <div class="grid" id="servicesGrid"></div>
+  </section>
+
+  <section>
+    <div class="kicker">Featured</div>
+    <h2>From the <span class="grad-text">shop floor.</span></h2>
+    <div class="grid" id="productGrid"></div>
+    <p style="margin-top:16px"><a class="btn" href="shop.html">See the full catalog — 14 live listings →</a></p>
+  </section>
+
+  <section>
+    <div class="kicker">The Reserve showcase</div>
+    <h2>See what we're actually making &amp; selling.</h2>
+    <p style="color:var(--muted)">Real shop photography, general pricing, graded-card examples, vendor gear, and the custom-print workflow — all in the original Rare Candy Reserve style.</p>
+    <div class="steps">
+      <div class="step"><div class="n grad-text">01 · CUSTOM</div><h3>Send us a picture. Tell us what you want.</h3><p>Upload reference images and describe size, colors, material, deadline, or what needs to be recreated. We quote the actual job instead of pretending every print costs the same.</p></div>
+      <div class="step"><div class="n grad-text">02 · COLLECT</div><h3>Cards, comics &amp; collectibles.</h3><p>Graded cards and collectible stock are presented individually. Market-sensitive items are quoted/listed individually rather than locked to a fake flat price.</p></div>
+      <div class="step"><div class="n grad-text">03 · VENDOR</div><h3>Display gear &amp; replacement parts.</h3><p>Booth risers, holders, organizers, paint stations and replacement parts can be modeled around an existing piece or a reference photo.</p></div>
+    </div>
+  </section>
+
+  <section id="forge">
+    <div class="kicker">Tabletop &amp; DND</div>
+    <h2>Forge your <span class="grad-text">perfect character.</span></h2>
+    <p style="color:var(--muted)">Lock in an alignment, a race, a look, and the era they're from — then write the backstory. Export it, bring it to the table, or hand it to us for a custom mini or portrait.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;align-items:start">
+      <div>
+        <label>Character name</label>
+        <input id="forgeName" placeholder="Unnamed Character" oninput="forgePreview()">
+        <label>Alignment</label>
+        <select id="forgeAlign" onchange="forgePreview()">
+          <option>True Neutral</option><option>Lawful Good</option><option>Neutral Good</option><option>Chaotic Good</option>
+          <option>Lawful Neutral</option><option>Chaotic Neutral</option><option>Lawful Evil</option><option>Neutral Evil</option><option>Chaotic Evil</option>
+        </select>
+        <label>Race / lineage</label>
+        <input id="forgeRace" placeholder="Human" oninput="forgePreview()">
+        <label>Class / style</label>
+        <input id="forgeClass" placeholder="e.g. Rogue, Paladin, Star-forged Bard…" oninput="forgePreview()">
+        <label>Where and when are they from?</label>
+        <input id="forgeOrigin" placeholder="e.g. A flooded port city, 2149" oninput="forgePreview()">
+        <label>Backstory</label>
+        <textarea id="forgeStory" placeholder="How did they get here? What do they want?" oninput="forgePreview()"></textarea>
+      </div>
+      <div class="card">
+        <div class="tag">Character sheet draft</div>
+        <h2 id="forgeOutName">Unnamed Character</h2>
+        <p><b id="forgeOutAlign">True Neutral</b> · <span id="forgeOutRace">Human</span></p>
+        <p>Class / style — <b id="forgeOutClass">—</b></p>
+        <p>Origin — <b id="forgeOutOrigin">—</b></p>
+        <p id="forgeOutStory" style="color:var(--muted)">Their backstory will appear here as you type.</p>
+        <p style="margin-top:16px"><button class="btn" onclick="forgeRequest()">Want it made real? Request a custom mini or portrait</button></p>
+        <p id="forgeMsg" style="color:var(--green);font-weight:700"></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Custom print pricing</div>
+    <h2>Priced by size first, <span class="grad-text">material second.</span></h2>
+    <p style="color:var(--muted)">General starting prices. Exact custom work gets quoted from the reference pictures and requirements.</p>
+    <div id="pricingTableHome"></div>
+    <p style="margin-top:14px"><a class="btn" href="shop.html">Price your print →</a></p>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
 </body>
 </html>

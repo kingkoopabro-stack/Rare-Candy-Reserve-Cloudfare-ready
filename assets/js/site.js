@@ -55,7 +55,7 @@ const PRODUCTS = [
    imgs:["images/airpods-case-closed.jpg"]},
   {id:"dnd-dice-set", slug:"dnd-dice-set", tag:"CUSTOM · Tabletop Dice", name:"Custom Set of D&D Dice — Choose Two Colors",
    desc:"Custom 3D-printed set of D&D dice. Choose two colors: red, yellow, white, blue, black, pink, or green. No satchel included — the satchel was sold.",
-   price:18.00, ship:"+ shipping (by location)", icon:"🎲",
+   price:18.00, ship:"+ shipping (by location)", icon:"🎲", stripe:"https://buy.stripe.com/00w3cxbbkd6ZdxubvA6sw02",
    imgs:["images/dice-3d-printed.jpg"]},
   {id:"mcr-vinyl", slug:"mcr-vinyl", tag:"SEALED · Collectible Vinyl", name:"MCR — Three Cheers for Sweet Revenge",
    desc:"Still-sealed collector's pressing, includes a preservation stand so it displays like a graded card.",
@@ -153,6 +153,16 @@ const CATALOG = [
   {id:"cat-buster-sword", slug:"buster-sword-keychain", ebay:null, icon:"🔑", tag:"Keychain", name:"Cloud's Buster Sword Keychain (Final Fantasy VII)", price:null, img:null, comingSoon:true,
    imgs:["images/buster-sword-keychain.jpg"],
    desc:"Black metal Buster Sword keychain."},
+  {id:"cat-shield", slug:"pokemon-shield-switch-loose", ebay:null, icon:"🎮", tag:"Video Game · Loose Cart", name:"Pokémon Shield — Nintendo Switch, Loose Cartridge Only", price:29.99, img:null,
+   imgs:["images/placeholder.svg"],
+   desc:"Pokémon Shield (2019) for Nintendo Switch — loose cartridge only, no case or box. Tested working. Fair eBay loose price — recent sold listings $25–$35."},
+  {id:"cat-deadlands-lot", slug:"deadlands-lot-25", ebay:null, icon:"🃏", tag:"TCG Lot · Deadlands", name:"Deadlands TCG — Shrink-Wrapped Lot, 25 Cards", price:12.00, img:null,
+   imgs:["images/placeholder.svg"],
+   desc:"25 Deadlands cards, shrink-wrapped as a lot. Best quantity for a playable / collectible starter lot — 25 cards, mixed."},
+  {id:"cat-custom-mini", slug:"custom-mini", ebay:null, icon:"♟", tag:"Custom Miniature", name:"Custom Tabletop Mini — Choose a Type or Design Your Own", price:12.00, img:null,
+   imgs:["images/mini-beholder-group.jpg"],
+   variations:[{label:"Standard mini — from $12", price:12.00},{label:"Beholder — $20", price:20.00},{label:"Dragon — $25", price:25.00},{label:"Knight / Paladin — $18", price:18.00},{label:"Wizard — $18", price:18.00},{label:"Rogue — $18", price:18.00},{label:"Design your own — $25", price:25.00}],
+   desc:"Order a custom tabletop mini: pick a type — Beholder, Dragon, Knight/Paladin, Wizard, Rogue — or design your own and describe it in the custom order form. Printed to order."},
 ];
 const SOON = [
   {icon:"🃏", tag:"Graded Card", name:"PSA 9–10 slab, rotating stock", price:"Priced per card", note:"Listings loading soon"},
@@ -287,7 +297,7 @@ function renderCart(){
           <div><b>${money(unit*i.qty)}</b></div>
         </div>`; }).join("") +
         `<div class="cart-line" style="border-bottom:0"><div><b>Subtotal</b></div><div></div><div><b>${money(cartTotal())}</b></div></div>
-         <p style="color:var(--muted);font-size:13px">Shipping is by location unless the item says free shipping — calculated at checkout once Stripe and Square are connected. No charge is made until checkout is connected.</p>`;
+         <p style="color:var(--muted);font-size:13px">Shipping is by location unless the item says free shipping — calculated at checkout. No charge is made until you pay with Stripe or PayPal.</p>`;
       document.getElementById("checkoutBox").style.display = "block";
     }
   }
@@ -296,7 +306,7 @@ function openCart(){ renderCart(); document.getElementById("cartDrawer").classLi
 function closeCart(){ document.getElementById("cartDrawer").classList.remove("open"); document.getElementById("drawerScrim").classList.remove("show"); }
 function submitOrder(e){
   e.preventDefault();
-  document.getElementById("orderMsg").textContent = "✓ This order was NOT placed and no card was charged. Checkout will run through Stripe or Square once payment links are wired.";
+  document.getElementById("orderMsg").textContent = "✓ This order was NOT placed and no card was charged. Checkout runs through Stripe or PayPal — pick one below.";
   return false;
 }
 
@@ -328,6 +338,7 @@ function productCard(p){
     <h3>${p.name}</h3><p>${p.desc}</p>
     <p><span class="price">${money(p.price)}</span> <span class="ship">${p.ship}</span></p>
     <button class="btn" onclick="addToCart('${p.id}')">Add to cart</button>
+    ${p.stripe ? `<a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener" style="margin-left:8px">Buy with Stripe →</a>` : ""}
   </div>`;
 }
 function catalogCard(c){
@@ -370,7 +381,7 @@ function catalogCard(c){
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p style="color:var(--muted);font-size:14px">${c.desc}</p>` : ""}
     ${priceLine}
-    <p>${buyBtn}${ebayLink}</p>
+    <p>${buyBtn}${c.stripe ? ` <a class="btn ghost" href="${c.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}${ebayLink}</p>
   </div>`;
 }
 function renderPageSections(){

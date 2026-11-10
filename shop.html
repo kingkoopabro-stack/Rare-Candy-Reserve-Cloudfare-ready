@@ -80,6 +80,7 @@
     <form onsubmit="return submitQuote(event)" style="margin-top:18px">
       <label>Name</label><input id="qName"><div class="field-msg" id="qNameMsg"></div>
       <label>Email</label><input id="qEmail" type="email"><div class="field-msg" id="qEmailMsg"></div>
+      <label>Mini type (for custom minis — pick one, or design your own)</label><select id="qMiniType"><option>Not a mini — custom print</option><option>Beholder</option><option>Dragon</option><option>Knight / Paladin</option><option>Wizard</option><option>Rogue</option><option>Design my own — describe below</option></select>
       <label>Project details</label><textarea id="qDetails" placeholder="Size, colors, material, deadline, or what needs to be recreated…"></textarea><div class="field-msg" id="qDetailsMsg"></div>
       <label>Reference pictures</label>
       <input id="qPhotos" placeholder="e.g. 3 photos in the Drive folder, or 'will send via chat'">
@@ -96,16 +97,16 @@
     <div id="checkoutBox" style="display:none">
       <div class="note stripe">
         <b>⚠ CHECKOUT IS NOT CONNECTED YET.</b><br>
-        Checkout runs on Stripe and Square (static site + payment links — no backend needed).
+        Checkout runs on Stripe and PayPal (static site + payment links — no backend needed).
         Until payment links are wired, orders route to Contact and Cash App / BTC stay available as manual options. No card is charged here.
       </div>
-      <p style="margin-top:14px"><button class="btn" disabled>Pay with Stripe or Square — disabled — checkout not connected yet</button></p>
+      <p style="margin-top:14px"><b>Pay with Stripe:</b> use the “Buy with Stripe →” button on any item. <b>Pay with PayPal:</b> choose PayPal below and send the order — we’ll send you a PayPal invoice.</p>
       <form onsubmit="return submitOrder(event)" style="margin-top:16px">
         <label>Name</label><input id="oName" required>
         <label>Email</label><input id="oEmail" type="email" required>
         <label>Shipping address</label><textarea id="oAddr" required></textarea>
         <label>Payment preference</label>
-        <select id="oPay"><option>Stripe card (when connected)</option><option>Square card (when connected)</option><option>PayPal</option><option>Cash App (manual)</option><option>BTC (manual)</option></select>
+        <select id="oPay"><option>Stripe card</option><option>PayPal</option><option>Cash App (manual)</option><option>BTC (manual)</option></select>
         <p style="margin-top:16px"><button class="btn" type="submit">Place order (no charge yet) →</button></p>
         <p id="orderMsg" style="color:var(--green);font-weight:700"></p>
       </form>
@@ -114,8 +115,8 @@
 
   <section>
     <div class="note">
-      <b>Payment methods at launch:</b> Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
-      Checkout runs on Stripe and Square at launch (Phase 1: static site + payment links — no backend needed to start). Cash App and BTC stay available as manual options.<br>
+      <b>Payment methods at launch:</b> Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
+      Checkout runs on Stripe and PayPal (static site + payment links — no backend needed). Cash App and BTC stay available as manual options.<br>
       <b>Cart items route to Contact until payment links are wired.</b>
     </div>
   </section>
@@ -126,7 +127,7 @@
     <div class="follow-label">Listen &amp; follow — a steady heart</div>
     <div class="follow-row" id="followRow"></div>
     <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
-    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
     <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
   </div>
 </footer>

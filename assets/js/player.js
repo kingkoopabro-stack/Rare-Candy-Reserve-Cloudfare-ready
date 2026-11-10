@@ -1,20 +1,12 @@
 /* ============================================================
    RCR cassette player — "a steady heart"
    TO SWAP TRACKS: just edit the TRACKS array below. Each entry is
-   { title, file, note }. Files live in site/audio/ (as-is, no
-   re-encoding). The ASH Drive folder holds 22 audio files total;
-   these 6 are the starter set.
+   { title, file, note }. Files live in site/audio/.
    ============================================================ */
 const TRACKS = [
-  { title: "Djent instro",                 file: "audio/Djent%20instro.mp3",                  note: "Instrumental" },
+  { title: "I sunk for you",               file: "audio/Sunk%20for%20you.mp3",                note: "End of the year" },
   { title: "Introduction to heartbreak",   file: "audio/Introduction%20to%20heartbreak.mp3",  note: "" },
-  // LITE LAUNCH BUILD (2026-11-09): the 4 WAV tracks (Sweet BBgirl, Don't give up now,
-  // We will meet again I promise, Stay till the sunrise) are omitted from this deploy —
-  // the free deploy route can't take files that large. Add them back as MP3s once Ash
-  // approves converting them. The full 6-track list lives in the original.
 ];
-
-// LITE note: only the 2 MP3 tracks are in this deploy (see above).
 const COVER_ART = "images/allison-album-artwork.png"; // "Finished Allison Album artwork end of the year.png"
 
 let currentTrack = 0;

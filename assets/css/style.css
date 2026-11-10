@@ -15,9 +15,6 @@ h1,h2,h3{line-height:1.2;margin:.4em 0}
 .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin:4px;font-size:13px;color:var(--muted)}
 .pill b{color:var(--ink)}
 
-/* staging banner */
-.staging-banner{background:repeating-linear-gradient(45deg,#ff9a00,#ff9a00 18px,#141424 18px,#141424 36px);color:#fff;text-align:center;font-weight:800;letter-spacing:.06em;padding:10px 12px;font-size:14px;text-shadow:0 1px 4px #000}
-.staging-banner span{background:#141424;padding:4px 12px;border-radius:999px;border:2px solid #ff9a00}
 
 /* header / nav */
 header.site{position:sticky;top:0;z-index:50;background:rgba(11,11,20,.94);border-bottom:1px solid var(--line);backdrop-filter:blur(6px)}
@@ -185,8 +182,6 @@ section h2{border-bottom:3px solid transparent;border-image:linear-gradient(90de
 /* cassette: stronger RGB glow ring */
 .cassette{box-shadow:0 0 0 2px var(--pink),0 0 42px rgba(255,45,149,.4),0 0 70px rgba(0,229,255,.25),0 0 100px rgba(124,77,255,.2)}
 
-/* staging banner slides */
-.staging-banner{animation:bannerSlide 3s linear infinite}
 
 /* vaporwave horizon glow at the very bottom */
 footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 70%,rgba(255,45,149,.16))}

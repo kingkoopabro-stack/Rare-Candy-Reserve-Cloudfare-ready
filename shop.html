@@ -31,7 +31,7 @@
 <main class="wrap">
   <div class="kicker">The shop</div>
   <h1>Cards, comics, <span class="grad-text">collectibles &amp; more.</span></h1>
-  <p style="color:var(--muted)">The full storefront is coming online as we finish moving off third-party marketplaces. Click any item for its own detail view — every item has 3 photos (placeholders until real photos are uploaded).</p>
+  <p style="color:var(--muted)">Cards, comics, and collectibles — professional stock only. Click any item for its own detail view.</p>
 
   <div id="detailView" style="display:none"></div>
 
@@ -41,15 +41,9 @@
   </section>
 
   <section id="catalogSection">
-    <h2>Full catalog — <span class="grad-text">14 live listings.</span></h2>
-    <p style="color:var(--muted)">Every live listing from the shop's eBay inventory, on the site at the same prices. <b style="color:var(--ink)">14 live listings · $662.97 total list value</b> (eBay's total: Beholder counted at its $60 top variation, extender both styles $36). Gengar and Rayquaza are out of stock and not counted. Click any item for its detail view.</p>
+    <h2>Full catalog — <span class="grad-text">collectibles only.</span></h2>
+    <p style="color:var(--muted)">Live collectible listings from the shop's eBay inventory, on the site at the same prices. Gengar, Grovyle, and Rayquaza are sold out and not for sale. Click any item for its detail view.</p>
     <div class="grid" id="catalogGrid"></div>
-    <div class="note" style="margin-top:16px">Photos are placeholders for now — eBay blocked the image pull for all 16 listings, so upload photos via the Drive folder or chat (3 per item). Killer Klown photos already exist in the workspace and can be wired in first.</div>
-  </section>
-
-  <section>
-    <h2>More stock, <span class="grad-text">loading soon.</span></h2>
-    <div class="grid" id="soonGrid"></div>
   </section>
 
   <section>
@@ -102,10 +96,8 @@
     <div id="checkoutBox" style="display:none">
       <div class="note stripe">
         <b>⚠ CHECKOUT IS NOT CONNECTED YET.</b><br>
-        The publishable key in this file is <code>pk_test_REPLACE_WITH_REAL_PUBLISHABLE_KEY</code> — it is a placeholder, not a real key. No card is charged here.
-        At launch, checkout runs on Stripe and Square (Phase 1: static site + payment links — no backend needed).
-        Until Stripe and Square are connected, orders route to Contact and Cash App / BTC stay available as manual options.
-        <b>Real payments cannot work until Ash provides his real Stripe publishable key (and Square is connected).</b>
+        Checkout runs on Stripe and Square (static site + payment links — no backend needed).
+        Until payment links are wired, orders route to Contact and Cash App / BTC stay available as manual options. No card is charged here.
       </div>
       <p style="margin-top:14px"><button class="btn" disabled>Pay with Stripe or Square — disabled — checkout not connected yet</button></p>
       <form onsubmit="return submitOrder(event)" style="margin-top:16px">
@@ -124,7 +116,7 @@
     <div class="note">
       <b>Payment methods at launch:</b> Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
       Checkout runs on Stripe and Square at launch (Phase 1: static site + payment links — no backend needed to start). Cash App and BTC stay available as manual options.<br>
-      <b>Cart items route to Contact until Stripe and Square are connected.</b>
+      <b>Cart items route to Contact until payment links are wired.</b>
     </div>
   </section>
 </main>

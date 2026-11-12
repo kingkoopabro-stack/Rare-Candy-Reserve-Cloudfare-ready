@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Developer Console — Rare Candy Reserve (STAGING)</title>
+<meta name="description" content="Owner console — update inventory, prices, SKUs, stock and photos, then export to the repo. STAGING PREVIEW, not live.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="console">
+
+<div class="staging-banner"><span>⚠ STAGING PREVIEW — NOT LIVE · NOT A REAL STORE YET · DO NOT SHARE CHECKOUT LINKS ⚠</span></div>
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">🛠 Owner tools · Staging only</div>
+    <h1>Developer <span class="grad-text">Console</span>.</h1>
+    <p class="lede">Update inventory fast — prices, SKUs, stock, photos — then export and push to the repo. Edits save to <b>this browser only</b> until you export them.</p>
+  </div>
+
+  <div class="note stripe" style="margin-top:22px">
+    <b>How this works (v1):</b> every change below is stored in this browser's localStorage and shows up in the console + preview right away.
+    It does <b>not</b> change the live site or rewrite site.js on disk. To go live: hit <b>Export catalog JSON</b> (or <b>Export site.js snippet</b>), then push that file to the repo.
+    Photos are downscaled to 800px JPEG before saving — browser storage is limited (~5MB), so keep uploads small. VCR Special flags feed the VCR Coin staking rewards on the home page.
+  </div>
+  <p id="consoleMsg" style="color:var(--green);font-weight:800;min-height:1.4em"></p>
+
+  <section>
+    <div class="kicker">Preview</div>
+    <h2>See it like a <span class="grad-text">visitor</span> would.</h2>
+    <p style="color:var(--muted)">The first 4 console items, rendered exactly like the shop renders them. Switch the dropdown to check the mobile layout — the preview is shrunk to fit the console.</p>
+    <p>
+      <label for="consolePreviewMode" style="display:inline-block;margin:0 8px 0 0">Preview size</label>
+      <select id="consolePreviewMode" style="width:auto;display:inline-block;min-width:260px">
+        <option value="desktop">💻 Desktop — 1000px wide</option>
+        <option value="mobile">📱 Mobile — 390px wide</option>
+      </select>
+    </p>
+    <div class="console-preview-wrap" id="consolePreviewWrap">
+      <div class="console-preview-inner" id="consolePreviewInner"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Add an item</div>
+    <h2>Add a <span class="grad-text">new item</span>.</h2>
+    <div class="card">
+      <form id="consoleAddForm">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0 16px">
+          <div>
+            <label for="newName">Name *</label>
+            <input id="newName" placeholder="e.g. CGC 9 Charizard ex">
+          </div>
+          <div>
+            <label for="newTag">Tag</label>
+            <input id="newTag" placeholder="e.g. Graded Card · CGC 9">
+          </div>
+          <div>
+            <label for="newPrice">Price ($)</label>
+            <input id="newPrice" type="number" step="0.01" min="0" placeholder="e.g. 24.99">
+          </div>
+          <div>
+            <label for="newSku">SKU</label>
+            <input id="newSku" placeholder="e.g. RCR-001">
+          </div>
+          <div>
+            <label for="newStock">Stock (qty)</label>
+            <input id="newStock" type="number" step="1" min="0" placeholder="e.g. 3">
+          </div>
+          <div>
+            <label for="newImgSrc">Image source — repo path or Drive link</label>
+            <input id="newImgSrc" placeholder="images/… or https://drive.google.com/…">
+          </div>
+        </div>
+        <label for="newPhoto">Photo (optional — downscaled to 800px)</label>
+        <input id="newPhoto" type="file" accept="image/*">
+        <p style="margin-top:16px"><button class="btn" type="submit">+ Add item to console</button></p>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Bulk add — when you're rushing</div>
+    <h2>Add <span class="grad-text">several at once</span>.</h2>
+    <p style="color:var(--muted)">Pick multiple photos at once — a quick row appears for each one with its own name, price, SKU and stock. Fill in what you know, then hit <b>Add all</b> and they all land in the console together. Same as the single form: saved in this browser only until you export.</p>
+    <div class="card">
+      <label for="consoleBulkFiles">Photos — select as many as you like</label>
+      <input id="consoleBulkFiles" type="file" accept="image/*" multiple>
+      <div id="consoleBulkRows" style="margin-top:14px"></div>
+      <p style="margin-top:14px"><button class="btn" id="consoleBulkAdd" disabled>+ Add all to console</button>
+      <span id="consoleBulkMsg" style="color:var(--green);font-weight:700;margin-left:10px"></span></p>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Inventory</div>
+    <h2>Edit the <span class="grad-text">catalog</span>.</h2>
+    <p style="color:var(--muted)"><span id="consoleCount"></span> — change a field and it saves automatically. <b>Image source</b> takes a repo path like <code>images/my-photo.jpg</code> or a Google Drive share link (shown as a thumbnail in the preview). The <b>photo upload</b> replaces the photo for this browser only. Tick <b>VCR Special</b> to make an item a VCR Coin special (15% off in the cart once a visitor unlocks specials).</p>
+    <p>
+      <input id="consoleSearch" type="search" placeholder="🔍 Search by name, tag, id or SKU…" style="max-width:420px">
+    </p>
+    <p>
+      <button class="btn" id="consoleExportJson">⬇ Export catalog JSON</button>
+      <button class="btn ghost" id="consoleExportSnippet">⬇ Export site.js snippet</button>
+      <button class="btn ghost" id="consoleResetAll" style="border-color:var(--pink);color:var(--pink)">Reset all console edits</button>
+    </p>
+    <div style="overflow-x:auto">
+      <table class="console-table">
+        <thead>
+          <tr>
+            <th>Item</th><th>Price ($)</th><th>SKU</th><th>Stock</th><th>Image source</th><th>Photo upload</th><th>VCR Special</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="consoleTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe &amp; Square (live at launch) · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved. · STAGING PREVIEW — not the live site. Nothing here charges a card.</p>
+    <p style="font-size:12px"><a href="console.html">🛠 Developer Console</a> · owner tools — inventory, check-ins &amp; VCR Coin</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+<script src="assets/js/vcr.js"></script>
+<script src="assets/js/console.js"></script>
+</body>
+</html>

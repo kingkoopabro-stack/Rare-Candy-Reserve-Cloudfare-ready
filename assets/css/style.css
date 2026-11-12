@@ -198,6 +198,13 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .studio-spot img{display:block;width:100%;border-radius:10px}
 .studio-spot figcaption{padding:10px 12px 12px;font-size:13px;font-weight:700;color:var(--muted);text-align:center;background:#0b0b14}
 
+/* Podcast neon sign — Whats the alternative? (Episode 1 push, 2026-11-12) */
+.neon-sign{margin:26px auto 0;max-width:760px;border-radius:18px;padding:6px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.55),0 0 44px rgba(0,229,255,.3);animation:neonPulse 3s ease-in-out infinite}
+.sign-inner{background:#0b0b14;border-radius:14px;padding:26px 18px;text-align:center}
+.sign-text{display:block;font-size:clamp(28px,5vw,44px);font-weight:900;letter-spacing:.02em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sign-sub{display:block;margin-top:10px;font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ep-player audio{width:100%;outline:none}
+
 /* Podcast episode cards */
 .ep-coming{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#0b0b14;background:var(--grad);border-radius:999px;padding:5px 12px;box-shadow:0 0 14px rgba(255,45,149,.5)}
 .ep-player{margin-top:14px;background:#05050c;border:1px solid var(--line);border-radius:12px;padding:18px 16px;text-align:center;color:var(--muted)}

@@ -4,8 +4,27 @@
    { title, file, note }. Files live in site/audio/.
    ============================================================ */
 const TRACKS = [
-  { title: "Sunk for you",               file: "audio/Sunk%20for%20you.mp3",                note: "End of the year" },
-  { title: "Introduction to heartbreak",   file: "audio/Introduction%20to%20heartbreak.mp3",  note: "" },
+  { title: "Break habits, not hearts", file: "audio/01%20-%20Break%20habits%2C%20not%20hearts.mp3", note: "End of the year" },
+  { title: "Untold weapons", file: "audio/02%20-%20Untold%20weapons.mp3", note: "End of the year" },
+  { title: "Voice inside my head original", file: "audio/03%20-%20Voice%20inside%20my%20head%20original.mp3", note: "End of the year" },
+  { title: "Sunk for you", file: "audio/04%20-%20Sunk%20for%20you.mp3", note: "End of the year" },
+  { title: "I'll prove everything", file: "audio/05%20-%20I%27ll%20prove%20everything.mp3", note: "End of the year" },
+  { title: "Mr.Selfish", file: "audio/06%20-%20Mr.Selfish.mp3", note: "End of the year" },
+  { title: "Sweet BBgirl", file: "audio/07%20-%20Sweet%20BBgirl.mp3", note: "End of the year" },
+  { title: "Let's Travel", file: "audio/08%20-%20Let%27s%20Travel.mp3", note: "End of the year" },
+  { title: "Straight to pieces", file: "audio/09%20-%20Straight%20to%20pieces.mp3", note: "End of the year" },
+  { title: "The day she came to be", file: "audio/10%20-%20The%20day%20she%20came%20to%20be.mp3", note: "End of the year" },
+  { title: "Djentlemen Thief", file: "audio/11%20-%20Djentlemen%20Thief.mp3", note: "End of the year" },
+  { title: "Guess how it ends", file: "audio/12%20-%20Guess%20how%20it%20ends.mp3", note: "End of the year" },
+  { title: "On top of it Feat. Chest Club", file: "audio/13%20-%20On%20top%20of%20it%20Feat.%20Chest%20Club.mp3", note: "End of the year" },
+  { title: "Monster in disguise", file: "audio/14%20-%20Monster%20in%20disguise.mp3", note: "End of the year" },
+  { title: "Stay until sunrise", file: "audio/15%20-%20Stay%20until%20sunrise.mp3", note: "End of the year" },
+  { title: "Read between the lines", file: "audio/16%20-%20Read%20between%20the%20lines.mp3", note: "End of the year" },
+  { title: "Introduction to heartache", file: "audio/17%20-%20Introduction%20to%20heartache.mp3", note: "End of the year" },
+  { title: "We will meet again I swear", file: "audio/18%20-%20We%20will%20meet%20again%20I%20swear.mp3", note: "End of the year" },
+  { title: "Dance till they drop", file: "audio/19%20-%20Dance%20till%20they%20drop.mp3", note: "End of the year" },
+  { title: "Aiming to tease part 2", file: "audio/20%20-%20Aiming%20to%20tease%20part%202.mp3", note: "End of the year" },
+  { title: "Give them the world", file: "audio/21%20-%20Give%20them%20the%20world.mp3", note: "End of the year" },
 ];
 const COVER_ART = "images/end-of-the-year-cover.jpg";
 

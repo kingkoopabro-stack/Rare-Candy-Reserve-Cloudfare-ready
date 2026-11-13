@@ -46,33 +46,36 @@
 
   <section>
     <div class="kicker">On air now</div>
-    <h2>Press play — <span class="grad-text">the rotation is live.</span></h2>
-    <p style="color:var(--muted)">A steady heart on rotation, 24/7. New approved tracks from the chill area join the rotation as they come in. The album “End of the year” — 21 tracks — is pending a fix with the distributor, so the full album joins the rotation once it’s out.</p>
-    <div class="cassette" id="cassette">
-      <div class="tape-window">
-        <div class="reels">
-          <div class="reel"></div>
-          <div class="label">
-            <img id="coverArt" src="images/end-of-the-year-cover.jpg" alt="End of the year — album artwork">
-            <div class="t-title" id="nowTitle">Sunk for you</div>
-            <div class="t-note" id="nowNote">End of the year</div>
-          </div>
-          <div class="reel"></div>
+    <h2>Press play — <span class="grad-text">a taste of the station.</span></h2>
+    <p style="color:var(--muted)">DJ Slabb introduces the songs, reads the sponsor spots, and keeps it like a talk show mixed with radio. This is a short loop — a taste. The full 24/7 broadcast is live below, and the full album “End of the year” (21 tracks) is on the music page.</p>
+    <div class="vnr-brand">VNR</div>
+    <div class="vnr-brand-sub">Vita Nova Radio · 24/7 · A taste of the station</div>
+    <div class="vnr-radio" id="vnrRadio">
+      <div class="vnr-dial">
+        <div class="vnr-dial-scale"><span>88</span><span>92</span><span>98</span><span>104</span><span>108</span></div>
+        <div class="vnr-needle" id="vnrNeedle"></div>
+        <div class="vnr-dial-label">Vita Nova Radio · FM</div>
+      </div>
+      <div class="vnr-toprow">
+        <span class="vnr-station">📻 VNR on air</span>
+        <span class="vnr-onair" id="vnrOnAir">● ON AIR</span>
+      </div>
+      <div class="vnr-mid">
+        <div class="vnr-grille" aria-hidden="true"></div>
+        <div class="vnr-display">
+          <div class="vnr-now" id="vnrNow">Press play for a taste of the station</div>
+          <div class="vnr-sub" id="vnrSub">DJ Slabb · A Steady Heart · Vita Nova Records</div>
         </div>
       </div>
-      <div class="transport">
-        <button class="t-btn small" type="button" onclick="prevTrack()" aria-label="Previous track">⏮</button>
-        <button class="t-btn" type="button" id="playBtn" onclick="togglePlay()" aria-label="Play or pause">▶</button>
-        <button class="t-btn small" type="button" onclick="nextTrack()" aria-label="Next track">⏭</button>
+      <div class="vnr-controls">
+        <button class="vnr-play" type="button" id="vnrPlayBtn" onclick="vnrToggle()" aria-label="Play or pause">▶</button>
+        <input type="range" class="vnr-seek" id="vnrSeek" min="0" max="674" value="0" step="1" aria-label="Seek">
+        <div class="vnr-time"><span id="vnrCur">0:00</span> / <span id="vnrTot">11:14</span></div>
       </div>
-      <div class="progress">
-        <input type="range" id="seekBar" min="0" max="100" value="0" step="1" aria-label="Seek">
-        <div class="time-row"><span id="timeCur">0:00</span><span id="timeTot">0:00</span></div>
-      </div>
-      <div class="tracklist" id="trackList"></div>
-      <p id="playerMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
+      <p class="vnr-note">A taste of the station — DJ intros, songs, a sponsor spot, and a thank-you, on repeat. <a href="https://radio.rarecandyreserve.org/vitanova" target="_blank" rel="noopener">Tune in live, 24/7 →</a></p>
+      <p id="vnrMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
     </div>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">The full album — all 21 tracks from “End of the year”. Tap a track to play it.</p>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">The full album — all 21 tracks from “End of the year” — is on the <a href="music.html">music page</a>.</p>
   </section>
 
   <section>
@@ -201,7 +204,7 @@
 </footer>
 
 <script src="assets/js/site.js"></script>
-<script src="assets/js/player.js"></script>
+<script src="assets/js/vnr-radio.js"></script>
 <script>
 /* Radio page — DJ greeting by local time + live stream hookup */
 (function(){

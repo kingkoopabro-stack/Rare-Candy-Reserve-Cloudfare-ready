@@ -42,31 +42,60 @@
   </div>
 
   <section>
-    <div class="cassette" id="cassette">
-      <div class="tape-window">
-        <div class="reels">
-          <div class="reel"></div>
-          <div class="label">
-            <img id="coverArt" src="images/end-of-the-year-cover.jpg" alt="End of the year — album artwork">
-            <div class="t-title" id="nowTitle">Sunk for you</div>
-            <div class="t-note" id="nowNote">End of the year</div>
-          </div>
-          <div class="reel"></div>
+    <div class="vnr-brand">VNR</div>
+    <div class="vnr-brand-sub">Vita Nova Radio · 24/7 · A taste of the station</div>
+    <div class="vnr-radio" id="vnrRadio">
+      <div class="vnr-dial">
+        <div class="vnr-dial-scale"><span>88</span><span>92</span><span>98</span><span>104</span><span>108</span></div>
+        <div class="vnr-needle" id="vnrNeedle"></div>
+        <div class="vnr-dial-label">Vita Nova Radio · FM</div>
+      </div>
+      <div class="vnr-toprow">
+        <span class="vnr-station">📻 VNR on air</span>
+        <span class="vnr-onair" id="vnrOnAir">● ON AIR</span>
+      </div>
+      <div class="vnr-mid">
+        <div class="vnr-grille" aria-hidden="true"></div>
+        <div class="vnr-display">
+          <div class="vnr-now" id="vnrNow">Press play for a taste of the station</div>
+          <div class="vnr-sub" id="vnrSub">DJ Slabb · A Steady Heart · Vita Nova Records</div>
         </div>
       </div>
-      <div class="transport">
-        <button class="t-btn small" type="button" onclick="prevTrack()" aria-label="Previous track">⏮</button>
-        <button class="t-btn" type="button" id="playBtn" onclick="togglePlay()" aria-label="Play or pause">▶</button>
-        <button class="t-btn small" type="button" onclick="nextTrack()" aria-label="Next track">⏭</button>
+      <div class="vnr-controls">
+        <button class="vnr-play" type="button" id="vnrPlayBtn" onclick="vnrToggle()" aria-label="Play or pause">▶</button>
+        <input type="range" class="vnr-seek" id="vnrSeek" min="0" max="674" value="0" step="1" aria-label="Seek">
+        <div class="vnr-time"><span id="vnrCur">0:00</span> / <span id="vnrTot">11:14</span></div>
       </div>
-      <div class="progress">
-        <input type="range" id="seekBar" min="0" max="100" value="0" step="1" aria-label="Seek">
-        <div class="time-row"><span id="timeCur">0:00</span><span id="timeTot">0:00</span></div>
-      </div>
-      <div class="tracklist" id="trackList"></div>
-      <p id="playerMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
+      <p class="vnr-note">A taste of the station — DJ intros, songs, a sponsor spot, and a thank-you, on repeat. <a href="https://radio.rarecandyreserve.org/vitanova" target="_blank" rel="noopener">Tune in live, 24/7 →</a></p>
+      <p id="vnrMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
     </div>
-    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">The full album — all 21 tracks from “End of the year”. Tap a track to play it.</p>
+    <div class="vnr-album-list">
+      <div class="kicker">Full album — End of the year</div>
+      <p style="color:var(--muted);font-size:14px">All 21 tracks. Tap a title to play it.</p>
+      <ol>
+        <li><a href="audio/01%20-%20Break%20habits%2C%20not%20hearts.mp3">Break habits, not hearts</a></li>
+        <li><a href="audio/02%20-%20Untold%20weapons.mp3">Untold weapons</a></li>
+        <li><a href="audio/03%20-%20Voice%20inside%20my%20head%20original.mp3">Voice inside my head original</a></li>
+        <li><a href="audio/04%20-%20Sunk%20for%20you.mp3">Sunk for you</a></li>
+        <li><a href="audio/05%20-%20I%27ll%20prove%20everything.mp3">I'll prove everything</a></li>
+        <li><a href="audio/06%20-%20Mr.Selfish.mp3">Mr.Selfish</a></li>
+        <li><a href="audio/07%20-%20Sweet%20BBgirl.mp3">Sweet BBgirl</a></li>
+        <li><a href="audio/08%20-%20Let%27s%20Travel.mp3">Let's Travel</a></li>
+        <li><a href="audio/09%20-%20Straight%20to%20pieces.mp3">Straight to pieces</a></li>
+        <li><a href="audio/10%20-%20The%20day%20she%20came%20to%20be.mp3">The day she came to be</a></li>
+        <li><a href="audio/11%20-%20Djentlemen%20Thief.mp3">Djentlemen Thief</a></li>
+        <li><a href="audio/12%20-%20Guess%20how%20it%20ends.mp3">Guess how it ends</a></li>
+        <li><a href="audio/13%20-%20On%20top%20of%20it%20Feat.%20Chest%20Club.mp3">On top of it Feat. Chest Club</a></li>
+        <li><a href="audio/14%20-%20Monster%20in%20disguise.mp3">Monster in disguise</a></li>
+        <li><a href="audio/15%20-%20Stay%20until%20sunrise.mp3">Stay until sunrise</a></li>
+        <li><a href="audio/16%20-%20Read%20between%20the%20lines.mp3">Read between the lines</a></li>
+        <li><a href="audio/17%20-%20Introduction%20to%20heartache.mp3">Introduction to heartache</a></li>
+        <li><a href="audio/18%20-%20We%20will%20meet%20again%20I%20swear.mp3">We will meet again I swear</a></li>
+        <li><a href="audio/19%20-%20Dance%20till%20they%20drop.mp3">Dance till they drop</a></li>
+        <li><a href="audio/20%20-%20Aiming%20to%20tease%20part%202.mp3">Aiming to tease part 2</a></li>
+        <li><a href="audio/21%20-%20Give%20them%20the%20world.mp3">Give them the world</a></li>
+      </ol>
+    </div>
   </section>
 
   <section>
@@ -89,6 +118,6 @@
 </footer>
 
 <script src="assets/js/site.js"></script>
-<script src="assets/js/player.js"></script>
+<script src="assets/js/vnr-radio.js"></script>
 </body>
 </html>

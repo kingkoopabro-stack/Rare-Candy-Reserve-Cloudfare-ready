@@ -213,3 +213,34 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .ep-coming{display:inline-block;font-size:12px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#0b0b14;background:var(--grad);border-radius:999px;padding:5px 12px;box-shadow:0 0 14px rgba(255,45,149,.5)}
 .ep-player{margin-top:14px;background:#05050c;border:1px solid var(--line);border-radius:12px;padding:18px 16px;text-align:center;color:var(--muted)}
 .ep-player .play-dot{width:54px;height:54px;border-radius:50%;margin:0 auto 10px;background:var(--grad);color:#0b0b14;font-size:22px;font-weight:900;display:flex;align-items:center;justify-content:center;opacity:.55;box-shadow:0 0 18px rgba(0,229,255,.4)}
+
+/* VNR old-school radio — the station loop player (music + radio pages) */
+.vnr-brand{text-align:center;font-weight:900;font-size:clamp(44px,9vw,84px);letter-spacing:.08em;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 34px rgba(255,45,149,.35);margin:6px 0 2px}
+.vnr-brand-sub{text-align:center;font-size:12px;font-weight:800;letter-spacing:.34em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.vnr-radio{max-width:640px;margin:0 auto;background:linear-gradient(160deg,#7a4a26,#5a3016 55%,#3e2008);border:3px solid #2a1503;border-radius:22px;padding:20px 20px 16px;box-shadow:0 0 0 2px #c98a4b,0 0 42px rgba(255,154,0,.35),0 0 70px rgba(255,45,149,.18),inset 0 2px 0 rgba(255,255,255,.18)}
+.vnr-dial{position:relative;background:linear-gradient(180deg,#fdf3d0,#f3e2a8);border:2px solid #2a1503;border-radius:12px;padding:12px 14px 8px;color:#3a2408}
+.vnr-dial-scale{display:flex;justify-content:space-between;font-weight:900;font-size:13px;letter-spacing:.08em}
+.vnr-dial-label{text-align:center;font-size:11px;font-weight:800;letter-spacing:.28em;text-transform:uppercase;margin-top:4px}
+.vnr-needle{position:absolute;top:6px;bottom:22px;width:3px;background:#d21f3c;border-radius:2px;left:2%;box-shadow:0 0 8px rgba(210,31,60,.8);transition:left .3s linear}
+.vnr-toprow{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.vnr-onair{font-weight:900;font-size:13px;letter-spacing:.22em;color:#8a6a4a;background:#2a1503;border-radius:999px;padding:6px 12px}
+.vnr-onair.lit{color:#fff;background:#c1121f;box-shadow:0 0 16px rgba(255,40,60,.9);animation:neonPulse 1.4s ease-in-out infinite}
+.vnr-station{font-weight:900;font-size:14px;letter-spacing:.14em;color:#ffd9a0;text-transform:uppercase}
+.vnr-mid{display:flex;gap:14px;margin-top:14px;align-items:stretch}
+.vnr-grille{flex:0 0 96px;border-radius:12px;border:2px solid #2a1503;background:radial-gradient(circle at 50% 50%,#3a2408 2px,transparent 2.5px) 0 0/14px 14px,#6b4423}
+.vnr-display{flex:1;background:#120a04;border:2px solid #2a1503;border-radius:12px;padding:14px 16px;min-width:0}
+.vnr-now{font-weight:900;font-size:18px;color:#ffd166;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vnr-sub{font-size:13px;color:#e8c98a;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vnr-controls{display:flex;gap:12px;align-items:center;margin-top:16px}
+.vnr-play{flex:none;width:58px;height:58px;border-radius:50%;border:3px solid #2a1503;background:radial-gradient(circle at 35% 30%,#ffe9b0,#e8a33d 60%,#9a5f14);color:#2a1503;font-size:22px;font-weight:900;cursor:pointer;box-shadow:0 3px 0 #2a1503,0 0 18px rgba(255,154,0,.5)}
+.vnr-play:active{transform:translateY(2px);box-shadow:0 1px 0 #2a1503}
+.vnr-seek{flex:1;accent-color:#ff9a00}
+.vnr-time{flex:none;font-size:13px;font-weight:800;color:#ffd9a0;white-space:nowrap}
+.vnr-note{margin-top:14px;text-align:center;color:#f3d9ae;font-size:13px}
+.vnr-note a{color:#7fe7ff}
+.vnr-album-list{max-width:640px;margin:26px auto 0;text-align:left}
+.vnr-album-list ol{margin:10px 0 0;padding-left:22px;color:var(--ink)}
+.vnr-album-list li{margin:5px 0}
+.vnr-album-list a{color:var(--ink);text-decoration:none}
+.vnr-album-list a:hover{color:var(--cyan)}
+@media(max-width:640px){.vnr-grille{flex-basis:64px}.vnr-now{font-size:16px}}

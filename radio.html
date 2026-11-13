@@ -6,6 +6,23 @@
 <title>VITA NOVA RADIO — 24/7 · Rare Candy Reserve</title>
 <meta name="description" content="VITA NOVA RADIO — the 24/7 station from Vita Nova Records. A steady heart on rotation, podcasts to listen to and make, a chill area to submit music, and a place to host and be heard, learn and teach.">
 <link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* Live visualizer — listeners see visuals, not just a play bar */
+.live-viz{max-width:760px;margin:0 auto;border-radius:16px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.5),0 0 44px rgba(0,229,255,.3)}
+.live-viz-inner{background:#0b0b14;border-radius:12px;padding:16px}
+.live-viz canvas{display:block;width:100%;height:120px;border-radius:8px;background:#05050a}
+.live-now{font-size:20px;font-weight:900;text-align:center;margin-top:12px}
+.live-now small{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-top:4px}
+.live-djmsg{text-align:center;font-weight:800;color:var(--ink);margin-top:10px;min-height:22px}
+.live-ticker{overflow:hidden;white-space:nowrap;margin-top:12px;border-top:1px solid #fff2;border-bottom:1px solid #fff2;padding:8px 0}
+.live-ticker span{display:inline-block;padding-left:100%;animation:liveTick 28s linear infinite;font-weight:800;color:var(--muted)}
+@keyframes liveTick{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+.live-badge{display:inline-flex;align-items:center;gap:8px;font-weight:900;font-size:14px;letter-spacing:.08em;border-radius:999px;padding:6px 14px;border:2px solid #fff2;color:var(--muted)}
+.live-badge .dot{width:12px;height:12px;border-radius:50%;background:#555}
+.live-badge.on{color:#ff2d55;border-color:#ff2d55}
+.live-badge.on .dot{background:#ff2d55;animation:liveBlink 1.1s ease-in-out infinite}
+@keyframes liveBlink{0%,100%{opacity:1;box-shadow:0 0 8px #ff2d55}50%{opacity:.35;box-shadow:0 0 2px #ff2d55}}
+</style>
 </head>
 <body data-page="radio">
 
@@ -186,10 +203,17 @@
   <section>
     <div class="kicker">📡 Tune in live — VNR on air</div>
     <h2>Listen live, <span class="grad-text">right here.</span></h2>
-    <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play to tune in to VNR on air, 24/7.</p>
-    <div class="card" style="max-width:640px;margin:0 auto">
-      <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%"></audio>
-      <p id="liveMsg" style="color:var(--muted);font-size:13px">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
+    <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play and you get the visuals, the song, and the ticker — right here, no other page.</p>
+    <div class="live-viz">
+      <div class="live-viz-inner">
+        <canvas id="liveViz" width="720" height="120" aria-label="Live audio visualizer"></canvas>
+        <div style="text-align:center;margin-top:12px"><span class="live-badge" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">OFF AIR</span></span></div>
+        <div class="live-now">VITA NOVA RADIO — Live<small id="liveNowSub">DJ Slabb · A Steady Heart · Vita Nova Records</small></div>
+        <div class="live-djmsg" id="liveDjMsg">Tune in — the station is live, 24/7.</div>
+        <div class="live-ticker"><span>thank you for listening to Vita Nova Radio! 🎙️ VITA NOVA RADIO — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly · 👕 ASH SUPPLY CO. — first drop coming · 💿 “End of the year” — 21 tracks · 📻 Requests open — send yours in ·</span></div>
+        <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%;margin-top:14px"></audio>
+        <p id="liveMsg" style="color:var(--muted);font-size:13px;text-align:center">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
+      </div>
     </div>
   </section>
 </main>
@@ -217,6 +241,104 @@
     else if(h >= 18 && h < 23) g.textContent = "Good evening — Slabb here, settling in for the night shift on Vita Nova Radio.";
     else g.textContent = "Late night — Slabb here, keeping you company on Vita Nova Radio.";
   }
+})();
+
+/* Live visualizer — bars from the live audio, procedural fallback if the stream is cross-origin-blocked */
+(function(){
+  var audio = document.getElementById("liveAudio");
+  var canvas = document.getElementById("liveViz");
+  if(!audio || !canvas) return;
+  var ctx = canvas.getContext("2d");
+  var W = canvas.width, H = canvas.height;
+  var analyser = null, data = null, actx = null, live = false, t0 = Date.now();
+  function setup(){
+    if(actx) return;
+    try{
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      var src = actx.createMediaElementSource(audio);
+      analyser = actx.createAnalyser();
+      analyser.fftSize = 128;
+      data = new Uint8Array(analyser.frequencyBinCount);
+      src.connect(analyser);
+      analyser.connect(actx.destination);
+      live = true;
+    }catch(e){ live = false; }
+  }
+  audio.addEventListener("play", function(){
+    setup();
+    if(actx && actx.state === "suspended") actx.resume();
+  });
+  function draw(){
+    requestAnimationFrame(draw);
+    ctx.clearRect(0, 0, W, H);
+    var bars = 48, bw = W / bars, vals = [], i, v;
+    var playing = !audio.paused && !audio.ended;
+    if(live && analyser && playing){
+      analyser.getByteFrequencyData(data);
+      var sum = 0;
+      for(i = 0; i < data.length; i++) sum += data[i];
+      if(sum > 0){
+        for(i = 0; i < bars; i++){
+          v = data[Math.floor(i * data.length / bars)] / 255;
+          vals.push(v);
+        }
+      }
+    }
+    if(vals.length === 0){
+      /* Procedural fallback — bars dance when playing, settle when paused */
+      var t = (Date.now() - t0) / 1000;
+      for(i = 0; i < bars; i++){
+        v = playing ? (0.25 + 0.55 * Math.abs(Math.sin(t * 2.2 + i * 0.55)) * Math.abs(Math.sin(t * 0.9 + i * 0.21))) : 0.06;
+        vals.push(v);
+      }
+    }
+    for(i = 0; i < bars; i++){
+      var h = Math.max(3, vals[i] * (H - 8));
+      var x = i * bw + 1, y = H - h;
+      var grad = ctx.createLinearGradient(0, H, 0, 0);
+      grad.addColorStop(0, "#00e5ff"); grad.addColorStop(0.55, "#7c4dff"); grad.addColorStop(1, "#ff2d95");
+      ctx.fillStyle = grad;
+      ctx.fillRect(x, y, bw - 2, h);
+    }
+  }
+  draw();
+
+  /* LIVE badge — red blinking dot when the stream is connected and playing, OFF AIR when it is not */
+  var badge = document.getElementById("liveBadge");
+  var badgeText = document.getElementById("liveBadgeText");
+  var lastTime = -1, lastAdvance = Date.now();
+  function setLive(on){
+    if(!badge) return;
+    badge.classList.toggle("on", !!on);
+    if(badgeText) badgeText.textContent = on ? "LIVE" : "OFF AIR";
+  }
+  setLive(false);
+  setInterval(function(){
+    if(!audio) return;
+    var t = audio.currentTime;
+    if(!audio.paused && !audio.ended && audio.readyState > 2){
+      if(t !== lastTime){ lastTime = t; lastAdvance = Date.now(); }
+      setLive(Date.now() - lastAdvance < 5000);
+    } else {
+      setLive(false);
+    }
+  }, 2000);
+  audio.addEventListener("error", function(){ setLive(false); });
+  audio.addEventListener("pause", function(){ setLive(false); });
+
+  /* DJ message — whatever Chris puts in radio-now.txt shows up here, checked every 30s */
+  var msg = document.getElementById("liveDjMsg");
+  function fetchMsg(){
+    if(!msg) return;
+    fetch("radio-now.txt?t=" + Date.now())
+      .then(function(r){ return r.ok ? r.text() : null; })
+      .then(function(t){
+        if(t && t.trim()) msg.textContent = t.trim();
+      })
+      .catch(function(){ /* keep the default message */ });
+  }
+  fetchMsg();
+  setInterval(fetchMsg, 30000);
 })();
 </script>
 </body>

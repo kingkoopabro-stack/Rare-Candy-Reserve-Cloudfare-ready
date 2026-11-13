@@ -65,9 +65,6 @@ const PRODUCTS = [
   {id:"retro-keychain", slug:"retro-keychain", tag:"MINI PRINT · 3D Print", name:"Retro Console Keychain",
    desc:"Miniature handheld consoles, printed to order. Pick your console — Game Boy, GBA SP, DS, Switch, and more.",
    price:12.00, stripe:"https://buy.stripe.com/cNi8wRbbkeb3ali8jo6sw05", ship:"free shipping if bundled · solo: shipping by location", icon:"🎮"},
-  {id:"killer-klown", slug:"killer-klown", tag:"COMPLETE SET · Cosplay", name:"Killer Klown Costume + Ray Gun",
-   desc:"Full mask and costume set, includes the cotton candy ray gun prop.",
-   price:50.00, stripe:"https://buy.stripe.com/bJe7sN93c6IBdxufLQ6sw06", ship:"+ shipping (by location)", icon:"🤡"},
 ];
 /* Live eBay inventory — titles + prices exact (verified 2026-11-06).
    Photos wired from Ash's Drive (drive-photo-map.md, 2026-11-09); Sunflora still has
@@ -89,9 +86,7 @@ const CATALOG = [
    imgs:["images/turok-1.jpg"]},
   {id:"cat-xmen", slug:"xmen-lot", ebay:"168390280510", icon:"❌", tag:"Comic Lot", name:"Marvel X-Men / Mutant 6-comic Starter Collection", price:38.00, stripe:"https://buy.stripe.com/aFa3cx6V46IBfFCbvA6sw0a", img:null,
    imgs:["images/xmen-xforce-1.jpg"]},
-  {id:"cat-sunflora", slug:"sunflora-cgc10", ebay:"168711754988", icon:"🌻", tag:"Graded Card · CGC Pristine 10", name:"2024 Sunflora AR 102/101 CGC Pristine 10", price:27.99, stripe:"https://buy.stripe.com/5kQbJ31AKeb38daarw6sw0b", img:null},
-  {id:"cat-klowns", slug:"killer-klowns", ebay:"168818855550", icon:"🤡", tag:"Cosplay", name:"Spirit Halloween Killer Klowns Costume Adult XL + Cotton Candy Gun", price:140.00, stripe:"https://buy.stripe.com/8x228tfrA0kdaliczE6sw0c", img:null,
-   imgs:["images/killer-klowns-costume-1.jpg"]},
+  {id:"cat-sunflora", slug:"sunflora-cgc10", ebay:"168711754988", icon:"🌻", tag:"Graded Card · CGC Pristine 10", name:"2024 Sunflora AR 102/101 CGC Pristine 10", price:30.00, stripe:"https://buy.stripe.com/5kQbJ31AKeb38daarw6sw0b", img:null},
   {id:"cat-glaceon", slug:"glaceon-vmax", ebay:"168818972853", icon:"❄️", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Glaceon VMAX 041/203 Evolving Skies", price:12.00, stripe:"https://buy.stripe.com/9B67sNbbkeb39heczE6sw0d", img:null,
    imgs:["images/glaceon-vmax-front.jpg"]},
   {id:"cat-rayquaza", slug:"rayquaza-v", ebay:"168818990115", icon:"🐉", tag:"Graded Card · CGC 9", name:"CGC 9 Rayquaza V 107/172 Japanese VSTAR Universe", price:18.00, img:null, outOfStock:true,
@@ -619,6 +614,34 @@ function submitQuote(e){
     "\n\n— Sent from the Rare Candy Reserve custom-order form");
   document.getElementById("quoteMsg").textContent =
     "✓ Your email app should have opened with a draft addressed to the shop (" + SHOP_CONTACT_EMAIL + "). Hit send there to finish. (Recipient address still needs Ash's confirmation.)";
+  return false;
+}
+
+/* ---------- shared form handler (radio / community / nerd pages) ----------
+   One generic handler for every mailto-backed form on the new pages.
+   Fields marked data-req are required (checkboxes must be checked).
+   Gathers every named field into the email body and opens a pre-addressed
+   draft to the shop, the same way the contact + quote forms already do. */
+function submitSiteForm(e, subject){
+  e.preventDefault();
+  const f = e.target;
+  let ok = true;
+  f.querySelectorAll("[data-req]").forEach(el => {
+    const bad = el.type === "checkbox" ? !el.checked : !el.value.trim();
+    el.classList.toggle("err", bad);
+    if(bad) ok = false;
+  });
+  if(!ok) return false;
+  const lines = [];
+  f.querySelectorAll("input,select,textarea").forEach(el => {
+    if(!el.name) return;
+    if(el.type === "checkbox") lines.push(el.name + ": " + (el.checked ? "Yes" : "No"));
+    else if(el.value.trim()) lines.push(el.name + ": " + el.value.trim());
+  });
+  openMailDraft(SHOP_CONTACT_EMAIL, subject,
+    lines.join("\n") + "\n\n— Sent from the Rare Candy Reserve website");
+  const msg = f.querySelector(".form-msg");
+  if(msg) msg.textContent = "✓ Your email app should have opened with a draft addressed to the shop (" + SHOP_CONTACT_EMAIL + "). Hit send there to finish.";
   return false;
 }
 

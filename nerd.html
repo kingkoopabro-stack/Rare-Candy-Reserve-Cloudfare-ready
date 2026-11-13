@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nerd Hub — Games, News &amp; Drops · Rare Candy Reserve</title>
+<meta name="description" content="The Nerd Hub — new games, releases, deals, open source projects, LARP events, and game reviews. First up: a Legend of Zelda review, and a look at Photosyn, the game being built here.">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+/* Nerd Hub — platform badges (brand colors, text badges) */
+.plat-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.plat{display:inline-flex;align-items:center;gap:8px;font-weight:900;font-size:14px;color:#fff;border-radius:999px;padding:9px 16px;text-decoration:none;border:2px solid #fff2}
+.plat small{font-weight:800;opacity:.8;font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.plat-switch{background:#e60012;box-shadow:0 0 14px rgba(230,0,18,.55)}
+.plat-steam{background:#1b2838;box-shadow:0 0 14px rgba(102,192,244,.45)}
+.plat-pc{background:#2a2a44;box-shadow:0 0 14px rgba(124,77,255,.45)}
+.plat-ios{background:#111;box-shadow:0 0 14px rgba(255,255,255,.25)}
+.plat-android{background:#0f3d1e;box-shadow:0 0 14px rgba(61,220,132,.45)}
+.photosyn-cover{max-width:340px;margin:0 auto;border-radius:16px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.5),0 0 44px rgba(0,229,255,.3)}
+.photosyn-cover img{display:block;width:100%;border-radius:12px}
+.photosyn-cover figcaption{padding:10px 12px 12px;font-size:13px;font-weight:700;color:var(--muted);text-align:center;background:#0b0b14;border-radius:0 0 12px 12px}
+</style>
+</head>
+<body data-page="nerd">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">🎮 Nerd Hub · Games &amp; Nerd Culture</div>
+    <h1>New games. <span class="grad-text">Releases. Deals. Drops.</span></h1>
+    <p class="lede">The game and nerd culture corner of Rare Candy Reserve — new games and releases, deals worth your money, open source projects to build on and collab on, LARP and nerd events, and game reviews. Game-drop countdowns are coming soon.</p>
+    <p style="margin-top:18px">
+      <span class="pill">📰 News &amp; releases</span>
+      <span class="pill">💸 Deals</span>
+      <span class="pill">💻 Open source</span>
+      <span class="pill">⚔️ LARP &amp; events</span>
+      <span class="pill">⏳ Drop countdowns — coming soon</span>
+    </p>
+  </div>
+
+  <section>
+    <div class="kicker">⭐ First review</div>
+    <h2>The Legend of Zelda — <span class="grad-text">review coming first.</span></h2>
+    <div class="card" style="max-width:760px;margin:0 auto">
+      <div class="tag">Review · Coming soon</div>
+      <h3 style="margin-top:10px">The new Legend of Zelda game</h3>
+      <p>The first review on this page is the new Legend of Zelda game — Chris is covering it first. The full review, score, and what’s actually worth your time land here when it’s written. No score is posted until he’s played it.</p>
+      <p style="margin-top:14px;color:var(--muted);font-size:14px">Reviews here are honest and in his own words — what’s good, what’s not, and whether it’s worth the money.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🕹️ Up and coming — built here</div>
+    <h2>Photosyn — <span class="grad-text">the game from this shop.</span></h2>
+    <p style="color:var(--muted)">A space-mushroom meteor falls on Shibuya. The Shibuya Bloom spreads — a vine infection, more plant than fungi — and the Bloomed walk the streets. Marche, Aiya, and Bastille fight back with a sword, a handmade revolver, and plant-powered weapons. Turn-based combat with Persona-style flair, a real Tarot system, Resyn magic, and a moral at the center of it: divide friend from foe — peace or violence. Every choice has an effect. Save who you can while you can.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;align-items:start;margin-top:20px">
+      <figure class="photosyn-cover">
+        <img src="images/photosyn-cover-v5.jpg" alt="Photosyn — concept cover: Marche, Aiya, and Bastille">
+        <figcaption>Photosyn — concept cover · M-rated · Early development footage, not final gameplay</figcaption>
+      </figure>
+      <div>
+        <h3 style="margin-top:0">Where it’s headed</h3>
+        <p style="color:var(--muted)">Built in Unreal Engine 5. M-rated, Parasite Eve-style horror with a Ghibli heart and a gruesome story. Shibuya first — open world, revisitable — with crafting, resin magic, and a city you restore by helping people.</p>
+        <div class="plat-row">
+          <span class="plat plat-switch">Nintendo <b>Switch 2</b></span>
+          <span class="plat plat-steam">Steam</span>
+          <span class="plat plat-pc">PC</span>
+          <span class="plat plat-ios">iOS <small>mobile</small></span>
+          <span class="plat plat-android">Android <small>mobile</small></span>
+        </div>
+        <p style="color:var(--muted);font-size:14px">Aiming for Switch 2, Steam / PC, and a scaled-down mobile version for iOS and Android. The cover above is concept art — the final game look is still in development, and the footage shown is early development, not final gameplay.</p>
+        <p style="margin-top:14px"><a class="btn ghost" href="community.html">Talk Photosyn on The Street →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">📰 New games &amp; releases</div>
+    <h2>What’s new. <span class="grad-text">What’s dropping.</span></h2>
+    <p style="color:var(--muted)">New games and releases, curated by the shop — no filler, no reposted press releases. Got a release, a drop, or a game people should know about? Send it in and it gets listed here if it checks out.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Up and coming</div>
+        <h3>Photosyn</h3>
+        <p>The game being built here — Shibuya, the Bloom, and the trio. See the showcase above for the cover and the platforms.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Review first</div>
+        <h3>The Legend of Zelda</h3>
+        <p>The new Zelda game is the first review on this page. Full review coming when Chris has played it.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Submit a release</div>
+        <h3>Got a game to list?</h3>
+        <p>Send the title, the platform, and the release date — if it checks out, it goes up here.</p>
+        <form onsubmit="return submitSiteForm(event, 'Nerd Hub — new game / release submission')">
+          <label>Game title</label>
+          <input name="Game title" data-req placeholder="Game title">
+          <label>Platform(s)</label>
+          <input name="Platforms" data-req placeholder="e.g. Switch 2, Steam, PS5…">
+          <label>Release date (if known)</label>
+          <input name="Release date" placeholder="e.g. 2026-12-01 or “TBA”">
+          <label>Your name + email</label>
+          <input name="Name" data-req placeholder="Your name">
+          <input name="Email" data-req type="email" placeholder="you@example.com" style="margin-top:8px">
+          <p style="margin-top:14px"><button class="btn" type="submit">Submit the release →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+    </div>
+    <p style="color:var(--muted);font-size:14px;margin-top:14px">⏳ <b style="color:var(--ink)">Game-drop countdowns are coming soon</b> — a live countdown to the next big drop, right on this page.</p>
+  </section>
+
+  <section>
+    <div class="kicker">💸 Deals</div>
+    <h2>Deals worth <span class="grad-text">your money.</span></h2>
+    <p style="color:var(--muted)">Real deals on games, cards, and gear — checked before they’re posted, with the actual price and where to get it. No fake “was $99” markups. Spot a deal? Send it in.</p>
+    <div class="card" style="max-width:640px">
+      <div class="tag">Submit a deal</div>
+      <h3 style="margin-top:10px">Found a deal?</h3>
+      <form onsubmit="return submitSiteForm(event, 'Nerd Hub — deal submission')">
+        <label>What’s the deal?</label>
+        <input name="Deal" data-req placeholder="e.g. Game title + store + price">
+        <label>Link to the deal</label>
+        <input name="Deal link" data-req placeholder="https://…">
+        <label>Your name + email</label>
+        <input name="Name" data-req placeholder="Your name">
+        <input name="Email" data-req type="email" placeholder="you@example.com" style="margin-top:8px">
+        <p style="margin-top:14px"><button class="btn" type="submit">Submit the deal →</button></p>
+        <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">💻 Open source &amp; projects</div>
+    <h2>A mini-GitHub <span class="grad-text">for cool projects.</span></h2>
+    <p style="color:var(--muted)">Free downloads and software, and open source projects people can actually build on and collab on — right here on the website. Post a project, find collaborators, and build something together. Photosyn is the first one listed.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Featured project</div>
+        <h3>Photosyn</h3>
+        <p>The game in development here — Unreal Engine 5, Shibuya, the Bloom. Follow the build and talk about it on The Street.</p>
+        <p style="margin-top:14px"><a class="btn ghost" href="community.html">Join the discussion →</a></p>
+      </div>
+      <div class="card">
+        <div class="tag">Submit a project</div>
+        <h3>List your project</h3>
+        <p>Got a cool open source project, a free download, or software people should try? List it here and find collaborators.</p>
+        <form onsubmit="return submitSiteForm(event, 'Nerd Hub — open source project submission')">
+          <label>Project name</label>
+          <input name="Project name" data-req placeholder="Project name">
+          <label>Project link (repo / download)</label>
+          <input name="Project link" data-req placeholder="https://…">
+          <label>What does it do?</label>
+          <textarea name="Description" data-req placeholder="A line or two — what it is, what it needs, how to collab."></textarea>
+          <label>Your name + email</label>
+          <input name="Name" data-req placeholder="Your name">
+          <input name="Email" data-req type="email" placeholder="you@example.com" style="margin-top:8px">
+          <p style="margin-top:14px"><button class="btn" type="submit">List the project →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">⚔️ LARP &amp; events</div>
+    <h2>LARP, events, <span class="grad-text">and meetups.</span></h2>
+    <p style="color:var(--muted)">LARP events, game nights, drops, and nerd meetups — the stuff worth showing up for. Got an event? Send it in with the date, the place, and what it costs (if anything), and it goes up here.</p>
+    <div class="card" style="max-width:640px">
+      <div class="tag">Submit an event</div>
+      <h3 style="margin-top:10px">List a LARP or nerd event</h3>
+      <form onsubmit="return submitSiteForm(event, 'Nerd Hub — LARP / event submission')">
+        <label>Event name</label>
+        <input name="Event name" data-req placeholder="Event name">
+        <label>Date &amp; place</label>
+        <input name="Date and place" data-req placeholder="e.g. Dec 6, 2026 — Starke, FL">
+        <label>What is it?</label>
+        <textarea name="Description" data-req placeholder="LARP, game night, drop, meetup — what happens there?"></textarea>
+        <label>Your name + email</label>
+        <input name="Name" data-req placeholder="Your name">
+        <input name="Email" data-req type="email" placeholder="you@example.com" style="margin-top:8px">
+        <p style="margin-top:14px"><button class="btn" type="submit">Submit the event →</button></p>
+        <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

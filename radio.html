@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VITA NOVA RADIO — 24/7 · Rare Candy Reserve</title>
+<meta name="description" content="VITA NOVA RADIO — the 24/7 station from Vita Nova Records. A steady heart on rotation, podcasts to listen to and make, a chill area to submit music, and a place to host and be heard, learn and teach.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="radio">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">📻 Vita Nova Records · 24/7</div>
+    <h1>VITA NOVA <span class="grad-text">RADIO</span></h1>
+    <p class="lede">The 24/7 station from Vita Nova Records, hosted by Rare Candy Reserve. Tune in, listen, and make up your own mind.</p>
+    <p style="margin-top:18px"><a class="tunein-8bit" href="https://radio.rarecandyreserve.org/vitanova" target="_blank" rel="noopener">▶ Tune in live</a></p>
+    <figure class="radio-banner">
+      <img data-radio-banner src="images/radio-afternoon.jpg" alt="Vita Nova Radio art">
+      <figcaption><span data-radio-banner-caption>Vita Nova Radio</span> · changes with the time of day</figcaption>
+    </figure>
+    <p style="margin-top:18px;color:var(--muted)"><b style="color:var(--ink)" id="djGreeting">Slabb here — welcome to Vita Nova Radio.</b><br>Your host introduces every song by name, reads the sponsor spots, and keeps it like a talk show mixed with radio — the vibe shifts with the time of day.</p>
+  </div>
+
+  <section>
+    <div class="kicker">On air now</div>
+    <h2>Press play — <span class="grad-text">the rotation is live.</span></h2>
+    <p style="color:var(--muted)">A steady heart on rotation, 24/7. New approved tracks from the chill area join the rotation as they come in. The album “End of the year” — 21 tracks — is pending a fix with the distributor, so the full album joins the rotation once it’s out.</p>
+    <div class="cassette" id="cassette">
+      <div class="tape-window">
+        <div class="reels">
+          <div class="reel"></div>
+          <div class="label">
+            <img id="coverArt" src="images/end-of-the-year-cover.jpg" alt="End of the year — album artwork">
+            <div class="t-title" id="nowTitle">Sunk for you</div>
+            <div class="t-note" id="nowNote">End of the year</div>
+          </div>
+          <div class="reel"></div>
+        </div>
+      </div>
+      <div class="transport">
+        <button class="t-btn small" type="button" onclick="prevTrack()" aria-label="Previous track">⏮</button>
+        <button class="t-btn" type="button" id="playBtn" onclick="togglePlay()" aria-label="Play or pause">▶</button>
+        <button class="t-btn small" type="button" onclick="nextTrack()" aria-label="Next track">⏭</button>
+      </div>
+      <div class="progress">
+        <input type="range" id="seekBar" min="0" max="100" value="0" step="1" aria-label="Seek">
+        <div class="time-row"><span id="timeCur">0:00</span><span id="timeTot">0:00</span></div>
+      </div>
+      <div class="tracklist" id="trackList"></div>
+      <p id="playerMsg" style="color:var(--amber);font-weight:700;text-align:center"></p>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:13px;margin-top:12px">2 tracks on the station right now — “Sunk for you” and “Introduction to heartbreak”. Tap a track to play it. More tracks join as they’re approved.</p>
+  </section>
+
+  <section>
+    <div class="kicker">🎙 Podcasts — listen &amp; make</div>
+    <h2>Listen to the show. <span class="grad-text">Then make your own.</span></h2>
+    <p style="color:var(--muted)">“What’s the alternative?” lives here too — listen to the latest episode, and if you’ve got a show in you, pitch it below. The station is a place to host and be heard.</p>
+    <div class="grid">
+      <div class="card ep-card">
+        <div class="tag">Episode 1 · Nov 10, 2026</div>
+        <h3 style="margin-top:10px">Episode 1: What AI Should and Should Not Do</h3>
+        <p>Hosts Slab &amp; Jordan debate what AI should and should not be used for — learning, art, music, and the line between showing a product’s potential and deceiving people. Brought to you by Vita Nova Records. 🎧 12:41</p>
+        <div class="ep-player">
+          <audio controls preload="metadata" src="audio/episode-01-v4.mp3" style="width:100%">
+            Your browser doesn’t support the audio player — <a href="audio/episode-01-v4.mp3">download Episode 1 (MP3, 12:41)</a>.
+          </audio>
+        </div>
+        <p style="margin-top:14px"><a class="btn ghost" href="podcast.html">All episodes →</a></p>
+      </div>
+      <div class="card">
+        <div class="tag">Make your own</div>
+        <h3 style="margin-top:10px">Pitch a podcast</h3>
+        <p>Got a show idea — music, growing as a person, healing, collecting, games, or something nobody’s covering? Tell us the idea and we’ll talk about putting it on the station.</p>
+        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — podcast pitch')">
+          <label>Your name</label>
+          <input name="Name" data-req placeholder="Your name">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Show idea</label>
+          <textarea name="Show idea" data-req placeholder="What’s the show about? What would the first episode cover?"></textarea>
+          <p style="margin-top:14px"><button class="btn" type="submit">Send the pitch →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🌙 The chill area — learn &amp; teach</div>
+    <h2>Submit your music. <span class="grad-text">Get heard.</span></h2>
+    <p style="color:var(--muted)">Members who’ve joined and proven their identity can submit <b style="color:var(--ink)">non-AI-made music</b> in MP3 format or as a link. Every submission is reviewed — if it’s approved, it plays on VITA NOVA RADIO, 24/7. New artists can get signed through Vita Nova Records if they choose. This is the chill area: a place to host and be heard, learn and teach.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Submit music</div>
+        <h3 style="margin-top:10px">Get your track on the radio</h3>
+        <p>Send a link to your MP3 (or a streaming link) and tell us about the track. Human-made music only — no AI-generated audio or lyrics.</p>
+        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — music submission')">
+          <label>Track title</label>
+          <input name="Track title" data-req placeholder="Song title">
+          <label>Band name</label>
+          <input name="Band name" data-req placeholder="Your band or artist name">
+          <label>Composer</label>
+          <input name="Composer" data-req placeholder="Who wrote / composed it">
+          <label>MP3 or streaming link</label>
+          <input name="Track link" data-req placeholder="https://… (MP3 or streaming link)">
+          <label><input type="checkbox" name="Non-AI attestation" data-req style="width:auto"> I confirm this track is human-made — no AI-generated audio or lyrics.</label>
+          <label><input type="checkbox" name="Original work agreement" data-req style="width:auto"> I confirm this is my own original work and I have the right to share it for radio play.</label>
+          <p style="margin-top:14px"><button class="btn" type="submit">Submit the track →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">For artists</div>
+        <h3 style="margin-top:10px">How it works</h3>
+        <p>1 · You submit a track (MP3 or link) and confirm it’s human-made.<br>2 · The label reviews it — every track gets a listen.<br>3 · Approved tracks join the 24/7 rotation and play around the clock.<br>4 · If you’re open to it, we talk about signing with Vita Nova Records.</p>
+        <p style="margin-top:14px"><b style="color:var(--ink)">Your music plays 24/7.</b> That’s plays, ears, and a shot at being heard — for free. No pay-to-play.</p>
+        <p style="margin-top:14px"><a class="btn ghost" href="music.html">Hear a steady heart →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">📣 Ad space — $2.00 a spot</div>
+    <h2>Put your voice <span class="grad-text">on the air.</span></h2>
+    <p style="color:var(--muted)">A simple 30-second audio ad, played <b style="color:var(--ink)">5 times a week</b> for <b style="color:var(--ink)">$2.00</b>. You write the script, we voice it with a generated voice and your choice of jingle — and once it’s approved, it goes live on the station.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Book an ad</div>
+        <h3 style="margin-top:10px">$2.00 · 30 seconds · 5 plays a week</h3>
+        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — ad booking ($2.00)')">
+          <label>Your name / business</label>
+          <input name="Name / business" data-req placeholder="Who’s advertising?">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Ad script (30 seconds — about 65–75 words)</label>
+          <textarea name="Ad script" data-req placeholder="Write what the voice should say…"></textarea>
+          <label>Voice style</label>
+          <select name="Voice style">
+            <option>Warm &amp; friendly</option><option>Energetic &amp; upbeat</option><option>Calm &amp; smooth</option><option>Bold &amp; punchy</option>
+          </select>
+          <label>Jingle</label>
+          <select name="Jingle">
+            <option>Neon chime</option><option>Retro synth sting</option><option>Soft pad swell</option><option>No jingle — voice only</option>
+          </select>
+          <p style="margin-top:14px"><button class="btn" type="submit">Book the ad — $2.00 →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">How ads work</div>
+        <h3 style="margin-top:10px">Fair, simple, on the air</h3>
+        <p>1 · You send the script and pick a voice + jingle.<br>2 · The label reviews and voices it.<br>3 · Once approved, it plays 5 times a week on VITA NOVA RADIO.<br>4 · $2.00 per 30-second spot, per week.</p>
+        <p style="margin-top:14px">Payment is arranged with the shop after approval — no charge is made from this page.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">📡 Tune in live — VNR on air</div>
+    <h2>Listen live, <span class="grad-text">right here.</span></h2>
+    <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play to tune in to VNR on air, 24/7.</p>
+    <div class="card" style="max-width:640px;margin:0 auto">
+      <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%"></audio>
+      <p id="liveMsg" style="color:var(--muted);font-size:13px">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+<script src="assets/js/player.js"></script>
+<script>
+/* Radio page — DJ greeting by local time + live stream hookup */
+(function(){
+  var h = new Date().getHours();
+  var g = document.getElementById("djGreeting");
+  if(g){
+    if(h >= 5 && h < 12) g.textContent = "Good morning — Slabb here, easing you into the day on Vita Nova Radio.";
+    else if(h >= 12 && h < 18) g.textContent = "Good afternoon — Slabb here, keeping the rotation rolling on Vita Nova Radio.";
+    else if(h >= 18 && h < 23) g.textContent = "Good evening — Slabb here, settling in for the night shift on Vita Nova Radio.";
+    else g.textContent = "Late night — Slabb here, keeping you company on Vita Nova Radio.";
+  }
+})();
+</script>
+</body>
+</html>

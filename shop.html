@@ -18,6 +18,9 @@
       <a href="about.html" data-page="about">About</a>
       <a href="music.html" data-page="music">Music</a>
       <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
       <a href="contact.html" data-page="contact">Contact</a>
       <a href="donate.html" data-page="donate">Donate</a>
     </nav>
@@ -95,11 +98,7 @@
     <h2>Checkout</h2>
     <div id="cartPageBody"></div>
     <div id="checkoutBox" style="display:none">
-      <div class="note stripe">
-        <b>⚠ CHECKOUT IS NOT CONNECTED YET.</b><br>
-        Checkout runs on Stripe and PayPal (static site + payment links — no backend needed).
-        Until payment links are wired, orders route to Contact and Cash App / BTC stay available as manual options. No card is charged here.
-      </div>
+      <p style="color:var(--muted)">Checkout is live — pay securely with Stripe or PayPal.</p>
       <div id="paypalCartBox" style="margin-top:14px"></div>
       <p style="margin-top:14px"><b>Pay with Stripe:</b> use the “Buy with Stripe →” button on any item — Stripe takes the payment automatically, no invoice. <b>Pay with PayPal:</b> use the PayPal button above when it appears — PayPal takes the payment automatically, no invoice.</p>
       <form onsubmit="return submitOrder(event)" style="margin-top:16px">
@@ -116,9 +115,8 @@
 
   <section>
     <div class="note">
-      <b>Payment methods at launch:</b> Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
-      Checkout runs on Stripe and PayPal (static site + payment links — no backend needed). Cash App and BTC stay available as manual options.<br>
-      <b>Cart items route to Contact until payment links are wired.</b>
+      <b>Payment methods:</b> Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC<br>
+      Checkout runs on Stripe and PayPal (static site + payment links — no backend needed). Cash App and BTC stay available as manual options.
     </div>
   </section>
 </main>

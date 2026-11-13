@@ -56,6 +56,10 @@ section{margin-top:44px}
 .btn.ghost:hover{background:var(--cyan);color:#0b0b14}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn.small{padding:8px 14px;font-size:13.5px}
+/* 8-bit Tune In button — VNR live stream */
+.tunein-8bit{display:inline-block;font-family:"Courier New",ui-monospace,monospace;font-weight:900;letter-spacing:.14em;text-transform:uppercase;font-size:16px;color:#0b0b14;background:var(--green);border:3px solid #000;box-shadow:4px 4px 0 #000,8px 8px 0 var(--pink);padding:12px 22px;text-decoration:none}
+.tunein-8bit:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 #000,4px 4px 0 var(--pink)}
+.tunein-8bit:active{transform:translate(4px,4px);box-shadow:0 0 0 #000}
 
 /* photo placeholders */
 .photo{position:relative;border-radius:12px;overflow:hidden;cursor:pointer;border:1px dashed #4a4a6e;background:repeating-linear-gradient(45deg,#171728,#171728 12px,#1d1d33 12px,#1d1d33 24px);aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:12px}

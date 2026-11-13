@@ -4,10 +4,10 @@
    { title, file, note }. Files live in site/audio/.
    ============================================================ */
 const TRACKS = [
-  { title: "I sunk for you",               file: "audio/Sunk%20for%20you.mp3",                note: "End of the year" },
+  { title: "Sunk for you",               file: "audio/Sunk%20for%20you.mp3",                note: "End of the year" },
   { title: "Introduction to heartbreak",   file: "audio/Introduction%20to%20heartbreak.mp3",  note: "" },
 ];
-const COVER_ART = "images/allison-album-artwork.png"; // "Finished Allison Album artwork end of the year.png"
+const COVER_ART = "images/end-of-the-year-cover.jpg";
 
 let currentTrack = 0;
 let audio = null;

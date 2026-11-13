@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community — Do Whatever · Rare Candy Reserve</title>
+<meta name="description" content="The Do Whatever Community — check if a card is real or fake, sell and trade cards and collectibles, bid in the flea market, and hang out on The Street. A place to host and be heard.">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="community">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="https://allmylinks.com/Ashmusic" target="_blank" rel="noopener"><span class="aml-logo">♪ a steady heart</span><span class="aml-sub">AllMyLinks</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <div class="kicker">🤝 Do Whatever Community</div>
+    <h1>A place to host <span class="grad-text">and be heard.</span></h1>
+    <p class="lede">Check if a card is real or fake, sell and trade your cards and collectibles, bid in the flea market, and hang out on The Street. Listing is free — a small fair cut goes to the shop only when something sells. No hate speech, no outside sales, no firearms, nothing illegal.</p>
+    <p style="margin-top:18px">
+      <span class="pill">🃏 Card Check</span>
+      <span class="pill">🛒 Market</span>
+      <span class="pill">🔄 Up for Trade</span>
+      <span class="pill">🔨 Flea Market</span>
+      <span class="pill">💬 The Street</span>
+    </p>
+  </div>
+
+  <section>
+    <div class="kicker">🃏 Card Check</div>
+    <h2>Is this card real — <span class="grad-text">or does it look like a fake?</span></h2>
+    <p style="color:var(--muted)">Post a picture of a card and the community weighs in. Every post carries a title, a description, and flair so people know what they’re looking at — and the shop gives it an AI first look (advisory only, never a guarantee) before the votes come in.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Ask the community</div>
+        <h3 style="margin-top:10px">Post a card for checking</h3>
+        <form onsubmit="return submitSiteForm(event, 'Community — Card Check post')">
+          <label>Your name</label>
+          <input name="Name" data-req placeholder="Your name">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Card title</label>
+          <input name="Card title" data-req placeholder="e.g. Charizard ex 125/197 — is this real?">
+          <label>Photo link (upload the card photo and paste the link)</label>
+          <input name="Photo link" data-req placeholder="https://… (link to the card photo)">
+          <label>Flair</label>
+          <select name="Flair">
+            <option>Real or fake?</option><option>Grading estimate</option><option>Price check</option><option>Just showing off</option>
+          </select>
+          <label>Description</label>
+          <textarea name="Description" data-req placeholder="Where did you get it? What looks off — or right?"></textarea>
+          <p style="margin-top:14px"><button class="btn" type="submit">Post it for checking →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">How it works</div>
+        <h3 style="margin-top:10px">Real · Looks Fake · Not Sure</h3>
+        <p>1 · You post a clear photo, a title, and a description.<br>2 · The shop runs an AI first look and posts it as an advisory note.<br>3 · Members vote Real, Looks Fake, or Not Sure — and comment with GIFs.<br>4 · The votes and the comments stay on the post so the next person can learn from it.</p>
+        <p style="margin-top:14px">A clear, well-lit front-and-back photo gets the best answers. Blurry photos get asked for a reshoot.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🛒 Market — sell your cards &amp; collectibles</div>
+    <h2>List it free. <span class="grad-text">Sell it fair.</span></h2>
+    <p style="color:var(--muted)">Anyone can sell their own Pokémon cards and collectibles here once their account and payout method are set up. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells. Resale is welcome. No firearms, nothing illegal, ever.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">List an item</div>
+        <h3 style="margin-top:10px">Put something up for sale</h3>
+        <form onsubmit="return submitSiteForm(event, 'Community — Market listing')">
+          <label>Your name</label>
+          <input name="Name" data-req placeholder="Your name">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Item title</label>
+          <input name="Item title" data-req placeholder="What are you selling?">
+          <label>Price (USD)</label>
+          <input name="Price" data-req placeholder="e.g. 25.00">
+          <label>Photo link</label>
+          <input name="Photo link" data-req placeholder="https://… (link to the item photo)">
+          <label>Description &amp; condition</label>
+          <textarea name="Description" data-req placeholder="Condition, set, what’s included…"></textarea>
+          <label>Payout method (how you want to be paid)</label>
+          <input name="Payout method" data-req placeholder="e.g. PayPal, Cash App, Chime…">
+          <p style="margin-top:14px"><button class="btn" type="submit">List it for sale →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">Seller setup</div>
+        <h3 style="margin-top:10px">Account + payout, then sell</h3>
+        <p>Set up your account and a payout method once, then list as much as you like — free. When an item sells, a small fair cut goes to Rare Candy Reserve and the rest goes to you through your payout method. Payments are arranged directly with the seller until the automated payout is live.</p>
+        <p style="margin-top:14px"><b style="color:var(--ink)">The card is the item.</b> Bumper, stand, or figure extras are a free courtesy by message only — never the thing being sold.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🔄 Up for Trade</div>
+    <h2>Offer a trade. <span class="grad-text">Let the community weigh in.</span></h2>
+    <p style="color:var(--muted)">A dedicated area to offer cards up for trade. Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live, using the best tools available. Then members vote whether it’s a good trade, a fair one, or a bad deal, and comment if the poster allows it.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Offer a trade</div>
+        <h3 style="margin-top:10px">Put a card up for trade</h3>
+        <form onsubmit="return submitSiteForm(event, 'Community — Trade offer')">
+          <label>Your name</label>
+          <input name="Name" data-req placeholder="Your name">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>What you’re offering</label>
+          <input name="Offering" data-req placeholder="Card + condition">
+          <label>What you’re looking for</label>
+          <input name="Looking for" data-req placeholder="Card(s) you want in return">
+          <label>Photo link (front &amp; back)</label>
+          <input name="Photo link" data-req placeholder="https://… (link to the card photos)">
+          <label><input type="checkbox" name="Allow comments" checked style="width:auto"> Allow comments on this trade post</label>
+          <p style="margin-top:14px"><button class="btn" type="submit">Offer the trade →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">Trade safety</div>
+        <h3 style="margin-top:10px">Checked before it goes live</h3>
+        <p>1 · Photo required — no photo, no trade listing.<br>2 · The shop checks the card for fakes and proxies before it’s listed.<br>3 · Members vote: Good trade · Fair · Bad deal.<br>4 · Comments open only if the poster allows them.</p>
+        <p style="margin-top:14px">A trade that looks fake or proxy gets blocked, not listed. That’s the whole point.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🔨 Flea Market — simple bidding</div>
+    <h2>Bid on it. <span class="grad-text">Win it.</span></h2>
+    <p style="color:var(--muted)">An online flea-market area with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. Same rules as everywhere else here: nothing illegal, no firearms, keep it clean.</p>
+    <div class="grid">
+      <div class="card">
+        <div class="tag">Place a bid</div>
+        <h3 style="margin-top:10px">Bid on a flea-market item</h3>
+        <form onsubmit="return submitSiteForm(event, 'Community — Flea Market bid')">
+          <label>Your name</label>
+          <input name="Name" data-req placeholder="Your name">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Item you’re bidding on</label>
+          <input name="Item" data-req placeholder="Which listing?">
+          <label>Your bid (USD — must beat the high bid)</label>
+          <input name="Bid" data-req placeholder="e.g. 18.00">
+          <p style="margin-top:14px"><button class="btn" type="submit">Place the bid →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
+      <div class="card">
+        <div class="tag">List in the flea market</div>
+        <h3 style="margin-top:10px">Sell it by auction</h3>
+        <p>List an item for bidding the same way you’d list it for sale — title, photo, condition, and a starting bid. The shop sets the listing live and the bids come in. Listing is free; the small fair cut applies only when it sells.</p>
+        <p style="margin-top:14px"><a class="btn ghost" href="community.html">List it for sale instead →</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">💬 The Street &amp; Storefronts</div>
+    <h2>Hang out. <span class="grad-text">Set up shop.</span></h2>
+    <p style="color:var(--muted)">The Street is the forum — six corners to talk shop, music, plants, tech, and everything else, with the colorful neon shopping-district feel. Storefronts are member profiles: username, occupation, optional birthday (month and day only), bio, and a picture.</p>
+    <div class="grid">
+      <div class="card"><div style="font-size:28px">💬</div><h3>General</h3><p>Whatever’s on your mind — the main corner of The Street.</p></div>
+      <div class="card"><div style="font-size:28px">🛒</div><h3>Shop Talk</h3><p>Cards, slabs, prices, and the hunt — the shop floor, online.</p></div>
+      <div class="card"><div style="font-size:28px">🎵</div><h3>Music</h3><p>Songs, the label, the radio, and what you’re listening to.</p></div>
+      <div class="card"><div style="font-size:28px">🌱</div><h3>Plants &amp; Garden</h3><p>The nursery side — growing, trading, and showing off green things.</p></div>
+      <div class="card"><div style="font-size:28px">🔧</div><h3>Tech &amp; Builds</h3><p>Printers, rigs, mods, and the projects you’re building.</p></div>
+      <div class="card"><div style="font-size:28px">🌙</div><h3>Off Topic</h3><p>Everything else — keep it kind, keep it clean.</p></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="tag">Make a storefront</div>
+      <h3 style="margin-top:10px">Set up your profile</h3>
+      <p style="color:var(--muted)">Username, occupation, optional birthday, bio, and a picture — that’s your storefront. Birthdays show month and day only, never the year.</p>
+      <form onsubmit="return submitSiteForm(event, 'Community — Storefront profile')">
+        <label>Username</label>
+        <input name="Username" data-req placeholder="Your username">
+        <label>Your email</label>
+        <input name="Email" data-req type="email" placeholder="you@example.com">
+        <label>Occupation</label>
+        <input name="Occupation" placeholder="What do you do?">
+        <label>Birthday (optional — month/day only shows)</label>
+        <input name="Birthday" type="date">
+        <label>Bio</label>
+        <textarea name="Bio" placeholder="A line or two about you…"></textarea>
+        <label>Profile picture link</label>
+        <input name="Picture link" placeholder="https://… (link to your picture)">
+        <p style="margin-top:14px"><button class="btn" type="submit">Make my storefront →</button></p>
+        <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">🛡 Rules — keep everyone safe</div>
+    <h2>Sell what you want. <span class="grad-text">Keep it safe.</span></h2>
+    <div class="grid">
+      <div class="card"><div style="font-size:28px">🚫</div><h3>No hate speech</h3><p>No hate speech in communities or on pages — ever. Pages are customizable to a degree, but the rules aren’t.</p></div>
+      <div class="card"><div style="font-size:28px">🔒</div><h3>No outside sales</h3><p>Don’t take deals off the platform to dodge the rules. Outside sales risk a permanent IP ban of the account.</p></div>
+      <div class="card"><div style="font-size:28px">⛔</div><h3>Nothing illegal</h3><p>No firearms, nothing illegal at all — not in the market, not in trades, not in the flea market, nowhere.</p></div>
+      <div class="card"><div style="font-size:28px">🃏</div><h3>No fakes or proxies</h3><p>Trades and listings get checked before they go live. Fakes and proxies don’t get listed.</p></div>
+    </div>
+    <div class="note" style="margin-top:16px">
+      <b>After Dark — planned, not open.</b> The adult “after dark market” is coming later: sellers prove ID and age through a secure third-party route, content is hosted in an encrypted vault, and previews are watermark-blurred so they can’t be stolen and redistributed. It is not open yet, and nothing is listed there today.
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+  </div>
+</footer>
+
+<script src="assets/js/site.js"></script>
+</body>
+</html>

@@ -104,7 +104,7 @@ const CATALOG = [
   {id:"cat-spearow", slug:"spearow-psa10", ebay:null, icon:"🐦", tag:"Graded Card · PSA 10", name:"Spearow — Art Rare, PSA 10 GEM MT", price:40.00, img:null,
    imgs:["images/spearow-psa10-front.jpg"],
    desc:"Spearow, 2025 Pokémon M1L JP #074, Art Rare, Japanese. PSA GEM MT 10, cert 127913713."},
-  {id:"cat-mrmime", slug:"sabrinas-mr-mime", ebay:null, icon:"🎩", tag:"Graded Card · CGC 9", name:"Sabrina's Mr. Mime — CGC 9 MINT", price:null, img:null, comingSoon:true,
+  {id:"cat-mrmime", slug:"sabrinas-mr-mime", ebay:null, icon:"🎩", tag:"Graded Card · CGC 9", name:"Sabrina's Mr. Mime — CGC 9 MINT", price:null, img:null, outOfStock:true,
    imgs:["images/sabrina-mr-mime-front.jpg"],
    desc:"Sabrina's Mr. Mime, Pokémon (1999) Japanese, Gym 2: Challenge from the Darkness. CGC MINT 9, cert 6016734017."},
   {id:"cat-grovyle", slug:"grovyle-cgc9", ebay:null, icon:"🦎", tag:"Graded Card · CGC 9 · SOLD OUT", name:"Grovyle — Reverse Holo, CGC 9 MINT", price:null, img:null, outOfStock:true,

@@ -59,12 +59,15 @@ const PRODUCTS = [
    desc:"Custom 3D-printed set of D&D dice. Choose two colors: red, yellow, white, blue, black, pink, or green. No satchel included — the satchel was sold.",
    price:18.00, ship:"+ shipping (by location)", icon:"🎲", stripe:"https://buy.stripe.com/00w3cxbbkd6ZdxubvA6sw02",
    imgs:["images/dice-3d-printed.jpg"]},
-  {id:"mcr-vinyl", slug:"mcr-vinyl", tag:"SEALED · Collectible Vinyl", name:"MCR — Three Cheers for Sweet Revenge",
-   desc:"Still-sealed collector's pressing, includes a preservation stand so it displays like a graded card.",
-   price:26.00, stripe:"https://buy.stripe.com/9B6cN7bbkc2ValibvA6sw04", ship:"free shipping", icon:"💿"},
+  {id:"amby-deck", slug:"modded-amby-deck", tag:"HANDHELD · Modded Amby Deck", name:"Modded Amby Deck — Fully Modded Handheld (Choose Black or Pink)",
+   desc:"Fully modded and playable — faster than most PCs out of the box. Big 120Hz touchscreen, RGB backlit sticks, 8GB RAM + 128GB storage, Android. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus PC games via Winlator. Loaded with free ports and cool stuff. Protective case + wrist strap included, modded to order. (we do not condone piracy of any kind)",
+   price:220.00, ship:"+ shipping (by location)", icon:"🎮",
+   imgs:["images/amby-deck-two.jpg"],
+   variations:[{label:"Black", price:220.00},{label:"Pink", price:220.00}]},
   {id:"retro-keychain", slug:"retro-keychain", tag:"MINI PRINT · 3D Print", name:"Retro Console Keychain",
    desc:"Miniature handheld consoles, printed to order. Pick your console — Game Boy, GBA SP, DS, Switch, and more.",
-   price:12.00, stripe:"https://buy.stripe.com/cNi8wRbbkeb3ali8jo6sw05", ship:"free shipping if bundled · solo: shipping by location", icon:"🎮"},
+   price:12.00, stripe:"https://buy.stripe.com/cNi8wRbbkeb3ali8jo6sw05", ship:"free shipping if bundled · solo: shipping by location", icon:"🎮",
+   imgs:["images/pokemon-keychains.jpg"]},
 ];
 /* Live eBay inventory — titles + prices exact (verified 2026-11-06).
    Photos wired from Ash's Drive (drive-photo-map.md, 2026-11-09); Sunflora still has
@@ -108,9 +111,9 @@ const CATALOG = [
    imgs:["images/grovyle-cgc9-front.jpg"],
    desc:"Grovyle, Pokémon (2009), Arceus 39/99, Reverse Holo. Attacks Quick Attack / Cut, 80 HP. CGC MINT 9, cert 6098149057."},
   /* Unpriced inventory (Drive photo map, section C) — assessment-based filler until Ash prices them. */
-  {id:"cat-mewtwo-ex", slug:"mewtwo-ex-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo ex — BREAKthrough Secret Full Art 164/162, Raw (170 HP)", price:175.00, img:null,
+  {id:"cat-mewtwo-ex", slug:"mewtwo-ex-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo ex — XY Black Star Promo XY107, Raw (170 HP)", price:35.00, img:null,
    imgs:["images/mewtwo-ex-raw.jpg"],
-   desc:"Mewtwo ex, BREAKthrough Secret Full Art 164/162, 170 HP, Shatter Shot / Damage Change. Raw, near-mint — this card grades for a lot: a PSA 10 of this exact card sells for $8,400+. Authenticity and shape of the card guaranteed. Comes in a penny sleeve + top loader with the red/white 3D-printed slab bumper on a stand. Best Offer accepted — message the shop."},
+   desc:"Mewtwo ex, XY Black Star Promo XY107, 170 HP, Shatter Shot / Damage Change. Raw, near-mint — this card grades for a lot: a PSA 10 of this exact card sells for $1,050+. Authenticity and shape of the card guaranteed. Comes in a penny sleeve + top loader with the red/white 3D-printed slab bumper on a stand. PLUS a FREE surprise Mew card included with your order. Best Offer accepted — message the shop."},
   {id:"cat-mewtwo-130", slug:"mewtwo-130-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo — Raw (130 HP)", price:null, img:null, comingSoon:true,
    imgs:["images/mewtwo-130-raw.jpg"],
    desc:"Raw Mewtwo, 130 HP, attacks Life Sucker (20) / Psy Burn (110). Sleeved."},
@@ -160,9 +163,9 @@ const CATALOG = [
    imgs:["images/mini-beholder-group.jpg"],
    variations:[{label:"Standard mini — from $12", price:12.00},{label:"Beholder — $20", price:20.00},{label:"Dragon — $25", price:25.00},{label:"Knight / Paladin — $18", price:18.00},{label:"Wizard — $18", price:18.00},{label:"Rogue — $18", price:18.00},{label:"Design your own — $25", price:25.00}],
    desc:"Order a custom tabletop mini: pick a type — Beholder, Dragon, Knight/Paladin, Wizard, Rogue — or design your own and describe it in the custom order form. Printed to order."},
-  {id:"cat-trimui-smart-pro", slug:"trimui-smart-pro-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded", name:"Trimui Smart Pro — Modded (CrossMix, 128GB Card, Pink Case + Wrist Strap)", price:99.00, img:null,
+  {id:"cat-trimui-smart-pro", slug:"trimui-smart-pro-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded TSP", name:"TSP — Modded Trimui Smart Pro (CrossMix, 128GB Card, Pink Case + Wrist Strap)", price:99.00, img:null,
    imgs:["images/trimui-smart-pro.jpg","images/trimui-smart-pro-black.jpg"],
-   desc:"Modded Trimui Smart Pro — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced), pink protective case + wrist strap included. Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
+   desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced), pink protective case + wrist strap included. Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
   {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — Anbernic RG476H in All Its Glory", price:179.00, img:null,
    imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg"],
    desc:"Modded AmbyRG — the Anbernic RG476H in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Protective case + wrist strap included. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
@@ -252,6 +255,18 @@ function entryPrice(e){ return (e.varPrice != null) ? e.varPrice : findItem(e.id
 function addToCart(id){
   const item = cart.find(i => i.id === id && i.varLabel == null);
   if(item) item.qty++; else cart.push({id, qty:1});
+  saveCart(); openCart();
+}
+function addProductVarToCart(id){
+  const p = PRODUCTS.find(x => x.id === id); if(!p) return;
+  let varLabel = null, varPrice = null;
+  if(p.variations){
+    const sel = document.getElementById("var-"+id);
+    const v = p.variations[parseInt(sel.value, 10)];
+    varLabel = v.label; varPrice = v.price;
+  }
+  const item = cart.find(i => i.id === id && (i.varLabel || null) === (varLabel || null));
+  if(item) item.qty++; else cart.push({id, qty:1, varLabel, varPrice});
   saveCart(); openCart();
 }
 function addCatalogToCart(catId){
@@ -350,14 +365,24 @@ function productCard(p){
   const thumbs = (p.imgs && p.imgs.length > 1)
     ? p.imgs.slice(1).map((_,i)=>photoHTML(p,i+1)).join("")
     : photoHTML(p,1)+photoHTML(p,2);
+  let priceLine, buyBtn;
+  if(p.variations){
+    const opts = p.variations.map((v,i)=>`<option value="${i}">${v.label} — ${money(v.price)}</option>`).join("");
+    const lo = Math.min(...p.variations.map(v=>v.price)), hi = Math.max(...p.variations.map(v=>v.price));
+    priceLine = `<p><span class="price">${lo===hi ? money(lo) : money(lo)+" – "+money(hi)}</span> <span class="ship">${p.ship}</span></p>
+      <label style="margin-top:2px">Choose:</label><select id="var-${p.id}">${opts}</select>`;
+    buyBtn = `<button class="btn" style="margin-top:10px" onclick="addProductVarToCart('${p.id}')">Add to cart</button>`;
+  } else {
+    priceLine = `<p><span class="price">${money(p.price)}</span> <span class="ship">${p.ship}</span></p>`;
+    buyBtn = `<button class="btn" onclick="addToCart('${p.id}')">Add to cart</button>`;
+  }
   return `<div class="card">
     ${photoHTML(p,0)}
     <div class="thumbs">${thumbs}</div>
     <div class="tag" style="margin-top:12px">${p.tag}</div>
     <h3>${p.name}</h3><p>${p.desc}</p>
-    <p><span class="price">${money(p.price)}</span> <span class="ship">${p.ship}</span></p>
-    <button class="btn" onclick="addToCart('${p.id}')">Add to cart</button>
-    ${p.stripe ? `<a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener" style="margin-left:8px">Buy with Stripe →</a>` : ""}
+    ${priceLine}
+    <p>${buyBtn}${p.stripe ? ` <a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener" style="margin-left:8px">Buy with Stripe →</a>` : ""}</p>
   </div>`;
 }
 function catalogCard(c){

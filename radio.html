@@ -63,6 +63,23 @@
   </div>
 
   <section>
+    <div class="kicker">📡 Tune in live — VNR on air</div>
+    <h2>Listen live, <span class="grad-text">right here.</span></h2>
+    <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play and you get the visuals, the song, and the ticker — right here, no other page.</p>
+    <div class="live-viz">
+      <div class="live-viz-inner">
+        <canvas id="liveViz" width="720" height="120" aria-label="Live audio visualizer"></canvas>
+        <div style="text-align:center;margin-top:12px"><span class="live-badge" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">OFF AIR</span></span></div>
+        <div class="live-now">VITA NOVA RADIO — Live<small id="liveNowSub">DJ Slabb · A Steady Heart · Vita Nova Records</small></div>
+        <div class="live-djmsg" id="liveDjMsg">Tune in — the station is live, 24/7.</div>
+        <div class="live-ticker"><span>thank you for listening to Vita Nova Radio! 🎙️ VITA NOVA RADIO — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly · 👕 ASH SUPPLY CO. — first drop coming · 💿 “End of the year” — 21 tracks · 📻 Requests open — send yours in ·</span></div>
+        <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%;margin-top:14px"></audio>
+        <p id="liveMsg" style="color:var(--muted);font-size:13px;text-align:center">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
     <div class="kicker">On air now</div>
     <h2>Press play — <span class="grad-text">a taste of the station.</span></h2>
     <p style="color:var(--muted)">DJ Slabb introduces the songs, reads the sponsor spots, and keeps it like a talk show mixed with radio. This is a short loop — a taste. The full 24/7 broadcast is live below, and the full album “End of the year” (21 tracks) is on the music page.</p>
@@ -200,22 +217,7 @@
     </div>
   </section>
 
-  <section>
-    <div class="kicker">📡 Tune in live — VNR on air</div>
-    <h2>Listen live, <span class="grad-text">right here.</span></h2>
-    <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play and you get the visuals, the song, and the ticker — right here, no other page.</p>
-    <div class="live-viz">
-      <div class="live-viz-inner">
-        <canvas id="liveViz" width="720" height="120" aria-label="Live audio visualizer"></canvas>
-        <div style="text-align:center;margin-top:12px"><span class="live-badge" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">OFF AIR</span></span></div>
-        <div class="live-now">VITA NOVA RADIO — Live<small id="liveNowSub">DJ Slabb · A Steady Heart · Vita Nova Records</small></div>
-        <div class="live-djmsg" id="liveDjMsg">Tune in — the station is live, 24/7.</div>
-        <div class="live-ticker"><span>thank you for listening to Vita Nova Radio! 🎙️ VITA NOVA RADIO — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly · 👕 ASH SUPPLY CO. — first drop coming · 💿 “End of the year” — 21 tracks · 📻 Requests open — send yours in ·</span></div>
-        <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%;margin-top:14px"></audio>
-        <p id="liveMsg" style="color:var(--muted);font-size:13px;text-align:center">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
-      </div>
-    </div>
-  </section>
+
 </main>
 
 <footer class="site">
@@ -303,28 +305,42 @@
   }
   draw();
 
-  /* LIVE badge — red blinking dot when the stream is connected and playing, OFF AIR when it is not */
+  /* LIVE badge — reflects the actual broadcast: LIVE when the station is up, OFF AIR when it is not.
+     Uses a hidden probe player so the badge is right even before anyone presses play, and so
+     checking never interrupts the listener's own player. */
   var badge = document.getElementById("liveBadge");
   var badgeText = document.getElementById("liveBadgeText");
-  var lastTime = -1, lastAdvance = Date.now();
   function setLive(on){
     if(!badge) return;
     badge.classList.toggle("on", !!on);
     if(badgeText) badgeText.textContent = on ? "LIVE" : "OFF AIR";
   }
   setLive(false);
-  setInterval(function(){
-    if(!audio) return;
-    var t = audio.currentTime;
-    if(!audio.paused && !audio.ended && audio.readyState > 2){
-      if(t !== lastTime){ lastTime = t; lastAdvance = Date.now(); }
-      setLive(Date.now() - lastAdvance < 5000);
-    } else {
-      setLive(false);
-    }
-  }, 2000);
+  var probe = null;
+  function stopProbe(){
+    if(probe){ try{ probe.pause(); probe.removeAttribute("src"); probe.load(); }catch(e){} probe = null; }
+  }
+  function probeLive(){
+    /* If the listener is already playing, the station is obviously live. */
+    if(audio && !audio.paused && !audio.ended){ setLive(true); return; }
+    stopProbe();
+    probe = new Audio();
+    probe.preload = "auto";
+    probe.src = "https://radio.rarecandyreserve.org/vitanova";
+    probe.addEventListener("canplay", function(){ setLive(true); stopProbe(); });
+    probe.addEventListener("progress", function(){ if(probe && probe.readyState > 1){ setLive(true); stopProbe(); } });
+    probe.addEventListener("error", function(){ setLive(false); stopProbe(); });
+    try{ probe.load(); }catch(e){}
+    /* If nothing settles in 8s but the probe is still loading, the stream is open — call it live. */
+    setTimeout(function(){
+      if(probe && probe.readyState > 0){ setLive(true); stopProbe(); }
+    }, 8000);
+  }
+  probeLive();
+  setInterval(probeLive, 20000);
+  /* The listener's own player is a second signal: playing means live, an error means down. */
+  audio.addEventListener("playing", function(){ setLive(true); });
   audio.addEventListener("error", function(){ setLive(false); });
-  audio.addEventListener("pause", function(){ setLive(false); });
 
   /* DJ message — whatever Chris puts in radio-now.txt shows up here, checked every 30s */
   var msg = document.getElementById("liveDjMsg");

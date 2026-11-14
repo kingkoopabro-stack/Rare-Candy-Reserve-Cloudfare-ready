@@ -76,7 +76,7 @@ const PRODUCTS = [
    comingSoon entries are photographed but unpriced (no price, not buyable);
    draft entries are approved but not posted yet (price shown, not buyable). */
 const CATALOG = [
-  {id:"cat-gengar", slug:"gengar-cgc9", ebay:"168803766775", icon:"👻", tag:"Graded Card · CGC 9", name:"CGC 9 Gengar ex 047/071 Japanese Wild Force", price:22.00, img:null, outOfStock:true,
+  {id:"cat-gengar", slug:"gengar-cgc9", ebay:"168803766775", icon:"👻", tag:"Graded Card · CGC 9", name:"CGC 9 Gengar ex 047/071 Japanese Wild Force", price:20.00, img:null,
    imgs:["images/gengar-ex-front.jpg"]},
   {id:"cat-cyberjudge", slug:"cyber-judge-pack", ebay:"168803775765", icon:"🃏", tag:"Sealed Pack", name:"Pokemon Cyber Judge sv5M Japanese Booster Pack", price:5.99, stripe:"https://buy.stripe.com/3cIeVf1AK6IB9he7fk6sw07", ship:"+ $2.00 shipping", img:null,
    imgs:["images/cyber-judge-pack-front.jpg"]},
@@ -89,7 +89,8 @@ const CATALOG = [
    imgs:["images/turok-1.jpg"]},
   {id:"cat-xmen", slug:"xmen-lot", ebay:"168390280510", icon:"❌", tag:"Comic Lot", name:"Marvel X-Men / Mutant 6-comic Starter Collection", price:38.00, stripe:"https://buy.stripe.com/aFa3cx6V46IBfFCbvA6sw0a", img:null,
    imgs:["images/xmen-xforce-1.jpg"]},
-  {id:"cat-sunflora", slug:"sunflora-cgc10", ebay:"168711754988", icon:"🌻", tag:"Graded Card · CGC Pristine 10", name:"2024 Sunflora AR 102/101 CGC Pristine 10", price:30.00, stripe:"https://buy.stripe.com/5kQbJ31AKeb38daarw6sw0b", img:null},
+  {id:"cat-sunflora", slug:"sunflora-cgc10", ebay:"168711754988", icon:"🌻", tag:"Graded Card · CGC Pristine 10", name:"2024 Sunflora AR 102/101 CGC Pristine 10", price:30.00, stripe:"https://buy.stripe.com/5kQbJ31AKeb38daarw6sw0b", img:"images/sunflora-cgc10-1.jpg",
+   imgs:["images/sunflora-cgc10-1.jpg","images/sunflora-cgc10-2.jpg","images/sunflora-cgc10-3.jpg"]},
   {id:"cat-glaceon", slug:"glaceon-vmax", ebay:"168818972853", icon:"❄️", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Glaceon VMAX 041/203 Evolving Skies", price:12.00, stripe:"https://buy.stripe.com/9B67sNbbkeb39heczE6sw0d", img:null,
    imgs:["images/glaceon-vmax-front.jpg"]},
   {id:"cat-rayquaza", slug:"rayquaza-v", ebay:"168818990115", icon:"🐉", tag:"Graded Card · CGC 9", name:"CGC 9 Rayquaza V 107/172 Japanese VSTAR Universe", price:18.00, img:null, outOfStock:true,

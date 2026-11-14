@@ -64,10 +64,10 @@ const PRODUCTS = [
    price:220.00, ship:"+ shipping (by location)", icon:"🎮",
    imgs:["images/amby-deck-two.jpg"],
    variations:[{label:"Black", price:220.00},{label:"Pink", price:220.00}]},
-  {id:"retro-keychain", slug:"retro-keychain", tag:"MINI PRINT · 3D Print", name:"Retro Console Keychain",
-   desc:"Miniature handheld consoles, printed to order. Pick your console — Game Boy, GBA SP, DS, Switch, and more.",
-   price:12.00, stripe:"https://buy.stripe.com/cNi8wRbbkeb3ali8jo6sw05", ship:"free shipping if bundled · solo: shipping by location", icon:"🎮",
-   imgs:["images/pokemon-keychains.jpg"]},
+  {id:"tsp", slug:"modded-tsp", tag:"HANDHELD · Modded TSP", name:"TSP — Modded Trimui Smart Pro (CrossMix, 128GB Card, Pink Case + Wrist Strap)",
+   desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced), pink protective case + wrist strap included. Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)",
+   price:99.00, ship:"+ shipping (by location)", icon:"🎮",
+   imgs:["images/trimui-smart-pro.jpg","images/trimui-smart-pro-black.jpg"]},
 ];
 /* Live eBay inventory — titles + prices exact (verified 2026-11-06).
    Photos wired from Ash's Drive (drive-photo-map.md, 2026-11-09); Sunflora still has

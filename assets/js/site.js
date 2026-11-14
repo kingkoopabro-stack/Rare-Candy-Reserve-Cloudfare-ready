@@ -108,9 +108,9 @@ const CATALOG = [
    imgs:["images/grovyle-cgc9-front.jpg"],
    desc:"Grovyle, Pokémon (2009), Arceus 39/99, Reverse Holo. Attacks Quick Attack / Cut, 80 HP. CGC MINT 9, cert 6098149057."},
   /* Unpriced inventory (Drive photo map, section C) — assessment-based filler until Ash prices them. */
-  {id:"cat-mewtwo-ex", slug:"mewtwo-ex-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo ex — Raw (170 HP)", price:null, img:null, comingSoon:true,
+  {id:"cat-mewtwo-ex", slug:"mewtwo-ex-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo ex — BREAKthrough Secret Full Art 164/162, Raw (170 HP)", price:175.00, img:null,
    imgs:["images/mewtwo-ex-raw.jpg"],
-   desc:"Raw Mewtwo ex, 170 HP, attacks Shatter Shot / Damage Change. Shown in a red/white 3D-printed slab bumper on a stand. Set not identifiable from the photos."},
+   desc:"Mewtwo ex, BREAKthrough Secret Full Art 164/162, 170 HP, Shatter Shot / Damage Change. Raw, near-mint — this card grades for a lot: a PSA 10 of this exact card sells for $8,400+. Authenticity and shape of the card guaranteed. Comes in a penny sleeve + top loader with the red/white 3D-printed slab bumper on a stand. Best Offer accepted — message the shop."},
   {id:"cat-mewtwo-130", slug:"mewtwo-130-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo — Raw (130 HP)", price:null, img:null, comingSoon:true,
    imgs:["images/mewtwo-130-raw.jpg"],
    desc:"Raw Mewtwo, 130 HP, attacks Life Sucker (20) / Psy Burn (110). Sleeved."},

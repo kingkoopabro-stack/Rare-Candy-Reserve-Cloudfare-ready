@@ -151,7 +151,7 @@ const CATALOG = [
    imgs:["images/buster-sword-keychain.jpg"],
    desc:"Black metal Buster Sword keychain."},
   {id:"cat-shield", slug:"pokemon-shield-switch-loose", ebay:null, icon:"🎮", tag:"Video Game · Loose Cart", name:"Pokémon Shield — Nintendo Switch, Loose Cartridge Only", price:29.99, stripe:"https://buy.stripe.com/5kQeVf7Z87MFgJG7fk6sw0f", img:null,
-   imgs:["images/placeholder.svg"],
+   imgs:["images/pokemon-shield-cart-1.jpg","images/pokemon-shield-cart-2.jpg","images/pokemon-shield-cart-3.jpg"],
    desc:"Pokémon Shield (2019) for Nintendo Switch — loose cartridge only, no case or box. Tested working. Fair eBay loose price — recent sold listings $25–$35."},
   {id:"cat-deadlands-lot", slug:"deadlands-lot-25", ebay:null, icon:"🃏", tag:"TCG Lot · Deadlands", name:"Deadlands TCG — Shrink-Wrapped Lot, 25 Cards", price:12.00, stripe:"https://buy.stripe.com/8x28wR0wG9UN3WU9ns6sw0g", img:null,
    imgs:["images/placeholder.svg"],
@@ -160,6 +160,12 @@ const CATALOG = [
    imgs:["images/mini-beholder-group.jpg"],
    variations:[{label:"Standard mini — from $12", price:12.00},{label:"Beholder — $20", price:20.00},{label:"Dragon — $25", price:25.00},{label:"Knight / Paladin — $18", price:18.00},{label:"Wizard — $18", price:18.00},{label:"Rogue — $18", price:18.00},{label:"Design your own — $25", price:25.00}],
    desc:"Order a custom tabletop mini: pick a type — Beholder, Dragon, Knight/Paladin, Wizard, Rogue — or design your own and describe it in the custom order form. Printed to order."},
+  {id:"cat-trimui-smart-pro", slug:"trimui-smart-pro-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded", name:"Trimui Smart Pro — Modded (CrossMix, 128GB Card, Pink Case + Wrist Strap)", price:99.00, img:null,
+   imgs:["images/trimui-smart-pro.jpg","images/trimui-smart-pro-black.jpg"],
+   desc:"Modded Trimui Smart Pro — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced), pink protective case + wrist strap included. Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
+  {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — Anbernic RG476H in All Its Glory", price:179.00, img:null,
+   imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg"],
+   desc:"Modded AmbyRG — the Anbernic RG476H in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Protective case + wrist strap included. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
 ];
 const SOON = [
   {icon:"🃏", tag:"Graded Card", name:"PSA 9–10 slab, rotating stock", price:"Priced per card", note:"Listings loading soon"},

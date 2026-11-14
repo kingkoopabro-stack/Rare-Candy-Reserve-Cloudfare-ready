@@ -115,6 +115,28 @@
         <p>Set up your account and a payout method once, then list as much as you like — free. When an item sells, a small fair cut goes to Rare Candy Reserve and the rest goes to you through your payout method. Payments are arranged directly with the seller until the automated payout is live.</p>
         <p style="margin-top:14px"><b style="color:var(--ink)">The card is the item.</b> Bumper, stand, or figure extras are a free courtesy by message only — never the thing being sold.</p>
       </div>
+      <div class="card">
+        <div class="tag">Your profile</div>
+        <h3 style="margin-top:10px">Create your seller profile</h3>
+        <form onsubmit="return submitSiteForm(event, 'Community — Seller profile')">
+          <label>Username</label>
+          <input name="Username" data-req placeholder="Your shop name / username">
+          <label>Your email</label>
+          <input name="Email" data-req type="email" placeholder="you@example.com">
+          <label>Occupation (optional)</label>
+          <input name="Occupation" placeholder="What do you do?">
+          <label>Birthday — month / day only (optional)</label>
+          <input name="Birthday" placeholder="e.g. June 14">
+          <label>Profile picture link</label>
+          <input name="Picture link" placeholder="https://… (link to your picture)">
+          <label>About you / your shop</label>
+          <textarea name="Bio" placeholder="What do you collect and sell?"></textarea>
+          <label>Payout method (how you want to be paid)</label>
+          <input name="Payout method" data-req placeholder="e.g. PayPal, Cash App, Chime…">
+          <p style="margin-top:14px"><button class="btn" type="submit">Create my profile →</button></p>
+          <p class="form-msg" style="color:var(--green);font-weight:700"></p>
+        </form>
+      </div>
     </div>
   </section>
 

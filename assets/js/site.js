@@ -356,7 +356,7 @@ function photoHTML(p, idx){
 function productCard(p){
   const thumbs = (p.imgs && p.imgs.length > 1)
     ? p.imgs.slice(1).map((_,i)=>photoHTML(p,i+1)).join("")
-    : photoHTML(p,1)+photoHTML(p,2);
+    : "";
   let priceLine, buyBtn;
   if(p.variations){
     const opts = p.variations.map((v,i)=>`<option value="${i}">${v.label} — ${money(v.price)}</option>`).join("");

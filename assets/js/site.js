@@ -97,7 +97,7 @@ const CATALOG = [
   {id:"cat-vulpix", slug:"vulpix-v", ebay:"168819002299", icon:"🦊", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Alolan Vulpix V 033/195 Silver Tempest", price:12.00, stripe:"https://buy.stripe.com/6oU9AV1AKff7alidDI6sw0e", img:null,
    imgs:["images/vulpix-v-front.jpg"]},
   /* Copperajah draft — approved $15.00 price, NOT posted to eBay yet. Do not make it buyable. */
-  {id:"cat-copperajah", slug:"copperajah-cgc10", ebay:null, icon:"🐘", tag:"Graded Card · CGC 10 · DRAFT", name:"CGC 10 Copperajah ex 088/071 Japanese Snow Hazard", price:15.00, img:null,
+  {id:"cat-copperajah", slug:"copperajah-cgc10", ebay:null, icon:"🐘", tag:"Graded Card · CGC 10", name:"CGC 10 Copperajah ex 088/071 Japanese Snow Hazard", price:15.00, img:null, outOfStock:true,
    imgs:["images/copperajah-ex-front.jpg"],
    desc:"Draft listing — approved price $15.00, not posted to eBay yet. CGC GEM MINT 10, cert 6102490197, 300 HP, Snow Hazard 088/071 Super Rare Holo."},
   /* New slabs — photographed, not priced yet. comingSoon: show photo + assessment, no price, not buyable. */

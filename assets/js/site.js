@@ -329,11 +329,29 @@ function addToCart(id){
   if(item) item.qty++; else cart.push({id, qty:1});
   saveCart(); openCart();
 }
+/* The same item can have a variation <select> in both its catalog card and
+   the detail view (same id). getElementById returns the first in DOM order,
+   which can be the hidden one — so a catalog add could read the detail
+   view's default instead of the buyer's pick. Always read the select from
+   the view the buyer is actually looking at. */
+function varSel(id){
+  const det = document.getElementById("detailView");
+  if(det && det.style.display === "block"){
+    const d = det.querySelector('[id="var-'+id+'"]');
+    if(d) return d;
+  }
+  const all = document.querySelectorAll('[id="var-'+id+'"]');
+  for(const s of all){
+    if(det && det.contains(s)) continue;
+    return s;
+  }
+  return all[0] || null;
+}
 function addProductVarToCart(id){
   const p = PRODUCTS.find(x => x.id === id); if(!p) return;
   let varLabel = null, varPrice = null;
   if(p.variations){
-    const sel = document.getElementById("var-"+id);
+    const sel = varSel(id);
     const v = p.variations[parseInt(sel.value, 10)];
     varLabel = v.label; varPrice = v.price;
   }
@@ -345,7 +363,7 @@ function addCatalogToCart(catId){
   const c = CATALOG.find(x => x.id === catId); if(!c || c.outOfStock || c.comingSoon || c.draft) return;
   let varLabel = null, varPrice = null;
   if(c.variations){
-    const sel = document.getElementById("var-"+catId);
+    const sel = varSel(catId);
     const v = c.variations[parseInt(sel.value, 10)];
     varLabel = v.label; varPrice = v.price;
   }
@@ -357,7 +375,7 @@ function buyWithPayPal(id){
   const item = findItem(id); if(!item || item.outOfStock || item.comingSoon || item.draft) return;
   let label = item.name, price = item.price;
   if(item.variations){
-    const sel = document.getElementById("var-"+id);
+    const sel = varSel(id);
     if(sel){
       const v = item.variations[parseInt(sel.value, 10)];
       if(v){ label = item.name + " — " + v.label; price = v.price; }

@@ -99,18 +99,9 @@
     <h2>Checkout</h2>
     <div id="cartPageBody"></div>
     <div id="checkoutBox" style="display:none">
-      <p style="color:var(--muted)">Checkout is live — pay securely with Stripe or PayPal.</p>
+      <p style="color:var(--muted)">Checkout is live — pay securely with Stripe or PayPal. Immediate payment required. Handhelds come with a 12-day money-back guarantee.</p>
       <div id="paypalCartBox" style="margin-top:14px"></div>
-      <p style="margin-top:14px"><b>Pay with Stripe:</b> use the “Buy with Stripe →” button on any item — Stripe takes the payment automatically, no invoice. <b>Pay with PayPal:</b> use the PayPal button above when it appears — PayPal takes the payment automatically, no invoice.</p>
-      <form onsubmit="return submitOrder(event)" style="margin-top:16px">
-        <label>Name</label><input id="oName" required>
-        <label>Email</label><input id="oEmail" type="email" required>
-        <label>Shipping address</label><textarea id="oAddr" required></textarea>
-        <label>Payment preference</label>
-        <select id="oPay"><option>Stripe card</option><option>PayPal</option><option>Cash App (manual)</option><option>BTC (manual)</option></select>
-        <p style="margin-top:16px"><button class="btn" type="submit">Place order (no charge yet) →</button></p>
-        <p id="orderMsg" style="color:var(--green);font-weight:700"></p>
-      </form>
+      <p style="margin-top:14px"><b>Pay with PayPal:</b> use the PayPal button above, or the “Buy with PayPal →” button on any item — PayPal takes the payment automatically, no invoice. <b>Pay with Stripe:</b> use the “Buy with Stripe →” button on cards and comics that have one — Stripe takes the payment automatically, no invoice.</p>
     </div>
   </section>
 

@@ -58,13 +58,13 @@ const PRODUCTS = [
   {id:"enamel-pins", slug:"enamel-pins", tag:"ENAMEL PINS · Collectible", name:"Autism+Autistic Enamel Pin — Choose Your Pin",
    desc:"Enamel pins — collectible, actual size. Most pins $6 each. The three Ocarina of Time Deku Stones (Kokiri's Emerald, Goron's Ruby, Zora's Sapphire) are $6 each or $15 for all three as a set. Pick your pin from the dropdown. Unofficial fan-inspired designs.",
    price:6.00, ship:"+ shipping (by location)", icon:"📌",
-   imgs:["images/enamel-pins.jpg"],
+   imgs:["images/autistic-pin-totem.jpg","images/enamel-pins.jpg"],
    variations:[{label:"Autism+Autistic Enamel Pin", price:6.00},{label:"Parappa (Parappa the Rapper)", price:6.00},{label:"Master Onion", price:6.00},{label:"N64 Logo", price:6.00},{label:"Sunny Funny (Sunny Flower)", price:6.00},{label:"PJ Berri (the bear)", price:6.00},{label:"Deku Stone — Kokiri's Emerald", price:6.00},{label:"Deku Stone — Goron's Ruby", price:6.00},{label:"Deku Stone — Zora's Sapphire", price:6.00},{label:"Deku Stones — all three as a set", price:15.00}]},
-  {id:"amby-deck", slug:"modded-amby-deck", tag:"HANDHELD · Modded Amby Deck", name:"Modded Amby Deck — Fully Modded Handheld (Choose Black or Pink)",
-   desc:"Fully modded and playable — faster than most PCs out of the box. Big 120Hz touchscreen, RGB backlit sticks, 8GB RAM + 128GB storage, Android. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus PC games via Winlator. Loaded with free ports and cool stuff. Protective case + wrist strap included, modded to order. (we do not condone piracy of any kind)",
+  {id:"amby-deck", slug:"modded-amby-deck", tag:"HANDHELD · Modded Amby Deck", name:"Modded Amby Deck — Fully Modded Handheld (Choose Black, Indigo or Retro Gray)",
+   desc:"Fully modded and playable — faster than most PCs out of the box. Big 120Hz touchscreen, RGB backlit sticks, 8GB RAM + 128GB storage, Android. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus PC games via Winlator. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Loaded with free ports and cool stuff. Protective case + wrist strap included, modded to order. (we do not condone piracy of any kind)",
    price:220.00, ship:"+ shipping (by location)", icon:"🎮",
    imgs:["images/amby-deck-two.jpg"],
-   variations:[{label:"Black", price:220.00},{label:"Pink", price:220.00}]},
+   variations:[{label:"Black", price:220.00},{label:"Indigo", price:220.00},{label:"Retro Gray", price:220.00}]},
   {id:"tsp", slug:"modded-tsp", tag:"HANDHELD · Modded TSP", name:"TSP — Modded Trimui Smart Pro (CrossMix, 128GB Card)",
    desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Fully decked out ($110) comes with everything — pink protective case + wrist strap included. Machine only ($95) is just the handheld — add the pink case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)",
    price:110.00, ship:"+ shipping (by location)", icon:"🎮",
@@ -176,9 +176,10 @@ const CATALOG = [
    imgs:["images/trimui-smart-pro-black.jpg","images/trimui-smart-pro.jpg"],
    variations:[{label:"Fully decked out — everything included", price:110.00},{label:"Machine only — no case, no wrist strap", price:95.00},{label:"Machine only + pink case", price:105.00},{label:"Machine only + wrist strap", price:100.00}],
    desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Fully decked out ($110) comes with everything — pink protective case + wrist strap included. Machine only ($95) is just the handheld — add the pink case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
-  {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — Anbernic RG476H in All Its Glory", price:179.00, img:null,
+  {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — 120Hz Android Handheld in All Its Glory", price:179.00, img:null,
    imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg"],
-   desc:"Modded AmbyRG — the Anbernic RG476H in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Protective case + wrist strap included. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
+   variations:[{label:"Black", price:179.00},{label:"Indigo", price:179.00},{label:"Retro Gray", price:179.00}],
+   desc:"Modded AmbyRG in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Protective case + wrist strap included. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
   {id:"cat-bricktsp", slug:"bricktsp-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded BrickTSP", name:"BrickTSP — Modded Pocket Handheld (CrossMix, 128GB Card)", price:105.00, img:null,
    imgs:["images/bricktsp.jpg"],
    variations:[{label:"Fully decked out — everything included", price:105.00},{label:"Machine only — no case, no wrist strap", price:90.00},{label:"Machine only + protective case", price:100.00},{label:"Machine only + wrist strap", price:95.00}],
@@ -262,6 +263,7 @@ function injectChrome(){
       '</div>';
     document.body.appendChild(d);
   }
+
 }
 
 /* ---------- cart (localStorage) ---------- */

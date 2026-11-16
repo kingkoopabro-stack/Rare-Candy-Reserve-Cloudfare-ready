@@ -154,6 +154,14 @@ export async function onRequestPost({ env, request }) {
     v3Sets.push("show_vnr_player = ?");
     v3Vals.push(a.show_vnr_player === true || a.show_vnr_player === 1 ? 1 : 0);
   }
+  // v3.3 — autoplay the Steady Wave player on the member page. Only
+  // meaningful when show_vnr_player is on. Same graceful pattern: rides
+  // with the v3 columns, so if the migration hasn't run yet the edit
+  // retries without it.
+  if (typeof a.autoplay_vnr === "boolean" || a.autoplay_vnr === 0 || a.autoplay_vnr === 1) {
+    v3Sets.push("autoplay_vnr = ?");
+    v3Vals.push(a.autoplay_vnr === true || a.autoplay_vnr === 1 ? 1 : 0);
+  }
   // v3.2 — custom "Subscribe to my page" button text (max 40 chars;
   // empty falls back to the default) + the member-page theme pickers
   // (background color/image, text + accent colors, font — validated by

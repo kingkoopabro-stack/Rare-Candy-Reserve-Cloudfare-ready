@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Crystal candy mark">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Wrapped candy mark">
   <defs>
     <radialGradient id="ccb-back" cx="50%" cy="50%" r="50%">
       <stop offset="0%" stop-color="#120905" stop-opacity="0.97"/>
@@ -26,29 +26,57 @@
       <stop offset="0" stop-color="#ffffff" stop-opacity=".8"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
+    <clipPath id="ccb-body-main">
+      <rect x="58" y="96" width="140" height="64" rx="32"/>
+    </clipPath>
+    <clipPath id="ccb-body-left">
+      <rect x="30" y="188" width="64" height="30" rx="15"/>
+    </clipPath>
+    <clipPath id="ccb-body-right">
+      <rect x="162" y="188" width="64" height="30" rx="15"/>
+    </clipPath>
   </defs>
   <!-- dark backing hides the old mark beneath; fades to transparent at the edges -->
   <ellipse cx="128" cy="128" rx="126" ry="126" fill="url(#ccb-back)"/>
-  <!-- left small crystal -->
-  <polygon points="28,140 72,155 66,248 22,248" fill="url(#ccb-left)"/>
-  <polygon points="32,145 58,152 54,220 34,215" fill="#ffffff" opacity=".25"/>
-  <line x1="28" y1="140" x2="72" y2="155" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
-  <!-- right small crystal -->
-  <polygon points="184,155 228,140 234,248 190,248" fill="url(#ccb-right)"/>
-  <polygon points="190,158 216,148 220,220 194,215" fill="#ffffff" opacity=".25"/>
-  <line x1="184" y1="155" x2="228" y2="140" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
-  <!-- central tall crystal -->
-  <polygon points="128,8 188,80 178,250 78,250 68,80" fill="url(#ccb-main)"/>
-  <!-- left facet, lighter -->
-  <polygon points="128,8 68,80 78,250 128,250" fill="url(#ccb-sheen)" opacity=".35"/>
-  <!-- right facet, deeper -->
-  <polygon points="128,8 188,80 178,250 128,250" fill="#002a80" opacity=".28"/>
-  <!-- center ridge -->
-  <line x1="128" y1="12" x2="128" y2="246" stroke="#ffffff" stroke-opacity=".75" stroke-width="2"/>
-  <!-- top edges -->
-  <line x1="128" y1="8" x2="68" y2="80" stroke="#ffffff" stroke-opacity=".6" stroke-width="1.5"/>
-  <line x1="128" y1="8" x2="188" y2="80" stroke="#00e5ff" stroke-opacity=".6" stroke-width="1.5"/>
-  <line x1="78" y1="250" x2="178" y2="250" stroke="#ffffff" stroke-opacity=".4" stroke-width="1.5"/>
+  <!-- left small wrapped candy, tilted -->
+  <g transform="rotate(-12 62 203)">
+    <polygon points="30,195 8,178 8,228 30,211" fill="url(#ccb-left)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="94,195 116,178 116,228 94,211" fill="url(#ccb-left)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="30" y="188" width="64" height="30" rx="15" fill="url(#ccb-left)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+    <g clip-path="url(#ccb-body-left)">
+      <polygon points="44,188 48,188 42,218 38,218" fill="#ffffff" opacity=".35"/>
+      <polygon points="58,188 66,188 60,218 52,218" fill="#aaff00" opacity=".95"/>
+      <polygon points="80,188 84,188 78,218 74,218" fill="#ffffff" opacity=".35"/>
+      <polygon points="30,188 94,188 94,198 30,198" fill="url(#ccb-sheen)" opacity=".35"/>
+    </g>
+  </g>
+  <!-- right small wrapped candy, tilted -->
+  <g transform="rotate(12 194 203)">
+    <polygon points="162,195 140,178 140,228 162,211" fill="url(#ccb-right)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+    <polygon points="226,195 248,178 248,228 226,211" fill="url(#ccb-right)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5" stroke-linejoin="round"/>
+    <rect x="162" y="188" width="64" height="30" rx="15" fill="url(#ccb-right)" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+    <g clip-path="url(#ccb-body-right)">
+      <polygon points="176,188 180,188 174,218 170,218" fill="#ffffff" opacity=".35"/>
+      <polygon points="190,188 198,188 192,218 184,218" fill="#aaff00" opacity=".95"/>
+      <polygon points="212,188 216,188 210,218 206,218" fill="#ffffff" opacity=".35"/>
+      <polygon points="162,188 226,188 226,198 162,198" fill="url(#ccb-sheen)" opacity=".35"/>
+    </g>
+  </g>
+  <!-- central large wrapped candy -->
+  <polygon points="58,112 18,84 18,172 58,144" fill="url(#ccb-main)" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="54" y1="120" x2="24" y2="106" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <line x1="54" y1="136" x2="24" y2="150" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <polygon points="198,112 238,84 238,172 198,144" fill="url(#ccb-main)" stroke="#ffffff" stroke-opacity=".55" stroke-width="2" stroke-linejoin="round"/>
+  <line x1="202" y1="120" x2="232" y2="106" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <line x1="202" y1="136" x2="232" y2="150" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <rect x="58" y="96" width="140" height="64" rx="32" fill="url(#ccb-main)" stroke="#ffffff" stroke-opacity=".55" stroke-width="2"/>
+  <g clip-path="url(#ccb-body-main)">
+    <polygon points="78,96 88,96 72,160 62,160" fill="#ffffff" opacity=".35"/>
+    <polygon points="118,96 134,96 118,160 102,160" fill="#aaff00" opacity=".95"/>
+    <polygon points="158,96 168,96 152,160 142,160" fill="#ffffff" opacity=".35"/>
+    <polygon points="58,96 198,96 198,116 58,116" fill="url(#ccb-sheen)" opacity=".35"/>
+  </g>
+  <rect x="58" y="96" width="140" height="64" rx="32" fill="none" stroke="#00e5ff" stroke-opacity=".35" stroke-width="1.5"/>
   <!-- sparkles -->
   <polygon points="128,50 131,57 138,60 131,63 128,70 125,63 118,60 125,57" fill="#ffffff" opacity=".95"/>
   <polygon points="160,135 162,140 167,142 162,144 160,149 158,144 153,142 158,140" fill="#ffffff" opacity=".9"/>

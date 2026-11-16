@@ -161,6 +161,17 @@ var state = {
   findResults: [],
   headlines: [], // top posts by engagement (Headlines view / Street strip)
   route: null,
+  // Taffy Phone — the iPhone-like popup phone window Taffy lives in.
+  // The phone root lives on document.body (outside #dwc-app) so route
+  // changes never rebuild it (that keeps the radio playing and the notes
+  // textarea focused). All phone data is in-memory / this session only.
+  phone: { open: false, app: "home", wallpaper: "vaporwave" },
+  phoneGallery: [], // [{ url, name, timer }] — session only, auto-deleted after 10 min
+  phoneNotes: "", // session notes — this tab only, gone when you leave
+  phoneMsgList: null, // cached member list for the MSG contacts view
+  phoneChat: [], // [{ who: "me"|"taffy", text, emoji }] — session only, gone when you leave
+  phoneChatOpen: false, // chat bar expanded (tap-to-reveal); conversation stays in phoneChat when closed
+  phoneRenderedKey: "", // app|open|wallpaper|galleryCount — avoids rebuilding the radio
 };
 
 function deviceId() {
@@ -402,6 +413,471 @@ function renderAccount() {
   initLayoutEditor();
 }
 
+// ---------- Taffy — the little site helper (ONE helper, v5) ----------
+// v5: ASCENSION — inspired by Shawn Hocking's astral artwork (the reference
+// Chris sent): a glowing figure, arms OUTSTRETCHED to the sides, radiant
+// head, inside a big glowing rune mandala, energy streaming up and down in
+// purple and gold. KEEP Taffy's v4 look (Game Boy-type creature, ORIGINAL
+// RGB GRADIENT like Slabb's avatar — pink → purple → blue, cyan accents,
+// hand-drawn show style, cute, hands and feet). NO PC AT ALL — the laptop,
+// keyboard, keys and cursor are GONE.
+// Idle/talking: adorable and helpful — smiling, winking, mouth moving when
+// talking, arms waving around a bit. Friendly, alive.
+// Working (loading information): ASCENSION. Taffy floats in a meditation
+// pose, a radiant glowing mandala behind him, light rays streaming up and
+// down, and his ASTRAL FORM — a glowing spirit with arms OUTSTRETCHED and a
+// radiant head, just like the figure in the reference — rises out of him and
+// bobs up a bit, down, up, down, like he's stuck ascending while he loads
+// the information. The astral form shows the "904 Lokos" prison tattoos.
+// That is the .taffy-working loop. CSS only.
+// Mood swings are a FUTURE step.
+// The standalone asset lives at images/taffy-helper.svg.
+// uid keeps the gradient ids unique when Taffy appears twice on a page.
+function taffySVG(cls, uid) {
+  var u = uid || "a";
+  return '<svg class="' + (cls || "taffy") + '" viewBox="0 0 240 210" role="img" aria-label="Taffy, the little site helper">' +
+    '<defs>' +
+    '<linearGradient id="taffy-body-' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff2ea6"/><stop offset=".35" stop-color="#e060f0"/><stop offset=".6" stop-color="#7c4dff"/><stop offset="1" stop-color="#0066ff"/></linearGradient>' +
+    '<linearGradient id="taffy-screen-' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8f7ff"/><stop offset="1" stop-color="#5ee6ff"/></linearGradient>' +
+    '<linearGradient id="taffy-astral-' + u + '" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9de2" stop-opacity=".92"/><stop offset=".5" stop-color="#c9a6ff" stop-opacity=".8"/><stop offset="1" stop-color="#7dd7ff" stop-opacity=".92"/></linearGradient>' +
+    '<linearGradient id="taffy-gold-' + u + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe98a"/><stop offset=".55" stop-color="#d4af37"/><stop offset="1" stop-color="#b8860b"/></linearGradient>' +
+    '<filter id="taffy-glow-' + u + '" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+    '</defs>' +
+    '<g class="taffy-energy" filter="url(#taffy-glow-' + u + ')">' +
+    '<g class="taffy-mandala">' +
+    '<circle cx="120" cy="105" r="95" fill="#7c4dff" opacity=".08"/>' +
+    '<circle cx="120" cy="105" r="92" fill="none" stroke="url(#taffy-gold-' + u + ')" stroke-width="1.5" opacity=".8"/>' +
+    '<circle cx="120" cy="105" r="86" fill="none" stroke="#e8d9a0" stroke-width="5" stroke-dasharray="2 9.5" opacity=".75"/>' +
+    '<circle cx="120" cy="105" r="80" fill="none" stroke="#7c4dff" stroke-width="1.5" opacity=".8"/>' +
+    '<path d="M120 14 L196 152 L44 152 Z" fill="none" stroke="#ffd75e" stroke-width="1.2" opacity=".45"/>' +
+    '<path d="M120 26 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3 Z" fill="#ffe98a" opacity=".8"/>' +
+    '<path d="M120 184 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3 Z" fill="#ffe98a" opacity=".8"/>' +
+    '<path d="M42 105 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3 Z" fill="#ffe98a" opacity=".8"/>' +
+    '<path d="M198 105 l3 6 6 3 -6 3 -3 6 -3 -6 -6 -3 6 -3 Z" fill="#ffe98a" opacity=".8"/>' +
+    '</g>' +
+    '<g class="taffy-rays" fill="#ffe98a">' +
+    '<polygon points="108,0 132,0 120,62" opacity=".3"/>' +
+    '<polygon points="82,0 98,0 116,58" opacity=".22"/>' +
+    '<polygon points="142,0 158,0 124,58" opacity=".22"/>' +
+    '<polygon points="108,210 132,210 120,158" opacity=".26"/>' +
+    '<polygon points="82,210 98,210 116,162" opacity=".18"/>' +
+    '<polygon points="142,210 158,210 124,162" opacity=".18"/>' +
+    '</g>' +
+    '<circle class="taffy-ring taffy-ring-1" cx="120" cy="92" r="60" fill="none" stroke="#00e5ff" stroke-width="2"/>' +
+    '<circle class="taffy-ring taffy-ring-2" cx="120" cy="92" r="72" fill="none" stroke="#ff2ea6" stroke-width="1.5"/>' +
+    '<g class="taffy-orbit"><circle cx="120" cy="24" r="5" fill="#00e5ff"/><circle cx="184" cy="96" r="4" fill="#ff2ea6"/><circle cx="56" cy="96" r="4" fill="#aaff00"/></g>' +
+    '<path class="taffy-sparkle" d="M58 48 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z" fill="#ffffff"/>' +
+    '<path class="taffy-sparkle taffy-sparkle-2" d="M182 42 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z" fill="#ffffff"/>' +
+    '<path class="taffy-sparkle taffy-sparkle-3" d="M196 142 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z" fill="#ffffff"/>' +
+    '<path class="taffy-sparkle taffy-sparkle-4" d="M44 150 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 Z" fill="#ffd75e"/>' +
+    '</g>' +
+    '<g class="taffy-body">' +
+    '<path d="M80 44 Q74 38 82 37 L158 36 Q167 37 167 47 L167 120 L150 139 L90 140 Q74 139 73 125 L72 50 Q72 44 80 44 Z" fill="url(#taffy-body-' + u + ')" stroke="#2a0a4a" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<path d="M82 47 Q77 42 84 41 L156 40 Q164 41 164 49 L164 118 L148 135 L92 136 Q77 135 76 123 L75 52 Q75 48 82 47 Z" fill="none" stroke="#2a0a4a" stroke-width="1" opacity=".3" stroke-linejoin="round"/>' +
+    '<g class="taffy-front">' +
+    '<path d="M84 52 Q83 50 88 50 L152 49 Q157 50 157 56 L157 94 Q156 101 149 101 L90 102 Q83 101 83 95 Q82 66 84 52 Z" fill="url(#taffy-screen-' + u + ')" stroke="#10203a" stroke-width="2.5" stroke-linejoin="round"/>' +
+    '<g class="taffy-face">' +
+    '<g class="taffy-eye"><circle cx="108" cy="72" r="9" fill="#10203a"/><circle cx="111" cy="69" r="3" fill="#ffffff"/></g>' +
+    '<g class="taffy-eye taffy-eye-wink"><circle cx="132" cy="73" r="8.5" fill="#10203a"/><circle cx="135" cy="70" r="2.8" fill="#ffffff"/></g>' +
+    '<path class="taffy-mouth-smile" d="M110 86 Q115 93 120 89 Q125 94 130 86" fill="none" stroke="#10203a" stroke-width="3" stroke-linecap="round"/>' +
+    '<ellipse class="taffy-mouth-talk" cx="120" cy="89" rx="5.5" ry="3.5" fill="#10203a"/>' +
+    '<path d="M92 82 q3 4 8 2" fill="none" stroke="#f2a18e" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>' +
+    '<path d="M140 83 q3 4 8 2" fill="none" stroke="#f2a18e" stroke-width="2.5" stroke-linecap="round" opacity=".8"/>' +
+    '</g>' +
+    '<g class="taffy-face-meditate">' +
+    '<path d="M100 72 q8 6 16 0" fill="none" stroke="#10203a" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M124 73 q8 6 16 0" fill="none" stroke="#10203a" stroke-width="3" stroke-linecap="round"/>' +
+    '<path d="M113 88 Q120 92 127 88" fill="none" stroke="#10203a" stroke-width="3" stroke-linecap="round"/>' +
+    '</g>' +
+    '<g fill="#1f3a4d" transform="rotate(-3 96 116)"><rect x="91" y="106" width="10" height="20" rx="3"/><rect x="86" y="111" width="20" height="10" rx="3"/></g>' +
+    '<circle cx="146" cy="112" r="6" fill="#2fbf4a" stroke="#10203a" stroke-width="1.5"/>' +
+    '<circle cx="132" cy="122" r="5" fill="#e53935" stroke="#10203a" stroke-width="1.5"/>' +
+    '<rect x="108" y="131" width="10" height="4" rx="2" fill="#1f3a4d" transform="rotate(-12 113 133)"/>' +
+    '<rect x="124" y="131" width="10" height="4" rx="2" fill="#1f3a4d" transform="rotate(-12 129 133)"/>' +
+    '<path d="M142 134 l5 -4 M146 137 l5 -4 M150 140 l5 -4" fill="none" stroke="#2a0a4a" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>' +
+    '</g>' +
+    '<ellipse cx="88" cy="148" rx="11" ry="5" fill="#7c4dff"/>' +
+    '<ellipse cx="152" cy="148" rx="10" ry="5" fill="#7c4dff"/>' +
+    '</g>' +
+    '<g class="taffy-arms">' +
+    '<g class="taffy-arm taffy-arm-l"><path d="M72 102 Q76 124 90 138" fill="none" stroke="#e060f0" stroke-width="9" stroke-linecap="round"/><circle cx="92" cy="140" r="8" fill="#fff3d6" stroke="#2a0a4a" stroke-width="2"/></g>' +
+    '<g class="taffy-arm taffy-arm-r"><path d="M168 102 Q164 124 150 138" fill="none" stroke="#e060f0" stroke-width="9" stroke-linecap="round"/><circle cx="148" cy="140" r="8" fill="#fff3d6" stroke="#2a0a4a" stroke-width="2"/></g>' +
+    '</g>' +
+    '<g class="taffy-astral" filter="url(#taffy-glow-' + u + ')">' +
+    '<g stroke="url(#taffy-astral-' + u + ')" stroke-width="7" stroke-linecap="round" fill="none">' +
+    '<path d="M102 36 L70 48"/>' +
+    '<path d="M138 36 L170 48"/>' +
+    '</g>' +
+    '<circle cx="68" cy="49" r="6" fill="#fff7c0" stroke="#ffffff" stroke-width="1.5"/>' +
+    '<circle cx="172" cy="49" r="6" fill="#fff7c0" stroke="#ffffff" stroke-width="1.5"/>' +
+    '<path d="M96 34 Q120 26 144 34 L140 46 Q132 52 120 54 Q108 52 100 46 Z" fill="url(#taffy-astral-' + u + ')" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '<circle cx="120" cy="22" r="8" fill="#fff7c0" stroke="#ffffff" stroke-width="1.5"/>' +
+    '<circle cx="120" cy="22" r="12" fill="none" stroke="#ffe98a" stroke-width="1.5" opacity=".7"/>' +
+    '<text x="120" y="44" font-family="\'Comic Sans MS\', \'Chalkboard SE\', cursive" font-size="7.5" font-weight="bold" fill="#1a1030" text-anchor="middle" transform="rotate(-3 120 44)">904 Lokos</text>' +
+    '<path d="M120 48 q2.5 4 0 6 q-2.5 -2 0 -6" fill="#1a1030" opacity=".8"/>' +
+    '</g>' +
+    '</svg>';
+}
+// Taffy's quick-help buttons — every one uses a route or action the
+// Community already has. No new endpoints, no chatbot.
+// - File a report → Reports route (members file reports from there).
+// - Block a member → Reports route too: there is no block button yet, so
+//   blocking goes through reporting and the operator (Chris) removes them.
+// - FAQ → Rules route. - Contact support → IM to the operator (Chris,
+//   @RareCandyReserve, member 1) via the existing openIM.
+// - Email an admin / mod → opens the visitor's mail client addressed to
+//   TheRarecandyreserve@proton.me with a pre-filled subject. Texts come
+//   later; nothing here claims texts are set up.
+// Comments are NOT auto-forwarded to email — there is no server-side email
+// service configured, so comments live on the posts and the operator sees
+// them in the Community. That needs an email service to change.
+function taffyHelpHTML(inPhone) {
+  return '<div class="taffy-help">' +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">🚩 File a report</button>' +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">🚫 Block a member</button>' +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">❓ FAQ</button>' +
+    '<button type="button" class="btn ghost small" onclick="DWC.imMember(1, \'RareCandyReserve\')">💬 Contact support</button>' +
+    '<a class="btn ghost small" href="mailto:TheRarecandyreserve@proton.me?subject=Community%20%E2%80%94%20contact%20an%20admin%20or%20mod">✉️ Email an admin / mod</a>' +
+    (inPhone ? "" : '<button type="button" class="btn ghost small" onclick="DWC.phoneOpen()">📱 Open Taffy’s phone</button>') +
+    '</div>' +
+    '<p class="taffy-help-note">Flag and report any comment or profile, as well as messages or content you see, if it does not belong — an admin will see it and action will be taken. For further issues unresolved, reach out to TheRarecandyreserve@proton.me or leave a message for the owner of this website or its agents or employees.</p>' +
+    '<p class="taffy-help-note">Blocking happens through reports — report someone and Chris (the operator) can remove them. Contact support messages Chris directly. Email an admin / mod goes to TheRarecandyreserve@proton.me. Comments live on the posts — Chris sees them in the Community; email forwarding of every comment isn’t set up yet.</p>';
+}
+
+function copyTextToClipboard(text) {
+  var ta = document.createElement("textarea");
+  ta.value = text || "";
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+// ---------- Taffy Phone — the iPhone-like popup phone window ----------
+// The green call/text button (bottom-right) opens a little iPhone-style
+// popup: rounded frame, dynamic island, status bar, home screen with apps.
+// Taffy lives inside it. Each app wires to a Community feature that
+// already exists, or is honestly labeled in-session / coming soon.
+// No new API endpoints.
+// Apps: Vita Nova (Taffy), MSG (contacts — Taffy first, then friends),
+// Gallery (session-only, auto-deletes after 10 min), SOS (help),
+// Notes (session-only), radio (Steady Wave stream), Code (the layout/CSS
+// editor in Edit profile), Tutorial (coming soon — Chris adds the video).
+// The phone root lives on document.body, OUTSIDE #dwc-app, so route
+// changes never rebuild it — the radio keeps playing and the notes
+// textarea keeps focus. renderPhone() only rebuilds when the app, open
+// state, wallpaper, gallery count, or MSG list changes.
+var PHONE_WALLPAPERS = [
+  { id: "vaporwave", label: "Vaporwave", bg: "linear-gradient(160deg,#2b1055 0%,#7597de 42%,#ff2ea6 78%,#ff9a00 100%)" },
+  { id: "retro80s", label: "Retro 80s", bg: "radial-gradient(circle at 50% 36%,#ffd75e 0%,#ff9a3d 16%,#ff5e62 32%,transparent 34%),linear-gradient(180deg,#1a0b2e 0%,#3b1d5e 45%,#ff6b35 75%,#2b1055 100%)" },
+  { id: "neon", label: "Neon", bg: "radial-gradient(circle at 22% 18%,rgba(0,229,255,.4),transparent 55%),radial-gradient(circle at 82% 82%,rgba(255,46,166,.4),transparent 55%),#05050a" },
+  { id: "goth", label: "Goth", bg: "radial-gradient(circle at 50% 0%,rgba(124,77,255,.35),transparent 60%),linear-gradient(160deg,#000000 0%,#1a0b2e 55%,#3b0a3b 100%)" },
+];
+var PHONE_WALLPAPER_KEY = "dwc-phone-wallpaper";
+function phoneWallpaperBg(id) {
+  var found = null;
+  PHONE_WALLPAPERS.forEach(function (x) { if (x.id === id) found = x; });
+  return found ? found.bg : PHONE_WALLPAPERS[0].bg;
+}
+function loadPhoneWallpaper() {
+  try { var w = localStorage.getItem(PHONE_WALLPAPER_KEY); if (w) state.phone.wallpaper = w; } catch (e) {}
+}
+function savePhoneWallpaper(id) {
+  try { localStorage.setItem(PHONE_WALLPAPER_KEY, id); } catch (e) {}
+}
+function phoneTime() {
+  var d = new Date();
+  var h = d.getHours();
+  var ap = h >= 12 ? " PM" : " AM";
+  h = h % 12 || 12;
+  var m = d.getMinutes();
+  return h + ":" + (m < 10 ? "0" : "") + m + ap;
+}
+function phoneDate() {
+  var d = new Date();
+  var months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return months[d.getMonth()] + " " + d.getDate();
+}
+function phoneClockText() { return phoneDate() + "  " + phoneTime(); }
+function phoneTickClock() {
+  var el = document.getElementById("tp-clock");
+  if (el) el.textContent = phoneClockText();
+}
+var TP_SIGNAL_BARS =
+  '<svg width="17" height="11" viewBox="0 0 17 11" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="0.5" fill="#fff"/><rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="#fff"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="#fff"/><rect x="13.5" y="0" width="3" height="11" rx="0.5" fill="#fff"/></svg>';
+var TP_STATUS_ICONS =
+  '<svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1.5 4.5a9 9 0 0 1 13 0"/><path d="M4 7.5a5.5 5.5 0 0 1 8 0"/><circle cx="8" cy="10" r="1.2" fill="#fff" stroke="none"/></svg>' +
+  '<svg width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".5"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#fff"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="#fff" fill-opacity=".5"/></svg>';
+var TP_ICON_MSG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 5.9 2 10.8c0 2.8 1.5 5.2 3.8 6.8L4.5 22l5-2.7c.8.2 1.6.3 2.5.3 5.5 0 10-3.9 10-8.8S17.5 2 12 2z" fill="#fff"/></svg>';
+var TP_ICON_GALLERY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="#fff"/><path d="M5 17l4.5-4.5L12 15l3-3 4 4" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.6" fill="#f59e0b"/></svg>';
+var TP_ICON_NOTES = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" fill="#fff"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"/></svg>';
+var TP_ICON_TUTORIAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg>';
+
+function phoneTopbarHTML(title) {
+  return '<div class="tp-topbar"><button type="button" class="tp-back" onclick="DWC.phoneGo(\'home\')">‹ Home</button><strong>' + esc(title) + '</strong><button type="button" class="tp-min" onclick="DWC.phoneMinimize()" title="Minimize the phone">—</button></div>';
+}
+function phoneAppTile(app, label, iconHTML) {
+  return '<button type="button" class="tp-app" onclick="DWC.phoneGo(\'' + app + '\')">' + iconHTML + '<span>' + esc(label) + '</span></button>';
+}
+function phoneHomeHTML() {
+  var name = state.profile ? "@" + state.profile.username : "friend";
+  return '<div class="tp-home">' +
+    '<p class="tp-hello">Hi, ' + esc(name) + ' 🍬</p>' +
+    '<p class="tp-sub">Taffy lives in the Vita Nova app.</p>' +
+    '<div class="tp-grid">' +
+    phoneAppTile("vitanova", "Vita Nova", '<span class="tp-icon tp-icon-vitanova">' + taffySVG("taffy-appicon", "phone") + '</span>') +
+    phoneAppTile("msg", "MSG", '<span class="tp-icon tp-icon-msg">' + TP_ICON_MSG + '</span>') +
+    phoneAppTile("gallery", "Gallery", '<span class="tp-icon tp-icon-gallery">' + TP_ICON_GALLERY + '</span>') +
+    phoneAppTile("sos", "SOS", '<span class="tp-icon tp-icon-sos"><span class="tp-glyph">SOS</span></span>') +
+    phoneAppTile("notes", "Notes", '<span class="tp-icon tp-icon-notes">' + TP_ICON_NOTES + '</span>') +
+    phoneAppTile("radio", "radio", '<span class="tp-icon tp-icon-radio"><span class="tp-glyph">♪</span></span>') +
+    phoneAppTile("code", "Code", '<span class="tp-icon tp-icon-code"><span class="tp-glyph">&lt;/&gt;</span></span>') +
+    phoneAppTile("tutorial", "Available soon — check back later!", '<span class="tp-icon tp-icon-tutorial">' + TP_ICON_TUTORIAL + '</span>') +
+    '</div>' +
+    '<div class="tp-wall"><span>Wallpaper</span><div class="tp-wall-swatches">' +
+    PHONE_WALLPAPERS.map(function (w) {
+      return '<button type="button" class="tp-wall-sw' + (state.phone.wallpaper === w.id ? " active" : "") + '" style="background:' + w.bg + '" title="' + esc(w.label) + '" aria-label="' + esc(w.label) + ' wallpaper" onclick="DWC.phoneWallpaper(\'' + w.id + '\')"></button>';
+    }).join("") +
+    '</div></div>' +
+    '<p class="tp-note">Tap an app to open it. The — button (top right) minimizes the phone back to the green button.</p>' +
+    '</div>';
+}
+// ---------- Taffy chat — lightweight, client-side only ----------
+// No AI API, no network, no heavy model. Pure keyword/pattern matching
+// over a small intent table. Fast, tiny, and honest about what it knows.
+// Returns { text, emoji, ascend }. `ascend` = play the ascension loop
+// while Taffy "thinks" (layout builds + code questions).
+var TAFFY_EMOJI_IDX = 0;
+function taffyPickEmoji(list) {
+  if (!list || !list.length) return "";
+  var e = list[TAFFY_EMOJI_IDX % list.length];
+  TAFFY_EMOJI_IDX++;
+  return e;
+}
+function taffyReply(raw) {
+  var t = (" " + (raw || "").toLowerCase().replace(/[^a-z0-9' ]/g, " ") + " ");
+  var has = function (re) { return re.test(t); };
+  // Greeting
+  if (has(/\b(hi|hello|hey|yo|hiya|howdy|good morning|good afternoon|good evening|sup)\b/))
+    return { text: "Hey hey! Good to see you. Ask me about layouts, selling, reports, music, or code — or just say hi back.", emoji: taffyPickEmoji(["👋", "😊", "✨"]), ascend: false };
+  // Who is Taffy / tattoos
+  if (has(/\b(who are you|your name|what are you|what's your name)\b/) || has(/\btattoo|904|lokos|prison|jail\b/))
+    return { text: "I'm Taffy — your little site helper. Cute up front, and yes… my astral form has the 904 Lokos tattoos. Don't judge, I earned them. Ask me to build you a layout and watch me ascend.", emoji: taffyPickEmoji(["🍬", "😎"]), ascend: false };
+  // Joke
+  if (has(/\bjoke|funny|make me laugh\b/))
+    return { text: "Okay, one: why did the Game Boy go to therapy? It had too many unresolved pixels. …I'll stick to layouts.", emoji: taffyPickEmoji(["😄", "🤣"]), ascend: false };
+  // Report / flag / block / bothering
+  if (has(/\breport|flag|block|bother|harass|spam|scam|abuse|rude|mean to me|stalking\b/))
+    return { text: "Got it — flag it and an admin will see it. Tap “File a report” below (or head to Reports), and tell them the comment, profile, or message that doesn't belong. For anything still unresolved, email TheRarecandyreserve@proton.me.", emoji: taffyPickEmoji(["🛡️", "🚩"]), ascend: false };
+  // Contact admin / support / email / mod
+  if (has(/\b(admin|support|contact|email|mod|moderator|owner|human|someone real)\b/))
+    return { text: "You can reach an admin two ways: tap “Email an admin / mod” below (TheRarecandyreserve@proton.me), or “Contact support” to message Chris directly. For reports, use the Reports area — that's the operator flag inbox.", emoji: taffyPickEmoji(["✉️", "💬"]), ascend: false };
+  // Layout / theme / customize my page
+  if (has(/\blayout|theme|customi[sz]e|my page|profile.*(look|design|color|style)|background|wallpaper\b/))
+    return { text: "Let's make your page yours! Hit “Open the Layout Bot” and I'll build you a theme — pick a vibe, an accent color, and a few mood words. Or open Edit Profile and use the layout presets and custom CSS yourself.", emoji: taffyPickEmoji(["🎨", "✨"]), ascend: true };
+  // Code / CSS
+  if (has(/\bcode|css|html|javascript|js\b|script|program|develop/))
+    return { text: "Code time! Open the Code app on the phone home screen — it opens the layout and custom-CSS editor — and I'll stay open alongside you. Tell me what you're trying to build and I'll point you to the right spot.", emoji: taffyPickEmoji(["💻", "💡"]), ascend: true };
+  // Sell / list / price / money
+  if (has(/\bsell|listing|list it|price|pricing|how much|shop|store|earn|make money|marketplace|payout\b/))
+    return { text: "Selling here is simple: your page is free, you list what you make or collect, and buyers find you. The Community takes just 1.5% once — and only once — when the sale completes and you're paid. Need a price? Tell me the item and I'll help you think it through.", emoji: taffyPickEmoji(["💰", "🍬"]), ascend: false };
+  // Music / radio / songs
+  if (has(/\bmusic|radio|song|track|playlist|listen|play.*music|steady wave|vita nova\b/))
+    return { text: "Turn it up! The radio app on the phone plays Steady Wave live, and on your profile you can pick up to 5 A Steady Heart tracks to show off. More licensed songs and public-domain pieces like Canon in D are coming too.", emoji: taffyPickEmoji(["🎵", "🎶"]), ascend: false };
+  // Help / what can you do
+  if (has(/\bhelp|what can you do|commands|what do you do|how do i|how to\b/))
+    return { text: "Here's what I'm good at: building layouts and themes, helping with code, showing you how to sell and get paid fairly, filing reports and blocking, answering FAQ, and playing the radio. Try “build me a layout” or “how do I sell?”", emoji: taffyPickEmoji(["💡", "✨"]), ascend: false };
+  // Thanks
+  if (has(/\bthank|thanks|thx|\bty\b|appreciated\b/))
+    return { text: "Anytime! That's what I'm here for. Go make something cool.", emoji: taffyPickEmoji(["😊", "💜"]), ascend: false };
+  // Bye
+  if (has(/\bbye|goodbye|good night|see you|later|gtg\b/))
+    return { text: "Bye for now! I'll be right here in the phone whenever you need me.", emoji: taffyPickEmoji(["👋", "🌙"]), ascend: false };
+  // Fallback — honest, never pretends to know
+  return { text: "Hmm, I'm still learning — I don't have a good answer for that one. Try asking about layouts, selling, reports, music, or code, or tap one of the buttons below and I'll point you the right way.", emoji: taffyPickEmoji(["🤔", ""]), ascend: false };
+}
+function phoneChatBubbleHTML(m) {
+  var cls = m.who === "me" ? "tp-bubble-me" : "tp-bubble-taffy";
+  var body = (m.emoji ? esc(m.emoji) + " " : "") + esc(m.text);
+  return '<div class="tp-bubble ' + cls + '">' + body + '</div>';
+}
+function phoneChatLogHTML() {
+  return state.phoneChat.map(phoneChatBubbleHTML).join("");
+}
+function phoneChatAdd(who, text, emoji) {
+  state.phoneChat.push({ who: who, text: text, emoji: emoji || "" });
+  if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
+  var log = document.getElementById("tp-chat-log");
+  if (log) {
+    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "" }));
+    while (log.children.length > state.phoneChat.length) log.removeChild(log.firstChild);
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function phoneTaffyHTML() {
+  var chatOpen = !!state.phoneChatOpen;
+  return phoneTopbarHTML("Vita Nova") + '<div class="tp-appview tp-taffy-full">' +
+    '<div class="tp-taffy" id="dwc-phone-taffy" onclick="DWC.phoneChatClose()">' + taffySVG("taffy", "phone") + '</div>' +
+    '<p class="tp-note">Hi, I’m Taffy! I build layouts, help with code, and answer questions about building your site.</p>' +
+    '<p><button type="button" class="btn small" onclick="DWC.phoneAscend()">✨ Make Taffy ascend</button> <button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the Layout Bot →</button></p>' +
+    taffyHelpHTML(true) +
+    '<div class="tp-chat' + (chatOpen ? " open" : "") + '" id="tp-chat">' +
+    '<button type="button" class="tp-chat-head" onclick="DWC.phoneChatToggle()"><span>💬 ' + (chatOpen ? "Chat with Taffy" : "Tap to chat with Taffy") + '</span><span class="tp-chat-chev">' + (chatOpen ? "⌄" : "⌃") + '</span></button>' +
+    '<div class="tp-chat-log" id="tp-chat-log">' + phoneChatLogHTML() + '</div>' +
+    '<div class="tp-chat-bar"><input id="tp-chat-input" type="text" placeholder="Message Taffy…" autocomplete="off" maxlength="300" onkeydown="if(event.key===\'Enter\'){DWC.phoneChatSend();}"><button type="button" class="tp-chat-send" onclick="DWC.phoneChatSend()" aria-label="Send message to Taffy">➤</button></div>' +
+    '</div>' +
+    '</div>';
+}
+async function loadPhoneMsgList() {
+  if (!state.profile || state.phoneMsgList) return;
+  var data = await apiGet("/members?limit=60");
+  var members = (data && data.members) || [];
+  var mine = state.profile.id;
+  var tops = {};
+  (state.profile.top_friend_ids || []).forEach(function (id) { tops[id] = true; });
+  members = members.filter(function (m) { return m.id !== mine; });
+  members.sort(function (a, b) { return ((tops[b.id] ? 1 : 0) - (tops[a.id] ? 1 : 0)); });
+  state.phoneMsgList = members;
+  if (state.phone.open && state.phone.app === "msg") renderPhone();
+}
+function phoneMsgHTML() {
+  // Taffy is IN the contacts, first — tap him and he opens in the phone,
+  // same as the Vita Nova app on the home screen. Both paths lead to Taffy.
+  var rows = '<button type="button" class="tp-contact" onclick="DWC.phoneGo(\'vitanova\')">' +
+    '<span class="tp-contact-face">' + taffySVG("taffy-contact", "phone2") + '</span>' +
+    '<span><strong>Taffy</strong><em>Your little site helper — tap to message him</em></span><span class="tp-contact-go">›</span></button>';
+  if (!state.profile) {
+    rows += '<p class="tp-note">Create your account to message friends — Taffy is here either way.</p><p><button type="button" class="btn small" onclick="DWC.phoneMinimize();DWC.openSignup()">Create account — it’s free</button></p>';
+  } else if (!state.phoneMsgList) {
+    rows += '<p class="tp-note">Loading friends…</p>';
+    loadPhoneMsgList();
+  } else if (!state.phoneMsgList.length) {
+    rows += '<p class="tp-note">No other members yet — you’re the first one here. Add friends in Edit profile (Top 8) and they’ll show up here.</p>';
+  } else {
+    rows += state.phoneMsgList.map(function (m) {
+      return '<button type="button" class="tp-contact" onclick="DWC.phoneMsgMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">' +
+        '<span class="tp-contact-av">' + esc((m.username || "?").slice(0, 1).toUpperCase()) + '</span>' +
+        '<span><strong>@' + esc(m.username) + '</strong><em>Tap to message</em></span><span class="tp-contact-go">›</span></button>';
+    }).join("");
+  }
+  return phoneTopbarHTML("MSG — Contacts") + '<div class="tp-appview">' + rows + '</div>';
+}
+function phoneGalleryHTML() {
+  var items = state.phoneGallery;
+  var thumbs = items.length
+    ? '<div class="tp-gallery">' + items.map(function (it, i) {
+        return '<figure><img src="' + esc(it.url) + '" alt="" onclick="DWC.phoneGalleryOpen(' + i + ')"><button type="button" onclick="DWC.phoneGalleryDel(' + i + ')" title="Delete">✕</button><figcaption>' + esc(it.name) + '</figcaption></figure>';
+      }).join("") + '</div>'
+    : '<p class="tp-note">No photos here yet — add one below.</p>';
+  return phoneTopbarHTML("Gallery") + '<div class="tp-appview">' +
+    '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site.</p>' +
+    thumbs +
+    '<label class="btn small tp-filebtn">+ Add a photo<input type="file" accept="image/*" hidden onchange="DWC.phoneGalleryAdd(this)"></label>' +
+    '<p class="tp-note">' + items.length + ' / 6 photos</p></div>';
+}
+function phoneSosHTML() {
+  return phoneTopbarHTML("SOS") + '<div class="tp-appview tp-sosview">' +
+    '<p class="tp-sos-title">Need help right now?</p>' +
+    '<p class="tp-note">Something doesn’t belong? File a report — it goes straight to Chris, the operator.</p>' +
+    '<button type="button" class="tp-sosbtn" onclick="DWC.phoneSos()">SOS</button>' +
+    '<p class="tp-note">For anything unresolved, email <a href="mailto:TheRarecandyreserve@proton.me">TheRarecandyreserve@proton.me</a> or leave a message for the owner of this website or its agents or employees.</p>' +
+    '</div>';
+}
+function phoneNotesHTML() {
+  return phoneTopbarHTML("Notes") + '<div class="tp-appview">' +
+    '<p class="tp-note">Jot down code or anything — saved in this tab only, gone when you leave. Copy it out before you go.</p>' +
+    '<textarea class="tp-notes" rows="10" maxlength="4000" placeholder="Paste or write code here…" oninput="DWC.phoneNotesInput(this)">' + esc(state.phoneNotes) + '</textarea>' +
+    '<p><button type="button" class="btn small" onclick="DWC.phoneNotesCopy()">Copy notes</button> <button type="button" class="btn ghost small" onclick="DWC.phoneNotesClear()">Clear</button></p>' +
+    '</div>';
+}
+function phoneRadioHTML() {
+  var picks = (state.profile && state.profile.ash_tracks) || [];
+  var picksHTML = picks.length
+    ? '<ol class="tp-picks">' + picks.map(function (n) { return '<li>' + esc(ASH_TRACKS[n - 1] || ("Track " + n)) + '</li>'; }).join("") + '</ol>'
+    : '<p class="tp-note">No picks yet — pick up to 5 A Steady Heart tracks in Edit profile.</p>';
+  return phoneTopbarHTML("radio") + '<div class="tp-appview">' +
+    '<div class="tp-radio-logo">♪</div>' +
+    '<p class="tp-radio-name">Steady Wave</p>' +
+    '<p class="tp-note" style="text-align:center">Chris’s station — live, 24/7.</p>' +
+    '<audio controls preload="none" src="' + VNR_STREAM_URL + '"></audio>' +
+    '<p class="tp-note"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p>' +
+    '<h4 style="margin:14px 0 6px">🎵 Your A Steady Heart picks</h4>' +
+    '<p class="tp-note">Track names only for now — the individual-track player comes later.</p>' +
+    picksHTML +
+    '</div>';
+}
+function phoneCodeHTML() {
+  return phoneTopbarHTML("Code") + '<div class="tp-appview">' +
+    '<p class="tp-note">The code editor lives in Edit profile — your MySpace layout box, with custom CSS and a live preview.</p>' +
+    '<p><button type="button" class="btn" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
+    '<p><button type="button" class="btn ghost small" onclick="DWC.phoneGo(\'vitanova\')">Keep Taffy open alongside →</button></p>' +
+    '<p class="tp-note">Taffy can sit in the phone while you code — or minimize the phone and he’ll wait for you.</p>' +
+    '</div>';
+}
+function phoneTutorialHTML() {
+  return phoneTopbarHTML("Tutorial") + '<div class="tp-appview">' +
+    '<p class="tp-note"><strong>Available soon — check back later!</strong></p>' +
+    '<p class="tp-note">A short video tour of everything Taffy can do is coming — Chris will add it here. It won’t be long, just the gist.</p>' +
+    '</div>';
+}
+function phoneScreenHTML() {
+  var app = state.phone.app;
+  var inner = "";
+  if (app === "vitanova") inner = phoneTaffyHTML();
+  else if (app === "msg") inner = phoneMsgHTML();
+  else if (app === "gallery") inner = phoneGalleryHTML();
+  else if (app === "sos") inner = phoneSosHTML();
+  else if (app === "notes") inner = phoneNotesHTML();
+  else if (app === "radio") inner = phoneRadioHTML();
+  else if (app === "code") inner = phoneCodeHTML();
+  else if (app === "tutorial") inner = phoneTutorialHTML();
+  else inner = phoneHomeHTML();
+  return '<div class="tp-screen" style="background:' + phoneWallpaperBg(state.phone.wallpaper) + '">' +
+    '<div class="tp-island"></div>' +
+    '<div class="tp-status"><span id="tp-clock">' + phoneClockText() + '</span><span class="tp-status-right"><span class="tp-carrier">VNwireless ' + TP_SIGNAL_BARS + '</span><span class="tp-status-icons">' + TP_STATUS_ICONS + '</span></span></div>' +
+    '<div class="tp-body">' + inner + '</div>' +
+    '<div class="tp-homebar" onclick="DWC.phoneGo(\'home\')" title="Home"></div>' +
+    '</div>';
+}
+function phoneRenderedKey() {
+  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x");
+}
+function renderPhone() {
+  var root = $("dwc-phone-root");
+  var btn = $("dwc-phone-btn");
+  if (!root) { ensurePhoneRoot(); root = $("dwc-phone-root"); btn = $("dwc-phone-btn"); if (!root) return; }
+  if (!state.phone.open) {
+    if (state.phoneRenderedKey !== "") { root.innerHTML = ""; state.phoneRenderedKey = ""; }
+    if (btn) btn.style.display = "";
+    return;
+  }
+  if (btn) btn.style.display = "none";
+  var key = phoneRenderedKey();
+  if (key === state.phoneRenderedKey) return; // already showing this — keeps the radio playing + notes focused
+  state.phoneRenderedKey = key;
+  root.innerHTML = '<div class="tp-phone" role="dialog" aria-label="Taffy’s phone">' + phoneScreenHTML() + '</div>';
+}
+function ensurePhoneRoot() {
+  if ($("dwc-phone-root")) return;
+  var root = document.createElement("div");
+  root.id = "dwc-phone-root";
+  document.body.appendChild(root);
+  var btn = document.createElement("button");
+  btn.id = "dwc-phone-btn";
+  btn.type = "button";
+  btn.className = "tp-btn";
+  btn.title = "Message Taffy";
+  btn.setAttribute("aria-label", "Message Taffy");
+  btn.innerHTML = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" fill="#fff"/></svg>';
+  btn.onclick = function () { DWC.phoneOpen(); };
+  document.body.appendChild(btn);
+  if (!state.phoneClockStarted) {
+    state.phoneClockStarted = true;
+    setInterval(phoneTickClock, 30000);
+  }
+}
+
 function profileFormHTML(p) {
   var isNew = !p;
   var v = function (k) { return p ? esc(p[k] || "") : ""; };
@@ -463,7 +939,9 @@ function profileFormHTML(p) {
         return '<label><input type="checkbox" name="ash_tracks" value="' + n + '" style="width:auto"' + ((p && p.ash_tracks || []).includes(n) ? " checked" : "") + ' onchange="DWC.ashTrackChanged(this)"> ' + n + ". " + esc(t) + "</label>";
       }).join("") + "</div>" +
       '<p class="dwc-minihead">Picked: <span id="dwc-ash-count">' + ((p && p.ash_tracks || []).length) + "</span>/5</p>" +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">More songs coming — I’ll keep adding legally available, licensed songs besides my own, from other artists with secured licenses and public domain pieces like Canon in D. I like working to stuff like that.</p>' +
       '<label><input type="checkbox" name="show_vnr_player" style="width:auto"' + (p && p.show_vnr_player ? " checked" : "") + '> 📻 Show Steady Wave player on my profile</label>' +
+      '<label><input type="checkbox" name="autoplay_vnr" style="width:auto"' + (p && p.autoplay_vnr ? " checked" : "") + '> ▶️ Autoplay the Steady Wave player when someone visits my page</label>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A small live player for the Steady Wave stream shows on your page. It just streams the station — no track selection, no playlist.</p></div>') +
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 MySpace layout — make this page yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a preset, or paste your own CSS. Your layout shows on <strong>your page only</strong> — it never touches anyone else's.</p>" +
@@ -490,8 +968,9 @@ function profileFormHTML(p) {
     '<label>Font</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
     "</div>" +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML() + "</div></div>" +
-    '<div class="dwc-layoutbox dwc-bot"><h4 style="margin:0 0 6px">🤖 Layout Bot — I’ll build your layout</h4>' +
-    "<p style=\"margin:0 0 8px\">Pick a vibe, pick a color, tell me the mood — Layout Bot writes the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — the Bot builds it right here from real palettes.</p>" +
+    '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🍬 Meet Taffy — your little site helper</h4>' +
+    "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related, I'm on it.</p></div></div>" +
+    "<p style=\"margin:8px 0\">Pick a vibe, pick a color, tell me the mood — I'll write the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — I build it right here from real palettes.</p>" +
     '<label>Vibe</label><select id="dwc-bot-vibe">' + Object.keys(LAYOUT_VIBES).map(function (k) { return '<option value="' + k + '">' + esc(LAYOUT_VIBES[k].label) + "</option>"; }).join("") + "</select>" +
     '<label>Accent color</label><div class="dwc-rowform"><input type="color" id="dwc-bot-accent" value="#ff2d95" style="flex:0 0 auto;width:64px;height:40px;padding:2px">' +
     ["#ff2d95", "#00e5ff", "#7c4dff", "#39ff88", "#ff9a00", "#d4af37"].map(function (c) {
@@ -500,6 +979,7 @@ function profileFormHTML(p) {
     '<label>Mood (optional — e.g. “dark and glowy” or “soft and bubbly”)</label>' +
     '<input id="dwc-bot-mood" maxlength="80" placeholder="e.g. dark and glowy">' +
     '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.runLayoutBot()">Generate my layout →</button></p>' +
+    taffyHelpHTML() +
     '<div id="dwc-bot-result"></div></div>' +
     (isNew ?
       '<label>Full name (required — one account per person; never shown publicly)</label>' +
@@ -964,6 +1444,9 @@ async function viewStreet(el) {
     "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
     "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></section>' +
+    '<section class="card"><div class="taffy-row"><div>' + taffySVG("taffy-small", "street") + '</div><div><h3 style="margin:0">🍬 Meet Taffy — your little site helper</h3>' +
+    "<p style=\"margin:6px 0 0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related.</p></div></div>" +
+    taffyHelpHTML() + '</section>' +
     '<div id="dwc-headlines-strip"></div>' +
     '<div id="dwc-composer"></div>' +
     '<div class="dwc-filters"><div role="group" aria-label="Filter by corner">' +
@@ -1535,7 +2018,7 @@ async function viewMember(el, memberId) {
     (m.show_vnr_player
       ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — hit play.</p>' +
         '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
-        '<audio controls preload="none" src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
+        '<audio controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
         '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
       : "") +
     '<section class="card"><h3 style="margin-top:0">About</h3>' +
@@ -1843,7 +2326,7 @@ async function openEphemeralChat(partnerId, partnerUsername, postId) {
 async function viewReports(el) {
   if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
   if (!state.profile.is_operator) {
-    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator’s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p style="color:var(--muted)">Only the operator can see the inbox. (If this is your shop, claim the operator role from your profile — first claim wins, so do it before opening the Community.)</p><p><button type="button" class="btn ghost small" onclick="DWC.claimOperator()">Claim operator role</button></p></section>';
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator’s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p>Flag and report any comment or profile, as well as messages or content you see, if it does not belong — an admin will see it and action will be taken. For further issues unresolved, reach out to <a href="mailto:TheRarecandyreserve@proton.me">TheRarecandyreserve@proton.me</a> or leave a message for the owner of this website or its agents or employees.</p><p style="color:var(--muted)">Only the operator can see the inbox. (If this is your shop, claim the operator role from your profile — first claim wins, so do it before opening the Community.)</p><p><button type="button" class="btn ghost small" onclick="DWC.claimOperator()">Claim operator role</button></p></section>';
     return;
   }
   el.innerHTML = '<section aria-label="Reports inbox"><h2 style="margin-top:0">🚩 Reports — operator inbox</h2><p style="color:var(--muted)">Loading…</p></section>';
@@ -2214,7 +2697,7 @@ window.DWC = {
   setCategory: function (c) { state.category = c; renderView(); },
   setSort: function (s) { state.sort = s; renderView(); },
   openSignup: function () { state.signupOpen = true; state.editingProfile = false; state.challenge = null; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
-  editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); },
+  editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },
@@ -2330,6 +2813,9 @@ window.DWC = {
     }
     if (form.querySelector('input[name="show_vnr_player"]')) {
       body.show_vnr_player = !!fd.get("show_vnr_player");
+    }
+    if (form.querySelector('input[name="autoplay_vnr"]')) {
+      body.autoplay_vnr = !!fd.get("autoplay_vnr");
     }
     if (isNew) {
       body.full_name = String(fd.get("full_name") || "").trim();
@@ -2839,16 +3325,24 @@ window.DWC = {
     var vibe = vibeEl ? vibeEl.value : "neon";
     var accent = accentEl ? accentEl.value : "";
     var mood = moodEl ? moodEl.value : "";
-    botLayoutCSS = buildLayoutFromVibe(vibe, accent, mood);
-    applyPreviewCSS(botLayoutCSS);
+    var tw = $("dwc-taffy");
+    // Taffy meditates to work — floats up, astral form leaves his body,
+    // pure energy around him while he summons the layout.
+    if (tw) tw.classList.add("taffy-working");
     var host = $("dwc-bot-result");
-    if (host) {
-      var v = LAYOUT_VIBES[vibe] || LAYOUT_VIBES.neon;
-      host.innerHTML = '<p class="dwc-info">🤖 Layout Bot built you a <strong>' + esc(v.label) + '</strong> theme' +
-        (accent ? ' with your <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + esc(accent) + ';vertical-align:-2px"></span> accent' : "") +
-        (mood ? ' — mood: "' + esc(mood) + '"' : "") + '. Preview is live above.' +
-        ' <button type="button" class="btn small" onclick="DWC.useBotLayout()">Use this layout →</button></p>';
-    }
+    if (host) host.innerHTML = '<p class="dwc-info">✨ Taffy is ascending… loading your layout.</p>';
+    setTimeout(function () {
+      botLayoutCSS = buildLayoutFromVibe(vibe, accent, mood);
+      applyPreviewCSS(botLayoutCSS);
+      if (tw) tw.classList.remove("taffy-working");
+      if (host) {
+        var v = LAYOUT_VIBES[vibe] || LAYOUT_VIBES.neon;
+        host.innerHTML = '<p class="dwc-info">🍬 Taffy built you a <strong>' + esc(v.label) + '</strong> theme' +
+          (accent ? ' with your <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + esc(accent) + ';vertical-align:-2px"></span> accent' : "") +
+          (mood ? ' — mood: "' + esc(mood) + '"' : "") + '. Preview is live above.' +
+          ' <button type="button" class="btn small" onclick="DWC.useBotLayout()">Use this layout →</button></p>';
+      }
+    }, 900);
   },
   useBotLayout: function () {
     if (!botLayoutCSS) return;
@@ -2858,7 +3352,7 @@ window.DWC = {
     if (ta) ta.value = botLayoutCSS;
     if (hidden) hidden.value = "custom";
     applyPreviewCSS(botLayoutCSS);
-    setNotice("Layout Bot's theme is in your layout box — hit Save profile to keep it.");
+    setNotice("Taffy's theme is in your layout box — hit Save profile to keep it.");
   },
   setPresence: async function (status) {
     if (!state.profile) return;
@@ -2915,6 +3409,140 @@ window.DWC = {
   },
   imMember: function (id, username) {
     DWC.openIM(id, username);
+  },
+
+  // ---------- Taffy Phone ----------
+  phoneOpen: function () {
+    ensurePhoneRoot();
+    state.phone.open = true;
+    state.phone.app = "home";
+    renderPhone();
+  },
+  phoneMinimize: function () {
+    state.phone.open = false;
+    renderPhone();
+  },
+  phoneGo: function (app) {
+    state.phone.app = app;
+    if (app === "msg") loadPhoneMsgList();
+    renderPhone();
+  },
+  phoneWallpaper: function (id) {
+    state.phone.wallpaper = id;
+    savePhoneWallpaper(id);
+    renderPhone();
+  },
+  phoneAscend: function () {
+    var tw = $("dwc-phone-taffy");
+    if (!tw || tw.classList.contains("taffy-working")) return;
+    tw.classList.add("taffy-working");
+    setTimeout(function () { if (tw) tw.classList.remove("taffy-working"); }, 2500);
+  },
+  phoneChatSend: function () {
+    var input = document.getElementById("tp-chat-input");
+    if (!input) return;
+    var text = (input.value || "").trim();
+    if (!text) return;
+    input.value = "";
+    input.focus();
+    phoneChatAdd("me", text, "");
+    var reply = taffyReply(text);
+    var log = document.getElementById("tp-chat-log");
+    var typingId = "tp-typing-" + Date.now();
+    if (log) {
+      log.insertAdjacentHTML("beforeend", '<div class="tp-bubble tp-bubble-taffy tp-typing" id="' + typingId + '"><span></span><span></span><span></span></div>');
+      log.scrollTop = log.scrollHeight;
+    }
+    var tw = document.getElementById("dwc-phone-taffy");
+    if (reply.ascend && tw) tw.classList.add("taffy-working");
+    var delay = 650 + Math.floor(Math.random() * 650);
+    setTimeout(function () {
+      var t = document.getElementById(typingId);
+      if (t) t.remove();
+      if (reply.ascend && tw) tw.classList.remove("taffy-working");
+      // Only append if the chat log is still on screen (user may have
+      // navigated away mid-thought — the message still lands in state).
+      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji);
+      else {
+        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "" });
+        if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
+      }
+    }, delay);
+  },
+  phoneChatToggle: function () {
+    state.phoneChatOpen = !state.phoneChatOpen;
+    var chat = document.getElementById("tp-chat");
+    if (!chat) return;
+    chat.classList.toggle("open", state.phoneChatOpen);
+    var head = chat.querySelector(".tp-chat-head");
+    if (head) head.innerHTML = '<span>💬 ' + (state.phoneChatOpen ? "Chat with Taffy" : "Tap to chat with Taffy") + '</span><span class="tp-chat-chev">' + (state.phoneChatOpen ? "⌄" : "⌃") + '</span>';
+    if (state.phoneChatOpen) {
+      var input = document.getElementById("tp-chat-input");
+      if (input) input.focus();
+      var log = document.getElementById("tp-chat-log");
+      if (log) log.scrollTop = log.scrollHeight;
+    }
+  },
+  phoneChatClose: function () {
+    if (!state.phoneChatOpen) return;
+    state.phoneChatOpen = false;
+    var chat = document.getElementById("tp-chat");
+    if (!chat) return;
+    chat.classList.remove("open");
+    var head = chat.querySelector(".tp-chat-head");
+    if (head) head.innerHTML = '<span>💬 Tap to chat with Taffy</span><span class="tp-chat-chev">⌃</span>';
+  },
+  phoneMsgMember: function (id, username) {
+    DWC.phoneMinimize();
+    DWC.openIM(id, username);
+  },
+  phoneSos: function () {
+    DWC.phoneMinimize();
+    DWC.go("reports");
+  },
+  phoneOpenEditor: function () {
+    DWC.phoneMinimize();
+    DWC.editProfile();
+  },
+  phoneGalleryAdd: async function (input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    if (state.phoneGallery.length >= 6) { setNotice("The gallery holds 6 photos at a time — delete one first."); input.value = ""; return; }
+    var img = await fileToImage(file, 1500000);
+    if (!img || img.error) { setNotice((img && img.error) || "That photo couldn't be read."); input.value = ""; return; }
+    var item = { url: "data:" + img.mimeType + ";base64," + img.dataBase64, name: file.name || "photo", timer: null };
+    item.timer = setTimeout(function () {
+      var idx = state.phoneGallery.indexOf(item);
+      if (idx >= 0) {
+        state.phoneGallery.splice(idx, 1);
+        if (state.phone.open && state.phone.app === "gallery") renderPhone();
+      }
+    }, 600000);
+    state.phoneGallery.push(item);
+    input.value = "";
+    renderPhone();
+  },
+  phoneGalleryDel: function (i) {
+    var it = state.phoneGallery[i];
+    if (!it) return;
+    if (it.timer) clearTimeout(it.timer);
+    state.phoneGallery.splice(i, 1);
+    renderPhone();
+  },
+  phoneGalleryOpen: function (i) {
+    var it = state.phoneGallery[i];
+    if (it) DWC.openLightbox(it.url);
+  },
+  phoneNotesInput: function (ta) {
+    state.phoneNotes = ta.value;
+  },
+  phoneNotesCopy: function () {
+    copyTextToClipboard(state.phoneNotes || "");
+    setNotice(state.phoneNotes ? "Notes copied." : "Nothing to copy yet.");
+  },
+  phoneNotesClear: function () {
+    state.phoneNotes = "";
+    renderPhone();
   },
 
   report: async function (type, id) {
@@ -3073,9 +3701,15 @@ async function init() {
     }, 60000);
   }
   render();
+  // Taffy Phone — the green call/text button lives on the page (outside
+  // #dwc-app) from the start, so it's always there to open the phone.
+  ensurePhoneRoot();
+  loadPhoneWallpaper();
+  renderPhone();
   window.addEventListener("hashchange", function () { render(); });
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 
 })();
+

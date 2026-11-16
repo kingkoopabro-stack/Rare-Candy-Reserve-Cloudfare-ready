@@ -424,6 +424,10 @@ export function shapeProfile(row) {
     // player. Independent options: either, both, or neither.
     ash_tracks: parseAshTracks(row.ash_tracks),
     show_vnr_player: row.show_vnr_player === 1,
+    // v3.3 — autoplay the Steady Wave player on the member page (only
+    // meaningful when show_vnr_player is on; browsers still gate sound
+    // autoplay behind a visitor interaction).
+    autoplay_vnr: row.autoplay_vnr === 1,
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),
@@ -452,6 +456,8 @@ export function shapeMember(row) {
     // Music (v3.1) — A Steady Heart picks + Vita Nova Radio player toggle.
     ash_tracks: parseAshTracks(row.ash_tracks),
     show_vnr_player: row.show_vnr_player === 1,
+    // v3.3 — autoplay the Steady Wave player on the member page.
+    autoplay_vnr: row.autoplay_vnr === 1,
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),

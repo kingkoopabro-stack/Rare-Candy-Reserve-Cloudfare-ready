@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Crystal candy">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Wrapped candy">
   <defs>
     <linearGradient id="cc-g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#ff2ea6"/>
@@ -11,15 +11,30 @@
       <stop offset="0" stop-color="#ffffff" stop-opacity=".85"/>
       <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
+    <clipPath id="cc-body">
+      <rect x="17" y="21" width="30" height="22" rx="11"/>
+    </clipPath>
   </defs>
-  <!-- faceted rock-candy crystal point -->
-  <polygon points="32,2 48,20 48,52 16,52 16,20" fill="url(#cc-g)" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>
-  <!-- left facet, lighter -->
-  <polygon points="32,2 16,20 16,52 32,52" fill="url(#cc-l)" opacity=".38"/>
-  <!-- right facet, deeper blue -->
-  <polygon points="32,2 48,20 48,52 32,52" fill="#0033aa" opacity=".22"/>
-  <!-- center ridge -->
-  <line x1="32" y1="4" x2="32" y2="50" stroke="#ffffff" stroke-opacity=".8" stroke-width="1.5"/>
+  <!-- classic wrapped candy: rounded body + twisted wrapper ends -->
+  <!-- left twist -->
+  <polygon points="17,24 3,15 3,49 17,40" fill="url(#cc-g)" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>
+  <line x1="15" y1="28" x2="5" y2="24" stroke="#ffffff" stroke-opacity=".5" stroke-width="1"/>
+  <line x1="15" y1="36" x2="5" y2="40" stroke="#ffffff" stroke-opacity=".5" stroke-width="1"/>
+  <!-- right twist -->
+  <polygon points="47,24 61,15 61,49 47,40" fill="url(#cc-g)" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>
+  <line x1="49" y1="28" x2="59" y2="24" stroke="#ffffff" stroke-opacity=".5" stroke-width="1"/>
+  <line x1="49" y1="36" x2="59" y2="40" stroke="#ffffff" stroke-opacity=".5" stroke-width="1"/>
+  <!-- candy body -->
+  <rect x="17" y="21" width="30" height="22" rx="11" fill="url(#cc-g)" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.5"/>
+  <!-- diagonal candy stripes, clipped to the body -->
+  <g clip-path="url(#cc-body)">
+    <polygon points="20,21 24,21 16,43 12,43" fill="#ffffff" opacity=".35"/>
+    <polygon points="30,21 37,21 29,43 22,43" fill="#aaff00" opacity=".95"/>
+    <polygon points="42,21 46,21 38,43 34,43" fill="#ffffff" opacity=".35"/>
+    <polygon points="17,21 47,21 47,29 17,29" fill="url(#cc-l)" opacity=".38"/>
+  </g>
+  <!-- cyan accent edge on the body -->
+  <rect x="17" y="21" width="30" height="22" rx="11" fill="none" stroke="#00e5ff" stroke-opacity=".35" stroke-width="1"/>
   <!-- sparkle -->
-  <polygon points="32,14 34,20 40,22 34,24 32,30 30,24 24,22 30,20" fill="#ffffff" opacity=".9"/>
+  <polygon points="48,8 49.5,12.5 54,14 49.5,15.5 48,20 46.5,15.5 42,14 46.5,12.5" fill="#ffffff" opacity=".9"/>
 </svg>

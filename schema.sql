@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   -- Music (v3.1, added by community-v3-migration.sql on live D1)
   ash_tracks TEXT NOT NULL DEFAULT '', -- A Steady Heart picks: track numbers 1–21, max 5
   show_vnr_player INTEGER NOT NULL DEFAULT 0, -- opt-in Vita Nova Radio player on the member page
+  autoplay_vnr INTEGER NOT NULL DEFAULT 0, -- opt-in autoplay for the Steady Wave player on the member page (v3.3)
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

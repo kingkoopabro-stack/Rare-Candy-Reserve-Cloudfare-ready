@@ -274,6 +274,65 @@ function fileToImage(file, maxBytes) {
     reader.readAsDataURL(file);
   });
 }
+// "Shrink my photo for profile size" — avatar resizer / converter.
+// Takes any JPG, PNG, or WebP, scales it down to fit within 512px on the
+// longest side (keeping the original aspect ratio), and converts it to JPEG
+// (quality 0.85) so a 2–5 MB phone photo becomes a small file well under the
+// 1.5 MB cap. Returns { dataBase64, mimeType, origKB, newKB, width, height,
+// shrunk } or { error }. Already profile-size and under the cap? Uses it
+// as-is, no re-encode. HEIC (iPhone default) can't be decoded by the browser,
+// so that still needs a screenshot — same plain message as before.
+var AVATAR_MAX_DIM = 512;
+function fmtKB(kb) { return kb >= 1000 ? (kb / 1000).toFixed(1).replace(".0", "") + " MB" : kb + " KB"; }
+function shrinkAvatarImage(file) {
+  return new Promise(function (resolve) {
+    if (!file) return resolve(null);
+    if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
+      return resolve({ error: "That photo isn't a JPG, PNG, or WebP — iPhone photos often save as HEIC. Pick a JPG, PNG, or WebP, or screenshot the photo and use that." });
+    }
+    var origKB = Math.round(file.size / 1000);
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (!w || !h) return resolve({ error: "That photo couldn't be read — try a different one." });
+      if (file.size <= 1500000 && w <= AVATAR_MAX_DIM && h <= AVATAR_MAX_DIM) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var parts = String(reader.result || "").split(",");
+          resolve({ dataBase64: parts[1] || "", mimeType: file.type, origKB: origKB, newKB: origKB, width: w, height: h, shrunk: false });
+        };
+        reader.onerror = function () { resolve({ error: "That photo couldn't be read — try again." }); };
+        reader.readAsDataURL(file);
+        return;
+      }
+      var scale = Math.min(1, AVATAR_MAX_DIM / Math.max(w, h));
+      var nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
+      var cv = document.createElement("canvas");
+      cv.width = nw; cv.height = nh;
+      var ctx = cv.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, nw, nh);
+      ctx.drawImage(img, 0, 0, nw, nh);
+      cv.toBlob(function (blob) {
+        if (!blob) return resolve({ error: "That photo couldn't be shrunk — try a different one." });
+        var r2 = new FileReader();
+        r2.onload = function () {
+          var parts = String(r2.result || "").split(",");
+          resolve({ dataBase64: parts[1] || "", mimeType: "image/jpeg", origKB: origKB, newKB: Math.round(blob.size / 1000), width: nw, height: nh, shrunk: true });
+        };
+        r2.onerror = function () { resolve({ error: "That photo couldn't be read — try again." }); };
+        r2.readAsDataURL(blob);
+      }, "image/jpeg", 0.85);
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      resolve({ error: "That photo couldn't be read — it may be a HEIC or a format this browser can't open. Screenshot the photo and use that." });
+    };
+    img.src = url;
+  });
+}
+
 // 3D print file reader (v3) — .stl / .obj / .3mf / .zip, under 25 MB.
 // Returns { dataBase64, fileName } (the server checks the extension).
 function fileToPrintFile(file, maxBytes) {
@@ -997,7 +1056,8 @@ function profileFormHTML(p) {
     '<input name="payout_method" maxlength="40" value="' + v("payout_method") + '" placeholder="e.g. PayPal, Cash App, Chime…">' +
     '<label>Payout handle</label>' +
     '<input name="payout_handle" maxlength="80" value="' + v("payout_handle") + '" placeholder="Your handle / address on that method">' +
-    '<label>Profile picture (JPG, PNG, or WebP, under 1.5 MB — optional; a personal photo is optional, an avatar or none is fine)</label>' +
+    '<label>📸 Profile picture — Shrink my photo for profile size</label>' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, or WebP — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically. iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
     '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" onchange="DWC.avatarPicked(this)">' +
     '<p id="dwc-avatar-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
     (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
@@ -2952,7 +3012,7 @@ window.DWC = {
     // Avatar: a bad picture must NEVER kill the whole save. If the pic
     // is too big or the wrong type, we save the rest of the profile and
     // tell the member exactly why the picture didn't stick.
-    var avatar = await fileToImage(fd.get("avatar") && fd.get("avatar").size ? fd.get("avatar") : null, 1500000);
+    var avatar = await shrinkAvatarImage(fd.get("avatar") && fd.get("avatar").size ? fd.get("avatar") : null);
     var avatarError = (avatar && avatar.error) || null;
     var avatarUploaded = false;
     var body = {
@@ -3529,20 +3589,23 @@ window.DWC = {
   },
   // Avatar picker feedback (v3.4) — the moment Chris picks a file, show
   // its size and whether it will work, instead of failing silently on save.
-  avatarPicked: function (input) {
+  avatarPicked: async function (input) {
     var note = document.getElementById("dwc-avatar-note");
     if (!note) return;
     var f = input && input.files && input.files[0];
     if (!f) { note.textContent = ""; return; }
-    var mb = (f.size / 1000000).toFixed(1).replace(".0", "");
-    if (f.type && IMAGE_MIMES_CLIENT.indexOf(f.type) === -1) {
-      note.textContent = "Picked “" + f.name + "” — that isn't a JPG, PNG, or WebP. iPhone photos often save as HEIC; pick a JPG/PNG/WebP, or screenshot the photo and use that.";
+    note.textContent = "Shrinking “" + f.name + "” to profile size…";
+    note.style.color = "var(--muted)";
+    var r = await shrinkAvatarImage(f);
+    if (!r) { note.textContent = ""; return; }
+    if (r.error) {
+      note.textContent = "Picked “" + f.name + "” — " + r.error;
       note.style.color = "var(--amber)";
-    } else if (f.size > 1500000) {
-      note.textContent = "Picked “" + f.name + "” — " + mb + " MB, too big. Keep it under 1.5 MB (a screenshot of the photo is usually small enough).";
-      note.style.color = "var(--amber)";
+    } else if (r.shrunk) {
+      note.textContent = "Picked “" + f.name + "” — shrunk from " + fmtKB(r.origKB) + " to " + fmtKB(r.newKB) + " (" + r.width + "×" + r.height + " JPEG) ✓ Good to go — hit Save profile.";
+      note.style.color = "var(--green)";
     } else {
-      note.textContent = "Picked “" + f.name + "” — " + mb + " MB ✓ Good to go — hit Save profile.";
+      note.textContent = "Picked “" + f.name + "” — " + fmtKB(r.newKB) + " ✓ Good to go — hit Save profile.";
       note.style.color = "var(--green)";
     }
   },

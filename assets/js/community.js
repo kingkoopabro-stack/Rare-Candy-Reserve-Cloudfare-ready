@@ -1176,7 +1176,7 @@ async function loadTopFriendPicker() {
   var others = members.filter(function (m) { return m.id !== mine; });
   if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">No other members to pick from yet — you’re the first one here.</p>'; return; }
   host.innerHTML = '<div class="dwc-checkgrid">' + others.map(function (m) {
-    return '<label><input type="checkbox" name="top_friend" value="' + m.id + '" style="width:auto"' + (picked.has(m.id) ? " checked" : "") + ' onchange="DWC.topFriendChanged(this)"> @' + esc(m.username) + "</label>";
+    return '<label><input type="checkbox" name="top_friend" value="' + m.id + '" style="width:auto"' + (picked.has(m.id) ? " checked" : "") + ' onchange="DWC.topFriendChanged(this)"> ' + esc(m.id === 1 ? "Chris (Ash)" : "@" + m.username) + "</label>";
   }).join("") + "</div>";
   updateTop8Count();
 }
@@ -2209,12 +2209,16 @@ function presenceDot(m) {
   var label = p === "online" ? "Online" : p === "away" ? "Away" : "Offline";
   return '<span class="dwc-dot ' + cls + '" title="' + label + (m.away_message && p === "away" ? " — " + esc(m.away_message) : "") + '"></span>';
 }
+// Chris (member id 1) is the site's Tom — every new member's first Top
+// Friend by default. His tile says "Chris (Ash)" with his profile picture,
+// not @RareCandyReserve.
+function topFriendLabel(f) { return f.id === 1 ? "Chris (Ash)" : "@" + f.username; }
 function topFriendsRowHTML(friends) {
   if (!friends || !friends.length) return '<p style="color:var(--muted)">No Top 8 yet — pick yours in Edit profile.</p>';
   return '<div class="dwc-top8">' + friends.map(function (f) {
     return '<a class="dwc-topfriend" href="#/member/' + f.id + '">' +
       (f.avatar_url ? '<img class="dwc-avatar" src="' + esc(f.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
-      "<span>@" + esc(f.username) + "</span></a>";
+      "<span>" + esc(topFriendLabel(f)) + "</span></a>";
   }).join("") + "</div>";
 }
 async function viewMember(el, memberId) {

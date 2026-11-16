@@ -241,11 +241,14 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(existing.id).first();
   } else {
     const r = await db.prepare(
-      `INSERT INTO profiles (device_id, username, full_name, birthday, terms_agreed_at, chat_name, occupation, bio, payout_method, payout_handle, avatar_blob_key, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO profiles (device_id, username, full_name, birthday, terms_agreed_at, chat_name, occupation, bio, payout_method, payout_handle, avatar_blob_key, top_friends, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(deviceId, username, String(a.full_name).trim().slice(0, 80), a.birthday ?? null, now,
       str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280),
-      str(a.payout_method, 40), str(a.payout_handle, 80), avatarKey ?? null, now, now).run();
+      str(a.payout_method, 40), str(a.payout_handle, 80), avatarKey ?? null,
+      // Chris (member id 1) is every new member's first Top Friend,
+      // MySpace-Tom style — already added, they can remove him if they want.
+      "1", now, now).run();
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");

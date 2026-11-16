@@ -253,10 +253,17 @@ async function apiDelete(path, body) {
     return data || { ok: false, error: "Request failed." };
   } catch (e) { return { ok: false, error: "Couldn't reach the Community — check your connection and try again." }; }
 }
+var IMAGE_MIMES_CLIENT = ["image/jpeg", "image/png", "image/webp"];
 function fileToImage(file, maxBytes) {
   return new Promise(function (resolve) {
     if (!file) return resolve(null);
-    if (file.size > (maxBytes || 2500000)) return resolve({ error: "That photo is too large — keep it under about 2.5 MB." });
+    // Wrong file type (e.g. iPhone HEIC) — say so plainly instead of
+    // letting the server reject the whole save.
+    if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
+      return resolve({ error: "That photo isn't a JPG, PNG, or WebP — iPhone photos often save as HEIC. Pick a JPG, PNG, or WebP, or screenshot the photo and use that." });
+    }
+    var limitMB = ((maxBytes || 2500000) / 1000000).toFixed(1).replace(".0", "");
+    if (file.size > (maxBytes || 2500000)) return resolve({ error: "That photo is too large — keep it under about " + limitMB + " MB." });
     var reader = new FileReader();
     reader.onload = function () {
       var dataUrl = String(reader.result || "");
@@ -902,8 +909,14 @@ function profileFormHTML(p) {
     '<label>Payout handle</label>' +
     '<input name="payout_handle" maxlength="80" value="' + v("payout_handle") + '" placeholder="Your handle / address on that method">' +
     '<label>Profile picture (JPG, PNG, or WebP, under 1.5 MB — optional; a personal photo is optional, an avatar or none is fine)</label>' +
-    '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" onchange="DWC.avatarPicked(this)">' +
+    '<p id="dwc-avatar-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
     (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
+    (isNew ? "" :
+    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔗 My links — buttons on your page</h4>' +
+    "<p style=\"margin:0 0 8px\">Add links that show as buttons on your member page — your shop, Instagram, whatever. Up to 5. A label and a full link starting with http:// or https://.</p>" +
+    '<div id="dwc-links-list">' + myLinksRowsHTML(p ? (p.my_links || []) : []) + '</div>' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/5</span></p></div>') +
     (isNew ? "" :
       '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌟 Top 8 — your Top Friends</h4>' +
       "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 8 friends to show on your page. Thanks for the add — now show it off.</p>" +
@@ -967,7 +980,7 @@ function profileFormHTML(p) {
     '<input type="color" name="theme_accent_color" value="' + (th.accent_color || "#ff2d95") + '" style="width:64px;height:40px;padding:2px">' +
     '<label>Font</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
     "</div>" +
-    '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML() + "</div></div>" +
+    '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div></div>" +
     '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🍬 Meet Taffy — your little site helper</h4>' +
     "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related, I'm on it.</p></div></div>" +
     "<p style=\"margin:8px 0\">Pick a vibe, pick a color, tell me the mood — I'll write the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — I build it right here from real palettes.</p>" +
@@ -1029,6 +1042,11 @@ function updateAshCount() {
   var el = $("dwc-ash-count");
   if (!el) return;
   el.textContent = document.querySelectorAll('input[name="ash_tracks"]:checked').length;
+}
+function updateLinksCount() {
+  var el = $("dwc-links-count");
+  if (!el) return;
+  el.textContent = document.querySelectorAll('#dwc-links-list .dwc-linkrow').length + "/5";
 }
 function initLayoutEditor() {
   var ta = document.querySelector('textarea[name="layout_css"]');
@@ -1285,17 +1303,45 @@ function sanitizeLayoutCssClient(css) {
   return out.trim();
 }
 
-// A mini fake profile the layout preview dresses up.
-function layoutPreviewInnerHTML() {
+// My links editor rows (v3.4) — one row per link: label + URL + remove.
+// Renders the member's real links; a blank row is always available so
+// adding the first link is one tap.
+function myLinksRowsHTML(links) {
+  var rows = (links || []).slice(0, 5).map(function (l) {
+    return '<div class="dwc-linkrow"><input name="link_label" maxlength="40" placeholder="Label — e.g. My shop" value="' + esc(l.label || "") + '">' +
+      '<input name="link_url" maxlength="500" placeholder="https://…" value="' + esc(l.url || "") + '">' +
+      '<button type="button" class="btn ghost small" onclick="DWC.removeLinkRow(this)" title="Remove this link">✕</button></div>';
+  }).join("");
+  if (!rows) {
+    rows = '<div class="dwc-linkrow"><input name="link_label" maxlength="40" placeholder="Label — e.g. My shop">' +
+      '<input name="link_url" maxlength="500" placeholder="https://…">' +
+      '<button type="button" class="btn ghost small" onclick="DWC.removeLinkRow(this)" title="Remove this link">✕</button></div>';
+  }
+  return rows;
+}
+function myLinksButtonsHTML(links) {
+  if (!links || !links.length) return "";
+  return '<div class="dwc-links">' + links.map(function (l) {
+    return '<a class="btn dwc-linkbtn" href="' + esc(l.url) + '" target="_blank" rel="noopener">' + esc(l.label) + ' ↗</a>';
+  }).join("") + "</div>";
+}
+
+// The layout preview in Edit Profile — shows the member's REAL page
+// (their bio, their Top Friends, their links), never fake demo content.
+// Empty sections are left out entirely so the preview is honest.
+function layoutPreviewInnerHTML(p) {
+  var bio = p && p.bio ? esc(p.bio) : null;
+  var friends = p && p.top_friend_ids ? p.top_friend_ids : [];
+  var links = p && p.my_links ? p.my_links : [];
+  var top8 = "";
+  if (friends.length) {
+    top8 = '<div class="card"><h3>🌟 Top 8</h3><p style="color:var(--muted)">Your ' + friends.length + ' Top Friend' + (friends.length === 1 ? "" : "s") + ' show here.</p></div>';
+  }
   return '<div class="dwc-myprofile dwc-previewbox">' +
-    '<div class="dwc-mypage-head"><span class="dwc-avatar dwc-avatar-none">🍬</span><div><h3 style="margin:0">@yourname</h3><p class="dwc-meta">Collector · Seller · your vibe here</p></div></div>' +
-    '<div class="card"><h3>About me</h3><p>This is how your page will look — your bio, your colors, your rules.</p></div>' +
-    '<div class="card"><h3>🌟 Top 8</h3><div class="dwc-top8">' +
-    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🎴</span><span>@friend1</span></span>' +
-    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🌸</span><span>@friend2</span></span>' +
-    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🎮</span><span>@friend3</span></span>' +
-    '</div></div>' +
-    '<p><a href="#" onclick="return false">a link on your page</a> · <button type="button" class="btn small" onclick="return false">a button</button></p>' +
+    '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
+    '<div class="card"><h3>About me</h3>' + (bio ? '<p style="white-space:pre-wrap">' + bio + "</p>" : '<p style="color:var(--muted)">No bio yet.</p>') + "</div>" +
+    top8 +
+    myLinksButtonsHTML(links) +
     "</div>";
 }
 function applyPreviewCSS(css) {
@@ -1997,7 +2043,15 @@ async function viewMember(el, memberId) {
       : '<button type="button" class="btn small" onclick="DWC.imMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">💬 IM @' + esc(m.username) + "</button>") +
     '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
     "</div></section>" +
-    '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>" +
+    // My links (v3.4) — only when the member actually has links.
+    // No links, no section, no placeholder.
+    (m.my_links && m.my_links.length ? '<section class="card"><h3 style="margin-top:0">🔗 My links</h3>' + myLinksButtonsHTML(m.my_links) + "</section>" : "") +
+    // Top 8 — only when the member actually has Top Friends. No
+    // friends, no section at all (no placeholder cards, no "pick yours"
+    // nudge on someone else's page).
+    ((m.top_friends && m.top_friends.length)
+      ? '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>"
+      : "") +
     ((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to
       ? '<section class="card dwc-sellercard"><h3 style="margin-top:0">🎨 What I sell</h3>' +
         ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
@@ -2736,8 +2790,12 @@ window.DWC = {
   saveProfile: async function (form) {
     var isNew = !state.profile;
     var fd = new FormData(form);
+    // Avatar: a bad picture must NEVER kill the whole save. If the pic
+    // is too big or the wrong type, we save the rest of the profile and
+    // tell the member exactly why the picture didn't stick.
     var avatar = await fileToImage(fd.get("avatar") && fd.get("avatar").size ? fd.get("avatar") : null, 1500000);
-    if (avatar && avatar.error) return formErr(form, avatar.error);
+    var avatarError = (avatar && avatar.error) || null;
+    var avatarUploaded = false;
     var body = {
       device_id: deviceId(),
       username: String(fd.get("username") || "").trim(),
@@ -2817,6 +2875,17 @@ window.DWC = {
     if (form.querySelector('input[name="autoplay_vnr"]')) {
       body.autoplay_vnr = !!fd.get("autoplay_vnr");
     }
+    // My links (v3.4) — label + URL pairs from the "My links" editor.
+    // Collected in order; the server validates (label 1-40 chars, URL
+    // must start with http:// or https://, max 5) and drops bad rows.
+    if (form.querySelectorAll('input[name="link_label"]').length || form.querySelectorAll('input[name="link_url"]').length) {
+      var linkLabels = form.querySelectorAll('input[name="link_label"]');
+      var linkUrls = form.querySelectorAll('input[name="link_url"]');
+      body.my_links = [];
+      for (var li = 0; li < linkLabels.length && li < linkUrls.length; li++) {
+        body.my_links.push({ label: String(linkLabels[li].value || "").trim(), url: String(linkUrls[li].value || "").trim() });
+      }
+    }
     if (isNew) {
       body.full_name = String(fd.get("full_name") || "").trim();
       body.terms_agreed = !!fd.get("terms_agreed");
@@ -2832,14 +2901,22 @@ window.DWC = {
     state.profile = data.profile;
     state.editingProfile = false;
     state.signupOpen = false;
+    // Avatar feedback: the picture either saved, or the member gets the
+    // exact reason it didn't (too big / wrong type / upload failed) —
+    // without losing the rest of the save.
+    if (avatar) avatarUploaded = !!(data.profile && data.profile.avatar_url);
+    var avatarNote = "";
+    if (avatarError) avatarNote = " Your picture didn't save — " + avatarError;
+    else if (data.avatar_error) avatarNote = " Your picture didn't save — " + data.avatar_error;
+    else if (avatarUploaded) avatarNote = " Picture saved ✓";
     if (data.v2_pending || data.v3_pending) {
       setNotice("Profile saved — but " +
         (data.v2_pending && data.v3_pending ? "your Top Friends / layout and your What I sell / Find prefs / music picks didn't stick yet."
           : data.v2_pending ? "your Top Friends / layout didn't stick yet."
           : "your What I sell / Find prefs / music picks didn't stick yet.") +
-        " The shop is still running a quick database update; try saving again later.");
+        " The shop is still running a quick database update; try saving again later." + avatarNote);
     } else {
-      setNotice(isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.");
+      setNotice((isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote);
     }
     render();
     await refreshStats();
@@ -3290,6 +3367,49 @@ window.DWC = {
       setNotice("Pick up to 5 tracks — unpick one first.");
     }
     updateAshCount();
+  },
+  // Avatar picker feedback (v3.4) — the moment Chris picks a file, show
+  // its size and whether it will work, instead of failing silently on save.
+  avatarPicked: function (input) {
+    var note = document.getElementById("dwc-avatar-note");
+    if (!note) return;
+    var f = input && input.files && input.files[0];
+    if (!f) { note.textContent = ""; return; }
+    var mb = (f.size / 1000000).toFixed(1).replace(".0", "");
+    if (f.type && IMAGE_MIMES_CLIENT.indexOf(f.type) === -1) {
+      note.textContent = "Picked “" + f.name + "” — that isn't a JPG, PNG, or WebP. iPhone photos often save as HEIC; pick a JPG/PNG/WebP, or screenshot the photo and use that.";
+      note.style.color = "var(--amber)";
+    } else if (f.size > 1500000) {
+      note.textContent = "Picked “" + f.name + "” — " + mb + " MB, too big. Keep it under 1.5 MB (a screenshot of the photo is usually small enough).";
+      note.style.color = "var(--amber)";
+    } else {
+      note.textContent = "Picked “" + f.name + "” — " + mb + " MB ✓ Good to go — hit Save profile.";
+      note.style.color = "var(--green)";
+    }
+  },
+  // My links editor (v3.4) — add a row (max 5) or remove one row.
+  addLinkRow: function () {
+    var list = document.getElementById("dwc-links-list");
+    if (!list) return;
+    var rows = list.querySelectorAll(".dwc-linkrow").length;
+    if (rows >= 5) { setNotice("Up to 5 links — remove one first."); return; }
+    var div = document.createElement("div");
+    div.className = "dwc-linkrow";
+    div.innerHTML = '<input name="link_label" maxlength="40" placeholder="Label — e.g. My shop">' +
+      '<input name="link_url" maxlength="500" placeholder="https://…">' +
+      '<button type="button" class="btn ghost small" onclick="DWC.removeLinkRow(this)" title="Remove this link">✕</button>';
+    list.appendChild(div);
+    updateLinksCount();
+    var first = div.querySelector('input[name="link_label"]');
+    if (first) first.focus();
+  },
+  removeLinkRow: function (btn) {
+    var list = document.getElementById("dwc-links-list");
+    if (!list || !btn) return;
+    var row = btn.closest(".dwc-linkrow");
+    if (row) row.remove();
+    if (!list.querySelectorAll(".dwc-linkrow").length) DWC.addLinkRow();
+    updateLinksCount();
   },
   applyLayoutPreset: function (id) {
     var form = document.querySelector("#dwc-account form");

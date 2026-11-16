@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   ash_tracks TEXT NOT NULL DEFAULT '', -- A Steady Heart picks: track numbers 1–21, max 5
   show_vnr_player INTEGER NOT NULL DEFAULT 0, -- opt-in Vita Nova Radio player on the member page
   autoplay_vnr INTEGER NOT NULL DEFAULT 0, -- opt-in autoplay for the Steady Wave player on the member page (v3.3)
+  my_links TEXT NOT NULL DEFAULT '', -- My links (v3.4): JSON [{label, url}] buttons on the member page, max 5
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

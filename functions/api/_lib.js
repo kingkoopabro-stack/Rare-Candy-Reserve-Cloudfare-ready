@@ -428,6 +428,8 @@ export function shapeProfile(row) {
     // meaningful when show_vnr_player is on; browsers still gate sound
     // autoplay behind a visitor interaction).
     autoplay_vnr: row.autoplay_vnr === 1,
+    // v3.4 — My links (buttons on the member page).
+    my_links: parseMyLinks(row.my_links),
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),
@@ -458,6 +460,8 @@ export function shapeMember(row) {
     show_vnr_player: row.show_vnr_player === 1,
     // v3.3 — autoplay the Steady Wave player on the member page.
     autoplay_vnr: row.autoplay_vnr === 1,
+    // v3.4 — My links (buttons on the member page).
+    my_links: parseMyLinks(row.my_links),
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),
@@ -542,6 +546,27 @@ export function matchScore(candidateTypes, candidateTags, seekerTypes, seekerTag
 export function parsePrefs(stored) {
   if (!stored) return [];
   return String(stored).split(",").map((t) => t.trim()).filter(Boolean);
+}
+// My links (v3.4) — stored as JSON [{label, url}] in profiles.my_links.
+// Label 1–40 chars, URL must start with http:// or https://, max 5.
+// Bad rows are dropped, never stored; a bad stored value parses to [].
+export function cleanMyLinks(list) {
+  const out = [];
+  for (const item of (Array.isArray(list) ? list : [])) {
+    const label = String((item && item.label) || "").trim().slice(0, 40);
+    const url = String((item && item.url) || "").trim().slice(0, 500);
+    if (!label || !/^https?:\/\//i.test(url)) continue;
+    if (out.some((l) => l.url === url)) continue;
+    out.push({ label, url });
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+export function parseMyLinks(stored) {
+  if (!stored) return [];
+  try {
+    return cleanMyLinks(JSON.parse(stored));
+  } catch { return []; }
 }
 // Clean a seller/buyer content-type list: keep only real genres, dedupe.
 export function cleanCreatorTypes(list) {

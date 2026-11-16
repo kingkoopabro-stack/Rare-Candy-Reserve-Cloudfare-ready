@@ -7,7 +7,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
   checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
-  cleanTheme,
+  cleanTheme, cleanMyLinks,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -52,12 +52,17 @@ export async function onRequestPost({ env, request }) {
     if (dupe) return fail("An account already exists for that name + date of birth — one account per person. If that's you, you're already on the street; if you lost access, that's the account to recover, not a new one.");
   }
 
+  // v3.4 — avatar: a bad picture must NEVER kill the whole save. If
+  // the upload fails (too big, wrong type, storage not ready), keep
+  // going without it and tell the member exactly why — the client
+  // shows avatar_error in the save notice.
   let avatarKey = undefined; // undefined = keep
+  let avatarError = null;
   if (a.remove_avatar) avatarKey = null;
   else if (a.avatar) {
     const up = await putImage(env, "avatars", deviceId, a.avatar, 1500000);
-    if (!up.ok) return fail(up.error);
-    avatarKey = up.key;
+    if (!up.ok) avatarError = up.error;
+    else avatarKey = up.key;
   }
 
   const now = nowMs();
@@ -175,6 +180,13 @@ export async function onRequestPost({ env, request }) {
     v3Sets.push("profile_theme = ?");
     v3Vals.push(cleanTheme(a.profile_theme));
   }
+  // v3.4 — My links (label + URL buttons on the member page). Stored as
+  // JSON; cleanMyLinks drops bad rows (no label, non-http(s) URL, dupes)
+  // and caps at 5. Same graceful pattern: rides with the v3 columns.
+  if (Array.isArray(a.my_links)) {
+    v3Sets.push("my_links = ?");
+    v3Vals.push(JSON.stringify(cleanMyLinks(a.my_links)));
+  }
   let row;
   let v2Pending = false;
   let v3Pending = false;
@@ -237,5 +249,5 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
-  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending });
+  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, avatar_error: avatarError });
 }

@@ -376,6 +376,13 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-comment:first-of-type{border-top:0}
 .dwc-rowform{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .dwc-rowform input,.dwc-rowform select{flex:1;min-width:140px}
+/* My links (v3.4) — editor rows in Edit Profile + buttons on the page. */
+.dwc-linkrow{display:flex;gap:8px;align-items:center;margin:0 0 8px}
+.dwc-linkrow input[name="link_label"]{flex:0 0 150px;min-width:110px}
+.dwc-linkrow input[name="link_url"]{flex:1;min-width:140px}
+.dwc-linkrow .btn{flex:none}
+.dwc-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
+.dwc-linkbtn{flex:none}
 .dwc-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
 .dwc-photos img{width:100%;min-width:0;height:180px;object-fit:cover;border-radius:12px;cursor:pointer}
 @media(max-width:640px){.dwc-photos img{height:120px}}

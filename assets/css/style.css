@@ -56,6 +56,12 @@ main{padding:28px 0 60px}
 .hero p.lede{font-size:18px;color:var(--muted);max-width:720px;margin:0 auto}
 section{margin-top:44px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
+/* Centered card grids — cards stay a consistent width and the last row centers
+   instead of hanging left with a lone card. Use on any area with a bunch of
+   containers (About grids, galleries, service/vendor rows). */
+.grid.grid-centered{display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
+.grid.grid-centered>.card{flex:0 1 260px}
+
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;transition:transform .15s,box-shadow .15s}
 .card:hover{transform:translateY(-2px);box-shadow:0 0 0 1px var(--violet),0 8px 30px rgba(124,77,255,.25)}
 .card h3{margin:.3em 0}

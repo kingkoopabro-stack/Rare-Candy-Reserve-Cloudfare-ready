@@ -518,7 +518,8 @@ function productCard(p){
     ${photoHTML(p,0)}
     <div class="thumbs">${thumbs}</div>
     <div class="tag" style="margin-top:12px">${p.tag}</div>
-    <h3>${p.name}</h3><p>${p.desc}</p>
+    <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>
+    <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
     ${priceLine}
     <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
   </div>`;
@@ -561,7 +562,7 @@ function catalogCard(c){
   return `<div class="card">${photo}
     <div class="tag" style="margin-top:12px">${c.tag}</div>
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
-    ${c.desc ? `<p style="color:var(--muted);font-size:14px">${c.desc}</p>` : ""}
+    ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p><p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
     ${priceLine}
     <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" href="${c.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
   </div>`;

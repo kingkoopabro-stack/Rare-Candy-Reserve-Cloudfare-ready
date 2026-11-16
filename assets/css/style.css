@@ -71,6 +71,11 @@ section{margin-top:44px}
    across cards no matter how long the description is. */
 .grid .card{display:flex;flex-direction:column}
 .grid .card > .card-actions{margin-top:auto}
+/* Shop cards: short preview only (3 lines, ellipsis) so every card stays
+   the same length and the buy buttons line up at the bottom. The full
+   description + all photos live on the item detail page ("Read more"). */
+.card-desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.card-more{font-size:13px;margin-top:6px}
 .grid .card > .dwc-actions{margin-top:auto}
 .card-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:0}
 .tag{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}

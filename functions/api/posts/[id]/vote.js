@@ -1,0 +1,32 @@
+// POST /api/posts/:id/vote — votePost. Hearts (or un-hearts) a post — the
+// ONLY reaction anywhere. No downvotes: a member either hearts a post or
+// doesn't. Toggling returns the new heart count.
+import { json, noDb, getDb, readJson, profileByDevice } from "../../_lib.js";
+
+export async function onRequestPost({ env, request, params }) {
+  const db = getDb(env);
+  if (!db) return noDb();
+  const a = await readJson(request);
+  const fail = (error) => json({ ok: false, error, hearts: 0, my_heart: false });
+  const me = await profileByDevice(db, String(a.device_id || ""));
+  if (!me) return fail("Create your profile first to heart posts.");
+  const id = Number(params.id);
+  const post = await db.prepare("SELECT kind FROM posts WHERE id = ? LIMIT 1").bind(id).first();
+  if (!post) return fail("That post is gone.");
+  if ((post.kind ?? "forum") === "adult" && me.age_verified !== 1) return fail("The 18+ area is for age-verified members only.");
+  const existing = await db.prepare("SELECT value FROM post_votes WHERE post_id = ? AND profile_id = ? LIMIT 1").bind(id, me.id).first();
+  let myHeart;
+  if (existing && existing.value === 1) {
+    await db.prepare("DELETE FROM post_votes WHERE post_id = ? AND profile_id = ?").bind(id, me.id).run();
+    myHeart = false;
+  } else if (existing) {
+    // Legacy downvote rows become hearts — negative votes no longer exist.
+    await db.prepare("UPDATE post_votes SET value = 1 WHERE post_id = ? AND profile_id = ?").bind(id, me.id).run();
+    myHeart = true;
+  } else {
+    await db.prepare("INSERT INTO post_votes (post_id, profile_id, value) VALUES (?, ?, 1)").bind(id, me.id).run();
+    myHeart = true;
+  }
+  const row = await db.prepare("SELECT COUNT(*) AS n FROM post_votes WHERE post_id = ? AND value = 1").bind(id).first();
+  return json({ ok: true, error: null, hearts: row?.n ?? 0, my_heart: myHeart });
+}

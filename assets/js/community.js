@@ -727,7 +727,7 @@ function phoneTaffyHTML() {
   return phoneTopbarHTML("Vita Nova") + '<div class="tp-appview tp-taffy-full">' +
     '<div class="tp-taffy" id="dwc-phone-taffy" onclick="DWC.phoneChatClose()">' + taffySVG("taffy", "phone") + '</div>' +
     '<p class="tp-note">Hi, I’m Taffy! I build layouts, help with code, and answer questions about building your site.</p>' +
-    '<p><button type="button" class="btn small" onclick="DWC.phoneAscend()">✨ Make Taffy ascend</button> <button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the Layout Bot →</button></p>' +
+    '<p><button type="button" class="btn small" onclick="DWC.phoneAscend()">✨ Make Taffy ascend</button> <button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
     taffyHelpHTML(true) +
     '<div class="tp-chat' + (chatOpen ? " open" : "") + '" id="tp-chat">' +
     '<button type="button" class="tp-chat-head" onclick="DWC.phoneChatToggle()"><span>💬 ' + (chatOpen ? "Chat with Taffy" : "Tap to chat with Taffy") + '</span><span class="tp-chat-chev">' + (chatOpen ? "⌄" : "⌃") + '</span></button>' +
@@ -3623,6 +3623,11 @@ window.DWC = {
   phoneOpenEditor: function () {
     DWC.phoneMinimize();
     DWC.editProfile();
+    // Land on the source code editor (Custom CSS), not the top of the form.
+    setTimeout(function () {
+      var ta = document.querySelector('textarea[name="layout_css"]');
+      if (ta) { ta.scrollIntoView({ behavior: "smooth", block: "center" }); ta.focus(); }
+    }, 80);
   },
   phoneGalleryAdd: async function (input) {
     var file = input && input.files && input.files[0];

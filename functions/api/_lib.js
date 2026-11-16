@@ -231,6 +231,82 @@ export function sanitizeListingHtml(input) {
   );
 }
 
+// --- MySpace throwback v2 helpers ---------------------------------------
+
+// Layout CSS sanitizer — custom profile layouts are CSS ONLY. Strips anything
+// that could run code or phone home: <script>/<style> blocks, @import and
+// @font-face (no external stylesheets or fonts), javascript:/vbscript: URLs,
+// CSS expressions and behaviors, and url() pointing anywhere except
+// https:// images or data:image/ blobs. position:fixed is downgraded to
+// absolute so a layout can't overlay the site chrome. Returns clean CSS
+// (max 8000 chars) — never throws.
+export function sanitizeLayoutCss(input) {
+  var css = String(input || "").slice(0, 8000);
+  css = css.replace(/<!--[\s\S]*?-->/g, "");
+  // Strip whole <script>/<style>/etc blocks first (through the closing tag),
+  // then any leftover lone tags — a lazy match on the opening tag alone
+  // would leave the block's contents behind.
+  css = css.replace(/<(script|style|iframe|object|embed)[\s\S]*?<\/\1\s*>/gi, "");
+  css = css.replace(/<\/?(script|style|iframe|object|embed|link|meta)\b[^>]*>/gi, "");
+  css = css.replace(/@import[^;{}]*;?/gi, "");
+  css = css.replace(/@font-face[\s\S]*?}/gi, "");
+  css = css.replace(/@charset[^;{}]*;?/gi, "");
+  css = css.replace(/javascript\s*:/gi, "");
+  css = css.replace(/vbscript\s*:/gi, "");
+  css = css.replace(/expression\s*\(/gi, "nope(");
+  css = css.replace(/behavior\s*:/gi, "nope:");
+  css = css.replace(/-moz-binding\s*:/gi, "nope:");
+  css = css.replace(/position\s*:\s*fixed/gi, "position:absolute");
+  // url(...) — keep only https:// images and data:image/ blobs.
+  css = css.replace(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)/gi, function (_m, d, s, u) {
+    var v = String(d ?? s ?? u ?? "").trim();
+    if (/^https:\/\//i.test(v) || /^data:image\//i.test(v)) return "url(" + v + ")";
+    return "url()";
+  });
+  return css.trim();
+}
+
+// Top Friends: stored as a comma-separated list of profile IDs, max 8.
+export function parseTopFriendIds(stored) {
+  if (!stored) return [];
+  var out = [];
+  for (const part of String(stored).split(",")) {
+    const n = parseInt(part.trim(), 10);
+    if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
+    if (out.length >= 8) break;
+  }
+  return out;
+}
+
+// Effective presence for a profile row: 'away' is explicit; 'online' only
+// counts if the heartbeat is fresh (<= 3 minutes); anything else is offline.
+export function presenceOf(row) {
+  if (!row) return "offline";
+  const st = row.presence_status || "offline";
+  if (st === "away") return "away";
+  if (st === "online") {
+    const seen = Number(row.last_seen || 0);
+    if (seen && Date.now() - seen <= 180000) return "online";
+    return "offline";
+  }
+  return "offline";
+}
+
+// Resolve Top Friend IDs to public cards, in the member's chosen order.
+export async function topFriendCards(db, ids) {
+  const list = (ids || []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 8);
+  if (!list.length) return [];
+  const placeholders = list.map(() => "?").join(",");
+  const { results } = await db.prepare(
+    `SELECT id, username, avatar_blob_key FROM profiles WHERE id IN (${placeholders})`,
+  ).bind(...list).all();
+  const byId = new Map((results || []).map((r) => [r.id, r]));
+  return list.filter((id) => byId.has(id)).map((id) => {
+    const r = byId.get(id);
+    return { id: r.id, username: r.username, avatar_url: imageUrl(r.avatar_blob_key) };
+  });
+}
+
 // --- Row shaping (public shapes; never leak full_name, payout handle, or device id) ---
 
 export function shapeProfile(row) {
@@ -242,6 +318,10 @@ export function shapeProfile(row) {
     chat_name: row.chat_name ?? "", occupation: row.occupation ?? "", bio: row.bio ?? "",
     avatar_url: imageUrl(row.avatar_blob_key),
     payout_method: row.payout_method ?? "", payout_handle: row.payout_handle ?? "",
+    // MySpace throwback v2 — Top Friends, custom layout, presence.
+    top_friend_ids: parseTopFriendIds(row.top_friends),
+    layout_css: row.layout_css ?? "", layout_preset: row.layout_preset ?? "",
+    presence: presenceOf(row), away_message: row.away_message ?? "",
     is_model: row.is_model === 1, model_bio: row.model_bio ?? "",
     model_categories: parseTags(row.model_categories),
     model_display_url: imageUrl(row.model_display_blob_key),
@@ -261,6 +341,8 @@ export function shapeMember(row) {
     occupation: row.occupation ?? "", bio: row.bio ?? "",
     avatar_url: imageUrl(row.avatar_blob_key),
     payout_ready: !!(row.payout_method && row.payout_handle),
+    // MySpace throwback v2 — presence for the AIM buddy list.
+    presence: presenceOf(row), away_message: row.away_message ?? "",
     created_at: iso(row.created_at),
   };
 }

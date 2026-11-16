@@ -6,7 +6,7 @@
 // human-check. No age proof is required to join — only for the 18+ area.
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
-  checkChallenge, putImage, nowMs,
+  checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -61,16 +61,55 @@ export async function onRequestPost({ env, request }) {
 
   const now = nowMs();
   const str = (v, max) => String(v ?? "").trim().slice(0, max);
+  // MySpace throwback v2 — only written when the request carries them.
+  // If the v2 migration hasn't been run yet the UPDATE fails with
+  // "no such column" and we retry with just the v1 columns, so an edit
+  // never breaks — the client is told via v2_pending.
+  const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "custom"];
+  const v2Sets = [];
+  const v2Vals = [];
+  if (Array.isArray(a.top_friends)) {
+    const ids = parseTopFriendIds(a.top_friends.join(","));
+    v2Sets.push("top_friends = ?");
+    v2Vals.push(ids.join(","));
+  }
+  if (typeof a.layout_css === "string") {
+    v2Sets.push("layout_css = ?");
+    v2Vals.push(sanitizeLayoutCss(a.layout_css));
+  }
+  if (typeof a.layout_preset === "string" && LAYOUT_PRESETS.includes(a.layout_preset)) {
+    v2Sets.push("layout_preset = ?");
+    v2Vals.push(a.layout_preset);
+  }
   let row;
+  let v2Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?"];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now];
+    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
     if (avatarKey !== undefined) { sets.push("avatar_blob_key = ?"); vals.push(avatarKey); }
     vals.push(existing.id);
-    await db.prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+    try {
+      await db.prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
+    } catch (e) {
+      // v2 columns don't exist yet (migration not run) — retry without them.
+      if (v2Sets.length && /no such column/i.test(String((e && e.message) || e))) {
+        v2Pending = true;
+        // Rebuild the SET list without the v2 columns and retry.
+        // (vals has one extra trailing entry — the profile id for WHERE.)
+        const keep = [];
+        const keepVals = [];
+        for (let i = 0; i < sets.length; i++) {
+          if (v2Sets.includes(sets[i])) continue;
+          keep.push(sets[i]);
+          keepVals.push(vals[i]);
+        }
+        keepVals.push(existing.id);
+        await db.prepare(`UPDATE profiles SET ${keep.join(", ")} WHERE id = ?`).bind(...keepVals).run();
+      } else { throw e; }
+    }
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(existing.id).first();
   } else {
     const r = await db.prepare(
@@ -82,5 +121,5 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
-  return json({ ok: true, error: null, profile: shapeProfile(row) });
+  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending });
 }

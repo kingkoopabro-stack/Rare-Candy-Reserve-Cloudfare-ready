@@ -2,10 +2,13 @@
    Do Whatever Community — site app (vanilla JS, talks to /api/*)
    Community lives on community.html; routes are hash routes:
    #/street #/cardcheck #/market #/trade #/flea #/orders #/payouts
-   #/members #/chat #/reports #/rules #/adult #/tag/<tag>
+   #/members #/member/<id> #/chat #/reports #/rules #/adult #/tag/<tag>
    #/tag/adult/<tag> #/post/<id> #/listing/<id>
    Identity: device id in localStorage (dwc-device-id); heart state in
    dwc-my-votes; adult welcome seen flag in dwc-adult-welcomed.
+   MySpace throwback v2: AIM-style buddy list + 1:1 IMs (#/chat), Top 8
+   friends + custom profile layouts + Layout Bot (member pages #/member),
+   presence heartbeat (online/away/offline + away message).
    When the D1 binding is absent the API answers { error:
    "db_unavailable" } and the app shows "Community is being set up —
    check back soon" instead of crashing.
@@ -103,6 +106,13 @@ var state = {
   checkResult: null, // card-check AI result (composer)
   listingCheck: null, // card-check AI result (listing form)
   chatTimer: null,
+  presenceTimer: null,
+  presence: "online", // online | away (own presence; heartbeat keeps it fresh)
+  awayMessage: "",
+  buddies: [],
+  inbox: [],
+  openIMs: [], // [{ id, username }]
+  imCache: {}, // profileId -> [messages]
   route: null,
 };
 
@@ -237,6 +247,7 @@ function parseRoute() {
   var n = parts[0];
   if (n === "post" && parts[1]) return { name: "thread", postId: parts[1] };
   if (n === "listing" && parts[1]) return { name: "listing", listingId: parts[1] };
+  if (n === "member" && parts[1]) return { name: "member", memberId: parts[1] };
   if (n === "tag" && parts[1] === "adult" && parts[2]) return { name: "tag", tag: decodeURIComponent(parts[2]), adult: true };
   if (n === "tag" && parts[1]) return { name: "tag", tag: decodeURIComponent(parts[1]), adult: false };
   if (NAV.some(function (x) { return x[0] === n; })) return { name: n };
@@ -278,6 +289,13 @@ function render() {
 function renderAccount() {
   var el = $("dwc-account");
   if (!el) return;
+  // The layout preview style only lives while the profile form is open —
+  // otherwise it would leak onto member pages (same .dwc-myprofile hooks).
+  var showingForm = (state.profile && state.editingProfile) || (!state.profile && state.signupOpen);
+  if (!showingForm) {
+    var ps = document.getElementById("dwc-layout-preview-style");
+    if (ps) ps.remove();
+  }
   if (state.profile && !state.editingProfile) {
     var p = state.profile;
     el.innerHTML =
@@ -290,6 +308,9 @@ function renderAccount() {
       (p.payout_method && p.payout_handle
         ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Market, Trades, and Flea Market.</p>'
         : '<p style="margin:4px 0 0">Add a payout method + handle whenever you\u2019re ready to sell — buying and posting never need it.</p>') +
+      '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
+      ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
+      (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(p.layout_preset) + "</span>" : "") + "</p>" +
       "</div>" +
       '<div style="margin-left:auto"><button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button></div>' +
       "</div></section>";
@@ -305,6 +326,8 @@ function renderAccount() {
   }
   el.innerHTML = profileFormHTML(state.profile);
   if (!state.challenge) loadChallenge();
+  if (state.editingProfile) loadTopFriendPicker();
+  initLayoutEditor();
 }
 
 function profileFormHTML(p) {
@@ -330,6 +353,34 @@ function profileFormHTML(p) {
     '<label>Profile picture (JPG, PNG, or WebP, under 1.5 MB — optional; a personal photo is optional, an avatar or none is fine)</label>' +
     '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp">' +
     (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
+    (isNew ? "" :
+      '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌟 Top 8 — your Top Friends</h4>' +
+      "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 8 friends to show on your page. Thanks for the add — now show it off.</p>" +
+      '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
+      '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/8</p></div>') +
+    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 MySpace layout — make this page yours</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick a preset, or paste your own CSS. Your layout shows on <strong>your page only</strong> — it never touches anyone else's.</p>" +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (v("layout_preset") === "" ? " active" : "") + '" data-presetbtn="" onclick="DWC.applyLayoutPreset(\'\')">None</button>' +
+    LAYOUT_PRESETS.map(function (pr) {
+      return '<button type="button" class="dwc-pill' + (v("layout_preset") === pr.id ? " active" : "") + '" data-presetbtn="' + pr.id + '" onclick="DWC.applyLayoutPreset(\'' + pr.id + '\')">' + esc(pr.name) + "</button>";
+    }).join("") + "</div>" +
+    '<label>Custom CSS — paste a MySpace layout\u2019s CSS here, or tweak a preset</label>' +
+    '<textarea name="layout_css" rows="8" maxlength="8000" placeholder="e.g. .dwc-myprofile{background:#003399;} .dwc-myprofile .card{border:2px solid #fff;}" oninput="DWC.layoutCssEdited(this)">' + v("layout_css") + "</textarea>" +
+    '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
+    "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
+    '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML() + "</div></div>" +
+    '<div class="dwc-layoutbox dwc-bot"><h4 style="margin:0 0 6px">🤖 Layout Bot — I\u2019ll build your layout</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick a vibe, pick a color, tell me the mood — Layout Bot writes the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — the Bot builds it right here from real palettes.</p>" +
+    '<label>Vibe</label><select id="dwc-bot-vibe">' + Object.keys(LAYOUT_VIBES).map(function (k) { return '<option value="' + k + '">' + esc(LAYOUT_VIBES[k].label) + "</option>"; }).join("") + "</select>" +
+    '<label>Accent color</label><div class="dwc-rowform"><input type="color" id="dwc-bot-accent" value="#ff2d95" style="flex:0 0 auto;width:64px;height:40px;padding:2px">' +
+    ["#ff2d95", "#00e5ff", "#7c4dff", "#39ff88", "#ff9a00", "#d4af37"].map(function (c) {
+      return '<button type="button" class="dwc-swatch" style="background:' + c + '" title="' + c + '" onclick="DWC.botAccent(\'' + c + '\')">&nbsp;</button>';
+    }).join("") + "</div>" +
+    '<label>Mood (optional — e.g. “dark and glowy” or “soft and bubbly”)</label>' +
+    '<input id="dwc-bot-mood" maxlength="80" placeholder="e.g. dark and glowy">' +
+    '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.runLayoutBot()">Generate my layout →</button></p>' +
+    '<div id="dwc-bot-result"></div></div>' +
     (isNew ?
       '<label>Full name (required — one account per person; never shown publicly)</label>' +
       '<input name="full_name" required minlength="2" maxlength="80" placeholder="Your full name">' +
@@ -348,6 +399,33 @@ async function loadChallenge() {
   state.challenge = data && data.token ? data : null;
   var el = $("dwc-challenge");
   if (el) el.innerHTML = state.challenge ? esc(state.challenge.question) : "Human check couldn't load — try again.";
+}
+
+// ---------- MySpace throwback v2: Top Friends picker + layout editor ----------
+var botLayoutCSS = ""; // Layout Bot's latest generated theme (until "Use this layout")
+
+async function loadTopFriendPicker() {
+  var host = $("dwc-topfriends-picker");
+  if (!host) return;
+  var data = await apiGet("/members?limit=60");
+  var members = (data && data.members) || [];
+  var picked = new Set((state.profile && state.profile.top_friend_ids) || []);
+  var mine = state.profile ? state.profile.id : null;
+  var others = members.filter(function (m) { return m.id !== mine; });
+  if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">No other members to pick from yet — you\u2019re the first one here.</p>'; return; }
+  host.innerHTML = '<div class="dwc-checkgrid">' + others.map(function (m) {
+    return '<label><input type="checkbox" name="top_friend" value="' + m.id + '" style="width:auto"' + (picked.has(m.id) ? " checked" : "") + ' onchange="DWC.topFriendChanged(this)"> @' + esc(m.username) + "</label>";
+  }).join("") + "</div>";
+  updateTop8Count();
+}
+function updateTop8Count() {
+  var el = $("dwc-top8-count");
+  if (!el) return;
+  el.textContent = document.querySelectorAll('input[name="top_friend"]:checked').length;
+}
+function initLayoutEditor() {
+  var ta = document.querySelector('textarea[name="layout_css"]');
+  if (ta) applyPreviewCSS(ta.value);
 }
 
 // ---------- GIF picker ----------
@@ -371,6 +449,161 @@ function gifEmbedHTML(url, label) {
   if (!url) return "";
   return '<div class="dwc-gifview"><iframe src="' + esc(url) + '" loading="lazy" title="' + esc(label || "GIF") + '" sandbox="allow-scripts allow-same-origin"></iframe>' +
     '<p>GIF via GIPHY' + (label ? " · " + esc(label) : "") + "</p></div>";
+}
+
+// ---------- MySpace layouts: presets + Layout Bot ----------
+// Layout CSS targets the .dwc-myprofile hooks only, so a member's layout
+// styles THEIR page and nothing else:
+//   .dwc-myprofile            the page wrapper (background)
+//   .dwc-myprofile .card      panels  ·  h2/h3 headings  ·  a links
+//   .dwc-myprofile .dwc-avatar  avatar ring  ·  .btn buttons
+//   .dwc-myprofile .dwc-topfriend  Top 8 tiles  ·  .dwc-mypage-head header
+var LAYOUT_PRESETS = [
+  { id: "classic", name: "Classic MySpace (2005)", css:
+    ".dwc-myprofile{background:#fff;font-family:Verdana,Tahoma,Arial,sans-serif;}" +
+    ".dwc-myprofile .card{background:#fff;border:1px solid #6699cc;border-radius:4px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#003399;font-family:Verdana,Tahoma,Arial,sans-serif;text-shadow:none;}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#000;}" +
+    ".dwc-myprofile .dwc-meta{color:#666;}" +
+    ".dwc-myprofile a{color:#003399;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #003399;box-shadow:none;}" +
+    ".dwc-myprofile .btn{background:#003399;color:#fff;}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #6699cc;border-radius:4px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #003399;}" },
+  { id: "neon", name: "Neon Vaporwave", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#12002e 0%,#2b0057 55%,#0a2a4a 100%);}" +
+    ".dwc-myprofile .card{background:rgba(20,0,50,.82);border:1px solid #ff2d95;border-radius:16px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;text-shadow:0 0 12px rgba(255,45,149,.8);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#f2f2f8;}" +
+    ".dwc-myprofile .dwc-meta{color:#c9b8ff;}" +
+    ".dwc-myprofile a{color:#00e5ff;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #ff2d95;box-shadow:0 0 12px rgba(255,45,149,.8);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#00e5ff);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2d95;border-radius:16px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2d95;}" },
+  { id: "midnight", name: "Midnight", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#05050a 0%,#0d0d1f 100%);}" +
+    ".dwc-myprofile .card{background:#12122a;border:1px solid #2a2a44;border-radius:12px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#00e5ff;text-shadow:0 0 10px rgba(0,229,255,.6);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#e8e8f5;}" +
+    ".dwc-myprofile .dwc-meta{color:#8a8aa8;}" +
+    ".dwc-myprofile a{color:#00e5ff;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;box-shadow:0 0 10px rgba(0,229,255,.6);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#00a8cc,#7c4dff);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #2a2a44;border-radius:12px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #00e5ff;}" },
+  { id: "candy", name: "Candy Pop", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#ffd7ef 0%,#e9d5ff 55%,#bff3ff 100%);}" +
+    ".dwc-myprofile .card{background:rgba(255,255,255,.9);border:2px solid #ff2d95;border-radius:24px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#d6007a;text-shadow:none;}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#3a0a2a;}" +
+    ".dwc-myprofile .dwc-meta{color:#8a5a7a;}" +
+    ".dwc-myprofile a{color:#d6007a;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #ff2d95;box-shadow:0 0 12px rgba(255,45,149,.45);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ff9a00);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;border-radius:24px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2d95;}" },
+];
+function layoutPresetCSS(id) {
+  for (var i = 0; i < LAYOUT_PRESETS.length; i++) if (LAYOUT_PRESETS[i].id === id) return LAYOUT_PRESETS[i].css;
+  return "";
+}
+
+// Layout Bot vibes — real palettes the bot builds a full theme from.
+// No AI API is involved: this is a client-side generator (vibe template
+// + accent color + mood keywords). It still writes a complete, working
+// theme — background, cards, headings, links, avatar ring, buttons.
+var LAYOUT_VIBES = {
+  neon: { label: "Neon Vaporwave", bg: "#12002e", bg2: "#2b0057", card: "rgba(20,0,50,.82)", cardBorder: "#ff2d95", accent: "#ff2d95", accent2: "#00e5ff", heading: "#ff5cb8", text: "#f2f2f8", muted: "#c9b8ff", link: "#00e5ff", font: "'Segoe UI', system-ui, sans-serif", radius: "16px", glow: "0 0 12px rgba(255,45,149,.8)" },
+  midnight: { label: "Midnight", bg: "#05050a", bg2: "#0d0d1f", card: "#12122a", cardBorder: "#2a2a44", accent: "#00e5ff", accent2: "#7c4dff", heading: "#00e5ff", text: "#e8e8f5", muted: "#8a8aa8", link: "#00e5ff", font: "'Segoe UI', system-ui, sans-serif", radius: "12px", glow: "0 0 10px rgba(0,229,255,.6)" },
+  candy: { label: "Candy Pop", bg: "#ffd7ef", bg2: "#e9d5ff", card: "rgba(255,255,255,.9)", cardBorder: "#ff2d95", accent: "#ff2d95", accent2: "#ff9a00", heading: "#d6007a", text: "#3a0a2a", muted: "#8a5a7a", link: "#d6007a", font: "'Trebuchet MS','Segoe UI',sans-serif", radius: "24px", glow: "0 0 12px rgba(255,45,149,.45)" },
+  classic: { label: "Classic MySpace (2005)", bg: "#ffffff", bg2: "#e6f0ff", card: "#ffffff", cardBorder: "#6699cc", accent: "#003399", accent2: "#6699cc", heading: "#003399", text: "#000000", muted: "#666666", link: "#003399", font: "Verdana,Tahoma,Arial,sans-serif", radius: "4px", glow: "none" },
+  forest: { label: "Forest", bg: "#07130b", bg2: "#14301d", card: "#10231a", cardBorder: "#39ff88", accent: "#39ff88", accent2: "#a8ffce", heading: "#7dffb0", text: "#e8f5ec", muted: "#8ab89a", link: "#7dffb0", font: "Georgia,'Times New Roman',serif", radius: "14px", glow: "0 0 10px rgba(57,255,136,.5)" },
+  sunset: { label: "Sunset", bg: "#2b0a1e", bg2: "#7a2a00", card: "rgba(60,16,8,.85)", cardBorder: "#ff9a00", accent: "#ff9a00", accent2: "#ff2d95", heading: "#ffb347", text: "#fff2e8", muted: "#d8a888", link: "#ffb347", font: "'Segoe UI', system-ui, sans-serif", radius: "18px", glow: "0 0 14px rgba(255,154,0,.6)" },
+  ocean: { label: "Ocean", bg: "#02131f", bg2: "#083a5c", card: "#0a2438", cardBorder: "#00a8ff", accent: "#00a8ff", accent2: "#00e5ff", heading: "#7dd8ff", text: "#e8f6ff", muted: "#7aa8c8", link: "#7dd8ff", font: "'Segoe UI', system-ui, sans-serif", radius: "14px", glow: "0 0 10px rgba(0,168,255,.55)" },
+  bubblegum: { label: "Bubblegum", bg: "#ffe3f2", bg2: "#ffc2e8", card: "#fff5fb", cardBorder: "#ff7ac0", accent: "#ff5cb8", accent2: "#b388ff", heading: "#e6007e", text: "#4a1030", muted: "#a86a90", link: "#e6007e", font: "'Comic Sans MS','Chalkboard SE','Segoe UI',sans-serif", radius: "26px", glow: "none" },
+  gold: { label: "Gold Luxe", bg: "#0d0a02", bg2: "#2a1f05", card: "#171204", cardBorder: "#d4af37", accent: "#d4af37", accent2: "#ffec99", heading: "#f5d76e", text: "#f5eed8", muted: "#a89468", link: "#f5d76e", font: "Georgia,'Times New Roman',serif", radius: "10px", glow: "0 0 12px rgba(212,175,55,.55)" },
+  dark: { label: "Dark Mode", bg: "#0b0b14", bg2: "#141424", card: "#141424", cardBorder: "#2a2a44", accent: "#7c4dff", accent2: "#00e5ff", heading: "#e8e8f5", text: "#f2f2f8", muted: "#a9a9c0", link: "#00e5ff", font: "'Segoe UI', system-ui, sans-serif", radius: "16px", glow: "none" },
+};
+function buildLayoutFromVibe(vibeId, accent, mood) {
+  var v = LAYOUT_VIBES[vibeId] || LAYOUT_VIBES.neon;
+  var acc = /^#[0-9a-fA-F]{6}$/.test(accent || "") ? accent : v.accent;
+  var m = String(mood || "").toLowerCase();
+  var radius = v.radius;
+  if (/\bround|bubbly|soft|curvy\b/.test(m)) radius = "26px";
+  if (/\bsharp|square|edgy|brutal\b/.test(m)) radius = "4px";
+  var glow = v.glow;
+  if (/\bglow|neon|bright|shine|lit\b/.test(m)) glow = "0 0 18px " + acc + ", 0 0 34px " + acc;
+  if (/\bno glow|flat|plain|matte\b/.test(m)) glow = "none";
+  var bg = v.bg, bg2 = v.bg2;
+  if (/\bdark|black|midnight|night\b/.test(m)) { bg = "#05050a"; bg2 = "#0d0d1f"; }
+  if (/\blight|bright|white|day\b/.test(m) && v !== LAYOUT_VIBES.classic) { bg = "#f5f0ff"; bg2 = "#d8e8ff"; }
+  if (/\bpink\b/.test(m)) acc = "#ff2d95";
+  if (/\bblue\b/.test(m)) acc = "#00a8ff";
+  if (/\bpurple|violet\b/.test(m)) acc = "#7c4dff";
+  if (/\bgreen\b/.test(m)) acc = "#39ff88";
+  if (/\bred\b/.test(m)) acc = "#ff3b30";
+  if (/\bgold|yellow\b/.test(m)) acc = "#d4af37";
+  return (
+    ".dwc-myprofile{background:linear-gradient(160deg," + bg + " 0%," + bg2 + " 100%);}" +
+    ".dwc-myprofile .card{background:" + v.card + ";border:1px solid " + v.cardBorder + ";border-radius:" + radius + ";}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:" + v.heading + ";font-family:" + v.font + ";text-shadow:" + glow + ";}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:" + v.text + ";}" +
+    ".dwc-myprofile .dwc-meta{color:" + v.muted + ";}" +
+    ".dwc-myprofile a{color:" + v.link + ";}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid " + acc + ";box-shadow:" + glow + ";}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg," + acc + "," + v.accent2 + ");}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid " + acc + ";border-radius:" + radius + ";}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid " + acc + ";}"
+  );
+}
+
+// Client-side mirror of the server layout sanitizer (for live preview).
+// The server is the enforcement point; this keeps the preview honest.
+function sanitizeLayoutCssClient(css) {
+  var out = String(css || "").slice(0, 8000);
+  out = out.replace(/<!--[\s\S]*?-->/g, "");
+  out = out.replace(/<(script|style|iframe|object|embed)[\s\S]*?<\/\1\s*>/gi, "");
+  out = out.replace(/<\/?(script|style|iframe|object|embed|link|meta)\b[^>]*>/gi, "");
+  out = out.replace(/@import[^;{}]*;?/gi, "");
+  out = out.replace(/@font-face[\s\S]*?}/gi, "");
+  out = out.replace(/@charset[^;{}]*;?/gi, "");
+  out = out.replace(/javascript\s*:/gi, "");
+  out = out.replace(/vbscript\s*:/gi, "");
+  out = out.replace(/expression\s*\(/gi, "nope(");
+  out = out.replace(/behavior\s*:/gi, "nope:");
+  out = out.replace(/position\s*:\s*fixed/gi, "position:absolute");
+  out = out.replace(/url\(\s*(?:"([^"]*)"|'([^']*)'|([^)]*?))\s*\)/gi, function (_m, d, s, u) {
+    var v = String(d ?? s ?? u ?? "").trim();
+    if (/^https:\/\//i.test(v) || /^data:image\//i.test(v)) return "url(" + v + ")";
+    return "url()";
+  });
+  return out.trim();
+}
+
+// A mini fake profile the layout preview dresses up.
+function layoutPreviewInnerHTML() {
+  return '<div class="dwc-myprofile dwc-previewbox">' +
+    '<div class="dwc-mypage-head"><span class="dwc-avatar dwc-avatar-none">🍬</span><div><h3 style="margin:0">@yourname</h3><p class="dwc-meta">Collector · Seller · your vibe here</p></div></div>' +
+    '<div class="card"><h3>About me</h3><p>This is how your page will look — your bio, your colors, your rules.</p></div>' +
+    '<div class="card"><h3>🌟 Top 8</h3><div class="dwc-top8">' +
+    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🎴</span><span>@friend1</span></span>' +
+    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🌸</span><span>@friend2</span></span>' +
+    '<span class="dwc-topfriend"><span class="dwc-avatar dwc-avatar-none">🎮</span><span>@friend3</span></span>' +
+    '</div></div>' +
+    '<p><a href="#" onclick="return false">a link on your page</a> · <button type="button" class="btn small" onclick="return false">a button</button></p>' +
+    "</div>";
+}
+function applyPreviewCSS(css) {
+  var clean = sanitizeLayoutCssClient(css || "");
+  var st = document.getElementById("dwc-layout-preview-style");
+  if (!st) {
+    st = document.createElement("style");
+    st.id = "dwc-layout-preview-style";
+    document.head.appendChild(st);
+  }
+  st.textContent = clean;
+  return clean;
 }
 
 // ---------- shared bits ----------
@@ -436,12 +669,17 @@ function renderView() {
   if (!el) return;
   var r = state.route;
   stopChatPoll();
+  // A member's custom layout only lives on their page — take it down
+  // whenever we navigate anywhere else.
+  var oldLayout = document.getElementById("dwc-member-layout");
+  if (oldLayout) oldLayout.remove();
   if (r.name === "street") return viewStreet(el);
   if (r.name === "cardcheck") return viewCardCheck(el);
   if (r.name === "market" || r.name === "trade" || r.name === "flea") return viewMarket(el, r.name);
   if (r.name === "orders") return viewOrders(el);
   if (r.name === "payouts") return viewPayouts(el);
   if (r.name === "members") return viewMembers(el);
+  if (r.name === "member") return viewMember(el, Number(r.memberId));
   if (r.name === "chat") return viewChat(el);
   if (r.name === "reports") return viewReports(el);
   if (r.name === "rules") return viewRules(el);
@@ -865,43 +1103,207 @@ async function viewMembers(el) {
     (members.length ? '<div class="grid">' + members.map(function (m) {
       return '<article class="card">' +
         (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
-        "<h3>@" + esc(m.username) + "</h3>" +
+        '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a> " + presenceDot(m) + "</h3>" +
         (m.occupation ? "<p>" + esc(m.occupation) + "</p>" : "") +
         (m.bio ? "<p>" + esc(m.bio) + "</p>" : "") +
         (m.birthday ? "<p>🎂 " + esc(m.birthday) + "</p>" : "") +
         '<p>' + (m.payout_ready ? '<span style="color:var(--green)">✓ Payout ready</span>' : '<span style="color:var(--muted)">Not payout-ready yet</span>') + "</p>" +
-        '<p class="dwc-meta">Joined ' + fmtDate(m.created_at) + "</p></article>";
+        '<p class="dwc-meta">Joined ' + fmtDate(m.created_at) + ' · <a href="#/member/' + m.id + '">View page →</a></p></article>';
     }).join("") + "</div>" : '<div class="note">No members yet.</div>') + "</section>";
 }
 
-// ---------- Live Chat ----------
+// ---------- Member page (MySpace profile) ----------
+function presenceDot(m) {
+  var p = m.presence || "offline";
+  var cls = p === "online" ? "dwc-dot-online" : p === "away" ? "dwc-dot-away" : "dwc-dot-offline";
+  var label = p === "online" ? "Online" : p === "away" ? "Away" : "Offline";
+  return '<span class="dwc-dot ' + cls + '" title="' + label + (m.away_message && p === "away" ? " — " + esc(m.away_message) : "") + '"></span>';
+}
+function topFriendsRowHTML(friends) {
+  if (!friends || !friends.length) return '<p style="color:var(--muted)">No Top 8 yet — pick yours in Edit profile.</p>';
+  return '<div class="dwc-top8">' + friends.map(function (f) {
+    return '<a class="dwc-topfriend" href="#/member/' + f.id + '">' +
+      (f.avatar_url ? '<img class="dwc-avatar" src="' + esc(f.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
+      "<span>@" + esc(f.username) + "</span></a>";
+  }).join("") + "</div>";
+}
+async function viewMember(el, memberId) {
+  el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
+  var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
+  var m = data && data.member;
+  if (!m) {
+    el.innerHTML = '<div class="note">That member doesn\u2019t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
+    return;
+  }
+  // Their layout, scoped to this page only (removed on navigation).
+  if (m.layout_css) {
+    var st = document.createElement("style");
+    st.id = "dwc-member-layout";
+    st.textContent = m.layout_css;
+    document.head.appendChild(st);
+  }
+  el.innerHTML =
+    '<div class="dwc-myprofile">' +
+    '<section class="card dwc-mypage-head"><div class="dwc-profile-row">' +
+    (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:84px;height:84px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:84px;height:84px;font-size:38px">🍬</span>') +
+    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + "</h2>" +
+    (m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
+    (m.bio ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(m.bio) + "</p>" : "") +
+    '<p class="dwc-meta" style="margin:4px 0">' +
+    (m.birthday ? "🎂 " + esc(m.birthday) + " · " : "") + "Joined " + fmtDate(m.created_at) +
+    (m.age_verified ? ' · <span style="color:var(--green)">Age verified ✓</span>' : "") +
+    (m.is_operator ? ' · <span style="color:var(--amber)">Operator</span>' : "") +
+    (m.payout_ready ? ' · <span style="color:var(--green)">✓ Payout ready</span>' : "") + "</p>" +
+    (m.presence === "away" && m.away_message ? '<p style="margin:4px 0">🌙 Away: “' + esc(m.away_message) + "”</p>" : "") +
+    "</div></div>" +
+    '<div class="dwc-actions" style="margin-top:14px">' +
+    (m.is_mine
+      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
+      : '<button type="button" class="btn small" onclick="DWC.imMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">💬 IM @' + esc(m.username) + "</button>") +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
+    "</div></section>" +
+    '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>" +
+    '<section class="card"><h3 style="margin-top:0">About</h3>' +
+    (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
+    (m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
+    "</section></div>";
+}
+
+// ---------- Live Chat — AIM throwback ----------
 function stopChatPoll() {
   if (state.chatTimer) { clearInterval(state.chatTimer); state.chatTimer = null; }
 }
+function presenceControlsHTML() {
+  if (!state.profile) return "";
+  return '<div class="dwc-presence">' +
+    '<span>You are <strong id="dwc-presence-state">' + (state.presence === "away" ? "🌙 Away" : "🟢 Online") + "</strong></span>" +
+    '<button type="button" class="btn ghost small" onclick="DWC.setPresence(\'online\')">🟢 Online</button>' +
+    '<button type="button" class="btn ghost small" onclick="DWC.setPresence(\'away\')">🌙 Away</button>' +
+    '<input id="dwc-away-msg" maxlength="140" placeholder="Away message — e.g. brb, grabbing snacks" value="' + esc(state.awayMessage) + '" style="flex:1;min-width:180px">' +
+    '<button type="button" class="btn ghost small" onclick="DWC.saveAwayMessage()">Save away message</button>' +
+    "</div>";
+}
 async function viewChat(el) {
   el.innerHTML =
-    '<section class="card" aria-label="Live chat"><h2 style="margin-top:0">💬 Live Chat — The Street, live</h2>' +
-    '<p style="color:var(--muted)">Guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</p>' +
+    '<section class="card" aria-label="Live chat — AIM style"><h2 style="margin-top:0">💬 Live Chat — The Street, live</h2>' +
+    '<p style="color:var(--muted)">📟 AIM throwback — buddy list, away messages, and 1:1 IMs. The main room is still right here. Guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</p>' +
+    presenceControlsHTML() +
     (state.profile
       ? '<p>Signed in as <strong>' + esc(state.profile.chat_name || state.profile.username) + '</strong> · <button type="button" class="dwc-linklike" onclick="DWC.editProfile()">Change chat name in profile</button></p>'
-      : '<p>Chatting as a guest — <button type="button" class="dwc-linklike" onclick="DWC.openSignup()">create an account</button> to chat uncensored under your name.</p>') +
-    '<div id="dwc-chat-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading chat…</p></div>' +
+      : '<p>Chatting as a guest — <button type="button" class="dwc-linklike" onclick="DWC.openSignup()">create an account</button> to chat uncensored, get a buddy list, and send IMs.</p>') +
+    '<div class="dwc-chatgrid">' +
+    '<div class="dwc-buddypanel"><h3 style="margin-top:0">👥 Buddy List</h3><div id="dwc-buddies"><p style="color:var(--muted)">Loading buddies…</p></div>' +
+    '<h3>📨 Recent IMs</h3><div id="dwc-inbox"><p style="color:var(--muted)">No IMs yet.</p></div></div>' +
+    '<div><div id="dwc-chat-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading chat…</p></div>' +
     '<form class="dwc-rowform" onsubmit="return DWC.sendChat(this)">' +
     (state.profile ? "" : '<input name="guest_name" maxlength="24" placeholder="Guest name (optional)" style="max-width:160px">') +
     '<input name="body" required maxlength="500" placeholder="Say something…" style="flex:1">' +
     '<button class="btn" type="submit">Send</button></form>' +
-    '<p class="dwc-form-err" data-err hidden></p></section>';
-  await loadChat();
-  state.chatTimer = setInterval(function () { loadChat(); }, 15000);
+    '<p class="dwc-form-err" data-err hidden></p></div>' +
+    "</div>" +
+    '<div id="dwc-imwins"></div>' +
+    "</section>";
+  syncIMShells();
+  await loadChatAim();
+  state.chatTimer = setInterval(function () { loadChatAim(); }, 15000);
 }
-async function loadChat() {
+async function loadChatAim() {
   var log = $("dwc-chat-log");
+  if (log) {
+    var data = await apiGet("/chat?limit=60");
+    var msgs = (data && data.messages) || [];
+    log.innerHTML = msgs.length
+      ? msgs.map(function (m) {
+          return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + '</strong>' + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        }).join("")
+      : "<p>No messages yet — say hi.</p>";
+    log.scrollTop = log.scrollHeight;
+  }
+  if (!state.profile) {
+    var buddiesHost = $("dwc-buddies");
+    if (buddiesHost) buddiesHost.innerHTML = '<p style="color:var(--muted)">Sign in to see who\u2019s online.</p>';
+    var inboxHost = $("dwc-inbox");
+    if (inboxHost) inboxHost.innerHTML = '<p style="color:var(--muted)">Sign in to send IMs.</p>';
+    return;
+  }
+  var b = await apiGet("/presence?limit=60");
+  if (b && b.buddies) { state.buddies = b.buddies; renderBuddies(); }
+  var ib = await apiGet("/direct-messages?device_id=" + encodeURIComponent(deviceId()) + "&inbox=1");
+  if (ib && ib.inbox) { state.inbox = ib.inbox; renderInbox(); }
+  for (var i = 0; i < state.openIMs.length; i++) {
+    var im = state.openIMs[i];
+    var conv = await apiGet("/direct-messages?device_id=" + encodeURIComponent(deviceId()) + "&with=" + im.id);
+    if (conv && conv.messages) {
+      state.imCache[im.id] = conv.messages;
+      renderIMLog(im.id);
+    }
+  }
+}
+function renderBuddies() {
+  var host = $("dwc-buddies");
+  if (!host) return;
+  var groups = { online: [], away: [], offline: [] };
+  state.buddies.forEach(function (b) {
+    var p = b.presence || "offline";
+    (groups[p] || groups.offline).push(b);
+  });
+  function row(b) {
+    var mine = state.profile && b.id === state.profile.id;
+    return '<button type="button" class="dwc-buddy"' + (mine ? " disabled" : ' onclick="DWC.openIM(' + b.id + ', \'' + esc(b.username.replace(/'/g, "")) + '\')"') + ">" +
+      presenceDot(b) +
+      (b.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(b.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      '<span class="dwc-buddy-name">@' + esc(b.username) + (mine ? " (you)" : "") + "</span>" +
+      (b.presence === "away" && b.away_message ? '<span class="dwc-buddy-away">“' + esc(b.away_message) + "”</span>" : "") +
+      "</button>";
+  }
+  var html =
+    (groups.online.length ? "<p class=\"dwc-minihead\">🟢 ONLINE (" + groups.online.length + ")</p>" + groups.online.map(row).join("") : "") +
+    (groups.away.length ? "<p class=\"dwc-minihead\">🌙 AWAY (" + groups.away.length + ")</p>" + groups.away.map(row).join("") : "") +
+    (groups.offline.length ? "<p class=\"dwc-minihead\">⚫ OFFLINE (" + groups.offline.length + ")</p>" + groups.offline.map(row).join("") : "");
+  host.innerHTML = html || '<p style="color:var(--muted)">No buddies yet.</p>';
+}
+function renderInbox() {
+  var host = $("dwc-inbox");
+  if (!host) return;
+  if (!state.inbox.length) { host.innerHTML = '<p style="color:var(--muted)">No IMs yet — click a buddy to say hi.</p>'; return; }
+  host.innerHTML = state.inbox.map(function (c) {
+    return '<button type="button" class="dwc-buddy" onclick="DWC.openIM(' + c.partner_id + ', \'' + esc(c.partner_username.replace(/'/g, "")) + '\')">' +
+      (c.partner_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      '<span class="dwc-buddy-name">@' + esc(c.partner_username) + "</span>" +
+      (c.unread ? '<span class="dwc-unread">' + c.unread + " new</span>" : "") +
+      '<span class="dwc-buddy-away">' + esc((c.last_from_me ? "You: " : "") + (c.last_body || "").slice(0, 60)) + "</span>" +
+      "</button>";
+  }).join("");
+}
+function syncIMShells() {
+  var host = $("dwc-imwins");
+  if (!host) return;
+  var want = {};
+  state.openIMs.forEach(function (im) { want[im.id] = im; });
+  host.querySelectorAll("[data-imwin]").forEach(function (w) {
+    if (!want[w.getAttribute("data-imwin")]) w.remove();
+  });
+  state.openIMs.forEach(function (im) {
+    if (host.querySelector('[data-imwin="' + im.id + '"]')) return;
+    var div = document.createElement("div");
+    div.className = "dwc-imwin";
+    div.setAttribute("data-imwin", String(im.id));
+    div.innerHTML =
+      '<div class="dwc-imwin-head"><strong>💬 IM — @' + esc(im.username) + '</strong><button type="button" class="dwc-linklike" onclick="DWC.closeIM(' + im.id + ')">✕ Close</button></div>' +
+      '<div class="dwc-imlog" id="dwc-imlog-' + im.id + '"><p style="color:var(--muted)">Loading…</p></div>' +
+      '<form class="dwc-rowform" onsubmit="return DWC.sendIM(this, ' + im.id + ')">' +
+      '<input name="body" required maxlength="500" placeholder="Message @' + esc(im.username) + '…" style="flex:1">' +
+      '<button class="btn small" type="submit">Send</button></form>';
+    host.appendChild(div);
+  });
+}
+function renderIMLog(id) {
+  var log = $("dwc-imlog-" + id);
   if (!log) return;
-  var data = await apiGet("/chat?limit=60");
-  var msgs = (data && data.messages) || [];
+  var msgs = state.imCache[id] || [];
   log.innerHTML = msgs.length
     ? msgs.map(function (m) {
-        return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + '</strong>' + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
       }).join("")
     : "<p>No messages yet — say hi.</p>";
   log.scrollTop = log.scrollHeight;
@@ -1246,6 +1648,21 @@ window.DWC = {
       remove_avatar: !!fd.get("remove_avatar"),
     };
     if (avatar) body.avatar = { dataBase64: avatar.dataBase64, mimeType: avatar.mimeType };
+    // MySpace throwback v2 — Top Friends (only if the picker actually
+    // rendered, so a failed member load never wipes the list), plus the
+    // custom layout CSS + preset.
+    if (form.querySelectorAll('input[name="top_friend"]').length) {
+      var tf = [];
+      form.querySelectorAll('input[name="top_friend"]:checked').forEach(function (cb) {
+        var n = parseInt(cb.value, 10);
+        if (n > 0 && tf.indexOf(n) === -1) tf.push(n);
+      });
+      body.top_friends = tf.slice(0, 8);
+    }
+    var cssEl = form.querySelector('textarea[name="layout_css"]');
+    if (cssEl) body.layout_css = cssEl.value;
+    var presetEl = form.querySelector('input[name="layout_preset"]');
+    if (presetEl) body.layout_preset = presetEl.value;
     if (isNew) {
       body.full_name = String(fd.get("full_name") || "").trim();
       body.terms_agreed = !!fd.get("terms_agreed");
@@ -1261,7 +1678,11 @@ window.DWC = {
     state.profile = data.profile;
     state.editingProfile = false;
     state.signupOpen = false;
-    setNotice(isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.");
+    if (data.v2_pending) {
+      setNotice("Profile saved — but your Top Friends / layout didn't stick yet. The shop is still running a quick database update; try saving again later.");
+    } else {
+      setNotice(isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.");
+    }
     render();
     await refreshStats();
     return false;
@@ -1506,9 +1927,131 @@ window.DWC = {
     if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send that."; } return false; }
     form.reset();
     if (data.censored) setNotice("Sent — guests are auto-censored, so a word in your message was starred out.");
-    await loadChat();
+    await loadChatAim();
     return false;
   },
+
+  // ---------- MySpace throwback v2 actions ----------
+  topFriendChanged: function (cb) {
+    var n = document.querySelectorAll('input[name="top_friend"]:checked').length;
+    if (n > 8) {
+      cb.checked = false;
+      setNotice("Top 8 means 8 — unpick one first.");
+    }
+    updateTop8Count();
+  },
+  applyLayoutPreset: function (id) {
+    var form = document.querySelector("#dwc-account form");
+    var ta = form && form.querySelector('textarea[name="layout_css"]');
+    var hidden = form && form.querySelector('input[name="layout_preset"]');
+    if (id === "") {
+      if (ta) ta.value = "";
+      if (hidden) hidden.value = "";
+    } else {
+      if (ta) ta.value = layoutPresetCSS(id);
+      if (hidden) hidden.value = id;
+    }
+    applyPreviewCSS(ta ? ta.value : "");
+    document.querySelectorAll("[data-presetbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-presetbtn") === id);
+    });
+  },
+  layoutCssEdited: function (ta) {
+    var form = ta.closest("form");
+    var hidden = form && form.querySelector('input[name="layout_preset"]');
+    if (hidden) hidden.value = "custom";
+    applyPreviewCSS(ta.value);
+    document.querySelectorAll("[data-presetbtn]").forEach(function (b) { b.classList.remove("active"); });
+  },
+  botAccent: function (color) {
+    var el = $("dwc-bot-accent");
+    if (el) el.value = color;
+  },
+  runLayoutBot: function () {
+    var vibeEl = $("dwc-bot-vibe");
+    var accentEl = $("dwc-bot-accent");
+    var moodEl = $("dwc-bot-mood");
+    var vibe = vibeEl ? vibeEl.value : "neon";
+    var accent = accentEl ? accentEl.value : "";
+    var mood = moodEl ? moodEl.value : "";
+    botLayoutCSS = buildLayoutFromVibe(vibe, accent, mood);
+    applyPreviewCSS(botLayoutCSS);
+    var host = $("dwc-bot-result");
+    if (host) {
+      var v = LAYOUT_VIBES[vibe] || LAYOUT_VIBES.neon;
+      host.innerHTML = '<p class="dwc-info">🤖 Layout Bot built you a <strong>' + esc(v.label) + '</strong> theme' +
+        (accent ? ' with your <span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + esc(accent) + ';vertical-align:-2px"></span> accent' : "") +
+        (mood ? ' — mood: "' + esc(mood) + '"' : "") + '. Preview is live above.' +
+        ' <button type="button" class="btn small" onclick="DWC.useBotLayout()">Use this layout →</button></p>';
+    }
+  },
+  useBotLayout: function () {
+    if (!botLayoutCSS) return;
+    var form = document.querySelector("#dwc-account form");
+    var ta = form && form.querySelector('textarea[name="layout_css"]');
+    var hidden = form && form.querySelector('input[name="layout_preset"]');
+    if (ta) ta.value = botLayoutCSS;
+    if (hidden) hidden.value = "custom";
+    applyPreviewCSS(botLayoutCSS);
+    setNotice("Layout Bot's theme is in your layout box — hit Save profile to keep it.");
+  },
+  setPresence: async function (status) {
+    if (!state.profile) return;
+    state.presence = status;
+    var data = await apiPost("/presence", { device_id: deviceId(), status: status, away_message: state.awayMessage });
+    if (data && data.ok) {
+      var label = $("dwc-presence-state");
+      if (label) label.textContent = status === "away" ? "🌙 Away" : "🟢 Online";
+      await loadChatAim();
+    } else if (data && data.error) setNotice(data.error);
+  },
+  saveAwayMessage: async function () {
+    if (!state.profile) return;
+    var input = $("dwc-away-msg");
+    state.awayMessage = input ? input.value : "";
+    var data = await apiPost("/presence", { device_id: deviceId(), status: state.presence, away_message: state.awayMessage });
+    if (data && data.ok) setNotice("Away message saved.");
+    else if (data && data.error) setNotice(data.error);
+  },
+  openIM: function (id, username) {
+    if (!state.profile) { setNotice("Create your account first — IMs are for members."); DWC.openSignup(); return; }
+    if (state.profile && id === state.profile.id) return;
+    if (!state.openIMs.some(function (im) { return im.id === id; })) {
+      state.openIMs.push({ id: id, username: username });
+      if (state.openIMs.length > 4) state.openIMs.shift();
+    }
+    if (state.route && state.route.name === "chat") {
+      syncIMShells();
+      loadChatAim();
+      var win = document.querySelector('[data-imwin="' + id + '"]');
+      if (win) win.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+      go("chat");
+    }
+  },
+  closeIM: function (id) {
+    state.openIMs = state.openIMs.filter(function (im) { return im.id !== id; });
+    delete state.imCache[id];
+    syncIMShells();
+  },
+  sendIM: async function (form, toId) {
+    var fd = new FormData(form);
+    var body = String(fd.get("body") || "").trim();
+    if (!body) return false;
+    var data = await apiPost("/direct-messages", { device_id: deviceId(), to: toId, body: body });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't send that IM."); return false; }
+    form.reset();
+    var conv = await apiGet("/direct-messages?device_id=" + encodeURIComponent(deviceId()) + "&with=" + toId);
+    if (conv && conv.messages) {
+      state.imCache[toId] = conv.messages;
+      renderIMLog(toId);
+    }
+    return false;
+  },
+  imMember: function (id, username) {
+    DWC.openIM(id, username);
+  },
+
   report: async function (type, id) {
     if (!state.profile) { setNotice("Create your account first — reports come from members so they're accountable."); DWC.openSignup(); return; }
     var reason = prompt("What's wrong with this " + type + "? (optional — one line is enough)");
@@ -1653,6 +2196,17 @@ async function init() {
   if (!$("dwc-app")) return;
   await refreshProfile();
   await refreshStats();
+  if (state.profile) {
+    // AIM presence: start Online (or Away if that's how they left it) and
+    // keep the heartbeat fresh every 60s so the buddy list sees them.
+    state.presence = state.profile.presence === "away" ? "away" : "online";
+    state.awayMessage = state.profile.away_message || "";
+    await apiPost("/presence", { device_id: deviceId(), status: state.presence, away_message: state.awayMessage });
+    state.presenceTimer = setInterval(function () {
+      if (!state.profile) return;
+      apiPost("/presence", { device_id: deviceId(), status: state.presence, away_message: state.awayMessage });
+    }, 60000);
+  }
   render();
   window.addEventListener("hashchange", function () { render(); });
 }

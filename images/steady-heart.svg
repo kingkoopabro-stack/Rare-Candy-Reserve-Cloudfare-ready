@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 92" role="img" aria-label="A steady heart — heart with heartbeat line">
+  <defs>
+    <linearGradient id="heartGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff2d95"/>
+      <stop offset="55%" stop-color="#ff9a00"/>
+      <stop offset="100%" stop-color="#00e5ff"/>
+    </linearGradient>
+    <clipPath id="heartClip">
+      <path d="M50 84 C22 62 8 46 8 30 C8 17 18 9 29 9 C38 9 46 15 50 23 C54 15 62 9 71 9 C82 9 92 17 92 30 C92 46 78 62 50 84 Z"/>
+    </clipPath>
+  </defs>
+  <path d="M50 84 C22 62 8 46 8 30 C8 17 18 9 29 9 C38 9 46 15 50 23 C54 15 62 9 71 9 C82 9 92 17 92 30 C92 46 78 62 50 84 Z" fill="rgba(255,45,149,.12)" stroke="url(#heartGrad)" stroke-width="3.5" stroke-linejoin="round"/>
+  <polyline points="12,46 32,46 38,46 43,34 49,58 55,28 61,46 68,46 88,46" fill="none" stroke="#00e5ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#heartClip)"/>
+</svg>

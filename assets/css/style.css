@@ -236,7 +236,6 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .about-home p{color:var(--muted);margin:0 0 12px;line-height:1.65}
 .about-home p strong{color:#fff}
 .about-home-welcome{display:flex;align-items:center;justify-content:center;gap:14px;margin:20px 0 0!important;font-size:clamp(19px,3.4vw,24px);font-weight:900;letter-spacing:.03em;color:#fff}
-.steady-heart{width:62px;height:57px;flex:none;filter:drop-shadow(0 0 8px rgba(255,45,149,.8)) drop-shadow(0 0 16px rgba(0,229,255,.5))}
 .about-home-tunein{text-align:center;margin:16px 0 0!important}
 .about-home-tunein a{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:13px}
 

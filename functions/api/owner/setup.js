@@ -18,6 +18,6 @@ export async function onRequestPost({ env, request }) {
   if (me.is_operator === 1) return json({ ok: true, error: null, is_operator: true, message: "This account is already the operator." });
   const existing = await db.prepare("SELECT id FROM profiles WHERE is_operator = 1 LIMIT 1").first();
   if (existing) return json({ ok: false, error: "An operator is already set — only the operator can change operator rights.", is_operator: false });
-  await db.prepare("UPDATE profiles SET is_operator = 1, updated_at = ? WHERE id = ?").bind(nowMs(), me.id).run();
-  return json({ ok: true, error: null, is_operator: true, message: "Operator claimed. This account can now see the Reports inbox, review photo IDs, and set the 18+ welcome picture." });
+  await db.prepare("UPDATE profiles SET is_operator = 1, age_verified = 1, updated_at = ? WHERE id = ?").bind(nowMs(), me.id).run();
+  return json({ ok: true, error: null, is_operator: true, message: "Operator claimed. This account can now see the Reports inbox, review photo IDs, and set the 18+ welcome picture. The operator is automatically age verified, so the 18+ area is open." });
 }

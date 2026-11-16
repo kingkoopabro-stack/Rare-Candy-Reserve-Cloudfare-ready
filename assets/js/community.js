@@ -418,6 +418,13 @@ function render() {
     var s = state.stats;
     html += '<p class="dwc-stats"><span>' + s.members + '</span> ' + (s.members === 1 ? "member" : "members") + ' · <span>' + s.posts + '</span> posts · <span>' + s.comments + '</span> comments · <span>' + s.card_checks + '</span> card checks · <span>' + s.listings + '</span> listings</p>';
   }
+  // Insert coin — visible to EVERYONE (signed in or guest, mobile or
+  // desktop). Guests already see the coin in the "New here?" signup card
+  // below, so the header coin only renders for signed-in members — that
+  // way every visitor sees exactly one, on any device.
+  if (state.profile) {
+    html += '<div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div>';
+  }
   html += '<div id="dwc-notice" class="dwc-notice" role="status" style="display:' + (state.notice ? "" : "none") + '">' + (state.notice ? esc(state.notice) : "") + '</div>';
   html += '<div id="dwc-account"></div>';
   html += '<nav class="dwc-pills" aria-label="Community sections">' + NAV.map(function (item) {

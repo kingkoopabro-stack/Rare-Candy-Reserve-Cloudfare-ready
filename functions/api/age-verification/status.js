@@ -1,6 +1,6 @@
 // GET /api/age-verification/status?device_id= — the caller's verification
 // state: age_verified flag + whether an ID review is pending.
-import { json, noDb, getDb, profileByDevice } from "../../_lib.js";
+import { json, noDb, getDb, profileByDevice } from "../_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);

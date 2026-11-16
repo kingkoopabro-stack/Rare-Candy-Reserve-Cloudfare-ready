@@ -1,7 +1,7 @@
 // GET /api/age-verification/id-image?request_id= — OPERATOR ONLY.
 // Streams the pending ID photo from the ID_VAULT R2 bucket so the operator
 // can review it. This is the ONLY way the image is ever viewed.
-import { getDb, profileByDevice, isOperator } from "../../_lib.js";
+import { getDb, profileByDevice, isOperator } from "../_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);

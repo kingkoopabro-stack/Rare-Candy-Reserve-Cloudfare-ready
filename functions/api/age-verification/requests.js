@@ -1,6 +1,6 @@
 // GET /api/age-verification/requests — OPERATOR ONLY. Lists pending ID
 // review requests (username + date only — no image data, no ID details).
-import { json, noDb, getDb, profileByDevice, isOperator, iso } from "../../_lib.js";
+import { json, noDb, getDb, profileByDevice, isOperator, iso } from "../_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);

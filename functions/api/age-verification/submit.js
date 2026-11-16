@@ -10,7 +10,7 @@
 // STORAGE GAP: if the ID_VAULT bucket is not bound yet, this endpoint
 // returns a clean error and does NOT accept the ID — an ID must never be
 // accepted into a place it cannot be reviewed from and deleted from.
-import { json, noDb, getDb, readJson, profileByDevice, decodeImage, nowMs } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, decodeImage, nowMs } from "../_lib.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);

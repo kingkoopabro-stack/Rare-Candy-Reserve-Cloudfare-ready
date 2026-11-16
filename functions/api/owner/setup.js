@@ -7,7 +7,7 @@
 //
 // The operator can: view + resolve the Reports inbox, review ID photos
 // and approve/reject age verification, and set the 18+ welcome picture.
-import { json, noDb, getDb, readJson, profileByDevice, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, nowMs } from "../_lib.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);

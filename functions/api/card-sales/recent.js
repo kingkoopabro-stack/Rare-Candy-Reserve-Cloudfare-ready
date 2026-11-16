@@ -1,5 +1,5 @@
 // GET /api/card-sales/recent — listRecentCardSales (newest first).
-import { json, noDb, getDb, iso } from "./_lib.js";
+import { json, noDb, getDb, iso } from "../_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);

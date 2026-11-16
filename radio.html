@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VITA NOVA RADIO — 24/7 · Rare Candy Reserve</title>
-<meta name="description" content="VITA NOVA RADIO — the 24/7 station from Vita Nova Records. A steady heart on rotation, podcasts to listen to and make, a chill area to submit music, and a place to host and be heard, learn and teach.">
-<link rel="stylesheet" href="assets/css/style.css">
+<title>Steady Wave — 24/7 · Rare Candy Reserve</title>
+<meta name="description" content="Steady Wave — the 24/7 station from Vita Nova Records. A steady heart on rotation, podcasts to listen to and make, a chill area to submit music, and a place to host and be heard, learn and teach.">
+<link rel="stylesheet" href="assets/css/style.css?v=26f3d1d2">
 <style>
 /* Live visualizer — listeners see visuals, not just a play bar */
 .live-viz{max-width:760px;margin:0 auto;border-radius:16px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.5),0 0 44px rgba(0,229,255,.3)}
@@ -28,7 +28,7 @@
 
 <header class="site">
   <div class="wrap navrow">
-    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <a class="logo" href="index.html"><img class="logo-mark" src="images/crystal-candy.svg" alt="">Rare Candy <b>Reserve</b></a>
     <nav class="main" id="mainNav">
       <a href="index.html" data-page="home">Home</a>
       <a href="shop.html" data-page="shop">Shop</a>
@@ -52,27 +52,27 @@
 <main class="wrap">
   <div class="hero">
     <div class="kicker">📻 Vita Nova Records · 24/7</div>
-    <h1>VITA NOVA <span class="grad-text">RADIO</span></h1>
+    <h1>STEADY <span class="grad-text">WAVE</span></h1>
     <p class="lede">The 24/7 station from Vita Nova Records, hosted by Rare Candy Reserve. Tune in, listen, and make up your own mind.</p>
-    <p style="margin-top:18px"><a class="tunein-8bit" href="https://radio.rarecandyreserve.org/vitanova" target="_blank" rel="noopener">▶ Tune in live</a></p>
-    <figure class="radio-banner">
-      <img data-radio-banner src="images/radio-afternoon.jpg" alt="Vita Nova Radio art">
-      <figcaption><span data-radio-banner-caption>Vita Nova Radio</span> · changes with the time of day</figcaption>
+    <p class="hero-cta" style="margin-top:18px"><a class="tunein-8bit" href="https://radio.rarecandyreserve.org/vitanova" target="_blank" rel="noopener">▶ Tune in live</a></p>
+    <figure class="steady-banner">
+      <img src="images/steady-wave-banner-top.jpg" alt="Steady Wave — STEADY/HEART neon art">
+      <figcaption><b>Steady Wave</b> · 24/7 · A steady heart on rotation</figcaption>
     </figure>
-    <p style="margin-top:18px;color:var(--muted)"><b style="color:var(--ink)" id="djGreeting">Slabb here — welcome to Vita Nova Radio.</b><br>Your host introduces every song by name, reads the sponsor spots, and keeps it like a talk show mixed with radio — the vibe shifts with the time of day.</p>
+    <p style="margin-top:18px;color:var(--muted)"><b style="color:var(--ink)" id="djGreeting">Slabb here — welcome to Steady Wave.</b><br>Your host introduces every song by name, reads the sponsor spots, and keeps it like a talk show mixed with radio — the vibe shifts with the time of day.</p>
   </div>
 
   <section>
-    <div class="kicker">📡 Tune in live — VNR on air</div>
+    <div class="kicker">📡 Tune in live — Steady Wave on air</div>
     <h2>Listen live, <span class="grad-text">right here.</span></h2>
     <p style="color:var(--muted)">The live broadcast from the shop — Vita Nova Records, hosted by Rare Candy Reserve. Press play and you get the visuals, the song, and the ticker — right here, no other page.</p>
     <div class="live-viz">
       <div class="live-viz-inner">
         <canvas id="liveViz" width="720" height="120" aria-label="Live audio visualizer"></canvas>
         <div style="text-align:center;margin-top:12px"><span class="live-badge" id="liveBadge"><span class="dot"></span><span id="liveBadgeText">OFF AIR</span></span></div>
-        <div class="live-now">VITA NOVA RADIO — Live<small id="liveNowSub">DJ Slabb · A Steady Heart · Vita Nova Records</small></div>
+        <div class="live-now">STEADY WAVE — Live<small id="liveNowSub">DJ Slabb · A Steady Heart · Vita Nova Records</small></div>
         <div class="live-djmsg" id="liveDjMsg">Tune in — the station is live, 24/7.</div>
-        <div class="live-ticker"><span>thank you for listening to Vita Nova Radio! 🎙️ VITA NOVA RADIO — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly · 👕 ASH SUPPLY CO. — first drop coming · 💿 “End of the year” — 21 tracks · 📻 Requests open — send yours in ·</span></div>
+        <div class="live-ticker"><span>thank you for listening to Steady Wave! 🎙️ STEADY WAVE — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly · 👕 ASH SUPPLY CO. — first drop coming · 💿 “End of the year” — 21 tracks · 📻 Requests open — send yours in ·</span></div>
         <audio id="liveAudio" controls preload="none" src="https://radio.rarecandyreserve.org/vitanova" style="width:100%;margin-top:14px"></audio>
         <p id="liveMsg" style="color:var(--muted);font-size:13px;text-align:center">Live stream: https://radio.rarecandyreserve.org/vitanova — if it’s silent, the station is reconnecting; the on-site rotation above keeps playing meanwhile.</p>
       </div>
@@ -83,16 +83,16 @@
     <div class="kicker">On air now</div>
     <h2>Press play — <span class="grad-text">a taste of the station.</span></h2>
     <p style="color:var(--muted)">DJ Slabb introduces the songs, reads the sponsor spots, and keeps it like a talk show mixed with radio. This is a short loop — a taste. The full 24/7 broadcast is live below, and the full album “End of the year” (21 tracks) is on the music page.</p>
-    <div class="vnr-brand">VNR</div>
-    <div class="vnr-brand-sub">Vita Nova Radio · 24/7 · A taste of the station</div>
+    <div class="vnr-brand">Steady Wave</div>
+    <div class="vnr-brand-sub">Steady Wave · 24/7 · A taste of the station</div>
     <div class="vnr-radio" id="vnrRadio">
       <div class="vnr-dial">
         <div class="vnr-dial-scale"><span>88</span><span>92</span><span>98</span><span>104</span><span>108</span></div>
         <div class="vnr-needle" id="vnrNeedle"></div>
-        <div class="vnr-dial-label">Vita Nova Radio · FM</div>
+        <div class="vnr-dial-label">Steady Wave · FM</div>
       </div>
       <div class="vnr-toprow">
-        <span class="vnr-station">📻 VNR on air</span>
+        <span class="vnr-station">📻 Steady Wave on air</span>
         <span class="vnr-onair" id="vnrOnAir">● ON AIR</span>
       </div>
       <div class="vnr-mid">
@@ -114,6 +114,10 @@
   </section>
 
   <section>
+    <figure class="steady-banner">
+      <img src="images/steady-wave-banner-bottom.jpg" alt="Steady Wave — city at sunset, ON AIR">
+      <figcaption><b>Steady Wave</b> · Podcasts — listen &amp; make your own</figcaption>
+    </figure>
     <div class="kicker">🎙 Podcasts — listen &amp; make</div>
     <h2>Listen to the show. <span class="grad-text">Then make your own.</span></h2>
     <p style="color:var(--muted)">“What’s the alternative?” lives here too — listen to the latest episode, and if you’ve got a show in you, pitch it below. The station is a place to host and be heard.</p>
@@ -133,7 +137,7 @@
         <div class="tag">Make your own</div>
         <h3 style="margin-top:10px">Pitch a podcast</h3>
         <p>Got a show idea — music, growing as a person, healing, collecting, games, or something nobody’s covering? Tell us the idea and we’ll talk about putting it on the station.</p>
-        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — podcast pitch')">
+        <form onsubmit="return submitSiteForm(event, 'Steady Wave — podcast pitch')">
           <label>Your name</label>
           <input name="Name" data-req placeholder="Your name">
           <label>Your email</label>
@@ -150,13 +154,13 @@
   <section>
     <div class="kicker">🌙 The chill area — learn &amp; teach</div>
     <h2>Submit your music. <span class="grad-text">Get heard.</span></h2>
-    <p style="color:var(--muted)">Members who’ve joined and proven their identity can submit <b style="color:var(--ink)">non-AI-made music</b> in MP3 format or as a link. Every submission is reviewed — if it’s approved, it plays on VITA NOVA RADIO, 24/7. New artists can get signed through Vita Nova Records if they choose. This is the chill area: a place to host and be heard, learn and teach.</p>
+    <p style="color:var(--muted)">Members who’ve joined and proven their identity can submit <b style="color:var(--ink)">non-AI-made music</b> in MP3 format or as a link. Every submission is reviewed — if it’s approved, it plays on Steady Wave, 24/7. New artists can get signed through Vita Nova Records if they choose. This is the chill area: a place to host and be heard, learn and teach.</p>
     <div class="grid">
       <div class="card">
         <div class="tag">Submit music</div>
         <h3 style="margin-top:10px">Get your track on the radio</h3>
         <p>Send a link to your MP3 (or a streaming link) and tell us about the track. Human-made music only — no AI-generated audio or lyrics.</p>
-        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — music submission')">
+        <form onsubmit="return submitSiteForm(event, 'Steady Wave — music submission')">
           <label>Track title</label>
           <input name="Track title" data-req placeholder="Song title">
           <label>Band name</label>
@@ -189,7 +193,7 @@
       <div class="card">
         <div class="tag">Book an ad</div>
         <h3 style="margin-top:10px">$2.00 · 30 seconds · 5 plays a week</h3>
-        <form onsubmit="return submitSiteForm(event, 'Vita Nova Radio — ad booking ($2.00)')">
+        <form onsubmit="return submitSiteForm(event, 'Steady Wave — ad booking ($2.00)')">
           <label>Your name / business</label>
           <input name="Name / business" data-req placeholder="Who’s advertising?">
           <label>Your email</label>
@@ -211,7 +215,7 @@
       <div class="card">
         <div class="tag">How ads work</div>
         <h3 style="margin-top:10px">Fair, simple, on the air</h3>
-        <p>1 · You send the script and pick a voice + jingle.<br>2 · The label reviews and voices it.<br>3 · Once approved, it plays 5 times a week on VITA NOVA RADIO.<br>4 · $2.00 per 30-second spot, per week.</p>
+        <p>1 · You send the script and pick a voice + jingle.<br>2 · The label reviews and voices it.<br>3 · Once approved, it plays 5 times a week on Steady Wave.<br>4 · $2.00 per 30-second spot, per week.</p>
         <p style="margin-top:14px">Payment is arranged with the shop after approval — no charge is made from this page.</p>
       </div>
     </div>
@@ -224,13 +228,13 @@
   <div class="wrap">
     <div class="follow-label">Listen &amp; follow — a steady heart</div>
     <div class="follow-row" id="followRow"></div>
-    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p><img class="logo-mark" src="images/crystal-candy.svg" alt=""> <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
     <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
     <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
   </div>
 </footer>
 
-<script src="assets/js/site.js?v=6f4513fd"></script>
+<script src="assets/js/site.js?v=26f3d1d2"></script>
 <script src="assets/js/vnr-radio.js"></script>
 <script>
 /* Radio page — DJ greeting by local time + live stream hookup */
@@ -238,10 +242,10 @@
   var h = new Date().getHours();
   var g = document.getElementById("djGreeting");
   if(g){
-    if(h >= 5 && h < 12) g.textContent = "Good morning — Slabb here, easing you into the day on Vita Nova Radio.";
-    else if(h >= 12 && h < 18) g.textContent = "Good afternoon — Slabb here, keeping the rotation rolling on Vita Nova Radio.";
-    else if(h >= 18 && h < 23) g.textContent = "Good evening — Slabb here, settling in for the night shift on Vita Nova Radio.";
-    else g.textContent = "Late night — Slabb here, keeping you company on Vita Nova Radio.";
+    if(h >= 5 && h < 12) g.textContent = "Good morning — Slabb here, easing you into the day on Steady Wave.";
+    else if(h >= 12 && h < 18) g.textContent = "Good afternoon — Slabb here, keeping the rotation rolling on Steady Wave.";
+    else if(h >= 18 && h < 23) g.textContent = "Good evening — Slabb here, settling in for the night shift on Steady Wave.";
+    else g.textContent = "Late night — Slabb here, keeping you company on Steady Wave.";
   }
 })();
 

@@ -1,0 +1,120 @@
+// Receipts (v3.1) — the invoice / money-spent history for private chats.
+// A receipt is saved when a buyer and seller agree a sale happened in a
+// private chat ("Mark transaction done"). The chat messages are still
+// deleted when the chat closes — but the receipt survives, because it is
+// the only record of the money.
+//
+// Per-user by design: every receipt row belongs to ONE member
+// (profile_id = the owner). GET returns ONLY the caller's own receipts —
+// a member never sees anyone else's spending. A receipt shows the amount,
+// what was bought (the note), the other party's username, whether this
+// member spent or received, and the date. NO chat content is kept — the
+// note is the only description, written by the member who marked it.
+//
+// One transaction per conversation: marking a second one is refused, so a
+// sale can't be double-recorded by accident. Both parties get a receipt
+// (the buyer a "spent" one, the seller a "received" one) so each side has
+// its own invoice.
+//
+// GET /api/receipts?device_id= — my receipts, newest first.
+// POST /api/receipts — { device_id, conversation_id, amount_dollars
+//   (whole dollars, 1–100000) or amount_cents, note (max 140 chars),
+//   role: "buyer" (I bought it — I spent) | "seller" (I sold it — I
+//   received) }. The caller must be a participant in an OPEN conversation.
+// If the v3 migration (with the receipts table) hasn't run yet, both
+// answer a clean "not set up yet" instead of crashing.
+import { json, noDb, getDb, readJson, profileByDevice, iso, money, nowMs } from "./_lib.js";
+
+function notSetup() {
+  return json({ ok: false, error: "Receipts aren't set up yet — the shop is still running a quick database update." });
+}
+
+function shapeReceipt(row) {
+  return {
+    id: row.id,
+    kind: row.kind, // "spent" | "received"
+    amount_cents: row.amount_cents,
+    amount: money(row.amount_cents),
+    note: row.note ?? "",
+    other_username: row.other_username ?? "member",
+    other_profile_id: row.other_profile_id,
+    conversation_id: row.conversation_id ?? null,
+    created_at: iso(row.created_at),
+  };
+}
+
+export async function onRequestGet({ env, request }) {
+  const db = getDb(env);
+  if (!db) return noDb();
+  const q = new URL(request.url).searchParams;
+  const me = await profileByDevice(db, q.get("device_id") || "");
+  if (!me) return json({ ok: false, error: "Create your account first to see your receipts.", receipts: [] });
+  try {
+    const { results } = await db.prepare(
+      `SELECT * FROM receipts WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`,
+    ).bind(me.id).all();
+    return json({ receipts: (results || []).map(shapeReceipt) });
+  } catch (e) {
+    if (/no such table/i.test(String((e && e.message) || e))) return notSetup();
+    throw e;
+  }
+}
+
+export async function onRequestPost({ env, request }) {
+  const db = getDb(env);
+  if (!db) return noDb();
+  const a = await readJson(request);
+  const me = await profileByDevice(db, String(a.device_id || ""));
+  if (!me) return json({ ok: false, error: "Create your account first." });
+  if (me.age_verified !== 1) {
+    return json({ ok: false, error: "Receipts are for 18+ private chats — verify your age first (Rules & After Dark)." });
+  }
+  const convId = Number(a.conversation_id || 0);
+  if (!convId) return json({ ok: false, error: "Pick a private chat to record a transaction for." });
+  const role = a.role === "seller" ? "seller" : "buyer";
+  // Amount: whole dollars from the client, or cents directly. 1–$100,000.
+  let amountCents = 0;
+  if (Number.isInteger(a.amount_cents)) amountCents = a.amount_cents;
+  else if (Number.isInteger(a.amount_dollars)) amountCents = a.amount_dollars * 100;
+  else if (typeof a.amount_dollars === "number") amountCents = Math.round(a.amount_dollars * 100);
+  if (!Number.isFinite(amountCents) || amountCents < 100 || amountCents > 10000000) {
+    return json({ ok: false, error: "Amount needs to be $1 to $100,000, in whole dollars." });
+  }
+  const note = String(a.note || "").trim().slice(0, 140);
+  if (!note) return json({ ok: false, error: "Say what was bought — one short line (up to 140 characters)." });
+  try {
+    const conv = await db.prepare("SELECT * FROM ephemeral_conversations WHERE id = ? LIMIT 1").bind(convId).first();
+    if (!conv) return json({ ok: false, error: "That chat doesn't exist." });
+    const isParticipant = conv.member_a_id === me.id || conv.member_b_id === me.id;
+    if (!isParticipant) return json({ ok: false, error: "That's not your chat." });
+    if (conv.closed_at) return json({ ok: false, error: "That chat was closed — its messages were deleted. Start a new one for a new sale." });
+    // One transaction per conversation — a sale can't be double-recorded.
+    const existing = await db.prepare("SELECT id FROM receipts WHERE conversation_id = ? LIMIT 1").bind(convId).first();
+    if (existing) {
+      return json({ ok: false, error: "A transaction is already recorded for this chat — check My receipts. Start a new chat for a new sale." });
+    }
+    const otherId = conv.member_a_id === me.id ? conv.member_b_id : conv.member_a_id;
+    const other = await db.prepare("SELECT id, username FROM profiles WHERE id = ? LIMIT 1").bind(otherId).first();
+    const otherName = other ? other.username : "member";
+    const now = nowMs();
+    // Both parties get a receipt: the buyer a "spent" one, the seller a
+    // "received" one. Each sees only their own, in My receipts.
+    const myKind = role === "buyer" ? "spent" : "received";
+    const theirKind = role === "buyer" ? "received" : "spent";
+    const inserted = await db.batch([
+      db.prepare(
+        `INSERT INTO receipts (profile_id, conversation_id, other_profile_id, other_username, kind, amount_cents, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(me.id, convId, otherId, otherName, myKind, amountCents, note, now),
+      db.prepare(
+        `INSERT INTO receipts (profile_id, conversation_id, other_profile_id, other_username, kind, amount_cents, note, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(otherId, convId, me.id, me.username, theirKind, amountCents, note, now),
+    ]);
+    const receiptId = inserted && inserted[0] && inserted[0].meta ? inserted[0].meta.last_row_id : null;
+    return json({ ok: true, error: null, receipt_id: receiptId, amount_cents: amountCents, amount: money(amountCents), note });
+  } catch (e) {
+    if (/no such table/i.test(String((e && e.message) || e))) return notSetup();
+    throw e;
+  }
+}

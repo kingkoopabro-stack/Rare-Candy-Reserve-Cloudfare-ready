@@ -38,6 +38,29 @@ export const ADULT_CATEGORIES = [
 ];
 
 export const FLAIRS = ["Question", "Card Check", "Show & Tell", "Price Check", "Help", "Discussion", "Hype", "Warning"];
+
+// Creator/Seller area (v3) — digital-content genres a seller picks when
+// they make a creator post or set up "What I sell" on their profile.
+export const CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Print Files", "Other"];
+// One-tap seller tag chips for the creator composer (the seller can also
+// type their own tags — these are just the quick ones).
+export const CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos"];
+// A Steady Heart — "End of the year" (21 tracks, in order). Members pick
+// up to 5 to feature on their profile. Track names are exact — never
+// re-title or alter them. Chris gives full permission to use all of it.
+// (Track names only — no audio player here; the player comes later.)
+export const ASH_TRACKS = [
+  "Break habits, not hearts", "Untold weapons", "Voice inside my head original",
+  "Sunk for you", "I'll prove everything", "Mr.Selfish", "Sweet BBgirl",
+  "Let's Travel", "Straight to pieces", "The day she came to be",
+  "Djentlemen Thief", "Guess how it ends", "On top of it Feat. Chest Club",
+  "Monster in disguise", "Stay until sunrise", "Read between the lines",
+  "Introduction to heartache", "We will meet again I swear",
+  "Dance till they drop", "Aiming to tease part 2", "Give them the world",
+];
+// Vita Nova Radio — the live Icecast MP3 stream. The only stream URL the
+// site uses; never invent another one.
+export const VNR_STREAM_URL = "https://radio.rarecandyreserve.org/vitanova";
 export const LISTING_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs", "Sealed Product", "Figures & Toys", "Video Games", "Plants", "3D Prints & Custom", "Other Collectibles"];
 export const SALE_VENUES = ["eBay", "Mercari", "Facebook Marketplace", "This app", "In person", "Other"];
 export const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"];
@@ -145,17 +168,72 @@ export async function putImage(env, prefix, deviceId, img, maxBytes = 2500000) {
   return { ok: true, key };
 }
 
+// --- 3D print files (v3) -------------------------------------------------
+// A creator post can attach one 3D print file: .stl / .obj / .3mf, or a
+// .zip containing them. Max 25 MB. Stored in the same IMAGES R2 bucket
+// under the "3d/" key prefix (no new bucket needed). The file bytes never
+// live in D1 — only the R2 key + original name + size on the post row.
+export const PRINT_FILE_EXTS = [".stl", ".obj", ".3mf", ".zip"];
+export const PRINT_FILE_MIMES = {
+  ".stl": "model/stl",
+  ".obj": "model/obj",
+  ".3mf": "model/3mf",
+  ".zip": "application/zip",
+};
+export function fileUrl(blobKey) {
+  if (!blobKey) return null;
+  return `/api/files?key=${encodeURIComponent(blobKey)}`;
+}
+export function decodePrintFile(file, maxBytes = 25000000) {
+  if (!file || typeof file.dataBase64 !== "string") return { ok: false, error: "No 3D file attached." };
+  const name = String(file.fileName || file.name || "").trim();
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+  if (!PRINT_FILE_EXTS.includes(ext)) {
+    return { ok: false, error: "That isn't a 3D print file — attach a .stl, .obj, .3mf, or a .zip of them." };
+  }
+  let bytes;
+  try {
+    const bin = atob(String(file.dataBase64).replace(/\s/g, ""));
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch { return { ok: false, error: "That file couldn't be read — try uploading it again." }; }
+  if (bytes.length > maxBytes) return { ok: false, error: "That file is too large — keep 3D print files under 25 MB." };
+  if (bytes.length === 0) return { ok: false, error: "That file looks empty." };
+  return { ok: true, bytes, ext, mime: PRINT_FILE_MIMES[ext], fileName: name.slice(0, 120) };
+}
+export async function putPrintFile(env, deviceId, file, maxBytes = 25000000) {
+  const dec = decodePrintFile(file, maxBytes);
+  if (!dec.ok) return dec;
+  if (!env.IMAGES) return { ok: false, error: "File uploads aren't connected yet — the shop is still setting up community file storage. You can post without a file for now." };
+  const safeName = dec.fileName.replace(/[^A-Za-z0-9._-]+/g, "_");
+  const key = `3d/${deviceId}-${Date.now()}-${Math.floor(Math.random() * 10000)}-${safeName}`;
+  await env.IMAGES.put(key, dec.bytes, { httpMetadata: { contentType: dec.mime } });
+  return { ok: true, key, fileName: dec.fileName, mime: dec.mime, size: dec.bytes.length };
+}
+
 // --- Text normalization ---------------------------------------------------
 
 export function normalizeTag(raw) {
   return (raw || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
 }
-export function normalizeTags(raw) {
+export function normalizeTags(raw, max = 6) {
   const out = [];
   for (const t of (raw || [])) {
     const n = normalizeTag(t);
     if (n && !out.includes(n)) out.push(n);
-    if (out.length >= 6) break;
+    if (out.length >= max) break;
+  }
+  return out;
+}
+// Creator-post tags: the seller types their own (comma-separated), max 8,
+// each 2–24 chars after normalization. Same normalization as forum tags.
+export function normalizeCreatorTags(raw) {
+  const out = [];
+  for (const t of (raw || [])) {
+    const n = normalizeTag(t);
+    if (n && n.length >= 2 && !out.includes(n)) out.push(n);
+    if (out.length >= 8) break;
   }
   return out;
 }
@@ -330,6 +408,25 @@ export function shapeProfile(row) {
     model_styles: parseTags(row.model_styles),
     model_music: row.model_music ?? "", model_gamer: row.model_gamer ?? "",
     model_breast: row.model_breast ?? "", model_ink: row.model_ink ?? "",
+    // Creator/Seller area (v3) — "What I sell" / "What I'm after". Public
+    // by design: the seller card on the member page and the Find results
+    // show exactly these fields (never payout handle or full name).
+    seller_types: parsePrefs(row.seller_types),
+    seller_tags: parsePrefs(row.seller_tags),
+    seller_open_to: row.seller_open_to ?? "",
+    seller_price_min_cents: row.seller_price_min_cents ?? 0,
+    seller_price_max_cents: row.seller_price_max_cents ?? 0,
+    buyer_types: parsePrefs(row.buyer_types),
+    buyer_tags: parsePrefs(row.buyer_tags),
+    buyer_budget_max_cents: row.buyer_budget_max_cents ?? 0,
+    // Music (v3.1) — A Steady Heart track picks (track numbers 1–21, max
+    // 5; titles come from ASH_TRACKS) + the opt-in Vita Nova Radio
+    // player. Independent options: either, both, or neither.
+    ash_tracks: parseAshTracks(row.ash_tracks),
+    show_vnr_player: row.show_vnr_player === 1,
+    // v3.2 — custom "Subscribe to my page" button text + member-page theme.
+    subscribe_label: row.subscribe_label ?? "Subscribe to my page",
+    profile_theme: parseTheme(row.profile_theme),
     created_at: iso(row.created_at),
   };
 }
@@ -343,6 +440,21 @@ export function shapeMember(row) {
     payout_ready: !!(row.payout_method && row.payout_handle),
     // MySpace throwback v2 — presence for the AIM buddy list.
     presence: presenceOf(row), away_message: row.away_message ?? "",
+    // Creator/Seller area (v3) — public seller card + Find results.
+    seller_types: parsePrefs(row.seller_types),
+    seller_tags: parsePrefs(row.seller_tags),
+    seller_open_to: row.seller_open_to ?? "",
+    seller_price_min_cents: row.seller_price_min_cents ?? 0,
+    seller_price_max_cents: row.seller_price_max_cents ?? 0,
+    buyer_types: parsePrefs(row.buyer_types),
+    buyer_tags: parsePrefs(row.buyer_tags),
+    buyer_budget_max_cents: row.buyer_budget_max_cents ?? 0,
+    // Music (v3.1) — A Steady Heart picks + Vita Nova Radio player toggle.
+    ash_tracks: parseAshTracks(row.ash_tracks),
+    show_vnr_player: row.show_vnr_player === 1,
+    // v3.2 — custom "Subscribe to my page" button text + member-page theme.
+    subscribe_label: row.subscribe_label ?? "Subscribe to my page",
+    profile_theme: parseTheme(row.profile_theme),
     created_at: iso(row.created_at),
   };
 }
@@ -383,8 +495,119 @@ export async function shapePost(db, row, author) {
     author_id: author.id, author_username: author.username, author_occupation: author.occupation ?? "",
     author_avatar_url: imageUrl(author.avatar_blob_key),
     score: hearts?.n ?? 0, comment_count: cc?.n ?? 0,
+    // Creator/Seller area (v3) — only set on creator posts; plain posts
+    // carry the defaults (is_creator 0, free, no genre, no file).
+    is_creator: row.is_creator === 1,
+    content_genre: row.content_genre ?? "",
+    price_cents: row.price_cents ?? 0,
+    // v3.2 — blur + pay-to-unlock are OPT-IN ONLY (both default 0/off).
+    // A photo is never blurred or paywalled unless the poster/seller
+    // explicitly ticked the box when posting.
+    blur_photo: row.blur_photo === 1,
+    pay_unlock: row.pay_unlock === 1,
+    file_url: fileUrl(row.file_blob_key ?? null),
+    file_name: row.file_name ?? "", file_mime: row.file_mime ?? "",
+    file_size: row.file_size ?? 0,
     created_at: iso(row.created_at),
   };
+}
+
+// --- Creator/Seller matching (v3, pure + testable) -----------------------
+// Score a candidate against a seeker's wants. Content-type overlap counts
+// most (+2 each), shared tags +1 each, and a price/budget fit +1.
+// Returns 0 when there is nothing in common (no match at all).
+export function matchScore(candidateTypes, candidateTags, seekerTypes, seekerTags, candidatePriceCents, seekerBudgetCents) {
+  const ct = new Set((candidateTypes || []).map((t) => String(t).toLowerCase()));
+  const st = new Set((seekerTypes || []).map((t) => String(t).toLowerCase()));
+  const cg = new Set((candidateTags || []).map((t) => String(t).toLowerCase()));
+  const sg = new Set((seekerTags || []).map((t) => String(t).toLowerCase()));
+  let score = 0;
+  for (const t of st) if (ct.has(t)) score += 2;
+  for (const t of sg) if (cg.has(t)) score += 1;
+  // Price fit: the seeker's budget covers the candidate's price (or the
+  // candidate is free), or the candidate's range overlaps the budget.
+  if (typeof seekerBudgetCents === "number" && seekerBudgetCents > 0) {
+    const price = typeof candidatePriceCents === "number" ? candidatePriceCents : 0;
+    if (price <= seekerBudgetCents) score += 1;
+  }
+  return score;
+}
+// Split a stored comma-separated pref field back into a list.
+export function parsePrefs(stored) {
+  if (!stored) return [];
+  return String(stored).split(",").map((t) => t.trim()).filter(Boolean);
+}
+// Clean a seller/buyer content-type list: keep only real genres, dedupe.
+export function cleanCreatorTypes(list) {
+  const out = [];
+  for (const t of (Array.isArray(list) ? list : [])) {
+    const v = String(t || "").trim();
+    if (v && CREATOR_GENRES.includes(v) && !out.includes(v)) out.push(v);
+  }
+  return out;
+}
+// A Steady Heart track picks (v3.1) — stored as comma-separated track
+// numbers (1–21, in the member's chosen order), max 5. Titles come from
+// ASH_TRACKS — never stored, never re-titled.
+export function parseAshTracks(stored) {
+  if (!stored) return [];
+  const out = [];
+  for (const part of String(stored).split(",")) {
+    const n = parseInt(part.trim(), 10);
+    if (Number.isInteger(n) && n >= 1 && n <= ASH_TRACKS.length && !out.includes(n)) out.push(n);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+
+// Member-page theme (v3.2) — JSON {bg_color, bg_image_url, text_color,
+// accent_color, font}. Every value is validated here, so the CSS the
+// frontend builds from it can never carry a script, an @import, or a
+// non-https image — same rules as sanitizeLayoutCss, enforced by
+// construction: colors must be #rrggbb, the background image must be
+// https://, and the font must be one of the fixed allowlisted stacks.
+export const THEME_FONTS = ["", "comic", "typewriter", "serif", "rounded"];
+export function parseTheme(stored) {
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+  if (!stored) return empty;
+  let obj;
+  try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
+  if (!obj || typeof obj !== "object") return empty;
+  const hex = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : "";
+  const out = { ...empty };
+  out.bg_color = hex(obj.bg_color);
+  out.text_color = hex(obj.text_color);
+  out.accent_color = hex(obj.accent_color);
+  const img = String(obj.bg_image_url || "").trim().slice(0, 500);
+  out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
+  out.font = THEME_FONTS.includes(obj.font) ? obj.font : "";
+  return out;
+}
+// Validate + normalize a theme from a client save. Returns the JSON string
+// to store ("" when nothing is set).
+export function cleanTheme(input) {
+  const t = parseTheme(input);
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font) return "";
+  return JSON.stringify(t);
+}
+export function cleanAshTracks(list) {
+  const out = [];
+  for (const t of (Array.isArray(list) ? list : [])) {
+    const n = Number(t);
+    if (Number.isInteger(n) && n >= 1 && n <= ASH_TRACKS.length && !out.includes(n)) out.push(n);
+    if (out.length >= 5) break;
+  }
+  return out;
+}
+// Clean a seller/buyer custom-tag list: normalized, 2–24 chars, max 8.
+export function cleanPrefTags(list) {
+  const out = [];
+  for (const t of (Array.isArray(list) ? list : [])) {
+    const n = normalizeTag(t);
+    if (n && n.length >= 2 && !out.includes(n)) out.push(n);
+    if (out.length >= 8) break;
+  }
+  return out;
 }
 
 export async function shapeListing(db, row, seller) {

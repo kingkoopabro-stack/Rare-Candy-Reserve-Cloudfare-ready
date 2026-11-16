@@ -7,6 +7,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
   checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
+  cleanTheme,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -65,7 +66,7 @@ export async function onRequestPost({ env, request }) {
   // If the v2 migration hasn't been run yet the UPDATE fails with
   // "no such column" and we retry with just the v1 columns, so an edit
   // never breaks — the client is told via v2_pending.
-  const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "custom"];
+  const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "afterdark", "creatorgold", "candyshop", "arcade", "ocean", "custom"];
   const v2Sets = [];
   const v2Vals = [];
   if (Array.isArray(a.top_friends)) {
@@ -81,11 +82,97 @@ export async function onRequestPost({ env, request }) {
     v2Sets.push("layout_preset = ?");
     v2Vals.push(a.layout_preset);
   }
+  // Creator/Seller area (v3) — "What I sell" / "What I'm after". Same
+  // graceful pattern as v2: if the v3 migration hasn't run yet, the
+  // UPDATE fails with "no such column" and we retry without the v3
+  // columns; the client is told via v3_pending.
+  const v3Sets = [];
+  const v3Vals = [];
+  const cleanTypes = (list) => {
+    const out = [];
+    for (const t of (Array.isArray(list) ? list : [])) {
+      const v = String(t || "").trim();
+      if (v && !out.includes(v)) out.push(v);
+    }
+    return out;
+  };
+  const cleanTags = (list) => {
+    const out = [];
+    for (const t of (Array.isArray(list) ? list : [])) {
+      const n = String(t || "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24);
+      if (n && n.length >= 2 && !out.includes(n)) out.push(n);
+      if (out.length >= 8) break;
+    }
+    return out;
+  };
+  const CREATOR_GENRES_LOCAL = ["Photos", "Videos", "Custom Content", "Audio", "3D Print Files", "Other"];
+  if (Array.isArray(a.seller_types)) {
+    v3Sets.push("seller_types = ?");
+    v3Vals.push(cleanTypes(a.seller_types).filter((t) => CREATOR_GENRES_LOCAL.includes(t)).join(","));
+  }
+  if (Array.isArray(a.seller_tags)) {
+    v3Sets.push("seller_tags = ?");
+    v3Vals.push(cleanTags(a.seller_tags).join(","));
+  }
+  if (typeof a.seller_open_to === "string") {
+    v3Sets.push("seller_open_to = ?");
+    v3Vals.push(str(a.seller_open_to, 140));
+  }
+  if (Number.isInteger(a.seller_price_min_cents) || Number.isInteger(a.seller_price_max_cents)) {
+    const lo = Number.isInteger(a.seller_price_min_cents) ? Math.max(0, Math.min(a.seller_price_min_cents, 10000000)) : 0;
+    const hi = Number.isInteger(a.seller_price_max_cents) ? Math.max(0, Math.min(a.seller_price_max_cents, 10000000)) : 0;
+    v3Sets.push("seller_price_min_cents = ?", "seller_price_max_cents = ?");
+    v3Vals.push(lo, hi >= lo ? hi : lo);
+  }
+  if (Array.isArray(a.buyer_types)) {
+    v3Sets.push("buyer_types = ?");
+    v3Vals.push(cleanTypes(a.buyer_types).filter((t) => CREATOR_GENRES_LOCAL.includes(t)).join(","));
+  }
+  if (Array.isArray(a.buyer_tags)) {
+    v3Sets.push("buyer_tags = ?");
+    v3Vals.push(cleanTags(a.buyer_tags).join(","));
+  }
+  if (Number.isInteger(a.buyer_budget_max_cents)) {
+    v3Sets.push("buyer_budget_max_cents = ?");
+    v3Vals.push(Math.max(0, Math.min(a.buyer_budget_max_cents, 10000000)));
+  }
+  // Music (v3.1) — A Steady Heart track picks (track numbers 1–21, max
+  // 5, in the member's order) + the opt-in Vita Nova Radio player.
+  // Same graceful pattern: they ride with the v3 columns, so if the
+  // migration hasn't run yet the edit retries without them.
+  if (Array.isArray(a.ash_tracks)) {
+    const picks = [];
+    for (const t of a.ash_tracks) {
+      const n = Number(t);
+      if (Number.isInteger(n) && n >= 1 && n <= 21 && !picks.includes(n)) picks.push(n);
+      if (picks.length >= 5) break;
+    }
+    v3Sets.push("ash_tracks = ?");
+    v3Vals.push(picks.join(","));
+  }
+  if (typeof a.show_vnr_player === "boolean" || a.show_vnr_player === 0 || a.show_vnr_player === 1) {
+    v3Sets.push("show_vnr_player = ?");
+    v3Vals.push(a.show_vnr_player === true || a.show_vnr_player === 1 ? 1 : 0);
+  }
+  // v3.2 — custom "Subscribe to my page" button text (max 40 chars;
+  // empty falls back to the default) + the member-page theme pickers
+  // (background color/image, text + accent colors, font — validated by
+  // cleanTheme: hex colors, https:// image, allowlisted font only).
+  // Same graceful pattern: they ride with the v3 columns.
+  if (typeof a.subscribe_label === "string") {
+    v3Sets.push("subscribe_label = ?");
+    v3Vals.push(str(a.subscribe_label, 40) || "Subscribe to my page");
+  }
+  if (typeof a.profile_theme === "string" || (a.profile_theme && typeof a.profile_theme === "object")) {
+    v3Sets.push("profile_theme = ?");
+    v3Vals.push(cleanTheme(a.profile_theme));
+  }
   let row;
   let v2Pending = false;
+  let v3Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals];
+    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
@@ -94,20 +181,41 @@ export async function onRequestPost({ env, request }) {
     try {
       await db.prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
     } catch (e) {
-      // v2 columns don't exist yet (migration not run) — retry without them.
-      if (v2Sets.length && /no such column/i.test(String((e && e.message) || e))) {
-        v2Pending = true;
-        // Rebuild the SET list without the v2 columns and retry.
-        // (vals has one extra trailing entry — the profile id for WHERE.)
-        const keep = [];
-        const keepVals = [];
-        for (let i = 0; i < sets.length; i++) {
-          if (v2Sets.includes(sets[i])) continue;
-          keep.push(sets[i]);
-          keepVals.push(vals[i]);
+      // A migration column doesn't exist yet — retry without the new
+      // columns so an edit never breaks. First drop just the v3 columns
+      // (the live DB may have v2 but not v3 yet); if that still fails,
+      // drop v2 too. The client is told via v2_pending / v3_pending.
+      if (/no such column|no column named/i.test(String((e && e.message) || e))) {
+        const without = (dropSets) => {
+          const keep = [];
+          const keepVals = [];
+          for (let i = 0; i < sets.length; i++) {
+            if (dropSets.includes(sets[i])) continue;
+            keep.push(sets[i]);
+            keepVals.push(vals[i]);
+          }
+          keepVals.push(existing.id);
+          return { keep, keepVals };
+        };
+        let done = false;
+        if (v3Sets.length) {
+          try {
+            const r1 = without(v3Sets);
+            await db.prepare(`UPDATE profiles SET ${r1.keep.join(", ")} WHERE id = ?`).bind(...r1.keepVals).run();
+            v3Pending = true;
+            done = true;
+          } catch (e2) {
+            if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2;
+          }
         }
-        keepVals.push(existing.id);
-        await db.prepare(`UPDATE profiles SET ${keep.join(", ")} WHERE id = ?`).bind(...keepVals).run();
+        if (!done && v2Sets.length) {
+          const r2 = without([...v2Sets, ...v3Sets]);
+          await db.prepare(`UPDATE profiles SET ${r2.keep.join(", ")} WHERE id = ?`).bind(...r2.keepVals).run();
+          v2Pending = true;
+          if (v3Sets.length) v3Pending = true;
+          done = true;
+        }
+        if (!done) throw e;
       } else { throw e; }
     }
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(existing.id).first();
@@ -121,5 +229,5 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
-  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending });
+  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending });
 }

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Crystal candy">
+  <defs>
+    <linearGradient id="cc-g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff2ea6"/>
+      <stop offset=".28" stop-color="#e060f0"/>
+      <stop offset=".52" stop-color="#7c4dff"/>
+      <stop offset=".74" stop-color="#00c0f0"/>
+      <stop offset="1" stop-color="#0066ff"/>
+    </linearGradient>
+    <linearGradient id="cc-l" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- faceted rock-candy crystal point -->
+  <polygon points="32,2 48,20 48,52 16,52 16,20" fill="url(#cc-g)" stroke="#ffffff" stroke-opacity=".55" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- left facet, lighter -->
+  <polygon points="32,2 16,20 16,52 32,52" fill="url(#cc-l)" opacity=".38"/>
+  <!-- right facet, deeper blue -->
+  <polygon points="32,2 48,20 48,52 32,52" fill="#0033aa" opacity=".22"/>
+  <!-- center ridge -->
+  <line x1="32" y1="4" x2="32" y2="50" stroke="#ffffff" stroke-opacity=".8" stroke-width="1.5"/>
+  <!-- sparkle -->
+  <polygon points="32,14 34,20 40,22 34,24 32,30 30,24 24,22 30,20" fill="#ffffff" opacity=".9"/>
+</svg>

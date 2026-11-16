@@ -24,30 +24,13 @@ const MUSIC_LINKS = {
   donate:   "https://buy.stripe.com/6oU14p4MW7MFeBy57c6sw00"
 };
 
-/* ---------- Steady Heart Radio time-of-day banner ----------
-   Decorative banner art on the home + podcast heroes. Swapped on load
-   from the visitor's LOCAL time — morning 05:00–11:59, afternoon
-   12:00–17:59, night 18:00–04:59. Any <img data-radio-banner> gets
-   swapped; an optional [data-radio-banner-caption] gets the label. */
-const RADIO_BANNERS = {
-  morning:   { src: "images/radio-morning.jpg",   label: "Steady Heart Radio — morning" },
-  afternoon: { src: "images/radio-afternoon.jpg", label: "Steady Heart Radio — afternoon" },
-  night:     { src: "images/radio-night.jpg",     label: "Steady Heart Radio — night" }
-};
-function radioBannerForHour(h){
-  if(h >= 5 && h < 12) return RADIO_BANNERS.morning;
-  if(h >= 12 && h < 18) return RADIO_BANNERS.afternoon;
-  return RADIO_BANNERS.night;
-}
-function setTimeOfDayBanner(){
-  const img = document.querySelector("img[data-radio-banner]");
-  if(!img) return;
-  const b = radioBannerForHour(new Date().getHours());
-  img.src = b.src;
-  img.alt = b.label + " — Steady Heart Radio art";
-  const cap = document.querySelector("[data-radio-banner-caption]");
-  if(cap) cap.textContent = b.label;
-}
+/* ---------- Steady Wave banner ----------
+   The station banner is FIXED now (2026-11-16) — the old time-of-day
+   swap is gone. The radio page + home page show
+   images/steady-wave-banner-top.jpg (the STEADY/HEART lettering) and
+   the podcast pages show images/steady-wave-banner-bottom.jpg
+   (cityscape + ON AIR). No JS swap — the <img> src in the HTML is
+   the banner. Do not re-add a swap. */
 
 /* ---------- shop data (copy + prices verbatim from the live site / eBay) ---------- */
 const PRODUCTS = [
@@ -66,9 +49,9 @@ const PRODUCTS = [
    imgs:["images/autistic-pin-totem.jpg","images/enamel-pins.jpg"],
    variations:[{label:"Autism+Autistic Enamel Pin", price:6.00},{label:"Parappa (Parappa the Rapper)", price:6.00},{label:"Master Onion", price:6.00},{label:"N64 Logo", price:6.00},{label:"Sunny Funny (Sunny Flower)", price:6.00},{label:"PJ Berri (the bear)", price:6.00},{label:"Deku Stone — Kokiri's Emerald", price:6.00},{label:"Deku Stone — Goron's Ruby", price:6.00},{label:"Deku Stone — Zora's Sapphire", price:6.00},{label:"Deku Stones — all three as a set", price:15.00}]},
   {id:"amby-deck", slug:"modded-amby-deck", tag:"HANDHELD · Modded Amby Deck", name:"Modded Amby Deck — Fully Modded Handheld (Choose Black, Indigo or Retro Gray)",
-   desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Fully modded and playable — faster than most PCs out of the box. Big 120Hz touchscreen, RGB backlit sticks, 8GB RAM + 128GB storage, Android. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus PC games via Winlator. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Loaded with free ports and cool stuff. Case applied, wrist wrap installed, and anti-shock case included. Modded to order. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)",
+   desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. The ultimate fully moddable alternative to a Switch — cheaper, better features, and way more customization, for less cost overall, since all you need to pay for is the console and me modding it to your taste. See the real photo in the gallery — I use mine like a desktop, too. Immediate payment required. 12-day money-back guarantee. Fully modded and playable — faster than most PCs out of the box. Big 120Hz touchscreen, RGB backlit sticks, 8GB RAM + 128GB storage, Android. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus PC games via Winlator. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Loaded with free ports and cool stuff. Case applied, wrist wrap installed, and anti-shock case included. Modded to order. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)",
    price:230.00, ship:"+ shipping (by location)", icon:"🎮",
-   imgs:["images/amby-deck-two.jpg"],
+   imgs:["images/amby-deck-two.jpg","images/amby-rg476h-real.jpg"],
    variations:[{label:"Black", price:230.00},{label:"Indigo", price:230.00},{label:"Retro Gray", price:230.00}]},
   {id:"bricktsp", slug:"modded-bricktsp", tag:"HANDHELD · Modded BrickTSP", name:"BrickTSP — Modded Pocket Handheld (CrossMix, 128GB Card)",
    desc:"BrickTSP — a pocket-size vertical handheld, modded and ready to play. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Sharp 3.2-inch 4:3 screen, 3000mAh battery, WiFi + Bluetooth. Plays PS1, SNES, Genesis, GBA and more full speed, plus light N64/Dreamcast. Loaded with free ports and cool stuff. Fully decked out ($105) comes with everything — protective case + wrist strap included. Machine only ($90) is just the handheld — add the protective case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)",
@@ -94,7 +77,7 @@ const PRODUCTS = [
    draft entries are approved but not posted yet (price shown, not buyable). */
 const CATALOG = [
   {id:"cat-gengar", slug:"gengar-cgc9", ebay:"168803766775", icon:"👻", tag:"Graded Card · CGC 9", name:"CGC 9 Gengar ex 047/071 Japanese Wild Force", price:20.00, img:null,
-   imgs:["images/gengar-ex-front.jpg"]},
+   imgs:["images/gengar-ex-front.jpg","images/gengar-ex-display.jpg","images/gengar-ex-closeup.jpg"]},
   {id:"cat-cyberjudge", slug:"cyber-judge-pack", ebay:"168803775765", icon:"🃏", tag:"Sealed Pack", name:"Pokemon Cyber Judge sv5M Japanese Booster Pack", price:5.99, stripe:"https://buy.stripe.com/3cIeVf1AK6IB9he7fk6sw07", ship:"+ $2.00 shipping", img:null,
    imgs:["images/cyber-judge-pack-front.jpg"]},
   {id:"cat-beholder", slug:"beholder-mini", ebay:"168803858135", icon:"👁", tag:"Tabletop Miniature", name:"3D Printed Beholder Tabletop Miniature", price:15.00, img:null,
@@ -108,12 +91,14 @@ const CATALOG = [
    imgs:["images/xmen-xforce-1.jpg"]},
   {id:"cat-sunflora", slug:"sunflora-cgc10", ebay:"168711754988", icon:"🌻", tag:"Graded Card · CGC Pristine 10", name:"2024 Sunflora AR 102/101 CGC Pristine 10", price:30.00, stripe:"https://buy.stripe.com/aFabJ3gvE3wp3WUarw6sw0h", img:"images/sunflora-cgc10-1.jpg",
    imgs:["images/sunflora-cgc10-1.jpg","images/sunflora-cgc10-2.jpg","images/sunflora-cgc10-3.jpg"]},
-  {id:"cat-glaceon", slug:"glaceon-vmax", ebay:"168818972853", icon:"❄️", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Glaceon VMAX 041/203 Evolving Skies", price:12.00, stripe:"https://buy.stripe.com/9B67sNbbkeb39heczE6sw0d", img:null,
-   imgs:["images/glaceon-vmax-front.jpg"]},
+  {id:"cat-glaceon", slug:"glaceon-vmax", ebay:"168818972853", icon:"❄️", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Glaceon VMAX 041/203 Evolving Skies", price:30.00, stripe:"https://buy.stripe.com/14A9AV6V4d6Z1OMbvA6sw0j", img:null,
+   imgs:["images/glaceon-vmax-front.jpg","images/glaceon-vmax-display.jpg","images/glaceon-vmax-closeup.jpg","images/glaceon-vmax-back.jpg"],
+   desc:"Glaceon VMAX, Evolving Skies 041/203 Holo, CGC 8.5 NM/MINT+. Comes with the white PETG slab bumper. Free glow bracelet with this Pokémon card order."},
   {id:"cat-rayquaza", slug:"rayquaza-v", ebay:"168818990115", icon:"🐉", tag:"Graded Card · CGC 9", name:"CGC 9 Rayquaza V 107/172 Japanese VSTAR Universe", price:18.00, img:null, outOfStock:true,
    imgs:["images/rayquaza-v-front.jpg"]},
-  {id:"cat-vulpix", slug:"vulpix-v", ebay:"168819002299", icon:"🦊", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Alolan Vulpix V 033/195 Silver Tempest", price:12.00, stripe:"https://buy.stripe.com/6oUfZjcfogjbali8jo6sw0i", img:null,
-   imgs:["images/vulpix-v-front.jpg"]},
+  {id:"cat-vulpix", slug:"vulpix-v", ebay:"168819002299", icon:"🦊", tag:"Graded Card · CGC 8.5", name:"CGC 8.5 Alolan Vulpix V 033/195 Silver Tempest", price:20.00, stripe:"https://buy.stripe.com/aFa5kFa7g9UN0KI6bg6sw0k", img:null,
+   imgs:["images/vulpix-v-front.jpg","images/vulpix-v-display.jpg","images/vulpix-v-back.jpg","images/vulpix-v-closeup.jpg"],
+   desc:"Alolan Vulpix V, Silver Tempest 033/195 Holo, CGC 8.5 NM/MINT+. Comes with the dark slab bumper. Free glow bracelet with this Pokémon card order."},
   /* Copperajah draft — approved $15.00 price, NOT posted to eBay yet. Do not make it buyable. */
   {id:"cat-copperajah", slug:"copperajah-cgc10", ebay:null, icon:"🐘", tag:"Graded Card · CGC 10", name:"CGC 10 Copperajah ex 088/071 Japanese Snow Hazard", price:15.00, img:null, outOfStock:true,
    imgs:["images/copperajah-ex-front.jpg"],
@@ -163,7 +148,7 @@ const CATALOG = [
    imgs:["images/buster-sword-keychain.jpg"],
    desc:"Black metal Buster Sword keychain."},
   {id:"cat-shield", slug:"pokemon-shield-switch-loose", ebay:null, icon:"🎮", tag:"Video Game · Loose Cart", name:"Pokémon Shield — Nintendo Switch, Loose Cartridge Only", price:29.99, stripe:"https://buy.stripe.com/5kQeVf7Z87MFgJG7fk6sw0f", img:null,
-   imgs:["images/pokemon-shield-cart-1.jpg","images/pokemon-shield-cart-2.jpg","images/pokemon-shield-cart-3.jpg"],
+   imgs:["images/pokemon-shield-cart-1.jpg","images/pokemon-shield-cart-2.jpg","images/pokemon-shield-cart-3.jpg","images/pokemon-shield-cart-loose.jpg"],
    desc:"Pokémon Shield (2019) for Nintendo Switch — loose cartridge only, no case or box. Tested working. Fair eBay loose price — recent sold listings $25–$35."},
   {id:"cat-deadlands-lot", slug:"deadlands-lot-25", ebay:null, icon:"🃏", tag:"TCG Lot · Deadlands", name:"Deadlands TCG — Shrink-Wrapped Lot, 25 Cards", price:12.00, stripe:"https://buy.stripe.com/8x28wR0wG9UN3WU9ns6sw0g", img:null,
    imgs:["images/placeholder.svg"],
@@ -177,9 +162,9 @@ const CATALOG = [
    variations:[{label:"Fully decked out — everything included", price:110.00},{label:"Machine only — no case, no wrist strap", price:95.00},{label:"Machine only + pink case", price:105.00},{label:"Machine only + wrist strap", price:100.00}],
    desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Fully decked out ($110) comes with everything — pink protective case + wrist strap included. Machine only ($95) is just the handheld — add the pink case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
   {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — 120Hz Android Handheld in All Its Glory", price:210.00, img:null,
-   imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg"],
+   imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg","images/amby-rg476h-real.jpg"],
    variations:[{label:"Black", price:210.00},{label:"Indigo", price:210.00},{label:"Retro Gray", price:210.00}],
-   desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Modded AmbyRG in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Modded to order — ready to play out of the box. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)"},
+   desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. The ultimate fully moddable alternative to a Switch — cheaper, better features, and way more customization, for less cost overall, since all you need to pay for is the console and me modding it to your taste. See the real photo in the gallery — I use mine like a desktop, too. Immediate payment required. 12-day money-back guarantee. Modded AmbyRG in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Modded to order — ready to play out of the box. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)"},
   {id:"cat-bricktsp", slug:"bricktsp-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded BrickTSP", name:"BrickTSP — Modded Pocket Handheld (CrossMix, 128GB Card)", price:105.00, img:null,
    imgs:["images/bricktsp.jpg"],
    variations:[{label:"Fully decked out — everything included", price:105.00},{label:"Machine only — no case, no wrist strap", price:90.00},{label:"Machine only + protective case", price:100.00},{label:"Machine only + wrist strap", price:95.00}],
@@ -240,6 +225,33 @@ const CATALOG = [
    imgs:["images/amby-retro.jpg"],
    variations:[{label:"Modded — fully decked out (case + wrist wrap + anti-shock case)", price:124.00},{label:"Modded — machine only", price:104.00},{label:"Stock — unmodded, ordered when you buy (allow extra time)", price:64.00}],
    desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Amby Retro — the Game Boy-shaped one. 3.4-inch 720×480 screen, Allwinner H700 chip, 1GB RAM + 16GB storage, Linux, 3500mAh battery (about 7 hours). Extra X/Y + L2/R2 buttons, HDMI TV-out, vibration motor, dual TF slots to 512GB, Wi-Fi + Bluetooth. Plays PS1, N64 and light Dreamcast. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Decked-out version has the case applied, wrist wrap installed, and anti-shock case included. Modded to order — ready to play out of the box. Stock version is unmodded and ordered when you buy — please allow a little extra time. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)"},
+  /* --- New listings — 2026-11-16 (Chris's batch: MCR vinyl, Pi + NES shell, death whistle, octopus, Sonic clock, Gengar stand, coin holder, used games) --- */
+  {id:"cat-mcr-vinyl", slug:"mcr-vinyl-three-cheers", ebay:null, icon:"🎵", tag:"Vinyl · Used — NM Record", name:"My Chemical Romance — Three Cheers for Sweet Revenge (Vinyl)", price:20.00, img:null,
+   imgs:["images/mcr-vinyl.jpg"],
+   desc:"My Chemical Romance — Three Cheers for Sweet Revenge on vinyl. Record is NM, case was opened, record played once. Buyer pays shipping."},
+  {id:"cat-pi-nes", slug:"raspberry-pi-nes-shell", ebay:null, icon:"🍓", tag:"Raspberry Pi · Modded + Printed Shell", name:"Your first Raspberry Pi + NES shell printed (other options available) pre installed extra parts!", price:65.00, img:null,
+   imgs:["images/pi-nes-shell.jpg","images/pi-gpio-diagram.jpg"],
+   variations:[{label:"Raspberry Pi 3B+ — with printed NES shell + modding", price:65.00},{label:"Raspberry Pi 4B+ — with printed NES shell + modding", price:95.00}],
+   desc:"Your first Raspberry Pi, in a 3D-printed NES-style shell, modded to work exactly how you need it. Custom firmware and a personalized OS with a boot splash screen of your design or mine. Heatsink(s) installed in the critical places. Power cord is optional — message the shop if you need one. Shell printed in PETG. Good for servers, app dev and developer tools, a mini PC, retro gaming, a relay, hosting your own website for free, or blocking ads on all devices on your network. The modding and the custom shell are what set it apart — you pay for the Pi and the work. Buyer pays shipping."},
+  {id:"cat-death-whistle", slug:"aztec-death-whistle", ebay:null, icon:"💀", tag:"3D PRINT · Replica", name:"Aztec Death Whistle — 3D Printed Replica", price:8.00, img:null,
+   imgs:["images/death-whistle.jpg"],
+   desc:"3D-printed replica of the actual Aztec death whistle. Comes with a braided rope authentic necklace. Available in aged or new bone feel and look. Terrifying sound when blown. Buyer pays shipping."},
+  {id:"cat-octopus-holder", slug:"octopus-holder", ebay:null, icon:"🐙", tag:"3D PRINT · Mounted Holder", name:"3D Printed Octopus Holder — Screw / Bolt Mounted", price:15.00, img:null,
+   imgs:["images/octopus-holder.jpg"],
+   desc:"3D-printed octopus holder, screw or bolt mounted. Holds vases, drink cans, or mini hookahs — that is what it was made for, besides soda cans — and it works for controllers and remotes too. Super sturdy, made on demand. Buyer pays shipping."},
+  {id:"cat-sonic-clock", slug:"sonic-alarm-clock", ebay:null, icon:"🦔", tag:"Alarm Clock · SEGA", name:"Sonic the Hedgehog Alarm Clock (SEGA)", price:20.00, img:null,
+   imgs:["images/sonic-clock-front.jpg","images/sonic-clock-back.jpg"],
+   desc:"Sonic the Hedgehog twin-bell alarm clock by SEGA. Blue bells, Sonic on the dial, ©SEGA on the back. See the photos for condition — front and back shown. Buyer pays shipping."},
+  {id:"cat-gengar-stand", slug:"gengar-shadow-stand", ebay:null, icon:"👻", tag:"3D PRINT · Display Stand", name:"Gengar Shadow Display Stand — 3D Printed", price:8.00, img:null,
+   imgs:["images/gengar-shadow-stand.jpg","images/gengar-ex-display.jpg"],
+   desc:"3D-printed Gengar shadow display stand — Gengar, Haunter, and Gastly silhouettes in a round frame with bats and bare branches. Stand only — the graded card and figure in the other photo are NOT included. Perfect for showing off a Gengar slab. Buyer pays shipping."},
+  {id:"cat-coin-holder", slug:"coin-case-slip-holder", ebay:null, icon:"🪙", tag:"Coin Display · 3D Printed", name:"Coin Case Slip Holder — Charizard + Zekrom Coins", price:15.00, img:null,
+   imgs:["images/coin-holders-wide.jpg","images/coin-charizard.jpg","images/coin-zekrom.jpg","images/coin-holders-bracelets.jpg"],
+   desc:"Two Pokémon coins in 3D-printed slip holders — Charizard and Zekrom — so you can display your coins in card cases. One listing: both coins and both holders included. Buyer pays shipping."},
+  {id:"cat-used-games", slug:"used-games", ebay:null, icon:"🎮", tag:"Video Games · Used", name:"Used Games — Loose", price:12.00, img:null,
+   imgs:["images/minecraft-ps3-case.jpg","images/minecraft-ps3-label.jpg","images/minecraft-ps3-back.jpg","images/pokemon-shield-cart-loose.jpg","images/minecraft-ps3-shield.jpg"],
+   variations:[{label:"Minecraft — PlayStation 3 Edition (loose disc)", price:12.00},{label:"Pokémon Shield — Nintendo Switch (loose cart)", price:29.99},{label:"Just Dance Wii combo", price:15.00}],
+   desc:"Used games, loose — priced for loose condition. Pick your game from the dropdown. Minecraft PS3 Edition is the loose disc in a clear case (front, label, and back shown). Pokémon Shield is the loose Switch cartridge — it is also listed on its own. Just Dance Wii combo: a real photo is coming — the last photo here is a placeholder (the dance booklet behind the Shield cart), message the shop for exactly what is in the combo. Looking for sealed games? Sealed packs are in the catalog too — look for the “Sealed Pack” tag. Buyer pays shipping."},
 ];
 const SOON = [
   {icon:"🃏", tag:"Graded Card", name:"PSA 9–10 slab, rotating stock", price:"Priced per card", note:"Listings loading soon"},
@@ -498,7 +510,7 @@ function productCard(p){
     const lo = Math.min(...p.variations.map(v=>v.price)), hi = Math.max(...p.variations.map(v=>v.price));
     priceLine = `<p><span class="price">${lo===hi ? money(lo) : money(lo)+" – "+money(hi)}</span> <span class="ship">${p.ship}</span></p>
       <label style="margin-top:2px">Choose:</label><select id="var-${p.id}">${opts}</select>`;
-    buyBtn = `<button class="btn" style="margin-top:10px" onclick="addProductVarToCart('${p.id}')">Add to cart</button>`;
+    buyBtn = `<button class="btn" onclick="addProductVarToCart('${p.id}')">Add to cart</button>`;
   } else {
     priceLine = `<p><span class="price">${money(p.price)}</span> <span class="ship">${p.ship}</span></p>`;
     buyBtn = `<button class="btn" onclick="addToCart('${p.id}')">Add to cart</button>`;
@@ -509,7 +521,7 @@ function productCard(p){
     <div class="tag" style="margin-top:12px">${p.tag}</div>
     <h3>${p.name}</h3><p>${p.desc}</p>
     ${priceLine}
-    <p>${buyBtn}${p.stripe ? ` <a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener" style="margin-left:8px">Buy with Stripe →</a>` : ""} <button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
+    <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
   </div>`;
 }
 function catalogCard(c){
@@ -541,7 +553,7 @@ function catalogCard(c){
     const lo = Math.min(...c.variations.map(v=>v.price)), hi = Math.max(...c.variations.map(v=>v.price));
     priceLine = `<p><span class="price">${lo===hi ? money(lo) : money(lo)+" – "+money(hi)}</span></p>
       <label style="margin-top:2px">Choose:</label><select id="var-${c.id}">${opts}</select>`;
-    buyBtn = `<button class="btn" style="margin-top:10px" onclick="addCatalogToCart('${c.id}')">Add to cart</button>`;
+    buyBtn = `<button class="btn" onclick="addCatalogToCart('${c.id}')">Add to cart</button>`;
   } else {
     priceLine = `<p><span class="price">${money(c.price)}</span>${c.ship ? ` <span class="ship">${c.ship}</span>` : ""}</p>`;
     buyBtn = `<button class="btn" onclick="addCatalogToCart('${c.id}')">Add to cart</button>`;
@@ -552,7 +564,7 @@ function catalogCard(c){
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p style="color:var(--muted);font-size:14px">${c.desc}</p>` : ""}
     ${priceLine}
-    <p>${buyBtn}${c.stripe ? ` <a class="btn ghost" href="${c.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? ` <button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
+    <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" href="${c.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
   </div>`;
 }
 function renderPageSections(){
@@ -813,7 +825,6 @@ function boot(){
   estimate();
   forgePreview();
   renderCart();
-  setTimeOfDayBanner();
   if(page === "shop"){
     const item = new URLSearchParams(location.search).get("item");
     if(item) showDetail(item);

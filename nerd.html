@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nerd Hub — Games, News &amp; Drops · Rare Candy Reserve</title>
 <meta name="description" content="The Nerd Hub — new games, releases, deals, open source projects, LARP events, and game reviews. First up: a Legend of Zelda review, and a look at Photosyn, the game being built here.">
-<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/style.css?v=26f3d1d2">
 <style>
 /* Nerd Hub — platform badges (brand colors, text badges) */
 .plat-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
@@ -39,7 +39,7 @@
 
 <header class="site">
   <div class="wrap navrow">
-    <a class="logo" href="index.html">🍬 Rare Candy <b>Reserve</b></a>
+    <a class="logo" href="index.html"><img class="logo-mark" src="images/crystal-candy.svg" alt="">Rare Candy <b>Reserve</b></a>
     <nav class="main" id="mainNav">
       <a href="index.html" data-page="home">Home</a>
       <a href="shop.html" data-page="shop">Shop</a>
@@ -121,11 +121,41 @@
       </div>
     </div>
     <div class="card" style="max-width:760px;margin:22px auto 0;text-align:center">
-      <div class="tag">📻 Vita Nova Radio — live status</div>
+      <div class="tag">📻 Steady Wave — live status</div>
       <p style="margin-top:12px"><span class="live-badge" id="nerdLiveBadge"><span class="dot"></span><span id="nerdLiveBadgeText">CHECKING…</span></span></p>
-      <div class="status-ticker"><span>thank you for listening to Vita Nova Radio! 🎙️ VITA NOVA RADIO — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly ·</span></div>
+      <div class="status-ticker"><span>thank you for listening to Steady Wave! 🎙️ STEADY WAVE — 24/7 · 🍬 Rare Candy Reserve · 🎧 “What’s the Alternative?” — new episodes weekly ·</span></div>
       <p style="margin-top:14px"><a class="btn ghost" href="radio.html">Listen live →</a></p>
     </div>
+  </section>
+
+  <section>
+    <div class="kicker">🎮 The Gaming Hub — my handhelds</div>
+    <h2>My handhelds — <span class="grad-text">better than a Switch for how I play.</span></h2>
+    <p style="color:var(--muted)">These are the handhelds I actually use — I prefer them even over a Switch. The Amby is the ultimate fully moddable alternative to a Switch: cheaper, better features, and way more customization, for less cost overall, since all you need to pay for is the console and me modding it to your taste.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px;align-items:start;margin-top:20px">
+      <figure class="zelda-img hub-photo">
+        <img src="images/amby-rg476h-real.jpg" alt="My Amby — Anbernic RG476H running Final Fantasy VII">
+        <figcaption>My Amby — running Final Fantasy VII, like a desktop in my hands</figcaption>
+      </figure>
+      <figure class="zelda-img hub-photo">
+        <img src="images/handheld-kingdom-hearts.jpg" alt="Handheld running Kingdom Hearts II">
+        <figcaption>Kingdom Hearts II on the go</figcaption>
+      </figure>
+    </div>
+    <div class="grid" style="margin-top:20px">
+      <div class="card">
+        <div class="tag">TSP — Linux + retro</div>
+        <h3>The TSP</h3>
+        <p>I only personally enjoy the TSP for Linux PC ports and retro gaming — game development on it is perfect for starters.</p>
+      </div>
+      <div class="card">
+        <div class="tag">Amby — music + work + games</div>
+        <h3>The Amby</h3>
+        <p>The Amby is for making music, working or coding, modding, and gaming on the go — its beautiful screen and amazing battery. Both of them last so long compared to American-sourced parts or devices.</p>
+      </div>
+    </div>
+    <p style="color:var(--muted);margin-top:16px">Music creation, gigs on the go to hook up to other hubs or instruments and loop audio, and all my favorite games I grew up with — free and online with my friends.</p>
+    <p style="margin-top:14px"><a class="btn" href="shop.html">Shop the handhelds →</a></p>
   </section>
 
   <section>
@@ -246,13 +276,13 @@
   <div class="wrap">
     <div class="follow-label">Listen &amp; follow — a steady heart</div>
     <div class="follow-row" id="followRow"></div>
-    <p>🍬 <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p><img class="logo-mark" src="images/crystal-candy.svg" alt=""> <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
     <p>Stripe · PayPal · Apple Pay · Google Pay · Credit / Debit · Cash App · BTC</p>
     <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
   </div>
 </footer>
 
-<script src="assets/js/site.js?v=6f4513fd"></script>
+<script src="assets/js/site.js?v=26f3d1d2"></script>
 <script>
 /* Nerd Hub — radio live status preview. Checks the stream URL; if it answers, the station is live. */
 (function(){

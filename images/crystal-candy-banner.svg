@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Crystal candy mark">
+  <defs>
+    <radialGradient id="ccb-back" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#120905" stop-opacity="0.97"/>
+      <stop offset="80%" stop-color="#120905" stop-opacity="0.95"/>
+      <stop offset="92%" stop-color="#120905" stop-opacity="0.75"/>
+      <stop offset="100%" stop-color="#120905" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ccb-main" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff2ea6"/>
+      <stop offset=".30" stop-color="#e060f0"/>
+      <stop offset=".55" stop-color="#7c4dff"/>
+      <stop offset=".80" stop-color="#00c0f0"/>
+      <stop offset="1" stop-color="#0066ff"/>
+    </linearGradient>
+    <linearGradient id="ccb-left" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#00e5ff"/>
+      <stop offset="1" stop-color="#0066ff"/>
+    </linearGradient>
+    <linearGradient id="ccb-right" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff9a00"/>
+      <stop offset=".5" stop-color="#ff2ea6"/>
+      <stop offset="1" stop-color="#7c4dff"/>
+    </linearGradient>
+    <linearGradient id="ccb-sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- dark backing hides the old mark beneath; fades to transparent at the edges -->
+  <ellipse cx="128" cy="128" rx="126" ry="126" fill="url(#ccb-back)"/>
+  <!-- left small crystal -->
+  <polygon points="28,140 72,155 66,248 22,248" fill="url(#ccb-left)"/>
+  <polygon points="32,145 58,152 54,220 34,215" fill="#ffffff" opacity=".25"/>
+  <line x1="28" y1="140" x2="72" y2="155" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <!-- right small crystal -->
+  <polygon points="184,155 228,140 234,248 190,248" fill="url(#ccb-right)"/>
+  <polygon points="190,158 216,148 220,220 194,215" fill="#ffffff" opacity=".25"/>
+  <line x1="184" y1="155" x2="228" y2="140" stroke="#ffffff" stroke-opacity=".5" stroke-width="1.5"/>
+  <!-- central tall crystal -->
+  <polygon points="128,8 188,80 178,250 78,250 68,80" fill="url(#ccb-main)"/>
+  <!-- left facet, lighter -->
+  <polygon points="128,8 68,80 78,250 128,250" fill="url(#ccb-sheen)" opacity=".35"/>
+  <!-- right facet, deeper -->
+  <polygon points="128,8 188,80 178,250 128,250" fill="#002a80" opacity=".28"/>
+  <!-- center ridge -->
+  <line x1="128" y1="12" x2="128" y2="246" stroke="#ffffff" stroke-opacity=".75" stroke-width="2"/>
+  <!-- top edges -->
+  <line x1="128" y1="8" x2="68" y2="80" stroke="#ffffff" stroke-opacity=".6" stroke-width="1.5"/>
+  <line x1="128" y1="8" x2="188" y2="80" stroke="#00e5ff" stroke-opacity=".6" stroke-width="1.5"/>
+  <line x1="78" y1="250" x2="178" y2="250" stroke="#ffffff" stroke-opacity=".4" stroke-width="1.5"/>
+  <!-- sparkles -->
+  <polygon points="128,50 131,57 138,60 131,63 128,70 125,63 118,60 125,57" fill="#ffffff" opacity=".95"/>
+  <polygon points="160,135 162,140 167,142 162,144 160,149 158,144 153,142 158,140" fill="#ffffff" opacity=".9"/>
+  <polygon points="96,168 98,172 102,174 98,176 96,180 94,176 90,174 94,172" fill="#ffffff" opacity=".9"/>
+  <polygon points="205,198 207,202 211,204 207,206 205,210 203,206 199,204 203,202" fill="#ffffff" opacity=".9"/>
+  <polygon points="52,198 54,201 57,203 54,205 52,208 50,205 47,203 50,201" fill="#ffffff" opacity=".85"/>
+</svg>

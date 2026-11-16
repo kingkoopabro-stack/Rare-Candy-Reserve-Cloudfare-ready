@@ -3,12 +3,24 @@
    Community lives on community.html; routes are hash routes:
    #/street #/cardcheck #/market #/trade #/flea #/orders #/payouts
    #/members #/member/<id> #/chat #/reports #/rules #/adult #/tag/<tag>
-   #/tag/adult/<tag> #/post/<id> #/listing/<id>
+   #/tag/adult/<tag> #/post/<id> #/listing/<id> #/find #/headlines
+   #/receipts
    Identity: device id in localStorage (dwc-device-id); heart state in
    dwc-my-votes; adult welcome seen flag in dwc-adult-welcomed.
    MySpace throwback v2: AIM-style buddy list + 1:1 IMs (#/chat), Top 8
    friends + custom profile layouts + Layout Bot (member pages #/member),
    presence heartbeat (online/away/offline + away message).
+   Creator/Seller area v3: creator posts in the 18+ forum (emoji titles,
+   genre picker, custom tags, price, 3D print files), Find a Seller /
+   Find a Buyer (#/find), and ephemeral private chats (private, deletes
+   when closed — NOT end-to-end encrypted) between seller and buyer.
+   v3.1 refinements: private chats say just "Private chat" (no
+   encryption wording in the UI); transactions in a private chat save a
+   receipt (My receipts, #/receipts) that survives the message delete;
+   Headlines (#/headlines) surfaces the Community's top posts by
+   engagement; member pages can show A Steady Heart track picks (max 5)
+   and an opt-in Steady Wave player (live stream only, no player
+   for individual tracks yet).
    When the D1 binding is absent the API answers { error:
    "db_unavailable" } and the app shows "Community is being set up —
    check back soon" instead of crashing.
@@ -43,6 +55,32 @@ var MODEL_EYE_COLORS = ["Brown", "Blue", "Green", "Hazel", "Gray", "Other"];
 var MODEL_STYLES = ["Girly", "Tomboy", "Goth", "Hipster", "Kawaii", "Nerdy", "Sporty", "Alt", "Classic", "Baddie"];
 var MODEL_INK_OPTIONS = ["None", "Tattoos", "Piercings", "Tattoos & piercings"];
 
+// Creator/Seller area (v3) — digital-content genres, one-tap seller tag
+// chips, and the emoji flair row for creator-post titles. Titles keep
+// emojis as-is (never stripped); the picker just inserts them.
+var CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Print Files", "Other"];
+var CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos"];
+var TITLE_EMOJIS = ["🔥", "💖", "✨", "🌙", "🍬", "💋", "😈", "😘", "🎀", "🌸", "💎", "👑", "🍓", "🍑", "🌶️", "💦", "🎥", "📸", "🖨️", "🎵"];
+
+// A Steady Heart — "End of the year" (21 tracks, in order). Chris gives
+// full permission to use all of it. Track names are exact — never
+// re-title or alter them. Members pick up to 5 to show on their profile.
+// (Track names only — no audio player for individual tracks yet; the
+// player comes later. The Steady Wave player below is the live
+// station stream, not per-track audio.)
+var ASH_TRACKS = [
+  "Break habits, not hearts", "Untold weapons", "Voice inside my head original",
+  "Sunk for you", "I'll prove everything", "Mr.Selfish", "Sweet BBgirl",
+  "Let's Travel", "Straight to pieces", "The day she came to be",
+  "Djentlemen Thief", "Guess how it ends", "On top of it Feat. Chest Club",
+  "Monster in disguise", "Stay until sunrise", "Read between the lines",
+  "Introduction to heartache", "We will meet again I swear",
+  "Dance till they drop", "Aiming to tease part 2", "Give them the world",
+];
+// Steady Wave — the live Icecast MP3 stream. The only stream URL the
+// site uses; never invent another one.
+var VNR_STREAM_URL = "https://radio.rarecandyreserve.org/vitanova";
+
 // GIF library — real GIFs on GIPHY (official Pokémon channel and creators).
 var GIFS = [
   { id: "gaS0ex2BtbyvnhRW1s", label: "Pikachu dance", group: "Pokemon", pageUrl: "https://giphy.com/gifs/hamlet-pikachu-gaS0ex2BtbyvnhRW1s" },
@@ -70,7 +108,7 @@ function gifEmbedUrl(id) { return "https://giphy.com/embed/" + id; }
 var AGE_NOTICE_HTML =
   '<div class="dwc-age-notice" role="note" aria-label="Age Verification Notice">' +
   '<p class="dwc-age-title">Age Verification Notice —</p>' +
-  '<p>You must be 18 years or older to sell adult content or enter the 18+ area. To confirm your age, upload a clear photo of your government-issued photo ID (driver\u2019s license, state ID, or passport).</p>' +
+  '<p>You must be 18 years or older to sell adult content or enter the 18+ area. To confirm your age, upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport).</p>' +
   '<p><strong>How your information is handled:</strong></p>' +
   '<ul><li>Your ID is used for one purpose only — to verify that you are 18 or older.</li>' +
   '<li>It is never stored, shared, sold, or kept anywhere, by us or by anyone else. Once your age is confirmed, the copy is permanently deleted.</li>' +
@@ -87,10 +125,10 @@ var AGE_REVIEW_NOTE =
   '<p class="dwc-review-note">🔒 <strong>How the review works here:</strong> your ID photo is held privately in an encrypted vault for Chris (the operator) to review — and permanently deleted the moment he approves or rejects it. It is never written to the database, and nobody else sees it.</p>';
 
 var OFFSITE_ADVISORY_HTML =
-  '<p class="dwc-advisory" role="note">⚠ <strong>Keep the deal on the platform.</strong> Selling off site is discouraged for a reason: here, every member is a verified account, orders and tracking are recorded, and there\u2019s a report trail if anything goes wrong. Take a deal off site and you lose all of that protection — no record, no verified buyer, no help if it goes bad.</p>';
+  '<p class="dwc-advisory" role="note">⚠ <strong>Keep the deal on the platform.</strong> Selling off site is discouraged for a reason: here, every member is a verified account, orders and tracking are recorded, and there’s a report trail if anything goes wrong. Take a deal off site and you lose all of that protection — no record, no verified buyer, no help if it goes bad.</p>';
 
 var THEFT_NOTICE_HTML =
-  '<p class="dwc-theft" role="note">⚖ <strong>Stealing content is theft.</strong> Anyone who takes a member\u2019s content and redistributes it — in any form — will be held liable in court for money owed due to damages, and more. Don\u2019t do it, and report it if you see it.</p>';
+  '<p class="dwc-theft" role="note">⚖ <strong>Stealing content is theft.</strong> Anyone who takes a member’s content and redistributes it — in any form — will be held liable in court for money owed due to damages, and more. Don’t do it, and report it if you see it.</p>';
 
 // ---------- state ----------
 var state = {
@@ -113,6 +151,15 @@ var state = {
   inbox: [],
   openIMs: [], // [{ id, username }]
   imCache: {}, // profileId -> [messages]
+  // Creator/Seller area (v3) — one ephemeral private chat at a time.
+  eph: null, // { conversation_id, partner_id, partner_username, post_id }
+  ephMessages: [], // messages in the open ephemeral chat
+  ephInbox: [], // my open ephemeral conversations
+  ephTxnMsg: null, // confirmation after a transaction is marked done
+  receipts: [], // my receipts (My receipts view)
+  findRole: "seller", // "seller" = I'm buying, looking for a seller; "buyer" = I'm selling, looking for a buyer
+  findResults: [],
+  headlines: [], // top posts by engagement (Headlines view / Street strip)
   route: null,
 };
 
@@ -209,6 +256,22 @@ function fileToImage(file, maxBytes) {
     reader.readAsDataURL(file);
   });
 }
+// 3D print file reader (v3) — .stl / .obj / .3mf / .zip, under 25 MB.
+// Returns { dataBase64, fileName } (the server checks the extension).
+function fileToPrintFile(file, maxBytes) {
+  return new Promise(function (resolve) {
+    if (!file) return resolve(null);
+    if (file.size > (maxBytes || 25000000)) return resolve({ error: "That file is too large — keep 3D print files under 25 MB." });
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = String(reader.result || "");
+      var parts = dataUrl.split(",");
+      resolve({ dataBase64: parts[1] || "", fileName: file.name || "print-file" });
+    };
+    reader.onerror = function () { resolve({ error: "That file couldn't be read — try again." }); };
+    reader.readAsDataURL(file);
+  });
+}
 function copyLink(url, btn) {
   var done = function () {
     if (btn) {
@@ -232,12 +295,18 @@ function fallbackCopy(text) {
 }
 function postLink(id) { return location.origin + location.pathname + "#/post/" + id; }
 function listingLink(id) { return location.origin + location.pathname + "#/listing/" + id; }
+// 3D print file downloads are age-gated server-side — the link carries
+// this device's id so /api/files can check the caller is age-verified.
+function fileDownloadUrl(url) {
+  if (!url) return "";
+  return url + (url.indexOf("?") >= 0 ? "&" : "?") + "device_id=" + encodeURIComponent(deviceId());
+}
 
 // ---------- routing ----------
 var NAV = [
   ["street", "The Street"], ["chat", "💬 Live Chat"], ["market", "Market"],
   ["trade", "⇄ Up for Trade"], ["flea", "🔨 Flea Market"], ["cardcheck", "🔍 Card Check"],
-  ["adult", "🌙 After Dark 18+"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
+  ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
 ];
 function parseRoute() {
@@ -277,13 +346,15 @@ function render() {
   html += '<nav class="dwc-pills" aria-label="Community sections">' + NAV.map(function (item) {
     var label = item[1];
     if (item[0] === "reports" && state.stats && state.stats.open_reports > 0) label = "🚩 Reports (" + state.stats.open_reports + ")";
-    return '<button type="button" class="dwc-pill' + (active === item[0] ? " active" : "") + '" onclick="DWC.go(\'' + item[0] + '\')">' + esc(label) + "</button>";
+    return '<button type="button" class="dwc-pill' + (active === item[0] ? " active" : "") + (item[0] === "find" ? " dwc-pill-find" : "") + '" onclick="DWC.go(\'' + item[0] + '\')">' + esc(label) + "</button>";
   }).join("") + "</nav>";
   html += '<div id="dwc-view"></div>';
+  html += '<div id="dwc-ephwins"></div>';
   app.innerHTML = html;
   renderAccount();
   renderView();
   renderNotice();
+  renderEphWin();
 }
 
 function renderAccount() {
@@ -301,13 +372,13 @@ function renderAccount() {
     el.innerHTML =
       '<section class="card dwc-profile-card"><div class="dwc-profile-row">' +
       (p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
-      '<div><h3 style="margin:0">✓ You\u2019re on the street as @' + esc(p.username) + '</h3>' +
+      '<div><h3 style="margin:0">✓ You’re on the street as @' + esc(p.username) + '</h3>' +
       '<p style="margin:4px 0 0">Buyer &amp; seller in one account.' +
       (p.age_verified ? ' <strong style="color:var(--green)">· Age verified ✓</strong>' : "") +
       (p.is_operator ? ' <strong style="color:var(--amber)">· Operator</strong>' : "") + "</p>" +
       (p.payout_method && p.payout_handle
         ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Market, Trades, and Flea Market.</p>'
-        : '<p style="margin:4px 0 0">Add a payout method + handle whenever you\u2019re ready to sell — buying and posting never need it.</p>') +
+        : '<p style="margin:4px 0 0">Add a payout method + handle whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
       (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(p.layout_preset) + "</span>" : "") + "</p>" +
@@ -319,9 +390,10 @@ function renderAccount() {
   if (!state.profile && !state.signupOpen) {
     el.innerHTML =
       '<section class="card" style="text-align:center"><h3 style="margin-top:0">New here?</h3>' +
-      '<p style="max-width:520px;margin:0 auto">One free account — buyer and seller in one. Name, username, date of birth, one tiny sum to prove you\u2019re human, agree to the rules below. That\u2019s it — then post, ask, chat, buy, and sell.</p>' +
-      '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it\u2019s free</button></p>' +
-      '<p style="font-size:13px">Just looking? The chat window works as a guest, too — guests are auto-censored, members aren\u2019t.</p></section>';
+      '<p style="max-width:520px;margin:0 auto">One free account — buyer and seller in one. Name, username, date of birth, one tiny sum to prove you’re human, agree to the rules below. That’s it — then post, ask, chat, buy, and sell.</p>' +
+      '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it’s free</button></p>' +
+      '<div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div>' +
+      '<p style="font-size:13px">Just looking? The chat window works as a guest, too — guests are auto-censored, members aren’t.</p></section>';
     return;
   }
   el.innerHTML = profileFormHTML(state.profile);
@@ -333,8 +405,11 @@ function renderAccount() {
 function profileFormHTML(p) {
   var isNew = !p;
   var v = function (k) { return p ? esc(p[k] || "") : ""; };
+  // v3.2 theme pickers — parsed + validated (hex colors, https image,
+  // allowlisted font); all empty unless the member opted in.
+  var th = parseThemeClient(p && p.profile_theme);
   return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
-    "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it\u2019s free" : "Edit your profile") + "</h3>" +
+    "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
     '<form onsubmit="return DWC.saveProfile(this)">' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
@@ -358,6 +433,38 @@ function profileFormHTML(p) {
       "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 8 friends to show on your page. Thanks for the add — now show it off.</p>" +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
       '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/8</p></div>') +
+    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 What I sell — your creator card</h4>' +
+    "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
+    '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>My seller tags (comma separated, up to 8 — buyers find you by these)</label>' +
+    '<input name="seller_tags" maxlength="240" value="' + esc(p ? (p.seller_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, custom">' +
+    '<label>Open to… (one line, up to 140 characters)</label>' +
+    '<input name="seller_open_to" maxlength="140" value="' + v("seller_open_to") + '" placeholder="e.g. custom sets on request">' +
+    '<div class="dwc-rowform"><label style="flex:1">My price from ($)<input name="seller_price_min" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_min_cents) || 0) / 100) + '"></label>' +
+    '<label style="flex:1">My price to ($)<input name="seller_price_max" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_max_cents) || 0) / 100) + '"></label></div>' +
+    '<label>Subscribe button text — what the button on your page says (up to 40 characters; default “Subscribe to my page”)</label>' +
+    '<input name="subscribe_label" maxlength="40" value="' + esc(p ? (p.subscribe_label || "Subscribe to my page") : "Subscribe to my page") + '" placeholder="Subscribe to my page"></div>' +
+    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔍 What I’m after — as a buyer</h4>' +
+    "<p style=\"margin:0 0 8px\">Powers Find a Buyer. Same deal — only these fields are shown.</p>" +
+    '<label>Content types I want</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="buyer_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.buyer_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>Tags I’m after (comma separated, up to 8)</label>' +
+    '<input name="buyer_tags" maxlength="240" value="' + esc(p ? (p.buyer_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, amateur">' +
+    '<label>My budget — up to ($)</label>' +
+    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>' +
+    (isNew ? "" :
+      '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎵 Music — A Steady Heart + Steady Wave</h4>' +
+      "<p style=\"margin:0 0 8px\">Feature A Steady Heart on your page — pick up to 5 tracks from “End of the year”. Track names only, no audio player for individual tracks yet. The radio player is the live station stream. Either, both, or neither — your call.</p>" +
+      '<label>My A Steady Heart tracks (pick up to 5)</label><div class="dwc-checkgrid dwc-trackgrid">' + ASH_TRACKS.map(function (t, i) {
+        var n = i + 1;
+        return '<label><input type="checkbox" name="ash_tracks" value="' + n + '" style="width:auto"' + ((p && p.ash_tracks || []).includes(n) ? " checked" : "") + ' onchange="DWC.ashTrackChanged(this)"> ' + n + ". " + esc(t) + "</label>";
+      }).join("") + "</div>" +
+      '<p class="dwc-minihead">Picked: <span id="dwc-ash-count">' + ((p && p.ash_tracks || []).length) + "</span>/5</p>" +
+      '<label><input type="checkbox" name="show_vnr_player" style="width:auto"' + (p && p.show_vnr_player ? " checked" : "") + '> 📻 Show Steady Wave player on my profile</label>' +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A small live player for the Steady Wave stream shows on your page. It just streams the station — no track selection, no playlist.</p></div>') +
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 MySpace layout — make this page yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a preset, or paste your own CSS. Your layout shows on <strong>your page only</strong> — it never touches anyone else's.</p>" +
     '<div class="dwc-presets">' +
@@ -365,12 +472,25 @@ function profileFormHTML(p) {
     LAYOUT_PRESETS.map(function (pr) {
       return '<button type="button" class="dwc-pill' + (v("layout_preset") === pr.id ? " active" : "") + '" data-presetbtn="' + pr.id + '" onclick="DWC.applyLayoutPreset(\'' + pr.id + '\')">' + esc(pr.name) + "</button>";
     }).join("") + "</div>" +
-    '<label>Custom CSS — paste a MySpace layout\u2019s CSS here, or tweak a preset</label>' +
+    '<label>Custom CSS — paste a MySpace layout’s CSS here, or tweak a preset</label>' +
     '<textarea name="layout_css" rows="8" maxlength="8000" placeholder="e.g. .dwc-myprofile{background:#003399;} .dwc-myprofile .card{border:2px solid #fff;}" oninput="DWC.layoutCssEdited(this)">' + v("layout_css") + "</textarea>" +
     '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
     "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
+    '<h4 style="margin:14px 0 6px">🎨 My page theme — colors, background &amp; font</h4>' +
+    "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. These sit on top of your preset; your custom CSS can still override them with !important.</p>" +
+    '<div class="dwc-themebox">' +
+    '<label><input type="checkbox" name="theme_bg_use" style="width:auto"' + (th.bg_color ? " checked" : "") + '> Use a custom background color</label>' +
+    '<input type="color" name="theme_bg_color" value="' + (th.bg_color || "#12002e") + '" style="width:64px;height:40px;padding:2px">' +
+    '<label>Background image URL (https:// — optional, shows behind everything on your page)</label>' +
+    '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url) + '" placeholder="https://…">' +
+    '<label><input type="checkbox" name="theme_text_use" style="width:auto"' + (th.text_color ? " checked" : "") + '> Use a custom text color</label>' +
+    '<input type="color" name="theme_text_color" value="' + (th.text_color || "#f2f2f8") + '" style="width:64px;height:40px;padding:2px">' +
+    '<label><input type="checkbox" name="theme_accent_use" style="width:auto"' + (th.accent_color ? " checked" : "") + '> Use a custom accent color (links, headings, friend borders)</label>' +
+    '<input type="color" name="theme_accent_color" value="' + (th.accent_color || "#ff2d95") + '" style="width:64px;height:40px;padding:2px">' +
+    '<label>Font</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
+    "</div>" +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML() + "</div></div>" +
-    '<div class="dwc-layoutbox dwc-bot"><h4 style="margin:0 0 6px">🤖 Layout Bot — I\u2019ll build your layout</h4>' +
+    '<div class="dwc-layoutbox dwc-bot"><h4 style="margin:0 0 6px">🤖 Layout Bot — I’ll build your layout</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a vibe, pick a color, tell me the mood — Layout Bot writes the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — the Bot builds it right here from real palettes.</p>" +
     '<label>Vibe</label><select id="dwc-bot-vibe">' + Object.keys(LAYOUT_VIBES).map(function (k) { return '<option value="' + k + '">' + esc(LAYOUT_VIBES[k].label) + "</option>"; }).join("") + "</select>" +
     '<label>Accent color</label><div class="dwc-rowform"><input type="color" id="dwc-bot-accent" value="#ff2d95" style="flex:0 0 auto;width:64px;height:40px;padding:2px">' +
@@ -412,7 +532,7 @@ async function loadTopFriendPicker() {
   var picked = new Set((state.profile && state.profile.top_friend_ids) || []);
   var mine = state.profile ? state.profile.id : null;
   var others = members.filter(function (m) { return m.id !== mine; });
-  if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">No other members to pick from yet — you\u2019re the first one here.</p>'; return; }
+  if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">No other members to pick from yet — you’re the first one here.</p>'; return; }
   host.innerHTML = '<div class="dwc-checkgrid">' + others.map(function (m) {
     return '<label><input type="checkbox" name="top_friend" value="' + m.id + '" style="width:auto"' + (picked.has(m.id) ? " checked" : "") + ' onchange="DWC.topFriendChanged(this)"> @' + esc(m.username) + "</label>";
   }).join("") + "</div>";
@@ -422,6 +542,13 @@ function updateTop8Count() {
   var el = $("dwc-top8-count");
   if (!el) return;
   el.textContent = document.querySelectorAll('input[name="top_friend"]:checked').length;
+}
+// A Steady Heart picker — max 5 tracks. If a 6th is ticked, untick it
+// and say so (the server also caps at 5, so nothing can sneak through).
+function updateAshCount() {
+  var el = $("dwc-ash-count");
+  if (!el) return;
+  el.textContent = document.querySelectorAll('input[name="ash_tracks"]:checked').length;
 }
 function initLayoutEditor() {
   var ta = document.querySelector('textarea[name="layout_css"]');
@@ -503,10 +630,107 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ff9a00);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;border-radius:24px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2d95;}" },
+  { id: "afterdark", name: "After Dark 🌙", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#0a0014 0%,#1a002e 50%,#2b001f 100%);}" +
+    ".dwc-myprofile .card{background:rgba(26,0,46,.88);border:1px solid #ff2ea6;border-radius:16px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;text-shadow:0 0 14px rgba(255,46,166,.9);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#f5e8f5;}" +
+    ".dwc-myprofile .dwc-meta{color:#c9a8d8;}" +
+    ".dwc-myprofile a{color:#ff2ea6;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #ff2ea6;box-shadow:0 0 14px rgba(255,46,166,.9);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2ea6,#7c4dff);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2ea6;border-radius:16px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2ea6;}" },
+  { id: "creatorgold", name: "Creator Gold 👑", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#0d0a02 0%,#241a05 55%,#3a2c08 100%);}" +
+    ".dwc-myprofile .card{background:#1a1405;border:1px solid #d4af37;border-radius:12px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#f5d76e;text-shadow:0 0 12px rgba(212,175,55,.7);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#f5eed8;}" +
+    ".dwc-myprofile .dwc-meta{color:#b8a468;}" +
+    ".dwc-myprofile a{color:#f5d76e;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #d4af37;box-shadow:0 0 12px rgba(212,175,55,.7);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#d4af37,#ffec99);color:#1a1405;}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;border-radius:12px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #d4af37;}" },
+  { id: "candyshop", name: "Candy Shop 🍬", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#fff0f7 0%,#ffe3f2 40%,#d8f3ff 75%,#e9d5ff 100%);}" +
+    ".dwc-myprofile .card{background:rgba(255,255,255,.92);border:2px solid #ff5cb8;border-radius:22px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#c4007a;text-shadow:none;}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#3a0a2a;}" +
+    ".dwc-myprofile .dwc-meta{color:#9a5a8a;}" +
+    ".dwc-myprofile a{color:#c4007a;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #ff5cb8;box-shadow:0 0 14px rgba(255,92,184,.5);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff5cb8,#00c8ff);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #00c8ff;border-radius:22px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff5cb8;}" },
+  { id: "arcade", name: "Retro Arcade 🕹️", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#0a0a12 0%,#1a0b2e 55%,#0b1a2e 100%);font-family:'Courier New',Courier,monospace;}" +
+    ".dwc-myprofile .card{background:#120a24;border:2px solid #00e5ff;border-radius:8px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#ffe600;text-shadow:0 0 12px rgba(255,230,0,.7);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#e8f6ff;}" +
+    ".dwc-myprofile .dwc-meta{color:#8ab8d8;}" +
+    ".dwc-myprofile a{color:#00e5ff;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #ffe600;box-shadow:0 0 12px rgba(255,230,0,.6);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ffe600);color:#0a0a12;}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #ffe600;border-radius:8px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #00e5ff;}" },
+  { id: "ocean", name: "Ocean Deep 🌊", css:
+    ".dwc-myprofile{background:linear-gradient(160deg,#001a2e 0%,#003a5c 55%,#005c5c 100%);}" +
+    ".dwc-myprofile .card{background:rgba(0,40,70,.85);border:1px solid #4dd8ff;border-radius:16px;}" +
+    ".dwc-myprofile h2,.dwc-myprofile h3{color:#7de8ff;text-shadow:0 0 12px rgba(77,216,255,.7);}" +
+    ".dwc-myprofile p,.dwc-myprofile li{color:#e8f8ff;}" +
+    ".dwc-myprofile .dwc-meta{color:#8ab8d8;}" +
+    ".dwc-myprofile a{color:#4dd8ff;}" +
+    ".dwc-myprofile .dwc-avatar{border:3px solid #4dd8ff;box-shadow:0 0 12px rgba(77,216,255,.6);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#0077b6,#00c8a8);}" +
+    ".dwc-myprofile .dwc-topfriend{border:2px solid #4dd8ff;border-radius:16px;}" +
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #4dd8ff;}" },
 ];
 function layoutPresetCSS(id) {
   for (var i = 0; i < LAYOUT_PRESETS.length; i++) if (LAYOUT_PRESETS[i].id === id) return LAYOUT_PRESETS[i].css;
   return "";
+}
+
+// ---------- Member-page theme pickers (v3.2) ----------
+// Background color/image, text + accent colors, and a font — all optional,
+// all validated (hex colors, https:// image, allowlisted font stacks), so
+// the CSS built from them can never carry a script or an @import. The
+// theme style is injected AFTER the member's layout CSS on their page, so
+// the pickers win over a preset for the properties they set; custom CSS
+// can still override them with !important.
+var THEME_FONTS = [
+  { id: "", name: "System default" },
+  { id: "comic", name: "Comic / Chalkboard", css: '"Comic Sans MS","Chalkboard SE","Comic Neue",cursive' },
+  { id: "typewriter", name: "Typewriter", css: '"Courier New",Courier,monospace' },
+  { id: "serif", name: "Classic serif", css: 'Georgia,"Times New Roman",serif' },
+  { id: "rounded", name: "Rounded", css: '"Trebuchet MS",Verdana,sans-serif' },
+];
+function themeFontCSS(id) {
+  for (var i = 0; i < THEME_FONTS.length; i++) if (THEME_FONTS[i].id === id) return THEME_FONTS[i].css || "";
+  return "";
+}
+function parseThemeClient(stored) {
+  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+  if (!stored) return empty;
+  var obj;
+  try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
+  if (!obj || typeof obj !== "object") return empty;
+  var hex = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
+  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "" };
+  var img = String(obj.bg_image_url || "").trim().slice(0, 500);
+  out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
+  out.font = themeFontCSS(obj.font) ? obj.font : "";
+  return out;
+}
+function themeCSS(theme) {
+  var t = parseThemeClient(theme);
+  var css = "";
+  if (t.bg_color) css += ".dwc-myprofile{background-color:" + t.bg_color + ";}";
+  if (t.bg_image_url) css += '.dwc-myprofile{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:cover;background-position:center;background-repeat:no-repeat;}';
+  if (t.text_color) css += ".dwc-myprofile{color:" + t.text_color + ";}.dwc-myprofile p,.dwc-myprofile li{color:" + t.text_color + ";}";
+  if (t.accent_color) css += ".dwc-myprofile a{color:" + t.accent_color + ";}.dwc-myprofile h2,.dwc-myprofile h3{color:" + t.accent_color + ";}.dwc-myprofile .dwc-topfriend{border-color:" + t.accent_color + ";}";
+  if (t.font) css += ".dwc-myprofile{font-family:" + themeFontCSS(t.font) + ";}";
+  return css;
 }
 
 // Layout Bot vibes — real palettes the bot builds a full theme from.
@@ -608,7 +832,7 @@ function applyPreviewCSS(css) {
 
 // ---------- shared bits ----------
 function needProfileHTML() {
-  return '<div class="card"><h3 style="margin-top:0">Create your account first</h3><p>That needs a username. It\u2019s free — name, username, date of birth, one tiny sum, agree to the rules.</p><p><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it\u2019s free</button></p></div>';
+  return '<div class="card"><h3 style="margin-top:0">Create your account first</h3><p>That needs a username. It’s free — name, username, date of birth, one tiny sum, agree to the rules.</p><p><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it’s free</button></p><div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div></div>';
 }
 function verificationBadge(p) {
   var st = p.verification_status || "not_checked";
@@ -624,21 +848,59 @@ function verificationBadge(p) {
   if (p.verification_summary) html += '<p class="dwc-vsum">' + esc(p.verification_summary) + "</p>";
   return html;
 }
+// ---------- Post photos: blur + pay-to-unlock (v3.2, OPT-IN ONLY) ----------
+// Default state for every photo: normal, fully visible, free to view.
+// Blur and pay-to-unlock apply ONLY when the poster/seller explicitly
+// ticked the box when posting. The author always sees their own photo
+// unblurred. A blurred photo shows a blurred preview + a tap-to-reveal
+// toggle (a preview control, not DRM). A pay-locked photo stays blurred
+// for everyone but the author — the only path is the "Pay to unlock"
+// button, which opens a private chat with the seller; the receipt marked
+// done in that chat is the unlock record. There is no payment backend and
+// no automatic unlock: the image URL itself is still fetchable by anyone
+// with the link, so this is a preview control, not access control.
+function postPhotoHTML(p) {
+  if (!p.image_url) return "";
+  var mine = state.profile && state.profile.id === p.author_id;
+  var locked = !!p.pay_unlock && p.price_cents > 0 && !mine;
+  var blurred = !!p.blur_photo && !mine;
+  if (locked) {
+    return '<div class="dwc-photowrap"><img class="dwc-post-img dwc-img-locked" src="' + esc(p.image_url) + '" alt="Locked preview photo" loading="lazy">' +
+      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div></div>';
+  }
+  if (blurred) {
+    return '<div class="dwc-photowrap"><img class="dwc-post-img dwc-img-blurred" src="' + esc(p.image_url) + '" alt="Blurred photo — tap to reveal" loading="lazy">' +
+      '<button type="button" class="dwc-reveal-btn" onclick="DWC.toggleBlur(this)">👁 Blurred photo — tap to reveal</button></div>';
+  }
+  return '<img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">';
+}
+
 function postCardHTML(p) {
   var heartOn = myHeart("post-" + p.id);
+  var isCreator = !!p.is_creator;
+  var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
   return '<article class="card dwc-post">' +
-    (p.image_url ? '<img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">' : "") +
+    postPhotoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
-    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + "</div>" +
+    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (isCreator ? " · 🎨 Creator" : "") + "</div>" +
     '<h3 style="margin:8px 0 4px"><a href="#/post/' + p.id + '" class="dwc-titlelink">' + esc(p.title) + "</a></h3>" +
+    (isCreator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
+      '<strong style="color:var(--green);font-size:17px">' + priceLabel + "</strong>" +
+      (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file</span>' : "") + "</p>" : "") +
     '<p>' + esc(p.body.length > 280 ? p.body.slice(0, 280) + "…" : p.body) + "</p>" +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
     '<p class="dwc-meta">by @' + esc(p.author_username) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
-    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
+    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions">' +
     '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
     '<a href="#/post/' + p.id + '">💬 ' + (p.comment_count || 0) + " comments</a>" +
     (p.kind === "card_auth" ? '<span class="dwc-auth">Real ' + p.auth_real + " · Fake " + p.auth_fake + " · Unsure " + p.auth_unsure + "</span>" : "") +
+    (isCreator && state.profile && state.profile.id !== p.author_id
+      ? (p.pay_unlock && p.price_cents > 0
+        ? '<button type="button" class="btn" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">🔓 Pay to unlock — ' + money(p.price_cents) + '</button>'
+        : '<button type="button" class="btn small" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">💬 Buy / Message seller</button>') : "") +
+    (isCreator && p.file_url && state.profile
+      ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
     "</div></article>";
@@ -681,6 +943,9 @@ function renderView() {
   if (r.name === "members") return viewMembers(el);
   if (r.name === "member") return viewMember(el, Number(r.memberId));
   if (r.name === "chat") return viewChat(el);
+  if (r.name === "find") return viewFind(el);
+  if (r.name === "headlines") return viewHeadlines(el);
+  if (r.name === "receipts") return viewReceipts(el);
   if (r.name === "reports") return viewReports(el);
   if (r.name === "rules") return viewRules(el);
   if (r.name === "adult") return viewAdult(el);
@@ -695,10 +960,11 @@ async function viewStreet(el) {
   el.innerHTML =
     '<section class="card"><h2 style="margin-top:0">How the street works</h2><ul class="dwc-rules-list">' +
     "<li><strong>List it free, sell it fair</strong> — listing costs nothing; a fair 5% cut on a sale keeps the street running.</li>" +
-    "<li><strong>Sell anything legal</strong> — not just cards. Adult content too, <em>if</em> you\u2019ve proved your age (only ever asked for that — see Rules &amp; After Dark).</li>" +
+    "<li><strong>Sell anything legal</strong> — not just cards. Adult content too, <em>if</em> you’ve proved your age (only ever asked for that — see Rules &amp; After Dark).</li>" +
     "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
     "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></section>' +
+    '<div id="dwc-headlines-strip"></div>' +
     '<div id="dwc-composer"></div>' +
     '<div class="dwc-filters"><div role="group" aria-label="Filter by corner">' +
     '<button type="button" class="dwc-pill' + (state.category === null ? " active" : "") + '" onclick="DWC.setCategory(null)">All corners</button>' +
@@ -712,6 +978,7 @@ async function viewStreet(el) {
     '<div id="dwc-feed"><p style="color:var(--muted)">Loading posts…</p></div>' +
     '<div id="dwc-tags"><p style="color:var(--muted)">Loading tags…</p></div>';
   renderComposer("street");
+  loadHeadlinesStrip();
   var data = await apiGet("/posts?device_id=" + encodeURIComponent(deviceId()) + "&sort=" + state.sort + "&limit=50" + (state.category ? "&category=" + encodeURIComponent(state.category) : ""));
   var feed = $("dwc-feed");
   if (!feed) return;
@@ -729,13 +996,77 @@ async function viewStreet(el) {
   }
 }
 
+// ---------- Headlines (v3.1) ----------
+// The Community's own most eye-catching posts, ranked by engagement
+// (hearts × 2 + comments). Community posts only — no outside news.
+// Adult posts only reach age-verified callers (the endpoint enforces it).
+function headlineCardHTML(h) {
+  return '<article class="card dwc-headline">' +
+    '<div class="dwc-headline-eng">🔥 ' + (h.engagement || 0) + ' · ❤️ ' + (h.score || 0) + ' · 💬 ' + (h.comment_count || 0) + "</div>" +
+    '<h3 class="dwc-headline-title" style="margin:8px 0 4px"><a href="#/post/' + h.id + '" class="dwc-titlelink">' + esc(h.title) + "</a></h3>" +
+    '<p style="margin:4px 0">by <strong>@' + esc(h.author_username) + "</strong>" + (h.kind === "adult" ? " · 18+" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
+    (h.body ? "<p>" + esc(h.body.length > 140 ? h.body.slice(0, 140) + "…" : h.body) + "</p>" : "") +
+    "</article>";
+}
+async function loadHeadlinesStrip() {
+  var host = $("dwc-headlines-strip");
+  if (!host) return;
+  var data = await apiGet("/headlines?device_id=" + encodeURIComponent(deviceId()) + "&limit=3");
+  var list = (data && data.headlines) || [];
+  if (!list.length) { host.innerHTML = ""; return; }
+  host.innerHTML =
+    '<section class="dwc-headlines-strip"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2>' +
+    list.map(function (h) {
+      return '<p class="dwc-headline-line"><a href="#/post/' + h.id + '">' + esc(h.title) + "</a> <span>🔥 " + (h.engagement || 0) + " · @" + esc(h.author_username) + "</span></p>";
+    }).join("") +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'headlines\')">See all headlines →</button></p></section>';
+}
+async function viewHeadlines(el) {
+  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2><p style="color:var(--muted)">The Community’s own most eye-catching posts — ranked by hearts and comments. No outside news, just what the street is shouting about.</p></section><div id="dwc-headlines-list"><p style="color:var(--muted)">Loading headlines…</p></div>';
+  var data = await apiGet("/headlines?device_id=" + encodeURIComponent(deviceId()) + "&limit=10");
+  var list = (data && data.headlines) || [];
+  state.headlines = list;
+  var host = $("dwc-headlines-list");
+  if (!host) return;
+  if (data && data.error) { host.innerHTML = '<div class="note">' + esc(data.error) + "</div>"; return; }
+  host.innerHTML = list.length
+    ? '<div class="grid">' + list.map(headlineCardHTML).join("") + "</div>"
+    : '<div class="note">No headlines yet — post something worth shouting about and it’ll land here.</div>';
+}
+
+// ---------- My receipts (v3.1) ----------
+// Each member sees ONLY their own receipts — what they spent (and, for
+// sellers, what they received) in private chats. No chat content is ever
+// kept; a receipt is just amount + note + the other party + date.
+async function viewReceipts(el) {
+  if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
+  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🧾 My receipts</h2><p style="color:var(--muted)">Your invoice history from private chats. When you mark a transaction done in a private chat, the receipt lands here — and it stays even after the chat’s messages are deleted. Only you can see yours.</p></section><div id="dwc-receipts-list"><p style="color:var(--muted)">Loading receipts…</p></div>';
+  var data = await apiGet("/receipts?device_id=" + encodeURIComponent(deviceId()));
+  var list = (data && data.receipts) || [];
+  state.receipts = list;
+  var host = $("dwc-receipts-list");
+  if (!host) return;
+  if (data && data.error) { host.innerHTML = '<div class="note">' + esc(data.error) + "</div>"; return; }
+  host.innerHTML = list.length
+    ? list.map(function (r) {
+        var spent = r.kind === "spent";
+        return '<article class="card dwc-receipt' + (spent ? " dwc-receipt-spent" : " dwc-receipt-received") + '">' +
+          '<p style="margin:0"><strong style="font-size:19px">' + (spent ? "−" : "+") + esc(r.amount || "") + '</strong> ' +
+          '<span class="dwc-receipt-kind">' + (spent ? "💸 Spent" : "💰 Received") + "</span></p>" +
+          '<p style="margin:6px 0 0">' + esc(r.note || "") + "</p>" +
+          '<p class="dwc-meta" style="margin:4px 0 0">with @' + esc(r.other_username) + " · " + fmtDate(r.created_at) + "</p>" +
+          "</article>";
+      }).join("")
+    : '<div class="note">No receipts yet — when you mark a transaction done in a private chat, your receipt lands here.</div>';
+}
+
 function renderComposer(context) {
   var host = $("dwc-composer");
   if (!host) return;
   var isAuth = context === "cardcheck";
   host.innerHTML =
     '<section class="card" aria-label="New post"><h3 style="margin-top:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
-    (state.profile ? "" : "<p>Posting needs an account — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create one, it\u2019s free</button>.</p>") +
+    (state.profile ? "" : "<p>Posting needs an account — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create one, it’s free</button>.</p>") +
     '<form onsubmit="return DWC.submitPost(this, \'' + context + '\')">' +
     '<div class="dwc-kindrow">' +
     '<button type="button" class="dwc-pill' + (!isAuth ? " active" : "") + '" data-kind="forum" onclick="DWC.composerKind(this, \'forum\')">💬 Forum</button>' +
@@ -745,13 +1076,14 @@ function renderComposer(context) {
     '<label>Corner</label><select name="category">' + CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Flair</label><select name="flair">' + FLAIRS.map(function (f) { return "<option" + (f === (isAuth ? "Card Check" : "Discussion") ? " selected" : "") + ">" + esc(f) + "</option>"; }).join("") + "</select>" +
     '<label>Title (3–120 characters)</label>' +
-    '<input name="title" required minlength="3" maxlength="120" placeholder="What\u2019s this about?">' +
-    '<label>What\u2019s on your mind? (up to 4000 characters)</label>' +
+    '<input name="title" required minlength="3" maxlength="120" placeholder="What’s this about?">' +
+    '<label>What’s on your mind? (up to 4000 characters)</label>' +
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. charizard, grading, psa">' +
     '<label>Photo (JPG, PNG, or WebP, under 2.5 MB — required for Card Check)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runCardCheck(this.form)">🔍 Run AI authenticity + price check on photo</button> <span data-checkresult></span></div>' +
     gifPickerHTML("composer-" + context) +
     '<p class="dwc-form-err" data-err hidden></p>' +
@@ -781,7 +1113,7 @@ async function viewCardCheck(el) {
 function priceChartHTML() {
   return '<article class="card" aria-label="Price chart lookup — actual member-reported sales">' +
     "<h3 style=\"margin-top:0\">📈 Price chart — real reported sales</h3>" +
-    "<p>Look up any card to see what it has <strong>actually sold for</strong>, as reported by the members who sold it — the chart the AI estimate can\u2019t fake. Sold a card yourself? Open its chart and log the sale.</p>" +
+    "<p>Look up any card to see what it has <strong>actually sold for</strong>, as reported by the members who sold it — the chart the AI estimate can’t fake. Sold a card yourself? Open its chart and log the sale.</p>" +
     '<form class="dwc-rowform" onsubmit="return DWC.lookupPrice(this)">' +
     '<input name="card" required minlength="2" maxlength="120" placeholder="Card name — e.g. Charizard" style="flex:1">' +
     '<button type="submit" class="btn ghost">Show chart</button></form>' +
@@ -808,7 +1140,7 @@ async function showPriceChart(cardName) {
   if (!host) return;
   host.innerHTML = "<p>Loading chart…</p>";
   var data = await apiGet("/card-sales?card_name=" + encodeURIComponent(cardName) + "&limit=40");
-  if (!data || !data.sales) { host.innerHTML = '<p class="dwc-form-err">The chart didn\u2019t load.</p>'; return; }
+  if (!data || !data.sales) { host.innerHTML = '<p class="dwc-form-err">The chart didn’t load.</p>'; return; }
   var sales = data.sales;
   var max = data.max_cents || 1;
   var rows = sales.map(function (s) {
@@ -837,8 +1169,8 @@ async function showPriceChart(cardName) {
 async function viewMarket(el, kind) {
   var titles = {
     market: ["🛒 Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell their own Pokémon cards and collectibles here once their account and payout method are set up. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
-    trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it\u2019s a good trade, a fair one, or a bad deal."],
-    flea: ["🔨 Flea Market — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online flea-market area with simple bidding — cards, collectibles, and whatever else the community\u2019s selling. Bids must beat the high bid. The high bidder completes the purchase."],
+    trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it’s a good trade, a fair one, or a bad deal."],
+    flea: ["🔨 Flea Market — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online flea-market area with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
   };
   var t = titles[kind];
   el.innerHTML =
@@ -862,17 +1194,17 @@ function renderListingForm(host, kind) {
   var kindLabel = kind === "sale" ? "for sale" : kind === "trade" ? "for trade" : "in the flea market";
   host.innerHTML =
     '<section class="card"><div class="tag">List an item ' + kindLabel + '</div><h3 style="margin-top:10px">Put something up ' + kindLabel + "</h3>" +
-    (p ? (p.payout_method && p.payout_handle ? "" : '<p class="dwc-warn">You\u2019re not payout-ready yet — add a payout method + handle in your profile before listing, or the listing will be blocked. You can still fill everything in now.</p>')
+    (p ? (p.payout_method && p.payout_handle ? "" : '<p class="dwc-warn">You’re not payout-ready yet — add a payout method + handle in your profile before listing, or the listing will be blocked. You can still fill everything in now.</p>')
       : "<p>Listing needs an account + payout method — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create your account</button> first.</p>") +
     '<form onsubmit="return DWC.submitListing(this, \'' + kind + '\')">' +
     '<label>Item title (3–120 characters)</label>' +
     '<input name="title" required minlength="3" maxlength="120" placeholder="What are you selling?">' +
     '<label>Category</label><select name="category">' + LISTING_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
-    '<label>' + (kind === "flea" ? "Starting bid (USD)" : kind === "trade" ? "Trade value (USD — what it\u2019s worth, for the fee split)" : "Price (USD)") + "</label>" +
+    '<label>' + (kind === "flea" ? "Starting bid (USD)" : kind === "trade" ? "Trade value (USD — what it’s worth, for the fee split)" : "Price (USD)") + "</label>" +
     '<input name="price" type="number" step="0.01" min="0" required placeholder="e.g. 25.00">' +
-    (kind === "trade" ? '<label>What you\u2019re looking for in return</label><input name="trade_wanted" maxlength="500" placeholder="Card(s) you want in return">' : "") +
+    (kind === "trade" ? '<label>What you’re looking for in return</label><input name="trade_wanted" maxlength="500" placeholder="Card(s) you want in return">' : "") +
     '<label>Description &amp; condition (a little formatting is allowed: bold, italic, lists, links)</label>' +
-    '<textarea name="description" required maxlength="6000" placeholder="Condition, set, what\u2019s included…"></textarea>' +
+    '<textarea name="description" required maxlength="6000" placeholder="Condition, set, what’s included…"></textarea>' +
     '<label>Photos — up to 3 (JPG, PNG, or WebP, each under 2.5 MB)' + (kind === "trade" ? " — a photo is required for trades" : "") + "</label>" +
     '<input name="photo1" type="file" accept="image/jpeg,image/png,image/webp">' +
     '<input name="photo2" type="file" accept="image/jpeg,image/png,image/webp">' +
@@ -891,7 +1223,7 @@ async function viewThread(el, postId) {
   var data = await apiGet("/posts/" + postId + "?device_id=" + encodeURIComponent(deviceId()));
   var p = data && data.post;
   if (!p) {
-    el.innerHTML = '<div class="note">That post is gone, or it\u2019s in the 18+ area and this account isn\u2019t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to The Street</button></p>';
+    el.innerHTML = '<div class="note">That post is gone, or it’s in the 18+ area and this account isn’t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to The Street</button></p>';
     return;
   }
   window.__dwcThreadKind = p.kind;
@@ -902,16 +1234,26 @@ async function viewThread(el, postId) {
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
     '<article class="card">' +
-    (p.image_url ? '<img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo">' : "") +
+    postPhotoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
-    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + "</div>" +
+    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (p.is_creator ? " · 🎨 Creator" : "") + "</div>" +
     "<h2>" + esc(p.title) + "</h2>" +
+    (p.is_creator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
+      '<strong style="color:var(--green);font-size:20px">' + (p.price_cents > 0 ? money(p.price_cents) : "Free") + "</strong>" +
+      (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file — ' + esc(p.file_name || "download") + "</span>" : "") + "</p>" +
+      '<p style="color:var(--muted);font-size:14px">' + (p.pay_unlock && p.price_cents > 0 ? 'This post is pay-to-unlock — hit “Pay to unlock” and sort out payment in a private chat. The receipt marked done in that chat is your proof of purchase.' : 'Payment is arranged privately with the seller — hit “Buy / Message seller” and sort it out in a private chat.') + ' No money moves in this app.</p>' : "") +
     '<p style="white-space:pre-wrap">' + esc(p.body) + "</p>" +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
     '<p class="dwc-meta">by @' + esc(p.author_username) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions">' +
     '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
+    (p.is_creator && state.profile && state.profile.id !== p.author_id
+      ? (p.pay_unlock && p.price_cents > 0
+        ? '<button type="button" class="btn" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">🔓 Pay to unlock — ' + money(p.price_cents) + '</button>'
+        : '<button type="button" class="btn small" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">💬 Buy / Message seller</button>') : "") +
+    (p.is_creator && p.file_url && state.profile
+      ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
     (isMine ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete my post</button>' +
@@ -987,7 +1329,7 @@ async function viewListing(el, listingId) {
       ? '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.buyListing(' + l.id + ')">' + (l.kind === "flea" ? "Complete purchase as high bidder →" : "Buy it →") + "</button> <span style=\"color:var(--muted);font-size:13px\">Payment is arranged directly with the seller — no money moves in this app.</span></p>"
       : "") +
     (l.status === "active" && l.kind === "trade" && !isMine
-      ? '<p style="margin-top:14px">Trade listings aren\u2019t bought — leave a comment below to offer your trade.</p>' : "") +
+      ? '<p style="margin-top:14px">Trade listings aren’t bought — leave a comment below to offer your trade.</p>' : "") +
     "</article>" +
     (l.kind === "flea" && l.status === "active"
       ? '<section class="card"><h3 style="margin-top:0">🔨 Place a bid</h3><p>Current high bid: <strong>' + money(l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) + "</strong> · " + l.bid_count + " bid" + (l.bid_count === 1 ? "" : "s") + " — your bid has to beat it.</p>" +
@@ -1059,7 +1401,7 @@ function orderCardHTML(o, isSeller) {
         (o.tracking_url ? ' · <a href="' + esc(o.tracking_url) + '" target="_blank" rel="noopener">Track with carrier ↗</a>' : "") + "</p>"
       : "") +
     (!isSeller
-      ? '<label class="dwc-alerts"><input type="checkbox" ' + (o.tracking_alerts ? "checked" : "") + ' onchange="DWC.setAlerts(' + o.id + ', this.checked)" style="width:auto"> Email me tracking alerts on this order <span style="color:var(--muted)">(preference saved — alert emails send once the street\u2019s mail connection is live)</span></label>'
+      ? '<label class="dwc-alerts"><input type="checkbox" ' + (o.tracking_alerts ? "checked" : "") + ' onchange="DWC.setAlerts(' + o.id + ', this.checked)" style="width:auto"> Email me tracking alerts on this order <span style="color:var(--muted)">(preference saved — alert emails send once the street’s mail connection is live)</span></label>'
       : '<form class="dwc-shipform" onsubmit="return DWC.updateShipping(this, ' + o.id + ')">' +
         '<select name="status"><option value="paid"' + (o.status === "paid" ? " selected" : "") + ">Paid</option><option value=\"shipped\"" + (o.status === "shipped" ? " selected" : "") + ">Shipped</option><option value=\"delivered\"" + (o.status === "delivered" ? " selected" : "") + ">Delivered</option></select>" +
         '<select name="carrier"><option value="">Carrier…</option>' + CARRIERS.map(function (c) { return '<option' + (o.carrier === c ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" +
@@ -1083,7 +1425,7 @@ async function viewPayouts(el) {
     "<h3 style=\"margin-top:0\">Your wallet</h3>" +
     "<p>Available: <strong style=\"color:var(--green);font-size:20px\">" + money(data.balance_cents) + "</strong></p>" +
     "<p>Pending (paid/shipped, not yet delivered): <strong>" + money(data.pending_cents) + "</strong> · Lifetime earnings: <strong>" + money(data.lifetime_cents) + "</strong></p>" +
-    (data.payout_method ? "<p>Payout method: " + esc(data.payout_method) + " · " + esc(data.payout_handle) + "</p>" : "<p>You haven\u2019t set a payout method yet — add one in your profile.</p>") +
+    (data.payout_method ? "<p>Payout method: " + esc(data.payout_method) + " · " + esc(data.payout_handle) + "</p>" : "<p>You haven’t set a payout method yet — add one in your profile.</p>") +
     (data.balance_cents > 0 ? '<p><button type="button" class="btn" onclick="DWC.requestPayout()">Request payout of ' + money(data.balance_cents) + " →</button></p><p style=\"font-size:13px;color:var(--muted)\">The payout is recorded here and sent to your payout method outside the app — no payment processor is connected yet.</p>" : "") +
     "</div>" +
     '<div class="card"><h3 style="margin-top:0">Payout history</h3>' +
@@ -1095,11 +1437,11 @@ async function viewPayouts(el) {
 
 // ---------- Members ----------
 async function viewMembers(el) {
-  el.innerHTML = '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they\u2019ve set up how they get paid when they sell.</p><p style="color:var(--muted)">Loading members…</p></section>';
+  el.innerHTML = '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they’ve set up how they get paid when they sell.</p><p style="color:var(--muted)">Loading members…</p></section>';
   var data = await apiGet("/members?limit=24");
   var members = (data && data.members) || [];
   el.innerHTML =
-    '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they\u2019ve set up how they get paid when they sell.</p>' +
+    '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they’ve set up how they get paid when they sell.</p>' +
     (members.length ? '<div class="grid">' + members.map(function (m) {
       return '<article class="card">' +
         (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
@@ -1132,7 +1474,7 @@ async function viewMember(el, memberId) {
   var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
   var m = data && data.member;
   if (!m) {
-    el.innerHTML = '<div class="note">That member doesn\u2019t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
+    el.innerHTML = '<div class="note">That member doesn’t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
     return;
   }
   // Their layout, scoped to this page only (removed on navigation).
@@ -1141,6 +1483,16 @@ async function viewMember(el, memberId) {
     st.id = "dwc-member-layout";
     st.textContent = m.layout_css;
     document.head.appendChild(st);
+  }
+  // Their theme pickers (v3.2) — injected AFTER the layout CSS, so the
+  // pickers win over a preset for the properties they set; custom CSS
+  // can still override them with !important.
+  var memberThemeCss = themeCSS(m.profile_theme);
+  if (memberThemeCss) {
+    var tst = document.createElement("style");
+    tst.id = "dwc-member-theme";
+    tst.textContent = memberThemeCss;
+    document.head.appendChild(tst);
   }
   el.innerHTML =
     '<div class="dwc-myprofile">' +
@@ -1163,6 +1515,29 @@ async function viewMember(el, memberId) {
     '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
     "</div></section>" +
     '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>" +
+    ((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to
+      ? '<section class="card dwc-sellercard"><h3 style="margin-top:0">🎨 What I sell</h3>' +
+        ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
+        ((m.seller_tags && m.seller_tags.length) ? '<p class="dwc-tags">' + m.seller_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
+        (m.seller_open_to ? "<p>Open to: “" + esc(m.seller_open_to) + "”</p>" : "") +
+        ((m.seller_price_min_cents || m.seller_price_max_cents) ? "<p>Price range: <strong>" + money(m.seller_price_min_cents) + " – " + money(m.seller_price_max_cents) + "</strong></p>" : "") +
+        (m.is_mine ? "" : '<p><button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> <button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
+        "</section>"
+      : "") +
+    ((m.ash_tracks && m.ash_tracks.length)
+      ? '<section class="card dwc-musiccard"><h3 style="margin-top:0">🎵 A Steady Heart picks</h3><p style="color:var(--muted);font-size:13px;margin-top:0">From “End of the year” — ' + esc(m.username) + '’s picks. Track names only for now; the player comes later.</p><ol class="dwc-music-picks">' +
+        m.ash_tracks.map(function (n) {
+          var title = ASH_TRACKS[n - 1] || ("Track " + n);
+          return '<li><span class="dwc-track-num">' + n + '.</span> ' + esc(title) + "</li>";
+        }).join("") +
+        "</ol></section>"
+      : "") +
+    (m.show_vnr_player
+      ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — hit play.</p>' +
+        '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
+        '<audio controls preload="none" src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
+        '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
+      : "") +
     '<section class="card"><h3 style="margin-top:0">About</h3>' +
     (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
     (m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
@@ -1221,7 +1596,7 @@ async function loadChatAim() {
   }
   if (!state.profile) {
     var buddiesHost = $("dwc-buddies");
-    if (buddiesHost) buddiesHost.innerHTML = '<p style="color:var(--muted)">Sign in to see who\u2019s online.</p>';
+    if (buddiesHost) buddiesHost.innerHTML = '<p style="color:var(--muted)">Sign in to see who’s online.</p>';
     var inboxHost = $("dwc-inbox");
     if (inboxHost) inboxHost.innerHTML = '<p style="color:var(--muted)">Sign in to send IMs.</p>';
     return;
@@ -1309,11 +1684,166 @@ function renderIMLog(id) {
   log.scrollTop = log.scrollHeight;
 }
 
+// ---------- Find a Seller / Find a Buyer (v3) ----------
+function findResultCardHTML(m) {
+  var isSeller = state.findRole === "seller";
+  return '<article class="card dwc-findcard">' +
+    (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
+    '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a> " + presenceDot(m) + "</h3>" +
+    '<p class="dwc-match">✨ Matched ' + m.match_score + " — " +
+    (m.matched_types.length ? esc(m.matched_types.join(", ")) : "") +
+    (m.matched_types.length && m.matched_tags.length ? " · " : "") +
+    (m.matched_tags.length ? m.matched_tags.map(function (t) { return "#" + esc(t); }).join(" ") : "") + "</p>" +
+    (m.bio ? "<p>" + esc(m.bio) + "</p>" : "") +
+    (isSeller
+      ? ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
+        ((m.seller_tags && m.seller_tags.length) ? '<p class="dwc-tags">' + m.seller_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
+        (m.seller_open_to ? "<p>Open to: “" + esc(m.seller_open_to) + "”</p>" : "") +
+        ((m.seller_price_min_cents || m.seller_price_max_cents) ? "<p>Price range: <strong>" + money(m.seller_price_min_cents) + " – " + money(m.seller_price_max_cents) + "</strong></p>" : "")
+      : ((m.buyer_types && m.buyer_types.length) ? "<p>After: <strong>" + esc(m.buyer_types.join(", ")) + "</strong></p>" : "") +
+        ((m.buyer_tags && m.buyer_tags.length) ? '<p class="dwc-tags">' + m.buyer_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
+        (m.buyer_budget_max_cents ? "<p>Budget: up to <strong>" + money(m.buyer_budget_max_cents) + "</strong></p>" : "")) +
+    '<div class="dwc-actions">' +
+    '<button type="button" class="btn small" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button>' +
+    '<a class="btn ghost small" href="#/member/' + m.id + '">View page →</a>' +
+    "</div></article>";
+}
+async function viewFind(el) {
+  if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
+  if (!state.profile.age_verified) {
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">✨ Find Seller / Buyer</h2><p>Find is 18+ — it matches buyers and sellers of digital content. Verify your age with a photo ID first (Rules &amp; After Dark).</p><p><button type="button" class="btn" onclick="DWC.go(\'rules\')">Rules &amp; After Dark →</button></p></section>';
+    return;
+  }
+  var p = state.profile;
+  el.innerHTML =
+    '<section class="card"><h2 style="margin-top:0">✨ Find Seller / Buyer</h2>' +
+    "<p style=\"color:var(--muted)\">Two sides of the same street. Tell us what you sell and what you're after — then find your match. Only public info is ever shown (username, bio, tags, content types). Nothing about your payouts or your real name.</p>" +
+    '<div class="dwc-findbtns">' +
+    '<button type="button" class="btn' + (state.findRole === "seller" ? "" : " ghost") + '" onclick="DWC.findRole(\'seller\')">🔍 Find a Seller</button>' +
+    '<button type="button" class="btn' + (state.findRole === "buyer" ? "" : " ghost") + '" onclick="DWC.findRole(\'buyer\')">🔍 Find a Buyer</button>' +
+    "</div>" +
+    '<p style="color:var(--muted)">Right now you’re looking for a <strong>' + (state.findRole === "seller" ? "seller" : "buyer") + '</strong> — matches are best-first, by what you both picked.</p></section>' +
+    '<section class="card"><h3 style="margin-top:0">⚙️ My Find prefs — what I sell &amp; what I’m after</h3>' +
+    '<form onsubmit="return DWC.saveFindPrefs(this)">' +
+    '<h4 style="margin:8px 0 6px">What I sell</h4>' +
+    '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>My seller tags (comma separated, up to 8)</label>' +
+    '<input name="seller_tags" maxlength="240" value="' + esc((p.seller_tags || []).join(", ")) + '" placeholder="e.g. cosplay, custom">' +
+    '<label>Open to… (one line)</label>' +
+    '<input name="seller_open_to" maxlength="140" value="' + esc(p.seller_open_to || "") + '" placeholder="e.g. custom sets on request">' +
+    '<div class="dwc-rowform"><label style="flex:1">My price from ($)<input name="seller_price_min" type="number" step="1" min="0" max="100000" value="' + Math.round((p.seller_price_min_cents || 0) / 100) + '"></label>' +
+    '<label style="flex:1">My price to ($)<input name="seller_price_max" type="number" step="1" min="0" max="100000" value="' + Math.round((p.seller_price_max_cents || 0) / 100) + '"></label></div>' +
+    '<h4 style="margin:16px 0 6px">What I’m after</h4>' +
+    '<label>Content types I want</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="buyer_types" value="' + esc(g) + '" style="width:auto"' + ((p.buyer_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>Tags I’m after (comma separated, up to 8)</label>' +
+    '<input name="buyer_tags" maxlength="240" value="' + esc((p.buyer_tags || []).join(", ")) + '" placeholder="e.g. cosplay, amateur">' +
+    '<label>My budget — up to ($)</label>' +
+    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round((p.buyer_budget_max_cents || 0) / 100) + '">' +
+    '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="margin-top:14px"><button class="btn" type="submit">Save my Find prefs →</button></p></form></section>' +
+    '<div id="dwc-find-results"><p style="color:var(--muted)">Loading matches…</p></div>' +
+    '<section class="card"><h3 style="margin-top:0">🔒 My private chats</h3><p style="color:var(--muted)">Private chats delete when closed — for both sides. Open one to pick up where you left off.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'receipts\')">🧾 My receipts →</button></p><div id="dwc-eph-inbox"><p style="color:var(--muted)">Loading…</p></div></section>';
+  await loadFindResults();
+  await loadEphInbox();
+}
+async function loadFindResults() {
+  var host = $("dwc-find-results");
+  if (!host) return;
+  var data = await apiGet("/find?device_id=" + encodeURIComponent(deviceId()) + "&role=" + state.findRole + "&limit=30");
+  var results = (data && data.results) || [];
+  state.findResults = results;
+  if (data && data.error) {
+    host.innerHTML = '<div class="note">' + esc(data.error) + "</div>";
+    return;
+  }
+  host.innerHTML = results.length
+    ? "<h3>" + (state.findRole === "seller" ? "Sellers for you — best match first" : "Buyers for you — best match first") + '</h3><div class="grid">' + results.map(findResultCardHTML).join("") + "</div>"
+    : '<div class="note">' + (state.findRole === "seller"
+      ? "No sellers match your wants yet — save your prefs above (what you're after), and check back once sellers set up what they sell."
+      : "No buyers match what you sell yet — save your prefs above (what you sell), and check back once buyers say what they're after.") + "</div>";
+}
+async function loadEphInbox() {
+  var host = $("dwc-eph-inbox");
+  if (!host) return;
+  var data = await apiGet("/ephemeral?device_id=" + encodeURIComponent(deviceId()) + "&inbox=1");
+  var inbox = (data && data.inbox) || [];
+  state.ephInbox = inbox;
+  if (!inbox.length) { host.innerHTML = '<p style="color:var(--muted)">No private chats open — start one from a creator post or a Find result.</p>'; return; }
+  host.innerHTML = inbox.map(function (c) {
+    return '<button type="button" class="dwc-buddy" onclick="DWC.openEphemeral(' + c.partner_id + ", '" + esc(c.partner_username.replace(/'/g, "")) + "', " + (c.post_id || "null") + ')">' +
+      (c.partner_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      '<span class="dwc-buddy-name">@' + esc(c.partner_username) + "</span>" +
+      '<span class="dwc-buddy-away">🔒 ' + esc((c.last_from_me ? "You: " : "") + (c.last_body || "").slice(0, 60)) + "</span>" +
+      "</button>";
+  }).join("");
+}
+
+// ---------- Ephemeral private chat (v3) ----------
+// One floating window at a time. Private chat: messages live in the
+// database only while the chat is open, and closing it deletes every
+// message for both sides. The window says so, plainly — it just says
+// "Private chat" and never words it as encrypted. (Developer note: this
+// is private + ephemeral, NOT true end-to-end encryption — there is no
+// client key exchange on this stack. That limit lives in the code
+// comments and the build report, never as a claim in the UI.)
+function renderEphWin() {
+  var host = $("dwc-ephwins");
+  if (!host) return;
+  var e = state.eph;
+  if (!e) { host.innerHTML = ""; return; }
+  host.innerHTML =
+    '<div class="dwc-ephwin" role="dialog" aria-label="Private chat">' +
+    '<div class="dwc-ephwin-head"><strong>🔒 Private chat — @' + esc(e.partner_username) + '</strong>' +
+    '<button type="button" class="dwc-linklike" onclick="DWC.closeEphemeral()">✕ Close &amp; delete</button></div>' +
+    '<p class="dwc-eph-note">🔒 <strong>Private chat.</strong> This chat lives only while it’s open — closing it deletes every message for both of you.</p>' +
+    '<div class="dwc-ephlog" id="dwc-ephlog">' +
+    (state.ephMessages.length
+      ? state.ephMessages.map(function (m) {
+          return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        }).join("")
+      : "<p>No messages yet — say hi. Payment and the file swap happen here, between the two of you.</p>") +
+    "</div>" +
+    (state.ephTxnMsg ? '<p class="dwc-eph-txn-done">' + esc(state.ephTxnMsg) + "</p>" : "") +
+    '<div class="dwc-eph-actions"><button type="button" class="btn ghost small" onclick="DWC.toggleTxnForm()">✓ Transaction done</button> <span style="color:var(--muted);font-size:13px">Mark a sale done — a receipt is saved for both of you, and it stays even after this chat is deleted.</span></div>' +
+    '<form id="dwc-txn-form" class="dwc-txn-form" hidden onsubmit="return DWC.saveTransaction(this)">' +
+    '<label>Amount — whole dollars ($)</label>' +
+    '<input name="amount" type="number" step="1" min="1" max="100000" required placeholder="e.g. 15">' +
+    '<label>What was bought (one short line, up to 140 characters)</label>' +
+    '<input name="note" maxlength="140" required placeholder="e.g. 20-photo set">' +
+    '<div class="dwc-rowform"><label><input type="radio" name="role" value="buyer" checked style="width:auto"> I bought it (I spent)</label>' +
+    '<label><input type="radio" name="role" value="seller" style="width:auto"> I sold it (I received)</label></div>' +
+    '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="margin-top:10px"><button class="btn small" type="submit">Save receipt →</button></p></form>' +
+    '<form class="dwc-rowform" onsubmit="return DWC.sendEphemeral(this)">' +
+    '<input name="body" required maxlength="1000" placeholder="Message @' + esc(e.partner_username) + '…" style="flex:1">' +
+    '<button class="btn small" type="submit">Send</button></form>' +
+    "</div>";
+  var log = $("dwc-ephlog");
+  if (log) log.scrollTop = log.scrollHeight;
+}
+async function openEphemeralChat(partnerId, partnerUsername, postId) {
+  if (!state.profile) { setNotice("Create your account first — private chats are for members."); DWC.openSignup(); return; }
+  var url = "/ephemeral?device_id=" + encodeURIComponent(deviceId()) + "&with=" + partnerId;
+  if (postId) url += "&post_id=" + postId;
+  var data = await apiGet(url);
+  if (!data || !data.conversation_id) { setNotice((data && data.error) || "Couldn't open that private chat."); return; }
+  state.eph = { conversation_id: data.conversation_id, partner_id: data.partner_id, partner_username: data.partner_username || partnerUsername, post_id: data.post_id ?? postId ?? null };
+  state.ephMessages = data.messages || [];
+  state.ephTxnMsg = null;
+  renderEphWin();
+  var win = document.querySelector(".dwc-ephwin");
+  if (win) win.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
 // ---------- Reports (operator inbox) ----------
 async function viewReports(el) {
   if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
   if (!state.profile.is_operator) {
-    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator\u2019s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p style="color:var(--muted)">Only the operator can see the inbox. (If this is your shop, claim the operator role from your profile — first claim wins, so do it before opening the Community.)</p><p><button type="button" class="btn ghost small" onclick="DWC.claimOperator()">Claim operator role</button></p></section>';
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator’s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p style="color:var(--muted)">Only the operator can see the inbox. (If this is your shop, claim the operator role from your profile — first claim wins, so do it before opening the Community.)</p><p><button type="button" class="btn ghost small" onclick="DWC.claimOperator()">Claim operator role</button></p></section>';
     return;
   }
   el.innerHTML = '<section aria-label="Reports inbox"><h2 style="margin-top:0">🚩 Reports — operator inbox</h2><p style="color:var(--muted)">Loading…</p></section>';
@@ -1353,23 +1883,23 @@ function viewRules(el) {
     "<li><strong>Listing is always free.</strong> When something sells, a fair 5% cut goes to Rare Candy Reserve to keep the street running — every listing shows the exact split before you post. Payments go directly between buyer and seller; the app never holds your money.</li>" +
     "<li><strong>You can sell any content — adult content included — IF you prove your age first.</strong> Regular stuff never needs age proof: join, post, buy, and sell with just the signup checks. Adult content and the 18+ area are the only places age verification is asked — and there it takes a <strong>real photo ID check</strong> (see the Age Verification Notice in the After Dark panel below). <strong>A typed birthday alone is never enough.</strong></li>" +
     "<li><strong>Two forums, both with tags.</strong> The general forum is for any topic — gaming, music, plants, tech, life — and every post gets tags; each tag has its own page collecting its posts. The 18+ forum is its twin for adult topics, verified members only, with its own tags and tag pages. Adult content never shows up in the general forum, its tag pages, or the front page.</li>" +
-    "<li><strong>Hearts only.</strong> The only reaction anywhere here is a heart — on posts and on comments. There is no downvote, no thumbs-down, no dislike. Heart it or don\u2019t.</li>" +
+    "<li><strong>Hearts only.</strong> The only reaction anywhere here is a heart — on posts and on comments. There is no downvote, no thumbs-down, no dislike. Heart it or don’t.</li>" +
     "<li><strong>Your post, your call on comments.</strong> Whoever wrote a post can turn its comments off (and back on) any time from the post itself. Existing comments stay visible; new ones pause.</li>" +
     "<li><strong>One account per person.</strong> Your name + date of birth is the pair that keeps it that way. Your full name and birth year are never shown publicly.</li>" +
-    "<li><strong>Report anything.</strong> Every post, comment, and listing has a 🚩 Report button. Reports go straight to the owner\u2019s inbox in this app for Chris to review.</li></ul></section>" +
+    "<li><strong>Report anything.</strong> Every post, comment, and listing has a 🚩 Report button. Reports go straight to the owner’s inbox in this app for Chris to review.</li></ul></section>" +
     '<section class="card"><h2 style="margin-top:0">Street rules — keep everyone safe</h2><ul class="dwc-rules-list">' +
     "<li><strong>Sell what you want — legally.</strong> <strong>No firearms, ammunition, or anything illegal, ever.</strong> Listings that mention them are blocked automatically.</li>" +
     "<li><strong>No fakes or proxies passed off as real.</strong> Card trades run an AI first look in the Card Check corner; a likely fake/proxy flag blocks the trade listing until the community weighs in. Proxies must be labeled as proxies if they're ever shown.</li>" +
     "<li><strong>No hate speech</strong> in posts, comments, usernames, or profiles. Pages and posts that break this get removed.</li>" +
     "<li><strong>No outside sales.</strong> Deals that start here stay here. On this platform your content and your deals are protected — verified member accounts, recorded orders and tracking, and a report trail. Take a deal off site and you lose all of that protection. Taking a buyer off-platform to dodge the street cut also risks a <strong>permanent ban of the account</strong> (and, on the public site, the IP).</li>" +
-    "<li><strong>Stealing content is theft — and it\u2019s expensive.</strong> Anyone who steals a member\u2019s content and redistributes it, in any form, <strong>will be held liable in court for money owed due to damages, and more</strong>. The platform will pursue content thieves. If you didn\u2019t make it or buy the right to share it, don\u2019t post it anywhere.</li>" +
+    "<li><strong>Stealing content is theft — and it’s expensive.</strong> Anyone who steals a member’s content and redistributes it, in any form, <strong>will be held liable in court for money owed due to damages, and more</strong>. The platform will pursue content thieves. If you didn’t make it or buy the right to share it, don’t post it anywhere.</li>" +
     "<li><strong>Be honest about condition.</strong> Photos of the actual item, flaws stated up front. The item is the item for sale — extras are courtesies, not the product.</li>" +
     "<li><strong>Chat:</strong> guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</li>" +
     "<li><strong>Payments &amp; shipping:</strong> buyer and seller arrange payment (the seller's payout method is on their profile) and shipping directly. Every purchase lands in the buyer's <strong>My Orders</strong> with the order status; when the seller ships, they add the carrier + tracking number there and the buyer gets their copy of it (plus a link to the carrier's tracking page). Sellers: your wallet balance and payout history live under <strong>Payouts</strong> — money becomes available when an order is marked delivered. Shipping-label creation through Shippo or a similar service is planned and will be labeled clearly when it actually works — it is not live yet.</li></ul>" +
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML + "</section>" +
     '<section class="card"><h2 style="margin-top:0">🌙 Adult content &amp; the 18+ area — how age verification works</h2>' +
     "<p>The deal is simple: <strong>you can sell any content, adult or otherwise, if you prove your age.</strong> Adult discussion lives in the <strong>🌙 After Dark 18+</strong> forum inside this app, and adult selling lives in the After Dark market — entering any 18+ area asks for age verification first. Everything else on the street never asks.</p>" +
-    "<p><strong>How the check works:</strong> you upload a clear photo of your government-issued photo ID (driver\u2019s license, state ID, or passport). Chris — the operator — reviews it himself: that it\u2019s a genuine-looking government ID, that the date of birth on it shows 18 or older, and that it matches the name and date of birth on your account. <strong>A typed birthday or an \u201cI\u2019m 18\u201d checkbox alone never verifies anyone.</strong> Until the check passes, there is no adult access — no entering the 18+ forum, no adult selling.</p>" +
+    "<p><strong>How the check works:</strong> you upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport). Chris — the operator — reviews it himself: that it’s a genuine-looking government ID, that the date of birth on it shows 18 or older, and that it matches the name and date of birth on your account. <strong>A typed birthday or an “I’m 18” checkbox alone never verifies anyone.</strong> Until the check passes, there is no adult access — no entering the 18+ forum, no adult selling.</p>" +
     AGE_NOTICE_HTML + AGE_REVIEW_NOTE +
     '<div id="dwc-age-block"></div></section>';
   renderAgeBlock();
@@ -1381,21 +1911,55 @@ async function renderAgeBlock() {
   if (!host) return;
   if (!state.profile) { host.innerHTML = needProfileHTML(); return; }
   if (state.profile.age_verified) {
-    host.innerHTML = '<p style="color:var(--green);font-weight:800">✓ You\u2019re age verified — the 18+ area is open to you.</p><p><button type="button" class="btn" onclick="DWC.go(\'adult\')">Enter the 18+ area →</button></p>';
+    host.innerHTML = '<p style="color:var(--green);font-weight:800">✓ You’re age verified — the 18+ area is open to you.</p><p><button type="button" class="btn" onclick="DWC.go(\'adult\')">Enter the 18+ area →</button></p>';
     return;
   }
   var st = await apiGet("/age-verification/status?device_id=" + encodeURIComponent(deviceId()));
   var pending = st && st.pending;
   host.innerHTML =
     (pending
-      ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself. You\u2019ll see your age-verified mark here once it\u2019s approved. Your photo is deleted the moment he decides.</p>'
+      ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself. You’ll see your age-verified mark here once it’s approved. Your photo is deleted the moment he decides.</p>'
       : "") +
     '<form onsubmit="return DWC.submitId(this)">' +
-    '<label>Upload a clear photo of your government-issued photo ID (driver\u2019s license, state ID, or passport) — JPG or PNG, under 2.5 MB</label>' +
+    '<label>Upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport) — JPG or PNG, under 2.5 MB</label>' +
     '<input name="id_photo" type="file" accept="image/jpeg,image/png" required>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Submit my ID for review →</button></p></form>';
 }
+
+// ---------- v3.2: 18+ area banners + Digital File Marketplace ----------
+// "Get matched with buyers & sellers fast!" — the area's intro banner,
+// right before the "After Dark — 18+" heading.
+var MATCH_BANNER_HTML =
+  '<div class="dwc-match-banner">Get matched with buyers &amp; sellers fast!</div>';
+// "Get your nut, and protect it too!!" + neon 18+ only + a PayPal balance
+// rising demo (CSS/SVG animation — clearly labeled EXAMPLE, never a real
+// PayPal screenshot). Sits above the main 18+ welcome picture.
+var NUT_BANNER_HTML =
+  '<div class="dwc-nut-banner"><span class="dwc-nut-line">Get your nut, and protect it too!!</span><span class="dwc-18only">18+ only</span>' +
+  '<div class="dwc-paypal-demo"><div class="dwc-paypal-label">Example — illustration only, not a real PayPal screenshot</div>' +
+  '<div class="dwc-paypal-balance">$1,240.00 <small>▲ +$12.50 just now</small></div>' +
+  '<p class="dwc-paypal-note">PayPal balance rising — sales land here the moment buyers pay.</p>' +
+  '<div class="dwc-paypal-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div></div></div>';
+// Digital File Marketplace — Chris's words verbatim + featured examples
+// (the shop's own 3D prints, clearly labeled EXAMPLE — no fake members,
+// no fake sales).
+var DFM_HTML =
+  '<section class="card dwc-dfm"><h3 class="dwc-neon-head" style="margin-top:0">Digital File Marketplace!</h3>' +
+  '<p>They try to download or take a pic/screenshot, IP logged, Perma ban, and their location is offered to you to press charges for IP infringement they sign up for upon the account creation screen, as we don\'t steal here. We help grow the hustle of every single hustler out there working hard but make it easier as we make nothing from these sales, we just keep them from giving your files away for free or copying them. And lets them know not to redistribute any IP from anyone or your account can be suspended indefinitely, it costs nothing to make an sellers/buyers account, but 100 free listings per month reset monthly, to 1.5% only taken ONCE AND ONLY ONCE the sale is complete and you\'ve gotten immediately required payment. We refuse to charge for any of our services as much as other big companies do, and don\'t need to, this place is to keep you, your files, your ideas, your communication, content, livelihood, knowledge, and information safe and ensures top measures taken to ensure this. If you need help reach out to an admin and get to building your space whether it need be a site you code for your business to start or model your photography to the world, RCR is the place to do it all!</p>' +
+  '<div class="dwc-examples">' +
+  '<div class="dwc-example"><img src="images/octopus-holder.jpg" alt="3D printed octopus holder"><div class="dwc-example-body"><span class="dwc-example-badge">Example</span><h4>3D Printed Octopus Holder</h4><p>Screw / bolt mounted · $15.00</p><p>Example showcase — not a real member listing.</p></div></div>' +
+  '<div class="dwc-example"><img src="images/death-whistle.jpg" alt="3D printed Aztec death whistle"><div class="dwc-example-body"><span class="dwc-example-badge">Example</span><h4>Aztec Death Whistle — Replica</h4><p>3D printed · $8.00</p><p>Example showcase — not a real member listing.</p></div></div>' +
+  '<div class="dwc-example"><img src="images/gengar-shadow-stand.jpg" alt="3D printed Gengar shadow display stand"><div class="dwc-example-body"><span class="dwc-example-badge">Example</span><h4>Gengar Shadow Display Stand</h4><p>3D printed · $8.00</p><p>Example showcase — not a real member listing.</p></div></div>' +
+  '</div></section>';
+// Find call-to-action — the unmissable entry to Find a Seller / Buyer +
+// private chats, right in the 18+ area. (Find itself is v3 — it only
+// appears once v3 is pushed and the v3 migration has run on live D1.)
+var FIND_CTA_HTML =
+  '<section class="card dwc-find-cta" style="text-align:center"><h3 style="margin-top:0">✨ Find a Seller / Find a Buyer</h3>' +
+  '<p style="color:var(--muted)">Looking for a certain type or genre? Find matches you with buyers and sellers by what they sell, what they want, and their price — best matches first.</p>' +
+  '<p><button type="button" class="btn" style="font-size:18px;padding:16px 26px" onclick="DWC.go(\'find\')">✨ Find a Seller / Find a Buyer →</button></p>' +
+  '<p><button type="button" class="btn ghost" onclick="DWC.go(\'find\')">🔒 My private chats →</button></p></section>';
 
 // ---------- After Dark 18+ ----------
 async function viewAdult(el) {
@@ -1405,13 +1969,17 @@ async function viewAdult(el) {
     var welcome = await apiGet("/adult-welcome?device_id=" + encodeURIComponent(deviceId()));
     var wimg = welcome && welcome.image_url;
     el.innerHTML =
+      MATCH_BANNER_HTML +
       '<section class="card" style="text-align:center"><h2 style="margin-top:0">🌙 After Dark — 18+ only</h2>' +
+      NUT_BANNER_HTML +
       (wimg
         ? '<img src="' + esc(wimg) + '" alt="Welcome to the 18+ area" class="dwc-welcome-img">'
         : '<div class="dwc-welcome-slot"><p>🌙</p><p><strong>Welcome picture slot</strong></p><p style="font-size:13px;color:var(--muted)">Chris uploads his own welcome picture here. The slot is empty until he does — no stock photo.</p></div>') +
       '<p>This area is for age-verified members only. A typed birthday alone is never enough — a real photo ID check is what opens the door.</p>' +
       (st && st.pending ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself.</p>' : "") +
       "</section>" +
+      DFM_HTML +
+      FIND_CTA_HTML +
       '<section class="card"><h3 style="margin-top:0">Verify your age</h3>' +
       AGE_NOTICE_HTML + AGE_REVIEW_NOTE + '<div id="dwc-age-block"></div></section>';
     renderAgeBlock();
@@ -1419,7 +1987,10 @@ async function viewAdult(el) {
   }
   try { localStorage.setItem(ADULT_KEY, "1"); } catch (e) {}
   el.innerHTML =
-    '<section class="card" style="text-align:center"><h2 style="margin-top:0">🌙 After Dark — 18+</h2><div id="dwc-welcome"></div></section>' +
+    MATCH_BANNER_HTML +
+    '<section class="card" style="text-align:center"><h2 style="margin-top:0">🌙 After Dark — 18+</h2>' + NUT_BANNER_HTML + '<div id="dwc-welcome"></div></section>' +
+    DFM_HTML +
+    FIND_CTA_HTML +
     '<div class="dwc-adultnav"><button type="button" class="dwc-pill active" data-adulttab="forum" onclick="DWC.adultTab(this, \'forum\')">💬 18+ Forum</button>' +
     '<button type="button" class="dwc-pill" data-adulttab="models" onclick="DWC.adultTab(this, \'models\')">🔍 Model Search</button>' +
     '<button type="button" class="dwc-pill" data-adulttab="finder" onclick="DWC.adultTab(this, \'finder\')">✨ Find My Girl or Guy</button>' +
@@ -1446,10 +2017,11 @@ async function renderAdultForum() {
   if (!host) return;
   adultTabButtons("forum");
   host.innerHTML =
-    '<div class="dwc-catgrid">' + ADULT_CATEGORIES.map(function (c) {
+    '<h3 style="margin:18px 0 4px">🗂️ Browse the 18+ categories</h3><div class="dwc-catgrid">' + ADULT_CATEGORIES.map(function (c) {
       return '<button type="button" class="dwc-cattile" onclick="DWC.adultCategory(\'' + esc(c) + '\')">' + esc(c) + "</button>";
     }).join("") + "</div>" +
     '<div id="dwc-adult-composer"></div>' +
+    '<div id="dwc-adult-creator"></div>' +
     '<div id="dwc-adult-feed"><p style="color:var(--muted)">Loading the 18+ forum…</p></div>' +
     '<div id="dwc-adult-tags"></div>';
   renderAdultComposer();
@@ -1479,16 +2051,63 @@ function renderAdultComposer() {
     '<label>Corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Flair</label><select name="flair">' + FLAIRS.map(function (f) { return "<option>" + esc(f) + "</option>"; }).join("") + "</select>" +
     '<label>Title (3–120 characters)</label>' +
-    '<input name="title" required minlength="3" maxlength="120" placeholder="What\u2019s this about?">' +
+    '<input name="title" required minlength="3" maxlength="120" placeholder="What’s this about?">' +
     '<label>Post (up to 4000 characters)</label>' +
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. cosplay, amateur">' +
     '<label>Photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     gifPickerHTML("composer-adult") +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Post to the 18+ forum →</button></p>' +
+    "</form></section>";
+  renderCreatorComposer();
+}
+
+// ---------- Creator post composer (v3) ----------
+// A creator post is an 18+ forum post that sells digital content: an
+// emoji-friendly title, a genre, the seller's own tags, a price (0 =
+// free), and an optional 3D print file. It shows up in the adult feed
+// and its tag pages like any adult post, with a Creator badge.
+function renderCreatorComposer() {
+  var host = $("dwc-adult-creator");
+  if (!host) return;
+  host.innerHTML =
+    '<section class="card dwc-creatorbox" aria-label="New creator post"><h3 style="margin-top:0">🎨 Creator post — sell your digital content</h3>' +
+    '<p style="color:var(--muted)">Selling photos, videos, custom content, audio, or 3D print files? Post it here. Age-verified members only — your post shows in the 18+ forum and its tag pages, with a Creator badge and your price. Payment is arranged privately with the buyer in a private chat.</p>' +
+    '<form onsubmit="return DWC.submitCreatorPost(this)">' +
+    '<input type="hidden" name="kind" value="adult">' +
+    '<label>Corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
+    '<label>Title (3–120 characters) — tap an emoji to add flair</label>' +
+    '<input name="title" required minlength="3" maxlength="120" placeholder="e.g. New set — 20 photos 🔥">' +
+    '<div class="dwc-emojirow" aria-label="Emoji flair — tap to add to the title">' +
+    TITLE_EMOJIS.map(function (e) { return '<button type="button" class="dwc-emoji" onclick="DWC.titleEmoji(this, \'' + e + '\')" title="Add ' + e + ' to the title">' + e + "</button>"; }).join("") +
+    "</div>" +
+    '<label>What kind of content is this? — tap a card</label>' +
+    '<div class="dwc-genregrid" role="group" aria-label="Content genre">' +
+    CREATOR_GENRES.map(function (g, i) { return '<button type="button" class="dwc-genrecard' + (i === 0 ? " on" : "") + '" data-genrecard="' + esc(g) + '" onclick="DWC.pickGenre(this, \'' + esc(g.replace(/'/g, "")) + '\')">' + esc(g) + "</button>"; }).join("") +
+    "</div>" +
+    '<input type="hidden" name="content_genre" value="' + esc(CREATOR_GENRES[0]) + '">' +
+    '<label>Description (up to 4000 characters)</label>' +
+    '<textarea name="body" required maxlength="4000" placeholder="What’s in it, how many photos/minutes, what makes it yours…"></textarea>' +
+    '<label>Your tags (up to 8, comma separated — buyers find you by these)</label>' +
+    '<input name="tags" maxlength="240" placeholder="e.g. cosplay, custom, amateur">' +
+    '<div class="dwc-chiprow" aria-label="One-tap seller tags">' +
+    CREATOR_TAG_CHIPS.map(function (t) { return '<button type="button" class="dwc-chip" onclick="DWC.addTagChip(this, \'' + esc(t.replace(/'/g, "")) + '\')">' + esc(t) + " +</button>"; }).join("") +
+    "</div>" +
+    '<label>Price (USD — 0 = free). Tick “Pay to unlock” below and viewers see a locked preview with a “Pay to unlock” button at this price.</label>' +
+    '<input name="price" type="number" step="1" min="0" max="100000" value="0" required>' +
+    '<label>Preview photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
+    '<label><input type="checkbox" name="pay_unlock" style="width:auto"> 🔓 Pay to unlock — set a price above and viewers see a locked preview with a “Pay to unlock” button. Only works with a price above $0. Off by default.</label>' +
+    '<label>3D print file — .stl, .obj, .3mf, or a .zip of them (under 25 MB — optional, only when the genre is 3D Print Files or you’re including one)</label>' +
+    '<input name="print_file" type="file" accept=".stl,.obj,.3mf,.zip">' +
+    gifPickerHTML("composer-creator") +
+    '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="margin-top:14px"><button class="btn" type="submit">Post it as a creator post →</button></p>' +
     "</form></section>";
 }
 async function renderModelSearch() {
@@ -1527,9 +2146,9 @@ async function renderFinder() {
   adultTabButtons("finder");
   host.innerHTML =
     '<section class="card"><h3 style="margin-top:0">✨ Find My Girl or Guy</h3>' +
-    "<p style=\"color:var(--muted)\">Pick what you\u2019re looking for. Models are matched ONLY on the details each model chose to share — blank means not shared, and it never counts against them.</p>" +
+    "<p style=\"color:var(--muted)\">Pick what you’re looking for. Models are matched ONLY on the details each model chose to share — blank means not shared, and it never counts against them.</p>" +
     '<form onsubmit="return DWC.findMatches(this)">' +
-    '<label>I\u2019m looking for</label><select name="gender"><option value="any">Anyone</option><option value="girl">Girl</option><option value="guy">Guy</option></select>' +
+    '<label>I’m looking for</label><select name="gender"><option value="any">Anyone</option><option value="girl">Girl</option><option value="guy">Guy</option></select>' +
     '<div class="dwc-rowform"><label style="flex:1">Age from<input name="age_min" type="number" min="18" max="99" placeholder="18"></label><label style="flex:1">Age to<input name="age_max" type="number" min="18" max="99" placeholder="99"></label></div>' +
     '<label>Eye color</label><select name="eye_color"><option value="">Any</option>' + MODEL_EYE_COLORS.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Weight</label><select name="weight"><option value="any">Any</option><option value="under120">Under 120 lbs</option><option value="120-150">120–150 lbs</option><option value="150-180">150–180 lbs</option><option value="over180">Over 180 lbs</option></select>' +
@@ -1549,7 +2168,7 @@ function renderModelMe() {
   var p = state.profile;
   host.innerHTML =
     '<section class="card"><h3 style="margin-top:0">📸 My Model Listing</h3>' +
-    "<p style=\"color:var(--muted)\">Opt in to the model search. Everything on your card is chosen by you — your blurb, your categories, your display picture, and the match details below. Leave anything blank and it simply isn\u2019t shared.</p>" +
+    "<p style=\"color:var(--muted)\">Opt in to the model search. Everything on your card is chosen by you — your blurb, your categories, your display picture, and the match details below. Leave anything blank and it simply isn’t shared.</p>" +
     '<form onsubmit="return DWC.saveModelProfile(this)">' +
     '<label><input type="checkbox" name="opt_in" style="width:auto"' + (p.is_model ? " checked" : "") + "> List me in the model search</label>" +
     '<label>Your public blurb (up to 280 characters)</label>' +
@@ -1663,6 +2282,55 @@ window.DWC = {
     if (cssEl) body.layout_css = cssEl.value;
     var presetEl = form.querySelector('input[name="layout_preset"]');
     if (presetEl) body.layout_preset = presetEl.value;
+    // Creator/Seller area (v3) — "What I sell" / "What I'm after".
+    var toCents = function (v) {
+      var n = parseInt(v, 10);
+      return Number.isNaN(n) ? 0 : Math.round(Math.max(0, n) * 100);
+    };
+    body.seller_types = [];
+    form.querySelectorAll('input[name="seller_types"]:checked').forEach(function (cb) { body.seller_types.push(cb.value); });
+    body.seller_tags = String(fd.get("seller_tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+    body.seller_open_to = String(fd.get("seller_open_to") || "").trim();
+    body.seller_price_min_cents = toCents(fd.get("seller_price_min"));
+    body.seller_price_max_cents = toCents(fd.get("seller_price_max"));
+    body.buyer_types = [];
+    form.querySelectorAll('input[name="buyer_types"]:checked').forEach(function (cb) { body.buyer_types.push(cb.value); });
+    body.buyer_tags = String(fd.get("buyer_tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+    body.buyer_budget_max_cents = toCents(fd.get("buyer_budget"));
+    // Subscribe button text (v3.2) — the seller's custom label for the
+    // button on their page; empty falls back to "Subscribe to my page".
+    if (form.querySelector('input[name="subscribe_label"]')) {
+      body.subscribe_label = String(fd.get("subscribe_label") || "").trim().slice(0, 40) || "Subscribe to my page";
+    }
+    // Member-page theme (v3.2) — only the pickers the member actually
+    // opted into (checkbox ticked / URL or font chosen). The server
+    // re-validates and stores "" when nothing is set.
+    if (form.querySelector('input[name="theme_bg_color"]')) {
+      var theme = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+      var hexOk = function (val) { return /^#[0-9a-fA-F]{6}$/.test(String(val || "").trim()) ? String(val).trim() : ""; };
+      if (fd.get("theme_bg_use")) theme.bg_color = hexOk(fd.get("theme_bg_color"));
+      var bgImg = String(fd.get("theme_bg_image") || "").trim().slice(0, 500);
+      if (/^https:\/\//i.test(bgImg)) theme.bg_image_url = bgImg;
+      if (fd.get("theme_text_use")) theme.text_color = hexOk(fd.get("theme_text_color"));
+      if (fd.get("theme_accent_use")) theme.accent_color = hexOk(fd.get("theme_accent_color"));
+      var fontSel = String(fd.get("theme_font") || "");
+      if (themeFontCSS(fontSel)) theme.font = fontSel;
+      body.profile_theme = JSON.stringify(theme);
+    }
+    // Music (v3.1) — A Steady Heart track picks (max 5) + the opt-in
+    // Steady Wave player. Edit-only fields (the picker only renders
+    // on edit), so only send them when the form has them.
+    if (form.querySelectorAll('input[name="ash_tracks"]').length) {
+      body.ash_tracks = [];
+      form.querySelectorAll('input[name="ash_tracks"]:checked').forEach(function (cb) {
+        var n = parseInt(cb.value, 10);
+        if (n >= 1 && n <= ASH_TRACKS.length && body.ash_tracks.indexOf(n) === -1) body.ash_tracks.push(n);
+      });
+      body.ash_tracks = body.ash_tracks.slice(0, 5);
+    }
+    if (form.querySelector('input[name="show_vnr_player"]')) {
+      body.show_vnr_player = !!fd.get("show_vnr_player");
+    }
     if (isNew) {
       body.full_name = String(fd.get("full_name") || "").trim();
       body.terms_agreed = !!fd.get("terms_agreed");
@@ -1678,8 +2346,12 @@ window.DWC = {
     state.profile = data.profile;
     state.editingProfile = false;
     state.signupOpen = false;
-    if (data.v2_pending) {
-      setNotice("Profile saved — but your Top Friends / layout didn't stick yet. The shop is still running a quick database update; try saving again later.");
+    if (data.v2_pending || data.v3_pending) {
+      setNotice("Profile saved — but " +
+        (data.v2_pending && data.v3_pending ? "your Top Friends / layout and your What I sell / Find prefs / music picks didn't stick yet."
+          : data.v2_pending ? "your Top Friends / layout didn't stick yet."
+          : "your What I sell / Find prefs / music picks didn't stick yet.") +
+        " The shop is still running a quick database update; try saving again later.");
     } else {
       setNotice(isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.");
     }
@@ -1710,6 +2382,7 @@ window.DWC = {
       body: String(fd.get("body") || "").trim(),
       tags: String(fd.get("tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean),
       gif_url: gif ? gif.url : null, gif_label: gif ? gif.label : "",
+      blur_photo: !!fd.get("blur_photo"),
       verification_status: check ? check.status : "not_checked",
       verification_summary: check ? (check.summary || "") : "",
     };
@@ -1723,6 +2396,190 @@ window.DWC = {
     else if (context === "cardcheck") renderView();
     else renderView();
     await refreshStats();
+    return false;
+  },
+
+  submitCreatorPost: async function (form) {
+    var fd = new FormData(form);
+    var photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
+    if (photo && photo.error) return formErr(form, photo.error);
+    var printFile = await fileToPrintFile(fd.get("print_file") && fd.get("print_file").size ? fd.get("print_file") : null, 25000000);
+    if (printFile && printFile.error) return formErr(form, printFile.error);
+    var gk = "composer-creator";
+    var gif = gifPick[gk];
+    var price = parseInt(fd.get("price"), 10);
+    if (Number.isNaN(price) || price < 0) price = 0;
+    var body = {
+      device_id: deviceId(), kind: "adult", is_creator: true,
+      category: String(fd.get("category") || ""),
+      flair: "",
+      title: String(fd.get("title") || "").trim(),
+      body: String(fd.get("body") || "").trim(),
+      content_genre: String(fd.get("content_genre") || ""),
+      price_cents: Math.round(price * 100),
+      // v3.2, OPT-IN ONLY — both default off; the server only honors
+      // pay_unlock on creator posts with a price above $0.
+      blur_photo: !!fd.get("blur_photo"),
+      pay_unlock: !!fd.get("pay_unlock"),
+      tags: String(fd.get("tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+      gif_url: gif ? gif.url : null, gif_label: gif ? gif.label : "",
+    };
+    if (photo) body.image = { dataBase64: photo.dataBase64, mimeType: photo.mimeType };
+    if (printFile) body.print_file = { dataBase64: printFile.dataBase64, fileName: printFile.fileName };
+    var data = await apiPost("/posts", body);
+    if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't post that.");
+    delete gifPick[gk];
+    setNotice("Creator post is live in the 18+ forum.");
+    renderAdultForum();
+    await refreshStats();
+    return false;
+  },
+
+  // Emoji flair — tap an emoji to insert it into the title at the cursor
+  // (or at the end). Titles keep emojis as-is; nothing strips them.
+  titleEmoji: function (btn, emoji) {
+    var form = btn.closest("form");
+    var input = form && form.querySelector('input[name="title"]');
+    if (!input) return;
+    var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+    var end = input.selectionEnd != null ? input.selectionEnd : input.value.length;
+    var next = input.value.slice(0, start) + emoji + input.value.slice(end);
+    if (next.length > 120) return;
+    input.value = next;
+    var pos = start + emoji.length;
+    input.focus();
+    try { input.setSelectionRange(pos, pos); } catch (e) {}
+  },
+
+  // Genre cards (v3.2) — tap a big genre card, it sets the hidden
+  // content_genre input and lights up. Default is the first genre.
+  pickGenre: function (btn, genre) {
+    var form = btn.closest("form");
+    var hidden = form && form.querySelector('input[name="content_genre"]');
+    if (hidden) hidden.value = genre;
+    var cards = form ? form.querySelectorAll("[data-genrecard]") : [];
+    for (var i = 0; i < cards.length; i++) cards[i].classList.toggle("on", cards[i].getAttribute("data-genrecard") === genre);
+  },
+
+  // Blur toggle (v3.2) — reveal / re-hide a blurred photo preview.
+  // This only flips the preview on this screen; it never changes the
+  // post itself, and it never un-locks a pay-to-unlock photo.
+  toggleBlur: function (btn) {
+    var wrap = btn.closest(".dwc-photowrap");
+    if (!wrap) return;
+    var img = wrap.querySelector("img");
+    if (!img) return;
+    var hidden = img.classList.toggle("dwc-img-blurred");
+    btn.textContent = hidden ? "👁 Blurred photo — tap to reveal" : "🙈 Blur this photo again";
+  },
+  // One-tap seller tag chip — adds the tag to the tags box (deduped).
+  addTagChip: function (btn, tag) {
+    var form = btn.closest("form");
+    var input = form && form.querySelector('input[name="tags"]');
+    if (!input) return;
+    var parts = input.value.split(",").map(function (t) { return t.trim(); }).filter(Boolean);
+    var norm = tag.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!parts.some(function (t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, "-") === norm; })) {
+      if (parts.length >= 8) { setNotice("8 tags max — drop one first."); return; }
+      parts.push(tag);
+      input.value = parts.join(", ");
+    }
+    btn.classList.add("on");
+  },
+
+  findRole: function (role) {
+    state.findRole = role === "buyer" ? "buyer" : "seller";
+    renderView();
+  },
+  saveFindPrefs: async function (form) {
+    var fd = new FormData(form);
+    var toCents = function (v) {
+      var n = parseInt(v, 10);
+      return Number.isNaN(n) ? 0 : Math.round(Math.max(0, n) * 100);
+    };
+    var body = {
+      device_id: deviceId(),
+      seller: {
+        types: fd.getAll("seller_types"),
+        tags: String(fd.get("seller_tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+        open_to: String(fd.get("seller_open_to") || "").trim(),
+        price_min_cents: toCents(fd.get("seller_price_min")),
+        price_max_cents: toCents(fd.get("seller_price_max")),
+      },
+      buyer: {
+        types: fd.getAll("buyer_types"),
+        tags: String(fd.get("buyer_tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+        budget_max_cents: toCents(fd.get("buyer_budget")),
+      },
+    };
+    var data = await apiPost("/find", body);
+    if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save those prefs.");
+    await refreshProfile();
+    setNotice("Find prefs saved — matches below are fresh.");
+    renderView();
+    return false;
+  },
+
+  // "Buy / Message seller" — opens a private ephemeral chat with the
+  // seller (optionally tied to the creator post). Payment and the file
+  // swap are arranged in that chat, between the two of them.
+  messageSeller: async function (sellerId, sellerUsername, postId) {
+    if (!state.profile) { setNotice("Create your account first — private chats are for members."); DWC.openSignup(); return; }
+    if (state.profile && sellerId === state.profile.id) { setNotice("That's your own post."); return; }
+    await openEphemeralChat(sellerId, sellerUsername, postId || null);
+  },
+  openEphemeral: async function (partnerId, partnerUsername, postId) {
+    await openEphemeralChat(partnerId, partnerUsername, postId || null);
+  },
+  // Close & delete — every message in this chat is deleted from the
+  // database, for both sides, and the chat can't be reopened.
+  closeEphemeral: async function () {
+    var e = state.eph;
+    if (!e) return;
+    if (!confirm("Close this private chat? Every message in it is deleted for both of you, and it can't be reopened. Any receipts you saved are kept in My receipts.")) return;
+    var data = await apiDelete("/ephemeral", { device_id: deviceId(), conversation_id: e.conversation_id });
+    state.eph = null;
+    state.ephMessages = [];
+    state.ephTxnMsg = null;
+    renderEphWin();
+    if (data && data.ok) setNotice("Private chat closed — its messages were deleted. Receipts you saved are kept in My receipts.");
+    else if (data && data.error) setNotice(data.error);
+    if (state.route && state.route.name === "find") renderView();
+  },
+  // Transaction done — record a sale in this private chat. Saves a
+  // receipt for BOTH parties (buyer "spent", seller "received") that
+  // survives the message delete. One transaction per chat.
+  toggleTxnForm: function () {
+    var f = $("dwc-txn-form");
+    if (f) f.hidden = !f.hidden;
+  },
+  saveTransaction: async function (form) {
+    var e = state.eph;
+    if (!e) return false;
+    var fd = new FormData(form);
+    var amount = parseInt(fd.get("amount"), 10);
+    var note = String(fd.get("note") || "").trim();
+    var role = fd.get("role") === "seller" ? "seller" : "buyer";
+    var data = await apiPost("/receipts", { device_id: deviceId(), conversation_id: e.conversation_id, amount_dollars: amount, note: note, role: role });
+    if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save that receipt.");
+    state.ephTxnMsg = "\u2713 Transaction recorded \u2014 " + (data.amount || "") + " for \u201c" + note + "\u201d. Receipts saved for both of you \u2014 see My receipts.";
+    renderEphWin();
+    return false;
+  },
+  sendEphemeral: async function (form) {
+    var e = state.eph;
+    if (!e) return false;
+    var fd = new FormData(form);
+    var body = String(fd.get("body") || "").trim();
+    if (!body) return false;
+    var data = await apiPost("/ephemeral", { device_id: deviceId(), conversation_id: e.conversation_id, body: body });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't send that."); return false; }
+    form.reset();
+    var conv = await apiGet("/ephemeral?device_id=" + encodeURIComponent(deviceId()) + "&conversation_id=" + e.conversation_id);
+    if (conv && conv.messages) {
+      state.ephMessages = conv.messages;
+      renderEphWin();
+    }
     return false;
   },
 
@@ -1940,6 +2797,14 @@ window.DWC = {
     }
     updateTop8Count();
   },
+  ashTrackChanged: function (cb) {
+    var n = document.querySelectorAll('input[name="ash_tracks"]:checked').length;
+    if (n > 5) {
+      cb.checked = false;
+      setNotice("Pick up to 5 tracks — unpick one first.");
+    }
+    updateAshCount();
+  },
   applyLayoutPreset: function (id) {
     var form = document.querySelector("#dwc-account form");
     var ta = form && form.querySelector('textarea[name="layout_css"]');
@@ -2134,7 +2999,7 @@ window.DWC = {
     var data = await apiPost("/models/matches", body);
     var host = $("dwc-finder-results");
     if (!host) return false;
-    if (!data || !data.models) { host.innerHTML = '<p class="dwc-form-err">The finder didn\u2019t load.</p>'; return false; }
+    if (!data || !data.models) { host.innerHTML = '<p class="dwc-form-err">The finder didn’t load.</p>'; return false; }
     host.innerHTML = "<h4>Matches" + (data.criteria_total ? " — " + data.criteria_total + " thing" + (data.criteria_total === 1 ? "" : "s") + " you picked" : "") + "</h4>";
     renderModelCards(host, data.models);
     return false;

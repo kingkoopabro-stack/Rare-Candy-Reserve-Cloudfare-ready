@@ -2293,15 +2293,19 @@ async function viewMember(el, memberId) {
         "</ol></section>"
       : "") +
     (m.show_vnr_player
-      ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — hit play.</p>' +
+      ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — tap play (browsers won’t start sound on their own until you tap something).</p>' +
         '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
-        '<audio controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
+        '<button type="button" class="btn" onclick="DWC.playVNR()">▶ Play Steady Wave</button> ' +
+        '<audio id="dwc-vnr-audio" controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
         '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
       : "") +
     '<section class="card"><h3 style="margin-top:0">About</h3>' +
     (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
     (m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
     "</section></div>";
+  // Start the Steady Wave stream on the visitor's first tap/click/scroll
+  // (browsers block autoplay with sound until a real gesture).
+  DWC.armVNRAutoplay();
 }
 
 // ---------- Live Chat — AIM throwback ----------
@@ -3755,6 +3759,28 @@ window.DWC = {
   },
   imMember: function (id, username) {
     DWC.openIM(id, username);
+  },
+
+  // ---------- Steady Wave player ----------
+  // Browsers block autoplay WITH SOUND until the visitor interacts, so
+  // the <audio autoplay> alone never starts the music. playVNR() is the
+  // explicit tap-to-play button; armVNRAutoplay() starts the stream on
+  // the visitor's FIRST tap/click/scroll/keypress anywhere on the page
+  // (a real user gesture, which browsers allow).
+  playVNR: function () {
+    var a = document.getElementById("dwc-vnr-audio");
+    if (!a) return;
+    var p = a.play();
+    if (p && p.catch) p.catch(function () {});
+  },
+  armVNRAutoplay: function () {
+    var a = document.getElementById("dwc-vnr-audio");
+    if (!a || a.dataset.vnrArmed) return;
+    a.dataset.vnrArmed = "1";
+    var kick = function () { DWC.playVNR(); };
+    ["pointerdown", "keydown", "touchstart", "wheel"].forEach(function (ev) {
+      document.addEventListener(ev, kick, { once: true, passive: true });
+    });
   },
 
   // ---------- Taffy Phone ----------

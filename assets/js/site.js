@@ -274,7 +274,6 @@ const SERVICES = [
   ["🔧","Tech & gadgets","Printed Raspberry Pi shells, wiring, and small custom electronics builds."],
 ];
 const GALLERY = [
-  ["🖨","Resident Evil-themed printer setup","Hardware check — the production setup"],
   ["🎨","Airbrush & paint-station stands","Sculpted holders for airbrushes, paints and tools"],
   ["🗄","Booth shelving inserts","Riser inserts sized to existing shelves"],
   ["🌀","Filament dryer with spool","Replacement parts & shop upkeep"],

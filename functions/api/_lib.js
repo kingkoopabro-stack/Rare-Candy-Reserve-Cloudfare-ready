@@ -143,10 +143,10 @@ export function imageUrl(blobKey) {
   return `/api/images?key=${encodeURIComponent(blobKey)}`;
 }
 
-const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp"];
+const IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export function decodeImage(img, maxBytes) {
   if (!img || typeof img.dataBase64 !== "string" || !img.mimeType) return { ok: false, error: "No image attached." };
-  if (!IMAGE_MIMES.includes(img.mimeType)) return { ok: false, error: "Photo must be JPG, PNG, or WebP." };
+  if (!IMAGE_MIMES.includes(img.mimeType)) return { ok: false, error: "Photo must be JPG, PNG, WebP, or GIF." };
   let bytes;
   try {
     const bin = atob(img.dataBase64.replace(/\s/g, ""));

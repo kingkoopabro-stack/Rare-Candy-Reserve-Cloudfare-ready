@@ -253,14 +253,14 @@ async function apiDelete(path, body) {
     return data || { ok: false, error: "Request failed." };
   } catch (e) { return { ok: false, error: "Couldn't reach the Community — check your connection and try again." }; }
 }
-var IMAGE_MIMES_CLIENT = ["image/jpeg", "image/png", "image/webp"];
+var IMAGE_MIMES_CLIENT = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 function fileToImage(file, maxBytes) {
   return new Promise(function (resolve) {
     if (!file) return resolve(null);
     // Wrong file type (e.g. iPhone HEIC) — say so plainly instead of
     // letting the server reject the whole save.
     if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
-      return resolve({ error: "That photo isn't a JPG, PNG, or WebP — iPhone photos often save as HEIC. Pick a JPG, PNG, or WebP, or screenshot the photo and use that." });
+      return resolve({ error: "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that." });
     }
     var limitMB = ((maxBytes || 2500000) / 1000000).toFixed(1).replace(".0", "");
     if (file.size > (maxBytes || 2500000)) return resolve({ error: "That photo is too large — keep it under about " + limitMB + " MB." });
@@ -288,7 +288,7 @@ function shrinkAvatarImage(file) {
   return new Promise(function (resolve) {
     if (!file) return resolve(null);
     if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
-      return resolve({ error: "That photo isn't a JPG, PNG, or WebP — iPhone photos often save as HEIC. Pick a JPG, PNG, or WebP, or screenshot the photo and use that." });
+      return resolve({ error: "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that." });
     }
     var origKB = Math.round(file.size / 1000);
     var url = URL.createObjectURL(file);
@@ -1057,8 +1057,8 @@ function profileFormHTML(p) {
     '<label>Payout handle</label>' +
     '<input name="payout_handle" maxlength="80" value="' + v("payout_handle") + '" placeholder="Your handle / address on that method">' +
     '<label>📸 Profile picture — Shrink my photo for profile size</label>' +
-    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, or WebP — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically. iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
-    '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp" onchange="DWC.avatarPicked(this)">' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically (a GIF becomes a still image). iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
+    '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.avatarPicked(this)">' +
     '<p id="dwc-avatar-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
     (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
     (isNew ? "" :
@@ -1829,8 +1829,8 @@ function renderComposer(context) {
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. charizard, grading, psa">' +
-    '<label>Photo (JPG, PNG, or WebP, under 2.5 MB — required for Card Check)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — required for Card Check)</label>' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runCardCheck(this.form)">🔍 Run AI authenticity + price check on photo</button> <span data-checkresult></span></div>' +
     gifPickerHTML("composer-" + context) +
@@ -1954,9 +1954,9 @@ function renderListingForm(host, kind) {
     '<label>Description &amp; condition (a little formatting is allowed: bold, italic, lists, links)</label>' +
     '<textarea name="description" required maxlength="6000" placeholder="Condition, set, what’s included…"></textarea>' +
     '<label>Photos — up to 3 (JPG, PNG, or WebP, each under 2.5 MB)' + (kind === "trade" ? " — a photo is required for trades" : "") + "</label>" +
-    '<input name="photo1" type="file" accept="image/jpeg,image/png,image/webp">' +
-    '<input name="photo2" type="file" accept="image/jpeg,image/png,image/webp">' +
-    '<input name="photo3" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<input name="photo1" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<input name="photo2" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<input name="photo3" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     (kind === "trade" ? '<p class="dwc-warn">Trades need a photo AND a completed AI authenticity check on it before they go live — run the check on the cover photo first.</p>' : "") +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runListingCheck(this.form)">🔍 Run AI authenticity check on cover photo</button> <span data-checkresult></span></div>' +
     '<label><input type="checkbox" name="allow_comments" checked style="width:auto"> Allow comments on this listing</label>' +
@@ -2816,8 +2816,8 @@ function renderAdultComposer() {
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. cosplay, amateur">' +
-    '<label>Photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — optional)</label>' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     gifPickerHTML("composer-adult") +
     '<p class="dwc-form-err" data-err hidden></p>' +
@@ -2860,7 +2860,7 @@ function renderCreatorComposer() {
     '<label>Price (USD — 0 = free). Tick “Pay to unlock” below and viewers see a locked preview with a “Pay to unlock” button at this price.</label>' +
     '<input name="price" type="number" step="1" min="0" max="100000" value="0" required>' +
     '<label>Preview photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     '<label><input type="checkbox" name="pay_unlock" style="width:auto"> 🔓 Pay to unlock — set a price above and viewers see a locked preview with a “Pay to unlock” button. Only works with a price above $0. Off by default.</label>' +
     '<label>3D print file — .stl, .obj, .3mf, or a .zip of them (under 25 MB — optional, only when the genre is 3D Print Files or you’re including one)</label>' +
@@ -2937,7 +2937,7 @@ function renderModelMe() {
       return '<label><input type="checkbox" name="model_categories" value="' + esc(c) + '" style="width:auto"' + ((p.model_categories || []).includes(c) ? " checked" : "") + "> " + esc(c) + "</label>";
     }).join("") + "</div>" +
     '<label>Display picture (JPG, PNG, or WebP, under 2.5 MB)</label>' +
-    '<input name="display_image" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<input name="display_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     (p.model_display_url ? '<label><input type="checkbox" name="remove_display_image" style="width:auto"> Remove my display picture</label>' : "") +
     '<label>Gender (for the finder)</label><select name="model_gender"><option value="">Prefer not to say</option><option value="girl"' + (p.model_gender === "girl" ? " selected" : "") + ">Girl</option><option value=\"guy\"" + (p.model_gender === "guy" ? " selected" : "") + ">Guy</option></select>" +
     '<label>Eye color</label><select name="model_eye_color"><option value="">Prefer not to say</option>' + MODEL_EYE_COLORS.map(function (c) { return '<option' + (p.model_eye_color === c ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" +

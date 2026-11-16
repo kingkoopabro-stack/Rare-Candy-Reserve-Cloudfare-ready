@@ -1041,7 +1041,7 @@ function profileFormHTML(p) {
   var th = parseThemeClient(p && p.profile_theme);
   return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
     "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
-    '<form onsubmit="return DWC.saveProfile(this)">' +
+    '<form onsubmit="DWC.saveProfile(this); return false;">' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
     '<label>Chat name (shown in Live Chat — defaults to your username)</label>' +
@@ -1815,7 +1815,7 @@ function renderComposer(context) {
   host.innerHTML =
     '<section class="card" aria-label="New post"><h3 style="margin-top:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
     (state.profile ? "" : "<p>Posting needs an account — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create one, it’s free</button>.</p>") +
-    '<form onsubmit="return DWC.submitPost(this, \'' + context + '\')">' +
+    '<form onsubmit="DWC.submitPost(this, \'' + context + '\'); return false;">' +
     '<div class="dwc-kindrow">' +
     '<button type="button" class="dwc-pill' + (!isAuth ? " active" : "") + '" data-kind="forum" onclick="DWC.composerKind(this, \'forum\')">💬 Forum</button>' +
     '<button type="button" class="dwc-pill' + (isAuth ? " active" : "") + '" data-kind="card_auth" onclick="DWC.composerKind(this, \'card_auth\')">🔍 Card Check</button>' +
@@ -1862,7 +1862,7 @@ function priceChartHTML() {
   return '<article class="card" aria-label="Price chart lookup — actual member-reported sales">' +
     "<h3 style=\"margin-top:0\">📈 Price chart — real reported sales</h3>" +
     "<p>Look up any card to see what it has <strong>actually sold for</strong>, as reported by the members who sold it — the chart the AI estimate can’t fake. Sold a card yourself? Open its chart and log the sale.</p>" +
-    '<form class="dwc-rowform" onsubmit="return DWC.lookupPrice(this)">' +
+    '<form class="dwc-rowform" onsubmit="DWC.lookupPrice(this); return false;">' +
     '<input name="card" required minlength="2" maxlength="120" placeholder="Card name — e.g. Charizard" style="flex:1">' +
     '<button type="submit" class="btn ghost">Show chart</button></form>' +
     '<div id="dwc-recent-sales"><p style="color:var(--muted)">Loading recent sales…</p></div>' +
@@ -1903,7 +1903,7 @@ async function showPriceChart(cardName) {
         rows
       : "<p>No member-reported sales for that card yet — log the first one below.</p>") +
     (state.profile
-      ? '<form class="dwc-logsale" onsubmit="return DWC.logCardSale(this)"><input type="hidden" name="card_name" value="' + esc(cardName) + '">' +
+      ? '<form class="dwc-logsale" onsubmit="DWC.logCardSale(this); return false;"><input type="hidden" name="card_name" value="' + esc(cardName) + '">' +
         "<strong>Log a sale you actually made:</strong> " +
         '<input name="price" type="number" step="0.01" min="0.01" required placeholder="Price sold for ($)">' +
         '<input name="sold_date" type="date" required>' +
@@ -1944,7 +1944,7 @@ function renderListingForm(host, kind) {
     '<section class="card"><div class="tag">List an item ' + kindLabel + '</div><h3 style="margin-top:10px">Put something up ' + kindLabel + "</h3>" +
     (p ? (p.payout_method && p.payout_handle ? "" : '<p class="dwc-warn">You’re not payout-ready yet — add a payout method + handle in your profile before listing, or the listing will be blocked. You can still fill everything in now.</p>')
       : "<p>Listing needs an account + payout method — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create your account</button> first.</p>") +
-    '<form onsubmit="return DWC.submitListing(this, \'' + kind + '\')">' +
+    '<form onsubmit="DWC.submitListing(this, \'' + kind + '\'); return false;">' +
     '<label>Item title (3–120 characters)</label>' +
     '<input name="title" required minlength="3" maxlength="120" placeholder="What are you selling?">' +
     '<label>Category</label><select name="category">' + LISTING_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
@@ -2031,7 +2031,7 @@ async function viewThread(el, postId) {
     }).join("") : "<p>Nothing yet — be the first to say something.</p>") +
     "</section>" +
     (state.profile && (p.allow_comments || isMine)
-      ? '<section class="card"><h3 style="margin-top:0">Add a comment</h3><form onsubmit="return DWC.submitComment(this, ' + p.id + ')">' +
+      ? '<section class="card"><h3 style="margin-top:0">Add a comment</h3><form onsubmit="DWC.submitComment(this, ' + p.id + '); return false;">' +
         '<textarea name="body" maxlength="2000" placeholder="Say something kind…"></textarea>' +
         gifPickerHTML("comment-" + p.id) +
         '<p class="dwc-form-err" data-err hidden></p>' +
@@ -2081,7 +2081,7 @@ async function viewListing(el, listingId) {
     "</article>" +
     (l.kind === "flea" && l.status === "active"
       ? '<section class="card"><h3 style="margin-top:0">🔨 Place a bid</h3><p>Current high bid: <strong>' + money(l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) + "</strong> · " + l.bid_count + " bid" + (l.bid_count === 1 ? "" : "s") + " — your bid has to beat it.</p>" +
-        (state.profile ? '<form class="dwc-rowform" onsubmit="return DWC.placeBid(this, ' + l.id + ')"><input name="bid" type="number" step="0.01" min="0.01" required placeholder="Your bid ($)"><button class="btn" type="submit">Place the bid →</button></form><p class="dwc-form-err" data-err hidden></p>' : needProfileHTML()) +
+        (state.profile ? '<form class="dwc-rowform" onsubmit="DWC.placeBid(this, ' + l.id + '); return false;"><input name="bid" type="number" step="0.01" min="0.01" required placeholder="Your bid ($)"><button class="btn" type="submit">Place the bid →</button></form><p class="dwc-form-err" data-err hidden></p>' : needProfileHTML()) +
         "</section>" : "") +
     (l.kind === "trade"
       ? '<section class="card"><h3 style="margin-top:0">Is it a good trade?</h3><div class="dwc-actions">' +
@@ -2096,7 +2096,7 @@ async function viewListing(el, listingId) {
     }).join("") : "<p>Nothing yet.</p>") +
     "</section>" +
     (state.profile && l.allow_comments
-      ? '<section class="card"><h3 style="margin-top:0">Comment on this listing</h3><form onsubmit="return DWC.submitListingComment(this, ' + l.id + ')">' +
+      ? '<section class="card"><h3 style="margin-top:0">Comment on this listing</h3><form onsubmit="DWC.submitListingComment(this, ' + l.id + '); return false;">' +
         '<textarea name="body" maxlength="2000" placeholder="Say something…"></textarea>' +
         gifPickerHTML("listing-comment-" + l.id) +
         '<p class="dwc-form-err" data-err hidden></p>' +
@@ -2150,7 +2150,7 @@ function orderCardHTML(o, isSeller) {
       : "") +
     (!isSeller
       ? '<label class="dwc-alerts"><input type="checkbox" ' + (o.tracking_alerts ? "checked" : "") + ' onchange="DWC.setAlerts(' + o.id + ', this.checked)" style="width:auto"> Email me tracking alerts on this order <span style="color:var(--muted)">(preference saved — alert emails send once the street’s mail connection is live)</span></label>'
-      : '<form class="dwc-shipform" onsubmit="return DWC.updateShipping(this, ' + o.id + ')">' +
+      : '<form class="dwc-shipform" onsubmit="DWC.updateShipping(this, ' + o.id + '); return false;">' +
         '<select name="status"><option value="paid"' + (o.status === "paid" ? " selected" : "") + ">Paid</option><option value=\"shipped\"" + (o.status === "shipped" ? " selected" : "") + ">Shipped</option><option value=\"delivered\"" + (o.status === "delivered" ? " selected" : "") + ">Delivered</option></select>" +
         '<select name="carrier"><option value="">Carrier…</option>' + CARRIERS.map(function (c) { return '<option' + (o.carrier === c ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" +
         '<input name="tracking_number" maxlength="60" value="' + esc(o.tracking_number) + '" placeholder="Tracking number">' +
@@ -2330,7 +2330,7 @@ async function viewChat(el) {
     '<div class="dwc-buddypanel"><h3 style="margin-top:0">👥 Buddy List</h3><div id="dwc-buddies"><p style="color:var(--muted)">Loading buddies…</p></div>' +
     '<h3>📨 Recent IMs</h3><div id="dwc-inbox"><p style="color:var(--muted)">No IMs yet.</p></div></div>' +
     '<div><div id="dwc-chat-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading chat…</p></div>' +
-    '<form class="dwc-rowform" onsubmit="return DWC.sendChat(this)">' +
+    '<form class="dwc-rowform" onsubmit="DWC.sendChat(this); return false;">' +
     (state.profile ? "" : '<input name="guest_name" maxlength="24" placeholder="Guest name (optional)" style="max-width:160px">') +
     '<input name="body" required maxlength="500" placeholder="Say something…" style="flex:1">' +
     '<button class="btn" type="submit">Send</button></form>' +
@@ -2426,7 +2426,7 @@ function syncIMShells() {
     div.innerHTML =
       '<div class="dwc-imwin-head"><strong>💬 IM — @' + esc(im.username) + '</strong><button type="button" class="dwc-linklike" onclick="DWC.closeIM(' + im.id + ')">✕ Close</button></div>' +
       '<div class="dwc-imlog" id="dwc-imlog-' + im.id + '"><p style="color:var(--muted)">Loading…</p></div>' +
-      '<form class="dwc-rowform" onsubmit="return DWC.sendIM(this, ' + im.id + ')">' +
+      '<form class="dwc-rowform" onsubmit="DWC.sendIM(this, ' + im.id + '); return false;">' +
       '<input name="body" required maxlength="500" placeholder="Message @' + esc(im.username) + '…" style="flex:1">' +
       '<button class="btn small" type="submit">Send</button></form>';
     host.appendChild(div);
@@ -2484,7 +2484,7 @@ async function viewFind(el) {
     "</div>" +
     '<p style="color:var(--muted)">Right now you’re looking for a <strong>' + (state.findRole === "seller" ? "seller" : "buyer") + '</strong> — matches are best-first, by what you both picked.</p></section>' +
     '<section class="card"><h3 style="margin-top:0">⚙️ My Find prefs — what I sell &amp; what I’m after</h3>' +
-    '<form onsubmit="return DWC.saveFindPrefs(this)">' +
+    '<form onsubmit="DWC.saveFindPrefs(this); return false;">' +
     '<h4 style="margin:8px 0 6px">What I sell</h4>' +
     '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
       return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
@@ -2569,7 +2569,7 @@ function renderEphWin() {
     "</div>" +
     (state.ephTxnMsg ? '<p class="dwc-eph-txn-done">' + esc(state.ephTxnMsg) + "</p>" : "") +
     '<div class="dwc-eph-actions"><button type="button" class="btn ghost small" onclick="DWC.toggleTxnForm()">✓ Transaction done</button> <span style="color:var(--muted);font-size:13px">Mark a sale done — a receipt is saved for both of you, and it stays even after this chat is deleted.</span></div>' +
-    '<form id="dwc-txn-form" class="dwc-txn-form" hidden onsubmit="return DWC.saveTransaction(this)">' +
+    '<form id="dwc-txn-form" class="dwc-txn-form" hidden onsubmit="DWC.saveTransaction(this); return false;">' +
     '<label>Amount — whole dollars ($)</label>' +
     '<input name="amount" type="number" step="1" min="1" max="100000" required placeholder="e.g. 15">' +
     '<label>What was bought (one short line, up to 140 characters)</label>' +
@@ -2578,7 +2578,7 @@ function renderEphWin() {
     '<label><input type="radio" name="role" value="seller" style="width:auto"> I sold it (I received)</label></div>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:10px"><button class="btn small" type="submit">Save receipt →</button></p></form>' +
-    '<form class="dwc-rowform" onsubmit="return DWC.sendEphemeral(this)">' +
+    '<form class="dwc-rowform" onsubmit="DWC.sendEphemeral(this); return false;">' +
     '<input name="body" required maxlength="1000" placeholder="Message @' + esc(e.partner_username) + '…" style="flex:1">' +
     '<button class="btn small" type="submit">Send</button></form>' +
     "</div>";
@@ -2680,7 +2680,7 @@ async function renderAgeBlock() {
     (pending
       ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself. You’ll see your age-verified mark here once it’s approved. Your photo is deleted the moment he decides.</p>'
       : "") +
-    '<form onsubmit="return DWC.submitId(this)">' +
+    '<form onsubmit="DWC.submitId(this); return false;">' +
     '<label>Upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport) — JPG or PNG, under 2.5 MB</label>' +
     '<input name="id_photo" type="file" accept="image/jpeg,image/png" required>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
@@ -2806,7 +2806,7 @@ function renderAdultComposer() {
   if (!host) return;
   host.innerHTML =
     '<section class="card" aria-label="New 18+ post"><h3 style="margin-top:0">New post — 18+ forum</h3>' +
-    '<form onsubmit="return DWC.submitPost(this, \'adult\')">' +
+    '<form onsubmit="DWC.submitPost(this, \'adult\'); return false;">' +
     '<input type="hidden" name="kind" value="adult">' +
     '<label>Corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Flair</label><select name="flair">' + FLAIRS.map(function (f) { return "<option>" + esc(f) + "</option>"; }).join("") + "</select>" +
@@ -2837,7 +2837,7 @@ function renderCreatorComposer() {
   host.innerHTML =
     '<section class="card dwc-creatorbox" aria-label="New creator post"><h3 style="margin-top:0">🎨 Creator post — sell your digital content</h3>' +
     '<p style="color:var(--muted)">Selling photos, videos, custom content, audio, or 3D print files? Post it here. Age-verified members only — your post shows in the 18+ forum and its tag pages, with a Creator badge and your price. Payment is arranged privately with the buyer in a private chat.</p>' +
-    '<form onsubmit="return DWC.submitCreatorPost(this)">' +
+    '<form onsubmit="DWC.submitCreatorPost(this); return false;">' +
     '<input type="hidden" name="kind" value="adult">' +
     '<label>Corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Title (3–120 characters) — tap an emoji to add flair</label>' +
@@ -2877,7 +2877,7 @@ async function renderModelSearch() {
   host.innerHTML =
     '<section class="card"><h3 style="margin-top:0">🔍 Model Search</h3>' +
     "<p style=\"color:var(--muted)\">Every card here shows ONLY what the model chose to share — their blurb, their chosen categories, and their chosen display picture. Nothing else about them is shown here.</p>" +
-    '<form class="dwc-rowform" onsubmit="return DWC.searchModels(this)">' +
+    '<form class="dwc-rowform" onsubmit="DWC.searchModels(this); return false;">' +
     '<input name="query" maxlength="60" placeholder="Search by name or keyword…" style="flex:1">' +
     '<select name="category"><option value="">All categories</option>' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<button class="btn" type="submit">Search</button></form>' +
@@ -2907,7 +2907,7 @@ async function renderFinder() {
   host.innerHTML =
     '<section class="card"><h3 style="margin-top:0">✨ Find My Girl or Guy</h3>' +
     "<p style=\"color:var(--muted)\">Pick what you’re looking for. Models are matched ONLY on the details each model chose to share — blank means not shared, and it never counts against them.</p>" +
-    '<form onsubmit="return DWC.findMatches(this)">' +
+    '<form onsubmit="DWC.findMatches(this); return false;">' +
     '<label>I’m looking for</label><select name="gender"><option value="any">Anyone</option><option value="girl">Girl</option><option value="guy">Guy</option></select>' +
     '<div class="dwc-rowform"><label style="flex:1">Age from<input name="age_min" type="number" min="18" max="99" placeholder="18"></label><label style="flex:1">Age to<input name="age_max" type="number" min="18" max="99" placeholder="99"></label></div>' +
     '<label>Eye color</label><select name="eye_color"><option value="">Any</option>' + MODEL_EYE_COLORS.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
@@ -2929,7 +2929,7 @@ function renderModelMe() {
   host.innerHTML =
     '<section class="card"><h3 style="margin-top:0">📸 My Model Listing</h3>' +
     "<p style=\"color:var(--muted)\">Opt in to the model search. Everything on your card is chosen by you — your blurb, your categories, your display picture, and the match details below. Leave anything blank and it simply isn’t shared.</p>" +
-    '<form onsubmit="return DWC.saveModelProfile(this)">' +
+    '<form onsubmit="DWC.saveModelProfile(this); return false;">' +
     '<label><input type="checkbox" name="opt_in" style="width:auto"' + (p.is_model ? " checked" : "") + "> List me in the model search</label>" +
     '<label>Your public blurb (up to 280 characters)</label>' +
     '<textarea name="model_bio" maxlength="280">' + esc(p.model_bio || "") + "</textarea>" +

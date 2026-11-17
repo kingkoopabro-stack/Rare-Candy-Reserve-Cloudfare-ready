@@ -2354,11 +2354,12 @@ async function viewStreet(el) {
 // (hearts × 2 + comments). Community posts only — no outside news.
 // Adult posts only reach age-verified callers (the endpoint enforces it).
 function headlineCardHTML(h) {
-  return '<article class="card dwc-headline">' +
+  return '<article class="card dwc-headline" onclick="DWC.go(\'post/' + h.id + '\')" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\')DWC.go(\'post/' + h.id + '\')">' +
     '<div class="dwc-headline-eng">🔥 ' + (h.engagement || 0) + ' · ❤️ ' + (h.score || 0) + ' · 💬 ' + (h.comment_count || 0) + "</div>" +
     '<h3 class="dwc-headline-title" style="margin:8px 0 4px"><a href="#/post/' + h.id + '" class="dwc-titlelink">' + esc(h.title) + "</a></h3>" +
     '<p style="margin:4px 0">by <strong>@' + esc(h.author_username) + "</strong>" + (h.kind === "adult" ? " · 18+" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
     (h.body ? "<p>" + esc(h.body.length > 140 ? h.body.slice(0, 140) + "…" : h.body) + "</p>" : "") +
+    '<p style="margin:8px 0 0"><a href="#/post/' + h.id + '" class="dwc-titlelink">Open post →</a></p>' +
     "</article>";
 }
 async function loadHeadlinesStrip() {
@@ -2587,6 +2588,8 @@ async function viewThread(el, postId) {
   var comments = await apiGet("/posts/" + postId + "/comments?device_id=" + encodeURIComponent(deviceId()));
   var list = (comments && comments.comments) || [];
   var isMine = state.profile && state.profile.id === p.author_id;
+  var isOperator = state.profile && state.profile.is_operator;
+  var canDelete = isMine || isOperator;
   var heartOn = myHeart("post-" + p.id);
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
@@ -2614,7 +2617,7 @@ async function viewThread(el, postId) {
       ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
-    (isMine ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete my post</button>' +
+    (canDelete ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete my post</button>' +
       '<button type="button" class="dwc-linklike" onclick="DWC.toggleComments(' + p.id + ", " + (!p.allow_comments) + ')">' + (p.allow_comments ? "🔇 Turn comments off" : "🔊 Turn comments on") + "</button>" : "") +
     "</div></article>" +
     (p.kind === "card_auth"

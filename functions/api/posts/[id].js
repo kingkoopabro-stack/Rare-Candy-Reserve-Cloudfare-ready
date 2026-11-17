@@ -1,5 +1,5 @@
 // GET /api/posts/:id — getPost (permalink target; adult posts only to
-// age-verified callers). DELETE /api/posts/:id — deletePost (own posts only).
+// age-verified callers). DELETE /api/posts/:id — deletePost (own posts, or any post if the caller is the operator).
 import { json, noDb, getDb, readJson, profileByDevice, shapePost } from "../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
@@ -28,7 +28,8 @@ export async function onRequestDelete({ env, request, params }) {
   const id = Number(params.id);
   const post = await db.prepare("SELECT * FROM posts WHERE id = ? LIMIT 1").bind(id).first();
   if (!post) return json({ ok: false, error: "That post is already gone." });
-  if (post.profile_id !== me.id) return json({ ok: false, error: "You can only delete your own posts." });
+  // Author can delete their own post; the operator (Chris) can delete any post.
+  if (post.profile_id !== me.id && me.is_operator !== 1) return json({ ok: false, error: "You can only delete your own posts." });
   const { results } = await db.prepare("SELECT id FROM comments WHERE post_id = ?").bind(id).all();
   const stmts = [db.prepare("DELETE FROM post_votes WHERE post_id = ?").bind(id)];
   for (const c of (results || [])) stmts.push(db.prepare("DELETE FROM comment_votes WHERE comment_id = ?").bind(c.id));

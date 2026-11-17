@@ -10,7 +10,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
-  parseTags, putImage, putPrintFile, nowMs,
+  parseTags, putImage, putVideo, putPrintFile, nowMs,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -94,6 +94,45 @@ export async function onRequestPost({ env, request }) {
     if (!up.ok) return fail(up.error);
     imageKey = up.key;
   }
+  // Short video clip (v3.5) — MP4 / WebM / MOV, max 15 MB, max 60s
+  // (the 60s limit is checked in the browser before upload).
+  let videoKey = null;
+  if (a.video) {
+    const up = await putVideo(env, "post-videos", String(a.device_id), a.video, 15000000);
+    if (!up.ok) return fail(up.error);
+    videoKey = up.key;
+  }
+
+  // Insert with graceful fallback for columns the live D1 table doesn't
+  // have yet (Chris runs migrations by hand). combos lists, in try order,
+  // which optional columns to leave out of the INSERT. Returns
+  // { post_id, videoSkipped } — videoSkipped is true when the winning
+  // attempt left out video_blob_key. Throws the last missing-column error
+  // when every attempt fails; any other error throws immediately.
+  const missingCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+  const tryInsert = async (cols, vals, combos) => {
+    let lastErr = null;
+    for (const combo of combos) {
+      const c2 = cols.filter((col) => combo.drop.indexOf(col) === -1);
+      const v2 = vals.filter((_, i) => combo.drop.indexOf(cols[i]) === -1);
+      try {
+        const r = await db.prepare(`INSERT INTO posts (${c2.join(", ")}) VALUES (${c2.map(() => "?").join(", ")})`).bind(...v2).run();
+        return { post_id: r.meta.last_row_id, videoSkipped: combo.drop.indexOf("video_blob_key") !== -1 };
+      } catch (e) {
+        if (!missingCol(e)) throw e;
+        lastErr = e;
+      }
+    }
+    throw lastErr;
+  };
+  // Success JSON for a post insert — video_skipped is only set when a
+  // video was actually picked AND the insert had to drop the video
+  // column (the v3.5 migration hasn't run yet). Never silently dropped.
+  const insertDone = (res) => {
+    const out = { ok: true, error: null, post_id: res.post_id };
+    if (res.videoSkipped && videoKey) out.video_skipped = true;
+    return json(out);
+  };
   const now = nowMs();
   const flair = String(a.flair || "").slice(0, 30);
   const vs = String(a.verification_status || "not_checked").slice(0, 40);
@@ -127,56 +166,45 @@ export async function onRequestPost({ env, request }) {
       if (!up.ok) return fail(up.error);
       fileKey = up.key; fileName = up.fileName; fileMime = up.mime; fileSize = up.size;
     }
-    const baseCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "is_creator", "content_genre", "price_cents", "file_blob_key", "file_name", "file_mime", "file_size", "created_at", "updated_at"];
-    const baseVals = [me.id, a.category, kind, flair, creatorTags, imageKey,
+    // v3.2 blur/pay-unlock columns sit in the list like any other column
+    // now (the tryInsert combos below drop them when the live table
+    // doesn't have them yet, same as video_blob_key).
+    const creatorCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "video_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "blur_photo", "pay_unlock", "is_creator", "content_genre", "price_cents", "file_blob_key", "file_name", "file_mime", "file_size", "created_at", "updated_at"];
+    const creatorVals = [me.id, a.category, kind, flair, creatorTags, imageKey, videoKey,
       a.gif_url ? String(a.gif_url).slice(0, 500) : null,
       String(a.gif_label || "").slice(0, 80), vs, vsum, title, body,
+      blurPhoto, payUnlock,
       1, genre, priceCents, fileKey, fileName, fileMime, fileSize, now, now];
-    const insertCreator = async (withV32) => {
-      const cols = withV32 ? [...baseCols.slice(0, 15), "blur_photo", "pay_unlock", ...baseCols.slice(15)] : baseCols;
-      const vals = withV32 ? [...baseVals.slice(0, 15), blurPhoto, payUnlock, ...baseVals.slice(15)] : baseVals;
-      const r = await db.prepare(`INSERT INTO posts (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals).run();
-      return r.meta.last_row_id;
-    };
+    let creatorRes;
     try {
-      const id = await insertCreator(true);
-      return json({ ok: true, error: null, post_id: id });
+      creatorRes = await tryInsert(creatorCols, creatorVals, [
+        { drop: [] },
+        { drop: ["video_blob_key"] },
+        { drop: ["blur_photo", "pay_unlock"] },
+        { drop: ["video_blob_key", "blur_photo", "pay_unlock"] },
+      ]);
     } catch (e) {
-      if (/no such column|no column named/i.test(String((e && e.message) || e))) {
-        // v3.2 columns not there yet (v3 ran, v3.2 didn't) — retry without
-        // blur/pay-unlock so the post still goes live, just unblurred.
-        try {
-          const id = await insertCreator(false);
-          return json({ ok: true, error: null, post_id: id });
-        } catch (e2) {
-          if (/no such column|no column named/i.test(String((e2 && e2.message) || e2))) {
-            return fail("Creator posts aren't set up yet — the shop is still running a quick database update. Try again later.");
-          }
-          throw e2;
-        }
-      }
+      // Every attempt hit a missing column — v3 columns not there yet.
+      if (missingCol(e)) return fail("Creator posts aren't set up yet — the shop is still running a quick database update. Try again later.");
       throw e;
     }
+    return insertDone(creatorRes);
   }
 
   // Blur (v3.2) — OPT-IN ONLY, off by default. Stored on any post with a
   // photo; a post with no photo just carries 0 and nothing changes.
   const blurPhoto = a.blur_photo === true ? 1 : 0;
-  const regCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "blur_photo", "created_at", "updated_at"];
-  const regVals = [me.id, a.category, kind, flair, tags, imageKey,
+  const regCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "video_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "blur_photo", "created_at", "updated_at"];
+  const regVals = [me.id, a.category, kind, flair, tags, imageKey, videoKey,
     a.gif_url ? String(a.gif_url).slice(0, 500) : null,
     String(a.gif_label || "").slice(0, 80), vs, vsum, title, body, blurPhoto, now, now];
-  try {
-    const r = await db.prepare(`INSERT INTO posts (${regCols.join(", ")}) VALUES (${regCols.map(() => "?").join(", ")})`).bind(...regVals).run();
-    return json({ ok: true, error: null, post_id: r.meta.last_row_id });
-  } catch (e) {
-    if (/no such column|no column named/i.test(String((e && e.message) || e))) {
-      // v3.2 blur column not there yet — retry without it so posting never breaks.
-      const cols2 = regCols.filter((c) => c !== "blur_photo");
-      const vals2 = regVals.filter((_, i) => regCols[i] !== "blur_photo");
-      const r = await db.prepare(`INSERT INTO posts (${cols2.join(", ")}) VALUES (${cols2.map(() => "?").join(", ")})`).bind(...vals2).run();
-      return json({ ok: true, error: null, post_id: r.meta.last_row_id });
-    }
-    throw e;
-  }
+  // v3.2 blur column / v3.5 video column not there yet — retry without
+  // them so posting never breaks (video_skipped tells the client).
+  const regRes = await tryInsert(regCols, regVals, [
+    { drop: [] },
+    { drop: ["video_blob_key"] },
+    { drop: ["blur_photo"] },
+    { drop: ["video_blob_key", "blur_photo"] },
+  ]);
+  return insertDone(regRes);
 }

@@ -168,6 +168,42 @@ export async function putImage(env, prefix, deviceId, img, maxBytes = 2500000) {
   return { ok: true, key };
 }
 
+// --- Short video clips (v3.5) --------------------------------------------
+// A post can attach one short video clip: MP4 / WebM / MOV, max 15 MB,
+// max 60 seconds (the 60s limit is checked in the browser before upload;
+// the server checks type + size, same as photos). Stored in the same
+// IMAGES R2 bucket under the "videos/" key prefix (no new bucket needed)
+// and served through /api/images like photos, with HTTP Range support
+// so <video> can seek.
+export const VIDEO_MIMES = ["video/mp4", "video/webm", "video/quicktime"];
+export function videoUrl(blobKey) {
+  if (!blobKey) return null;
+  return `/api/images?key=${encodeURIComponent(blobKey)}`;
+}
+export function decodeVideo(video, maxBytes = 15000000) {
+  if (!video || typeof video.dataBase64 !== "string" || !video.mimeType) return { ok: false, error: "No video attached." };
+  if (!VIDEO_MIMES.includes(video.mimeType)) return { ok: false, error: "Video must be MP4, WebM, or MOV." };
+  let bytes;
+  try {
+    const bin = atob(video.dataBase64.replace(/\s/g, ""));
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch { return { ok: false, error: "That video couldn't be read — try uploading it again." }; }
+  if (bytes.length > maxBytes) return { ok: false, error: `That video is too large — keep it under about ${(maxBytes / 1000000).toFixed(1).replace(".0", "")} MB.` };
+  return { ok: true, bytes, mime: video.mimeType };
+}
+
+// Stores a video in the IMAGES R2 bucket. Returns { ok, key?, error? }.
+// If the bucket is not bound yet, returns a clean error (never a crash).
+export async function putVideo(env, prefix, deviceId, video, maxBytes = 15000000) {
+  const dec = decodeVideo(video, maxBytes);
+  if (!dec.ok) return dec;
+  if (!env.IMAGES) return { ok: false, error: "Video uploads aren't connected yet — the shop is still setting up community file storage. You can post without a video for now." };
+  const key = `${prefix}/${deviceId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  await env.IMAGES.put(key, dec.bytes, { httpMetadata: { contentType: dec.mime } });
+  return { ok: true, key };
+}
+
 // --- 3D print files (v3) -------------------------------------------------
 // A creator post can attach one 3D print file: .stl / .obj / .3mf, or a
 // .zip containing them. Max 25 MB. Stored in the same IMAGES R2 bucket
@@ -498,7 +534,7 @@ export async function shapePost(db, row, author) {
     id: row.id, title: row.title, body: row.body, category: row.category,
     kind: row.kind ?? "forum", flair: row.flair ?? "", tags: parseTags(row.tags),
     allow_comments: row.allow_comments === 1,
-    image_url: imageUrl(row.image_blob_key), gif_url: row.gif_url ?? null, gif_label: row.gif_label ?? "",
+    image_url: imageUrl(row.image_blob_key), video_url: videoUrl(row.video_blob_key ?? null), gif_url: row.gif_url ?? null, gif_label: row.gif_label ?? "",
     verification_status: row.verification_status ?? "not_checked",
     verification_summary: row.verification_summary ?? "",
     auth_real: t.real, auth_fake: t.fake, auth_unsure: t.unsure,
@@ -598,8 +634,10 @@ export function parseAshTracks(stored) {
 // construction: colors must be #rrggbb, the background image must be
 // https://, and the font must be one of the fixed allowlisted stacks.
 export const THEME_FONTS = ["", "comic", "typewriter", "serif", "rounded"];
+export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost"];
+export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text"];
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", button_style: "", button_css: "", effects: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -612,13 +650,17 @@ export function parseTheme(stored) {
   const img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = THEME_FONTS.includes(obj.font) ? obj.font : "";
+  out.button_style = BUTTON_STYLE_IDS.includes(obj.button_style) ? obj.button_style : "";
+  out.button_css = sanitizeLayoutCss(String(obj.button_css || "")).slice(0, 4000);
+  const eff = Array.isArray(obj.effects) ? obj.effects : [];
+  out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 4);
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.button_style && !t.button_css && !(t.effects && t.effects.length)) return "";
   return JSON.stringify(t);
 }
 export function cleanAshTracks(list) {

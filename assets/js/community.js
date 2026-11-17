@@ -274,6 +274,56 @@ function fileToImage(file, maxBytes) {
     reader.readAsDataURL(file);
   });
 }
+// ---------- Short video clips (v3.5) ----------
+// One short clip per post: MP4 / WebM / MOV, max 15 MB, max 60 seconds.
+// The 60s check needs a <video> element, so it lives in videoPicked;
+// fileToVideo only reads the bytes (mime + size), mirroring fileToImage.
+var VIDEO_MIMES_CLIENT = ["video/mp4", "video/webm", "video/quicktime"];
+var VIDEO_EXT_MIMES = { ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime" };
+var VIDEO_MAX_BYTES = 15000000;
+var VIDEO_MAX_SECONDS = 60;
+function videoMimeFor(file) {
+  if (file.type && VIDEO_MIMES_CLIENT.indexOf(file.type) !== -1) return file.type;
+  // Some browsers leave file.type blank — fall back to the extension.
+  var name = String(file.name || "");
+  var dot = name.lastIndexOf(".");
+  var ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+  return VIDEO_EXT_MIMES[ext] || null;
+}
+function fileToVideo(file, maxBytes) {
+  return new Promise(function (resolve) {
+    if (!file) return resolve(null);
+    var mime = videoMimeFor(file);
+    if (!mime) return resolve({ error: "That video isn't an MP4, WebM, or MOV — pick one of those." });
+    var limitMB = ((maxBytes || VIDEO_MAX_BYTES) / 1000000).toFixed(1).replace(".0", "");
+    if (file.size > (maxBytes || VIDEO_MAX_BYTES)) return resolve({ error: "That video is too large — keep it under about " + limitMB + " MB." });
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = String(reader.result || "");
+      var parts = dataUrl.split(",");
+      resolve({ dataBase64: parts[1] || "", mimeType: mime, fileName: file.name || "video" });
+    };
+    reader.onerror = function () { resolve({ error: "That video couldn't be read — try again." }); };
+    reader.readAsDataURL(file);
+  });
+}
+// How long is this video file, in seconds? Loads it into a throwaway
+// <video> and reads the metadata. Resolves null when it can't be read.
+function videoDuration(file) {
+  return new Promise(function (resolve) {
+    var url = URL.createObjectURL(file);
+    var v = document.createElement("video");
+    v.preload = "metadata";
+    v.onloadedmetadata = function () {
+      URL.revokeObjectURL(url);
+      var d = v.duration;
+      resolve((typeof d === "number" && isFinite(d)) ? d : null);
+    };
+    v.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+    v.src = url;
+  });
+}
+
 // "Shrink my photo for profile size" — avatar resizer / converter.
 // Takes any JPG, PNG, or WebP, scales it down to fit within 512px on the
 // longest side (keeping the original aspect ratio), and converts it to JPEG
@@ -1302,6 +1352,230 @@ function gifEmbedHTML(url, label) {
     '<p>GIF via GIPHY' + (label ? " · " + esc(label) : "") + "</p></div>";
 }
 
+// ---------- Photo cropper + short video clips (v3.5) ----------
+// Crop: when a photo is picked in any post composer, a modal opens and
+// the member drags a box over it (move inside, resize by the corners).
+// "Use this crop" exports the region from the ORIGINAL full-resolution
+// image (longest side capped at 1600px, JPEG 0.85) into cropPick;
+// "Use original (no crop)" keeps the file as picked; Cancel keeps
+// whatever was there before. The cropper is plain canvas + Pointer
+// Events — no AI, no libraries.
+// Video: one short clip per post (MP4 / WebM / MOV, 15 MB, 60s). The
+// File stays in videoPick until submit, when it is read as base64.
+var cropPick = {}; // formKey -> { dataBase64, mimeType } (cropped JPEG)
+var cropOrig = {}; // formKey -> object URL of the original photo (preview)
+var videoPick = {}; // formKey -> { file, name, url, duration }
+var cropState = null; // open modal: { file, key, form, img, iw, ih, dw, dh, scale, rect, aspect, drag }
+var CROP_MAX_SIDE = 1600;
+var CROP_ASPECTS = { "free": null, "1:1": [1, 1], "4:3": [4, 3], "16:9": [16, 9] };
+// Export size for a crop region (original pixels): longest side capped
+// at 1600px, aspect kept. Pure — unit-tested in node (see test notes).
+function cropExportSize(sw, sh) {
+  var w = Math.max(1, Math.round(sw)), h = Math.max(1, Math.round(sh));
+  var longest = Math.max(w, h);
+  if (longest <= CROP_MAX_SIDE) return { w: w, h: h };
+  var k = CROP_MAX_SIDE / longest;
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+// Centered rect of the given aspect [w,h], as large as fits the display.
+function fitRectToAspect(ar, dw, dh) {
+  var k = Math.min(dw / ar[0], dh / ar[1]);
+  var w = Math.max(1, Math.floor(ar[0] * k)), h = Math.max(1, Math.floor(ar[1] * k));
+  return { x: Math.round((dw - w) / 2), y: Math.round((dh - h) / 2), w: w, h: h };
+}
+// Corner-drag a rect (display px) while holding its aspect (ar [w,h] or
+// null for free). mode fixes one corner: se = top-left fixed, nw =
+// bottom-right fixed, ne = bottom-left fixed, sw = top-right fixed.
+function fitDragRect(o, mode, dx, dy, ar, dw, dh) {
+  var min = 24;
+  var r = { x: o.x, y: o.y, w: o.w, h: o.h };
+  if (!ar) {
+    if (mode === "se" || mode === "ne") r.w = Math.max(min, Math.min(dw - o.x, o.w + dx));
+    if (mode === "nw" || mode === "sw") r.w = Math.max(min, Math.min(o.x + o.w, o.w - dx));
+    if (mode === "se" || mode === "sw") r.h = Math.max(min, Math.min(dh - o.y, o.h + dy));
+    if (mode === "nw" || mode === "ne") r.h = Math.max(min, Math.min(o.y + o.h, o.h - dy));
+  } else {
+    if (mode === "se" || mode === "ne") r.w = Math.max(min, Math.min(dw - o.x, o.w + dx));
+    else r.w = Math.max(min, Math.min(o.x + o.w, o.w - dx));
+    r.h = r.w * ar[1] / ar[0];
+    var maxH = (mode === "se" || mode === "sw") ? dh - o.y : o.y + o.h;
+    if (r.h > maxH) { r.h = maxH; r.w = r.h * ar[0] / ar[1]; }
+    var maxW = (mode === "se" || mode === "ne") ? dw - o.x : o.x + o.w;
+    if (r.w > maxW) { r.w = maxW; r.h = r.w * ar[1] / ar[0]; }
+    if (r.w < min) { r.w = min; r.h = r.w * ar[1] / ar[0]; }
+    if (r.h < min) { r.h = min; r.w = r.h * ar[0] / ar[1]; }
+  }
+  if (mode === "nw" || mode === "sw") r.x = o.x + o.w - r.w;
+  if (mode === "nw" || mode === "ne") r.y = o.y + o.h - r.h;
+  r.x = Math.max(0, r.x); r.y = Math.max(0, r.y);
+  return r;
+}
+function closeCropModal() {
+  var old = document.getElementById("dwc-crop-overlay");
+  if (old) old.remove();
+}
+function openCropModal(file, key, form) {
+  var url = URL.createObjectURL(file);
+  var img = new Image();
+  img.onload = function () {
+    URL.revokeObjectURL(url);
+    var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+    if (!iw || !ih) { formErr(form, "That photo couldn't be read — try a different one."); return; }
+    var scale = Math.min(1, 900 / iw, 520 / ih);
+    var dw = Math.max(1, Math.round(iw * scale)), dh = Math.max(1, Math.round(ih * scale));
+    cropState = { file: file, key: key, form: form, img: img, iw: iw, ih: ih, dw: dw, dh: dh, scale: scale, rect: { x: 0, y: 0, w: dw, h: dh }, aspect: "free", drag: null };
+    renderCropModal();
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); formErr(form, "That photo couldn't be read — try a different one."); };
+  img.src = url;
+}
+function renderCropModal() {
+  var st = cropState;
+  if (!st) return;
+  closeCropModal();
+  var div = document.createElement("div");
+  div.className = "dwc-crop-overlay";
+  div.id = "dwc-crop-overlay";
+  div.innerHTML =
+    '<div class="dwc-crop-modal" role="dialog" aria-label="Crop photo">' +
+    '<h3 style="margin-top:0">Crop your photo</h3>' +
+    '<p style="color:var(--muted)">Drag inside the box to move it, drag a corner to resize. Pick a shape, or leave it free.</p>' +
+    '<div class="dwc-crop-stage" id="dwc-crop-stage">' +
+    '<canvas id="dwc-crop-canvas" width="' + st.dw + '" height="' + st.dh + '"></canvas>' +
+    '<div class="dwc-crop-rect" id="dwc-crop-rect">' +
+    '<span class="dwc-crop-handle nw"></span><span class="dwc-crop-handle ne"></span>' +
+    '<span class="dwc-crop-handle sw"></span><span class="dwc-crop-handle se"></span>' +
+    '</div></div>' +
+    '<div class="dwc-crop-aspects">' +
+    '<button type="button" data-cropaspect="free" class="on" onclick="DWC.setCropAspect(\'free\')">Free</button>' +
+    '<button type="button" data-cropaspect="1:1" onclick="DWC.setCropAspect(\'1:1\')">1:1</button>' +
+    '<button type="button" data-cropaspect="4:3" onclick="DWC.setCropAspect(\'4:3\')">4:3</button>' +
+    '<button type="button" data-cropaspect="16:9" onclick="DWC.setCropAspect(\'16:9\')">16:9</button>' +
+    '</div>' +
+    '<div class="dwc-crop-actions">' +
+    '<button type="button" class="btn" onclick="DWC.applyCrop()">Use this crop</button>' +
+    '<button type="button" class="btn ghost" onclick="DWC.useOriginalCrop()">Use original (no crop)</button>' +
+    '<button type="button" class="btn ghost" onclick="DWC.cancelCrop()">Cancel</button>' +
+    '</div></div>';
+  document.body.appendChild(div);
+  var stage = document.getElementById("dwc-crop-stage");
+  stage.addEventListener("pointerdown", cropPointerDown);
+  stage.addEventListener("pointermove", cropPointerMove);
+  stage.addEventListener("pointerup", cropPointerUp);
+  stage.addEventListener("pointercancel", cropPointerUp);
+  drawCropCanvas();
+}
+// Draw the image + dimmed outside-the-rect area, and place the rect div
+// (percentages, so it tracks the canvas when CSS scales it on mobile).
+function drawCropCanvas() {
+  var st = cropState;
+  if (!st) return;
+  var c = document.getElementById("dwc-crop-canvas");
+  if (!c) return;
+  var ctx = c.getContext("2d");
+  ctx.drawImage(st.img, 0, 0, st.dw, st.dh);
+  var r = st.rect;
+  ctx.fillStyle = "rgba(0,0,0,0.55)";
+  ctx.fillRect(0, 0, st.dw, r.y);
+  ctx.fillRect(0, r.y + r.h, st.dw, st.dh - (r.y + r.h));
+  ctx.fillRect(0, r.y, r.x, r.h);
+  ctx.fillRect(r.x + r.w, r.y, st.dw - (r.x + r.w), r.h);
+  var div = document.getElementById("dwc-crop-rect");
+  if (div) {
+    div.style.left = (r.x / st.dw * 100) + "%";
+    div.style.top = (r.y / st.dh * 100) + "%";
+    div.style.width = (r.w / st.dw * 100) + "%";
+    div.style.height = (r.h / st.dh * 100) + "%";
+  }
+}
+function cropPointerDown(e) {
+  var st = cropState;
+  if (!st) return;
+  var stage = document.getElementById("dwc-crop-stage");
+  if (!stage) return;
+  var r = stage.getBoundingClientRect();
+  var dx = (e.clientX - r.left) / r.width * st.dw;
+  var dy = (e.clientY - r.top) / r.height * st.dh;
+  var tol = 18 / r.width * st.dw; // ~18 CSS px corner grab area
+  var cr = st.rect;
+  var mode = null;
+  var near = function (cx, cy) { return Math.abs(dx - cx) <= tol && Math.abs(dy - cy) <= tol; };
+  if (near(cr.x, cr.y)) mode = "nw";
+  else if (near(cr.x + cr.w, cr.y)) mode = "ne";
+  else if (near(cr.x, cr.y + cr.h)) mode = "sw";
+  else if (near(cr.x + cr.w, cr.y + cr.h)) mode = "se";
+  else if (dx >= cr.x && dx <= cr.x + cr.w && dy >= cr.y && dy <= cr.y + cr.h) mode = "move";
+  if (!mode) return;
+  e.preventDefault();
+  try { stage.setPointerCapture(e.pointerId); } catch (err) {}
+  st.drag = { mode: mode, startX: e.clientX, startY: e.clientY, rect: { x: cr.x, y: cr.y, w: cr.w, h: cr.h }, stageW: r.width, stageH: r.height };
+}
+function cropPointerMove(e) {
+  var st = cropState;
+  if (!st || !st.drag) return;
+  var d = st.drag;
+  var dx = (e.clientX - d.startX) / d.stageW * st.dw;
+  var dy = (e.clientY - d.startY) / d.stageH * st.dh;
+  var o = d.rect;
+  if (d.mode === "move") {
+    st.rect = {
+      x: Math.max(0, Math.min(st.dw - o.w, o.x + dx)),
+      y: Math.max(0, Math.min(st.dh - o.h, o.y + dy)),
+      w: o.w, h: o.h,
+    };
+  } else {
+    st.rect = fitDragRect(o, d.mode, dx, dy, CROP_ASPECTS[st.aspect], st.dw, st.dh);
+  }
+  drawCropCanvas();
+}
+function cropPointerUp() {
+  if (cropState) cropState.drag = null;
+}
+// Composer previews — the small "what's attached" area under each input.
+// Rendered with the composer (so picks survive a re-render) and updated
+// in place by the pick/crop handlers (so typed text is never lost).
+function cropPreviewInner(key) {
+  var c = cropPick[key];
+  if (c) {
+    return '<img class="dwc-crop-thumb" src="data:image/jpeg;base64,' + c.dataBase64 + '" alt="Cropped photo preview">' +
+      '<p>Photo cropped ✓ <button type="button" class="dwc-linklike" onclick="DWC.cropAgain(this, \'' + esc(key) + '\')">Crop again</button> <button type="button" class="dwc-linklike" onclick="DWC.removePhoto(this, \'' + esc(key) + '\')">Remove photo</button></p>';
+  }
+  if (cropOrig[key]) {
+    return '<img class="dwc-crop-thumb" src="' + esc(cropOrig[key]) + '" alt="Photo preview">' +
+      '<p>Original photo — no crop <button type="button" class="dwc-linklike" onclick="DWC.cropAgain(this, \'' + esc(key) + '\')">Crop it</button> <button type="button" class="dwc-linklike" onclick="DWC.removePhoto(this, \'' + esc(key) + '\')">Remove photo</button></p>';
+  }
+  return "";
+}
+function cropPreviewHTML(key) {
+  return '<div data-croppreview="' + esc(key) + '">' + cropPreviewInner(key) + '</div>';
+}
+function updateCropPreview(form, key) {
+  var box = form ? form.querySelector('[data-croppreview="' + key + '"]') : document.querySelector('[data-croppreview="' + key + '"]');
+  if (box) box.innerHTML = cropPreviewInner(key);
+}
+function videoPreviewInner(key) {
+  var v = videoPick[key];
+  if (!v) return "";
+  return '<video class="dwc-video-preview-vid" controls preload="metadata" playsinline src="' + esc(v.url) + '"></video>' +
+    '<p>' + esc(v.name) + ' · ' + Math.round(v.duration) + 's <button type="button" class="dwc-linklike" onclick="DWC.clearVideo(this, \'' + esc(key) + '\')">Remove video</button></p>';
+}
+function videoPreviewHTML(key) {
+  return '<div data-videopreview="' + esc(key) + '">' + videoPreviewInner(key) + '</div>';
+}
+function updateVideoPreview(form, key) {
+  var box = form ? form.querySelector('[data-videopreview="' + key + '"]') : document.querySelector('[data-videopreview="' + key + '"]');
+  if (box) box.innerHTML = videoPreviewInner(key);
+}
+function clearCropPick(key) {
+  delete cropPick[key];
+  if (cropOrig[key]) { try { URL.revokeObjectURL(cropOrig[key]); } catch (e) {} delete cropOrig[key]; }
+}
+function clearVideoPick(key) {
+  var v = videoPick[key];
+  if (v && v.url) { try { URL.revokeObjectURL(v.url); } catch (e) {} }
+  delete videoPick[key];
+}
+
 // ---------- MySpace layouts: presets + Layout Bot ----------
 // Layout CSS targets the .dwc-myprofile hooks only, so a member's layout
 // styles THEIR page and nothing else:
@@ -1742,12 +2016,34 @@ function postPhotoHTML(p) {
   return '<img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">';
 }
 
+// ---------- Post videos (v3.5) ----------
+// Same locked/blurred rules as photos: pay-locked shows a locked preview
+// (blurred first frame, no controls — the unlock path is the same private
+// chat as photos), blurred shows the video blurred with the same
+// tap-to-reveal button, otherwise a normal <video>.
+function postVideoHTML(p) {
+  if (!p.video_url) return "";
+  var mine = state.profile && state.profile.id === p.author_id;
+  var locked = !!p.pay_unlock && p.price_cents > 0 && !mine;
+  var blurred = !!p.blur_photo && !mine;
+  if (locked) {
+    return '<div class="dwc-photowrap"><video class="dwc-post-video dwc-img-locked" preload="metadata" playsinline muted src="' + esc(p.video_url) + '"></video>' +
+      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div></div>';
+  }
+  if (blurred) {
+    return '<div class="dwc-photowrap"><video class="dwc-post-video dwc-img-blurred" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>' +
+      '<button type="button" class="dwc-reveal-btn" onclick="DWC.toggleBlur(this)">👁 Blurred video — tap to reveal</button></div>';
+  }
+  return '<video class="dwc-post-video" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>';
+}
+
 function postCardHTML(p) {
   var heartOn = myHeart("post-" + p.id);
   var isCreator = !!p.is_creator;
   var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
   return '<article class="card dwc-post">' +
     postPhotoHTML(p) +
+    postVideoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
     '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (isCreator ? " · 🎨 Creator" : "") + "</div>" +
     '<h3 style="margin:8px 0 4px"><a href="#/post/' + p.id + '" class="dwc-titlelink">' + esc(p.title) + "</a></h3>" +
@@ -1952,8 +2248,12 @@ function renderComposer(context) {
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. charizard, grading, psa">' +
     '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — required for Card Check)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-' + context + '\')">' +
+    cropPreviewHTML("composer-" + context) +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
+    '<label>Short video clip (MP4, WebM, or MOV, under 15 MB and 60 seconds — optional)</label>' +
+    '<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" onchange="DWC.videoPicked(this, \'composer-' + context + '\')">' +
+    videoPreviewHTML("composer-" + context) +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runCardCheck(this.form)">🔍 Run AI authenticity + price check on photo</button> <span data-checkresult></span></div>' +
     gifPickerHTML("composer-" + context) +
     '<p class="dwc-form-err" data-err hidden></p>' +
@@ -2105,6 +2405,7 @@ async function viewThread(el, postId) {
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
     '<article class="card">' +
     postPhotoHTML(p) +
+    postVideoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
     '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (p.is_creator ? " · 🎨 Creator" : "") + "</div>" +
     "<h2>" + esc(p.title) + "</h2>" +
@@ -2944,8 +3245,12 @@ function renderAdultComposer() {
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. cosplay, amateur">' +
     '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — optional)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-adult\')">' +
+    cropPreviewHTML("composer-adult") +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
+    '<label>Short video clip (MP4, WebM, or MOV, under 15 MB and 60 seconds — optional)</label>' +
+    '<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" onchange="DWC.videoPicked(this, \'composer-adult\')">' +
+    videoPreviewHTML("composer-adult") +
     gifPickerHTML("composer-adult") +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Post to the 18+ forum →</button></p>' +
@@ -2987,11 +3292,15 @@ function renderCreatorComposer() {
     '<label>Price (USD — 0 = free). Tick “Pay to unlock” below and viewers see a locked preview with a “Pay to unlock” button at this price.</label>' +
     '<input name="price" type="number" step="1" min="0" max="100000" value="0" required>' +
     '<label>Preview photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
-    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-creator\')">' +
+    cropPreviewHTML("composer-creator") +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
     '<label><input type="checkbox" name="pay_unlock" style="width:auto"> 🔓 Pay to unlock — set a price above and viewers see a locked preview with a “Pay to unlock” button. Only works with a price above $0. Off by default.</label>' +
     '<label>3D print file — .stl, .obj, .3mf, or a .zip of them (under 25 MB — optional, only when the genre is 3D Print Files or you’re including one)</label>' +
     '<input name="print_file" type="file" accept=".stl,.obj,.3mf,.zip">' +
+    '<label>Short video clip (MP4, WebM, or MOV, under 15 MB and 60 seconds — optional)</label>' +
+    '<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" onchange="DWC.videoPicked(this, \'composer-creator\')">' +
+    videoPreviewHTML("composer-creator") +
     gifPickerHTML("composer-creator") +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Post it as a creator post →</button></p>' +
@@ -3288,9 +3597,20 @@ window.DWC = {
   submitPost: async function (form, context) {
     var fd = new FormData(form);
     var kind = fd.get("kind") || (context === "cardcheck" ? "card_auth" : "forum");
-    var photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
-    if (photo && photo.error) return formErr(form, photo.error);
     var gk = "composer-" + context;
+    // Cropped photo wins over the raw file input (the cropper already
+    // validated the source file). No crop? Read the file input as before.
+    var photo = cropPick[gk] || null;
+    if (!photo) {
+      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
+      if (photo && photo.error) return formErr(form, photo.error);
+    }
+    var video = null;
+    var vp = videoPick[gk];
+    if (vp && vp.file) {
+      video = await fileToVideo(vp.file, VIDEO_MAX_BYTES);
+      if (video && video.error) return formErr(form, video.error);
+    }
     var gif = gifPick[gk];
     var check = context === "cardcheck" ? state.checkResult : null;
     var body = {
@@ -3306,11 +3626,16 @@ window.DWC = {
       verification_summary: check ? (check.summary || "") : "",
     };
     if (photo) body.image = { dataBase64: photo.dataBase64, mimeType: photo.mimeType };
+    if (video) body.video = { dataBase64: video.dataBase64, mimeType: video.mimeType, fileName: video.fileName };
     var data = await apiPost("/posts", body);
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't post that.");
     delete gifPick[gk];
+    clearCropPick(gk);
+    clearVideoPick(gk);
     state.checkResult = null;
-    setNotice(kind === "adult" ? "Posted to the 18+ forum." : "Posted.");
+    var postMsg = kind === "adult" ? "Posted to the 18+ forum." : "Posted.";
+    if (data.video_skipped) postMsg += " The video didn't attach yet — the shop is still running a database update, so the post is live without it.";
+    setNotice(postMsg);
     if (context === "adult") renderAdultForum();
     else if (context === "cardcheck") renderView();
     else renderView();
@@ -3320,11 +3645,22 @@ window.DWC = {
 
   submitCreatorPost: async function (form) {
     var fd = new FormData(form);
-    var photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
-    if (photo && photo.error) return formErr(form, photo.error);
+    var gk = "composer-creator";
+    // Cropped photo wins over the raw file input (the cropper already
+    // validated the source file). No crop? Read the file input as before.
+    var photo = cropPick[gk] || null;
+    if (!photo) {
+      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
+      if (photo && photo.error) return formErr(form, photo.error);
+    }
+    var video = null;
+    var vp = videoPick[gk];
+    if (vp && vp.file) {
+      video = await fileToVideo(vp.file, VIDEO_MAX_BYTES);
+      if (video && video.error) return formErr(form, video.error);
+    }
     var printFile = await fileToPrintFile(fd.get("print_file") && fd.get("print_file").size ? fd.get("print_file") : null, 25000000);
     if (printFile && printFile.error) return formErr(form, printFile.error);
-    var gk = "composer-creator";
     var gif = gifPick[gk];
     var price = parseInt(fd.get("price"), 10);
     if (Number.isNaN(price) || price < 0) price = 0;
@@ -3344,11 +3680,16 @@ window.DWC = {
       gif_url: gif ? gif.url : null, gif_label: gif ? gif.label : "",
     };
     if (photo) body.image = { dataBase64: photo.dataBase64, mimeType: photo.mimeType };
+    if (video) body.video = { dataBase64: video.dataBase64, mimeType: video.mimeType, fileName: video.fileName };
     if (printFile) body.print_file = { dataBase64: printFile.dataBase64, fileName: printFile.fileName };
     var data = await apiPost("/posts", body);
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't post that.");
     delete gifPick[gk];
-    setNotice("Creator post is live in the 18+ forum.");
+    clearCropPick(gk);
+    clearVideoPick(gk);
+    var creatorMsg = "Creator post is live in the 18+ forum.";
+    if (data.video_skipped) creatorMsg += " The video didn't attach yet — the shop is still running a database update, so the post is live without it.";
+    setNotice(creatorMsg);
     renderAdultForum();
     await refreshStats();
     return false;
@@ -3380,16 +3721,135 @@ window.DWC = {
     for (var i = 0; i < cards.length; i++) cards[i].classList.toggle("on", cards[i].getAttribute("data-genrecard") === genre);
   },
 
-  // Blur toggle (v3.2) — reveal / re-hide a blurred photo preview.
-  // This only flips the preview on this screen; it never changes the
-  // post itself, and it never un-locks a pay-to-unlock photo.
+  // Blur toggle (v3.2) — reveal / re-hide a blurred photo or video
+  // preview. This only flips the preview on this screen; it never
+  // changes the post itself, and it never un-locks a pay-to-unlock photo.
   toggleBlur: function (btn) {
     var wrap = btn.closest(".dwc-photowrap");
     if (!wrap) return;
-    var img = wrap.querySelector("img");
-    if (!img) return;
-    var hidden = img.classList.toggle("dwc-img-blurred");
-    btn.textContent = hidden ? "👁 Blurred photo — tap to reveal" : "🙈 Blur this photo again";
+    var media = wrap.querySelector("img") || wrap.querySelector("video");
+    if (!media) return;
+    var hidden = media.classList.toggle("dwc-img-blurred");
+    var isVideo = media.tagName === "VIDEO";
+    btn.textContent = hidden
+      ? (isVideo ? "👁 Blurred video — tap to reveal" : "👁 Blurred photo — tap to reveal")
+      : (isVideo ? "🙈 Blur this video again" : "🙈 Blur this photo again");
+  },
+  // Photo cropper (v3.5) — a photo picked in any post composer opens the
+  // crop modal. Same checks as fileToImage, on the SOURCE file, before
+  // cropping. Cancel keeps whatever was attached before.
+  photoPicked: function (input, key) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
+      formErr(input.form, "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that.");
+      input.value = "";
+      return;
+    }
+    if (file.size > 2500000) {
+      formErr(input.form, "That photo is too large — keep it under about 2.5 MB.");
+      input.value = "";
+      return;
+    }
+    if (cropOrig[key]) { try { URL.revokeObjectURL(cropOrig[key]); } catch (e) {} }
+    cropOrig[key] = URL.createObjectURL(file);
+    updateCropPreview(input.form, key);
+    openCropModal(file, key, input.form);
+  },
+  cropAgain: function (btn, key) {
+    var form = btn.closest("form");
+    var input = form && form.querySelector('input[name="photo"]');
+    var file = input && input.files && input.files[0];
+    if (!file) { setNotice("The original photo isn't in the form anymore — pick it again to crop."); return; }
+    openCropModal(file, key, form);
+  },
+  removePhoto: function (btn, key) {
+    var form = btn.closest("form");
+    var input = form && form.querySelector('input[name="photo"]');
+    if (input) input.value = "";
+    clearCropPick(key);
+    updateCropPreview(form, key);
+  },
+  // Crop modal actions — applyCrop exports the region from the ORIGINAL
+  // full-resolution image (longest side capped at 1600px, JPEG 0.85).
+  applyCrop: function () {
+    var st = cropState;
+    if (!st) return;
+    var sx = st.rect.x / st.scale, sy = st.rect.y / st.scale;
+    var sw = st.rect.w / st.scale, sh = st.rect.h / st.scale;
+    var out = cropExportSize(sw, sh);
+    var cv = document.createElement("canvas");
+    cv.width = out.w; cv.height = out.h;
+    var ctx = cv.getContext("2d");
+    ctx.drawImage(st.img, sx, sy, sw, sh, 0, 0, out.w, out.h);
+    var parts = cv.toDataURL("image/jpeg", 0.85).split(",");
+    cropPick[st.key] = { dataBase64: parts[1] || "", mimeType: "image/jpeg" };
+    var form = st.form, key = st.key;
+    closeCropModal();
+    cropState = null;
+    updateCropPreview(form, key);
+  },
+  useOriginalCrop: function () {
+    var st = cropState;
+    if (!st) return;
+    delete cropPick[st.key];
+    var form = st.form, key = st.key;
+    closeCropModal();
+    cropState = null;
+    updateCropPreview(form, key);
+  },
+  cancelCrop: function () {
+    closeCropModal();
+    cropState = null;
+  },
+  setCropAspect: function (aspect) {
+    var st = cropState;
+    if (!st) return;
+    st.aspect = aspect;
+    var btns = document.querySelectorAll("[data-cropaspect]");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].getAttribute("data-cropaspect") === aspect);
+    if (aspect !== "free") {
+      st.rect = fitRectToAspect(CROP_ASPECTS[aspect], st.dw, st.dh);
+      drawCropCanvas();
+    }
+  },
+  // Short video clip (v3.5) — mime + size first, then the 60s duration
+  // check with a throwaway <video>. Rejected picks clear the input so a
+  // bad file never rides along on submit.
+  videoPicked: async function (input, key) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (!videoMimeFor(file)) {
+      formErr(input.form, "That video isn't an MP4, WebM, or MOV — pick one of those.");
+      input.value = "";
+      return;
+    }
+    if (file.size > VIDEO_MAX_BYTES) {
+      formErr(input.form, "That video is too large — keep it under about 15 MB.");
+      input.value = "";
+      return;
+    }
+    var dur = await videoDuration(file);
+    if (dur == null) {
+      formErr(input.form, "That video couldn't be read — try a different one.");
+      input.value = "";
+      return;
+    }
+    if (dur > VIDEO_MAX_SECONDS) {
+      formErr(input.form, "That video is " + Math.round(dur) + " seconds — keep clips to 60 seconds or less.");
+      input.value = "";
+      return;
+    }
+    if (videoPick[key] && videoPick[key].url) { try { URL.revokeObjectURL(videoPick[key].url); } catch (e) {} }
+    videoPick[key] = { file: file, name: file.name || "video", url: URL.createObjectURL(file), duration: dur };
+    updateVideoPreview(input.form, key);
+  },
+  clearVideo: function (btn, key) {
+    var form = btn.closest("form");
+    var input = form && form.querySelector('input[name="video"]');
+    if (input) input.value = "";
+    clearVideoPick(key);
+    updateVideoPreview(form, key);
   },
   // One-tap seller tag chip — adds the tag to the tags box (deduped).
   addTagChip: function (btn, tag) {

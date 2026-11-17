@@ -892,6 +892,51 @@ function taffyReply(raw) {
   // change font (family)
   if (has(/change.*font|different font|font.*(family|style)|comic.*font|serif/))
     return { text: "Fonts — the Font picker in Edit Profile has Comic, Typewriter, and more. Or apply this CSS for a Georgia serif look. Swap the family name for any font you like.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", emoji: "🔠", working: false };
+  // ---- More code help: real answers for code questions, not guesses ----
+  // custom font / Google Fonts (external fonts are blocked — say so plainly)
+  if (has(/google font|custom font|add (a )?font|import (a )?font|load (a )?font/))
+    return { text: "Google Fonts can't load here — the site blocks external stylesheets (@import and @font-face) to keep pages safe, so a font link won't work. But you can use any font already on people's devices. Here's a Georgia serif look — swap the family name for Comic Sans, Trebuchet, Verdana, or Courier. The Font picker in Edit Profile has them too.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", html: "<style>\n.dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}\n</style>", emoji: "🔠", working: false };
+  // add an image / picture to my page
+  if (has(/add (an? )?(image|picture|photo|pic)|put (a |an )?(image|picture|photo) on|insert (an? )?(image|picture|photo)/))
+    return { text: "Three ways: your profile picture lives in Edit Profile (tap the picture box), a background picture goes in the Background image URL box, or use this CSS with any https:// picture link — swap in your own link. It covers the whole page behind everything.", css: '.dwc-myprofile{background-image:url("https://example.com/my-picture.jpg");background-size:cover;background-position:center;}', html: "<style>\n.dwc-myprofile{background-image:url(\"https://example.com/my-picture.jpg\");background-size:cover;background-position:center;}\n</style>", emoji: "🖼️", working: false };
+  // change text / heading / link color
+  if (has(/text color|change.*text.*color|color.*(my )?text|heading color|link color|make.*text.*(pink|blue|purple|red|green|gold|white|black|cyan|orange)/))
+    return { text: "Text colors, here you go — this sets your body text pink, headings lighter pink, and links cyan. Swap any hex for the color you want, or use the color pickers in Edit Profile.", css: ".dwc-myprofile p,.dwc-myprofile li{color:#ff2d95;} .dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;} .dwc-myprofile a{color:#00e5ff;}", html: "<style>\n.dwc-myprofile p,.dwc-myprofile li{color:#ff2d95;}\n.dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;}\n.dwc-myprofile a{color:#00e5ff;}\n</style>", emoji: "🎨", working: false };
+  // center things
+  if (has(/center (my|the|text|page|everything|it|all)|how (do|can) i center|align center|centre/))
+    return { text: "Centering, done — this centers your text and your cards. Apply it and everything lines up in the middle.", css: ".dwc-myprofile{text-align:center;} .dwc-myprofile .card{margin-left:auto;margin-right:auto;}", html: "<style>\n.dwc-myprofile{text-align:center;}\n.dwc-myprofile .card{margin-left:auto;margin-right:auto;}\n</style>", emoji: "🎯", working: false };
+  // hide a section
+  if (has(/hide (my|the|a|an)? ?(top friends?|music|links?|bio|avatar|picture|heading|meta|section|something|it|this)/))
+    return { text: "Hiding things is one line each — this hides your Top Friends tiles, your music picks, and your links. Delete the lines for the parts you want to keep, and tell me which part if you want a different one hidden.", css: ".dwc-myprofile .dwc-topfriend{display:none;} .dwc-myprofile .dwc-music-picks{display:none;} .dwc-myprofile .dwc-links{display:none;}", html: "<style>\n.dwc-myprofile .dwc-topfriend{display:none;}\n.dwc-myprofile .dwc-music-picks{display:none;}\n.dwc-myprofile .dwc-links{display:none;}\n</style>", emoji: "🙈", working: false };
+  // add a video / embed
+  if (has(/add (a )?video|embed (a )?video|youtube|put (a )?video (on|in)/))
+    return { text: "Videos can't embed on a profile — the site strips iframes to keep pages safe, so a YouTube embed won't work. What does work: add the video as one of your My links in Edit Profile (up to 5) so people tap straight to it, or put your songs in profile music.", emoji: "🎥", working: false };
+  // rounded corners
+  if (has(/round(ed)? corners?|corner radius|corners? round/))
+    return { text: "Rounded corners — apply this and your cards go soft and bubbly. Lower the px for a subtle round, raise it for full bubble.", css: ".dwc-myprofile .card{border-radius:26px;}", html: "<style>\n.dwc-myprofile .card{border-radius:26px;}\n</style>", emoji: "🔘", working: false };
+  // custom cursor
+  if (has(/custom cursor|change (my )?cursor|mouse cursor|cursor (style|image|color)/))
+    return { text: "Custom cursor — this one gives you a crosshair. Swap crosshair for pointer, grab, or wait — or use a picture with cursor:url(\"https://example.com/my-cursor.png\"), auto; (it has to be an https:// link).", css: ".dwc-myprofile{cursor:crosshair;}", html: "<style>\n.dwc-myprofile{cursor:crosshair;}\n</style>", emoji: "🖱️", working: false };
+  // add music / audio to my page
+  if (has(/add (music|song|audio) (to|on)|put (a |some )?(music|song|audio) on|music on my (profile|page)|song on my (profile|page)/))
+    return { text: "Music on your page — Edit Profile has a profile music picker, up to 5 A Steady Heart tracks to show off. No arbitrary audio embeds (the site doesn't allow them), but your tracks play right on your page.", emoji: "🎵", working: false };
+  // fix broken code / why isn't my code working
+  if ((has(/\bbroken\b/) && has(/\b(code|css|layout)\b/)) ||
+      (has(/\bfix\b/) && has(/\b(code|css|layout)\b/)) ||
+      (has(/\b(isn.t|doesn.t)\b.{0,20}\bwork(ing)?\b/) && has(/\b(code|css|layout|my page)\b/)))
+    return { text: "Let's fix it — the usual culprits: a missing } or ; somewhere, a <style> or <script> tag pasted in (the site strips those — paste just the CSS), an @import or @font-face (blocked), a javascript: link (blocked), or a url() that isn't an https:// image. And make sure you hit Save profile. Tell me what your code does — or doesn't do — and I'll point at the line.", emoji: "🔧", working: false };
+  // what's allowed / can I use JavaScript
+  if (has(/can i use (javascript|js|script)|is (javascript|js|script) allowed|what (code|css) can i use|what.s allowed|allowed (code|css)|use (javascript|js)/))
+    return { text: "Short version: CSS only, no JavaScript. The site strips <script> tags, <style> tags, @import, @font-face, javascript: links, and iframes — that's to keep everyone's pages safe. What you CAN do is all the CSS: colors, fonts, backgrounds, borders, rounded corners, glow, sparkle, animations, and the Layout Bot presets. If you're not sure a line is allowed, ask me and I'll check it.", emoji: "📜", working: false };
+  // reset my layout / start over
+  if (has(/reset (my )?(layout|theme|page|profile|css)|start over|remove (my )?(custom )?css|clear (my )?(custom )?css|delete (my )?(layout|theme|css)/))
+    return { text: "Starting over is easy — Edit Profile, clear out the Custom CSS box, hit Save profile, and you're back to your preset. Or pick a fresh preset first and save that instead. Nothing is lost until you save, so you can always back out.", emoji: "🔄", working: false };
+  // preview before saving
+  if (has(/preview (my )?(layout|theme|page|profile|css)|how (do|can) i preview|see (my )?(layout|theme) before/))
+    return { text: "There's a live preview right in Edit Profile — your Custom CSS updates the preview as you type, so you see it before you save. The Layout Bot shows a preview too. Nothing goes live until you hit Save profile.", emoji: "👀", working: false };
+  // mobile / responsive
+  if (has(/mobile|responsive|my page on (my )?phone|looks (bad|weird|broken) on (my )?phone|phone (view|layout|screen)/))
+    return { text: "The site is responsive, so your page adapts to phones on its own. Two things that break it: fixed pixel widths (use max-width instead) and huge images. This line keeps every picture inside the screen — apply it and your page behaves on phones.", css: ".dwc-myprofile img{max-width:100%;height:auto;}", html: "<style>\n.dwc-myprofile img{max-width:100%;height:auto;}\n</style>", emoji: "📱", working: false };
   // change colors (general)
   if (has(/change.*color|change my colors|my colors|page colors/))
     return { text: "Colors are yours to pick — Edit Profile has color pickers for background, text, and accent, and they sit on top of your preset. Or tell me a color and a place (like \u201cpink background\u201d) and I'll build it.", emoji: taffyPickEmoji(["🎨", "✨"]), working: false };
@@ -901,9 +946,10 @@ function taffyReply(raw) {
   // Report / flag / block / bothering
   if (has(/\breport|flag|block|bother|harass|spam|scam|abuse|rude|mean to me|stalking\b/))
     return { text: taffyPick(["Got it — flag it and an admin will see it. Tap \u201cFile a report\u201d below (or head to Reports), and tell them the comment, profile, or message that doesn't belong. For anything still unresolved, email TheRarecandyreserve@proton.me.", "Say no more — that's what Reports is for. Tap \u201cFile a report\u201d, say what happened and where, and Chris will see it in the operator inbox. Blocking happens through reports too."]), emoji: taffyPickEmoji(["🛡️", "🚩"]), working: false };
-  // Contact admin / support / email / mod
-  if (has(/\b(admin|support|contact|email|mod|moderator|owner|human|someone real)\b/))
-    return { text: taffyPick(["You can reach an admin two ways: tap \u201cEmail an admin / mod\u201d below (TheRarecandyreserve@proton.me), or \u201cContact support\u201d to message Chris directly. For reports, use the Reports area — that's the operator flag inbox.", "Chris is the one who runs this place. \u201cContact support\u201d messages him directly, or email TheRarecandyreserve@proton.me. If something doesn't belong on the site, file a report instead — that's the fastest way to an admin."]), emoji: taffyPickEmoji(["✉️", "💬"]), working: false };
+  // Contact admin / support / email / mod — get a human.
+  // We don't do AI customer support here: Taffy hands you to a real person.
+  if (has(/\b(admin|support|contact|email|mod|moderator|owner|human|someone real|real person|live chat)\b/) || has(/talk to (a |someone|somebody)|speak to (a |someone|somebody)|need (a )?human|need real help|get (me )?(a )?(human|person)|real.{0,25}person/))
+    return { text: "We don't support AI customer support here, so let me get you to a human! Message Chris directly, email an admin, or file a report — all three are right here.", emoji: "🧑‍💻", human: true, working: false };
   // Profile picture
   if (has(/\b(profile picture|pfp|avatar|change my picture|upload a photo|upload a picture|profile pic|change my pfp)\b/))
     return { text: taffyPick(["Edit Profile, tap the picture box, pick a JPG, PNG, or WebP under 1.5 MB, and hit Save. If your photo's too big, a screenshot of it is usually small enough.", "Your picture lives in Edit Profile — pick a file under 1.5 MB (JPG, PNG, or WebP) and save. It'll show on your page right away. Too big? Screenshot it first."]), emoji: taffyPickEmoji(["🖼️", "✨"]), working: false };
@@ -992,21 +1038,22 @@ function taffyReply(raw) {
   else if (has(/post|sell|list|18|adult/)) steer = "the 18+ area is where posts live — you need to be age-verified first";
   var qw = kw || "that";
   return { text: taffyPick([
-    "Hmm, \u201c" + qw + "\u201d — that's a new one for me. " + steer + ". Or tap Contact support and Chris will sort you out.",
-    "You got me on that one — I don't have \u201c" + qw + "\u201d in my little brain yet. " + steer + ".",
-    "I'm not sure about \u201c" + qw + "\u201d yet, but I'm learning. " + steer + " — or ask Chris, he runs this place.",
-    "Good question, and I don't want to guess — \u201c" + qw + "\u201d isn't something I know yet. " + steer + ". If it's urgent, the Reports area reaches an admin."
-  ]), emoji: taffyPickEmoji(["🤔", ""]), working: false };
+    "Hmm, \u201c" + qw + "\u201d — that's a new one for me. " + steer + ". But we don't support AI customer support here, so let me get you to a human — message Chris, email an admin, or file a report, all right below.",
+    "You got me on that one — I don't have \u201c" + qw + "\u201d in my little brain yet. " + steer + ". If you need a real answer now, we don't do AI customer support here — tap below and a human will sort you out.",
+    "I'm not sure about \u201c" + qw + "\u201d yet, but I'm learning. " + steer + " — or get a human below, that's what they're for.",
+    "Good question, and I don't want to guess — \u201c" + qw + "\u201d isn't something I know yet. " + steer + ". If it's urgent, we don't support AI customer support here, so tap below and reach a human directly."
+  ]), emoji: taffyPickEmoji(["🤔", ""]), human: true, working: false };
 }
 function phoneChatBubbleHTML(m, idx) {
   var cls = m.who === "me" ? "tp-bubble-me" : "tp-bubble-taffy";
   var body = (m.emoji ? esc(m.emoji) + " " : "") + esc(m.text);
   var apply = "";
-  if (m.who === "taffy" && (m.css || m.html)) {
+  if (m.who === "taffy" && (m.css || m.html || m.human)) {
     apply = '<div style="margin-top:8px">';
     if (m.css) apply += '<button type="button" class="btn small" onclick="DWC.taffyApplyCSS(' + idx + ')">✨ Apply this to my layout</button>';
     if (m.html) apply += ' <button type="button" class="btn ghost small" onclick="DWC.taffyCopyHTML(' + idx + ')">📋 Copy HTML</button>';
     if (m.css) apply += '<div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all"><code>' + esc(m.css) + '</code></div>';
+    if (m.human) apply += '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"><button type="button" class="btn small" onclick="DWC.imMember(1, \'RareCandyReserve\')">💬 Contact support</button><a class="btn ghost small" href="mailto:TheRarecandyreserve@proton.me?subject=Community%20%E2%80%94%20contact%20an%20admin%20or%20mod">✉️ Email an admin / mod</a><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">🚩 File a report</button></div>';
     apply += '</div>';
   }
   return '<div class="tp-bubble ' + cls + '">' + body + apply + '</div>';
@@ -1014,12 +1061,12 @@ function phoneChatBubbleHTML(m, idx) {
 function phoneChatLogHTML() {
   return state.phoneChat.map(function (m, i) { return phoneChatBubbleHTML(m, i); }).join("");
 }
-function phoneChatAdd(who, text, emoji, css, html) {
-  state.phoneChat.push({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "" });
+function phoneChatAdd(who, text, emoji, css, html, human) {
+  state.phoneChat.push({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "", human: !!human });
   if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
   var log = document.getElementById("tp-chat-log");
   if (log) {
-    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "" }, state.phoneChat.length - 1));
+    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "", human: !!human }, state.phoneChat.length - 1));
     while (log.children.length > state.phoneChat.length) log.removeChild(log.firstChild);
     log.scrollTop = log.scrollHeight;
   }
@@ -1038,7 +1085,7 @@ function phoneTaffyHTML() {
   var chatOpen = !!state.phoneChatOpen;
   return phoneTopbarHTML("Vita Nova") + '<div class="tp-appview tp-taffy-full">' +
     '<div class="tp-taffy" id="dwc-phone-taffy" onclick="DWC.phoneChatClose()">' + taffySVG("taffy", "phone") + '</div>' +
-    '<p class="tp-note">Hi, I’m Taffy! I build layouts, help with code, and answer questions about building your site.</p>' +
+    '<p class="tp-note">Hi, I’m Taffy! I build layouts, help with code, and answer questions about building your site. If I can’t help, I’ll get you to a human — we don’t do AI customer support here.</p>' +
     '<p><button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
     taffyHelpHTML(true) +
     '<div class="tp-chat' + (chatOpen ? " open" : "") + '" id="tp-chat">' +
@@ -4489,9 +4536,9 @@ window.DWC = {
       if (reply.working && tw) tw.classList.remove("taffy-working");
       // Only append if the chat log is still on screen (user may have
       // navigated away mid-thought — the message still lands in state).
-      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji, reply.css, reply.html);
+      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji, reply.css, reply.html, reply.human);
       else {
-        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "", css: reply.css || "", html: reply.html || "" });
+        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "", css: reply.css || "", html: reply.html || "", human: !!reply.human });
         if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
       }
     }, delay);

@@ -562,6 +562,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-nut-banner{text-align:center;margin:2px 0 14px}
 .dwc-nut-line{font-size:clamp(24px,4.8vw,40px);font-weight:900;line-height:1.2;vertical-align:middle;background:linear-gradient(90deg,#ff2d95,#ff9a00,#00e5ff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 12px rgba(255,45,149,.5))}
 .dwc-18only{display:inline-block;margin-left:10px;vertical-align:middle;font-size:clamp(18px,3.4vw,28px);font-weight:900;letter-spacing:.1em;color:#fff;text-shadow:0 0 8px #ff2ea6,0 0 20px #ff2ea6,0 0 36px #ff2ea6;animation:dwcNeonFlicker2 2.4s infinite}
+.dwc-nut-sub{font-size:14px;line-height:1.5;color:var(--muted);max-width:640px;margin:8px auto 0;text-align:center}
 @keyframes dwcNeonFlicker2{0%,91%,94%,98%,100%{opacity:1}92%{opacity:.35}96%{opacity:.55}}
 /* PayPal balance rising — EXAMPLE illustration only, never a real screenshot. */
 .dwc-paypal-demo{max-width:420px;margin:14px auto 4px;border:2px solid var(--cyan);border-radius:16px;padding:14px 16px;background:#0b0b14;text-align:left;box-shadow:0 0 18px rgba(0,229,255,.3)}
@@ -780,3 +781,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-radio-name{text-align:center;font-size:18px;font-weight:700;margin:0 0 4px}
 .tp-appview audio{width:100%;margin:10px 0 4px}
 .tp-picks{margin:6px 0 0;padding-left:22px;font-size:13px;line-height:1.6}
+
+/* Member-page MySpace effects (v3.5): keyframes used by theme-generated CSS. */
+@keyframes dwcBgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes dwcMarquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+@keyframes dwcSparkleTwinkle{0%,100%{opacity:.25}50%{opacity:.9}}

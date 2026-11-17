@@ -756,6 +756,55 @@ function taffyReply(raw) {
   // Who is Taffy / tattoos
   if (has(/\b(who are you|your name|what are you|what's your name)\b/) || has(/\btattoo|904|lokos|prison|jail\b/))
     return { text: taffyPick(["I'm Taffy — your little site helper. Cute up front, and yes… my astral form has the 904 Lokos tattoos. Don't judge, I earned them. Ask me to build you a layout and watch me ascend.", "That's me — Taffy, the little helper that lives in the phone. I build layouts, help with code, and answer site questions. The tattoos are on my astral form, long story."]), emoji: taffyPickEmoji(["🍬", "😎"]), ascend: false };
+  // ---- Layout help that actually helps: real CSS + an Apply button ----
+  // Each of these returns a css snippet. The chat renders an
+  // "Apply this to my layout" button under it, which drops the CSS into
+  // the member's Custom CSS box (Edit Profile) and updates the preview.
+  // font size (the one that stumped her before)
+  if (has(/font size|bigger text|smaller text|text size|make.*text.*(bigger|smaller|larger)/))
+    return { text: "Easy — here's the CSS. Tap Apply and I'll drop it straight into your Custom CSS box, or paste it yourself in Edit Profile under MySpace layout.", css: ".dwc-myprofile{font-size:18px;} .dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", ascend: false };
+  // background color
+  if (has(/background color|change.*background|bg color|background.*(blue|pink|purple|black|dark|red|green)/))
+    return { text: "Background color, coming up. Apply it and your page goes dark purple — change the hex to any color you like in the Custom CSS box after.", css: ".dwc-myprofile{background:#12002e;}", emoji: "🎨", ascend: false };
+  // background image / GIF
+  if (has(/background image|background.*gif|gif background|add a gif|gif.*background|wallpaper/))
+    return { text: "GIF backgrounds work! Put the GIF link in the Background image URL box in Edit Profile (any https:// link), or use this CSS — swap in your own GIF link. It shows behind everything on your page.", css: '.dwc-myprofile{background-image:url("https://example.com/my-background.gif");background-size:cover;background-position:center;}', emoji: "🖼️", ascend: false };
+  // buttons glow
+  if (has(/glow.*button|button.*glow|glowing buttons|neon buttons/))
+    return { text: "Glowing buttons — yes. Apply this and every button on your page glows pink. Change the hex to glow any color.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{box-shadow:0 0 12px #ff2d95,0 0 28px #ff2d95;}", emoji: "✨", ascend: true };
+  // buttons round
+  if (has(/round buttons|rounded buttons|circle buttons/))
+    return { text: "Round buttons, done. Apply it and they all go pill-shaped. There's also a Soft Pill button preset in Edit Profile if you want it without code.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{border-radius:999px;}", emoji: "🔘", ascend: false };
+  // buttons color
+  if (has(/button color|colored buttons|change.*button|button.*color|make.*buttons.*(pink|blue|purple|red|green|gold)/))
+    return { text: "Here's a gradient for your buttons — pink to purple. Apply it, or pick a button preset in Edit Profile (Neon Glow, Arcade, RGB Gradient, Gold Luxe…) and skip the code entirely.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#ff2d95,#7c4dff);color:#fff;}", emoji: "🔘", ascend: false };
+  // headings
+  if (has(/heading.*(size|bigger|smaller)|bigger heading|change.*heading|heading.*font/))
+    return { text: "Bigger headings, here you go. Apply it and your h2s jump to 32px. Tweak the numbers to whatever size you like.", css: ".dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", ascend: false };
+  // borders
+  if (has(/border|thick border|no border|borderless/))
+    return { text: "Borders — this makes your cards pop with a thick pink border. Change the px for thicker or thinner, or the hex for a different color.", css: ".dwc-myprofile .card{border:3px solid #ff2d95;}", emoji: "🖼️", ascend: false };
+  // avatar ring
+  if (has(/avatar ring|ring around|picture border|profile pic.*border|border.*(avatar|picture|pfp)/))
+    return { text: "A ring around your picture — apply this and your avatar gets a glowing pink ring. There's also a ring thickness option in the Layout Bot.", css: ".dwc-myprofile .dwc-avatar{border:4px solid #ff2d95;box-shadow:0 0 14px #ff2d95;}", emoji: "⭕", ascend: false };
+  // spacing
+  if (has(/more space|spacing|padding|roomy|compact/))
+    return { text: "More breathing room — this pads your cards out to 28px. Lower the number for tighter, raise it for roomier.", css: ".dwc-myprofile .card{padding:28px;}", emoji: "📐", ascend: false };
+  // sparkle / glitter
+  if (has(/sparkle|glitter|twinkle|stars/))
+    return { text: "Sparkle! Apply this and your page gets a twinkling star field over it. There's also a Sparkle toggle in Edit Profile under MySpace effects.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", ascend: true };
+  // animated background
+  if (has(/animated background|moving background|rainbow background|animated.*bg/))
+    return { text: "Animated rainbow background — it slowly shifts through pink, purple, blue and green. Apply it and watch it move. There's a toggle for it in Edit Profile too.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", emoji: "🌈", ascend: true };
+  // marquee / scrolling text
+  if (has(/marquee|scrolling text|scrolling name|scrolling heading/))
+    return { text: "Old-school scrolling name — apply this and your page heading scrolls across like a 2005 MySpace page. Toggle in Edit Profile under MySpace effects too.", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}", emoji: "➡️", ascend: false };
+  // change font (family)
+  if (has(/change.*font|different font|font.*(family|style)|comic.*font|serif/))
+    return { text: "Fonts — the Font picker in Edit Profile has Comic, Typewriter, and more. Or apply this CSS for a Georgia serif look. Swap the family name for any font you like.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", emoji: "🔠", ascend: false };
+  // change colors (general)
+  if (has(/change.*color|change my colors|my colors|page colors/))
+    return { text: "Colors are yours to pick — Edit Profile has color pickers for background, text, and accent, and they sit on top of your preset. Or tell me a color and a place (like \u201cpink background\u201d) and I'll build it.", emoji: taffyPickEmoji(["🎨", "✨"]), ascend: false };
   // Joke
   if (has(/\bjoke|funny|make me laugh\b/))
     return { text: taffyPick(["Okay, one: why did the Game Boy go to therapy? It had too many unresolved pixels. …I'll stick to layouts.", "What do you call a candy that fixes your page? Taffy — that's literally my job. …Okay, I'll keep the day job."]), emoji: taffyPickEmoji(["😄", "🤣"]), ascend: false };
@@ -859,20 +908,24 @@ function taffyReply(raw) {
     "Good question, and I don't want to guess — \u201c" + qw + "\u201d isn't something I know yet. " + steer + ". If it's urgent, the Reports area reaches an admin."
   ]), emoji: taffyPickEmoji(["🤔", ""]), ascend: false };
 }
-function phoneChatBubbleHTML(m) {
+function phoneChatBubbleHTML(m, idx) {
   var cls = m.who === "me" ? "tp-bubble-me" : "tp-bubble-taffy";
   var body = (m.emoji ? esc(m.emoji) + " " : "") + esc(m.text);
-  return '<div class="tp-bubble ' + cls + '">' + body + '</div>';
+  var apply = "";
+  if (m.who === "taffy" && m.css) {
+    apply = '<div style="margin-top:8px"><button type="button" class="btn small" onclick="DWC.taffyApplyCSS(' + idx + ')">✨ Apply this to my layout</button><div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all"><code>' + esc(m.css) + '</code></div></div>';
+  }
+  return '<div class="tp-bubble ' + cls + '">' + body + apply + '</div>';
 }
 function phoneChatLogHTML() {
-  return state.phoneChat.map(phoneChatBubbleHTML).join("");
+  return state.phoneChat.map(function (m, i) { return phoneChatBubbleHTML(m, i); }).join("");
 }
-function phoneChatAdd(who, text, emoji) {
-  state.phoneChat.push({ who: who, text: text, emoji: emoji || "" });
+function phoneChatAdd(who, text, emoji, css) {
+  state.phoneChat.push({ who: who, text: text, emoji: emoji || "", css: css || "" });
   if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
   var log = document.getElementById("tp-chat-log");
   if (log) {
-    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "" }));
+    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "", css: css || "" }, state.phoneChat.length - 1));
     while (log.children.length > state.phoneChat.length) log.removeChild(log.firstChild);
     log.scrollTop = log.scrollHeight;
   }
@@ -1136,6 +1189,23 @@ function profileFormHTML(p) {
     '<input type="color" name="theme_accent_color" value="' + (th.accent_color || "#ff2d95") + '" style="width:64px;height:40px;padding:2px">' +
     '<label>Font</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
     "</div>" +
+    '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime.</p>" +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (!th.button_style ? " active" : "") + '" onclick="DWC.applyButtonStyle(\'\',this)">Default</button>' +
+    Object.keys(BUTTON_STYLES).map(function (k) {
+      return '<button type="button" class="dwc-pill' + (th.button_style === k ? " active" : "") + '" onclick="DWC.applyButtonStyle(\'' + k + '\',this)">' + esc(BUTTON_STYLES[k].label) + "</button>";
+    }).join("") + "</div>" +
+    '<input type="hidden" name="theme_button_style" value="' + esc(th.button_style || "") + '">' +
+    '<label>Custom button CSS — your own button code (glow, GIFs, whatever you want)</label>' +
+    '<textarea name="theme_button_css" rows="4" maxlength="4000" placeholder="e.g. .dwc-myprofile .btn{background:url(https://example.com/my.gif);background-size:cover;box-shadow:0 0 16px #ff2d95;}">' + esc(th.button_css || "") + "</textarea>" +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Targets the buttons on your page only. Images in url() must be https:// — a GIF URL works as a button background. CSS only, same limits as the layout box.</p>' +
+    '<h4 style="margin:14px 0 6px">✨ MySpace effects — the fun stuff</h4>' +
+    "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF background goes in the background-image URL box above — any https:// GIF works.</p>" +
+    '<div class="dwc-checkgrid">' +
+    Object.keys(MYSPACE_EFFECTS).map(function (k) {
+      return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> " + esc(MYSPACE_EFFECTS[k].label) + "</label>";
+    }).join("") + "</div>" +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div></div>" +
     '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🍬 Meet Taffy — your little site helper</h4>' +
     "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related, I'm on it.</p></div></div>" +
@@ -1370,10 +1440,14 @@ function parseThemeClient(stored) {
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
   if (!obj || typeof obj !== "object") return empty;
   var hex = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
-  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "" };
+  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", button_style: "", button_css: "", effects: [] };
   var img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = themeFontCSS(obj.font) ? obj.font : "";
+  out.button_style = (typeof BUTTON_STYLES !== "undefined" && BUTTON_STYLES[obj.button_style]) ? obj.button_style : "";
+  out.button_css = String(obj.button_css || "").slice(0, 4000);
+  var eff = Array.isArray(obj.effects) ? obj.effects : [];
+  out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 4);
   return out;
 }
 function themeCSS(theme) {
@@ -1384,6 +1458,11 @@ function themeCSS(theme) {
   if (t.text_color) css += ".dwc-myprofile{color:" + t.text_color + ";}.dwc-myprofile p,.dwc-myprofile li{color:" + t.text_color + ";}";
   if (t.accent_color) css += ".dwc-myprofile a{color:" + t.accent_color + ";}.dwc-myprofile h2,.dwc-myprofile h3{color:" + t.accent_color + ";}.dwc-myprofile .dwc-topfriend{border-color:" + t.accent_color + ";}";
   if (t.font) css += ".dwc-myprofile{font-family:" + themeFontCSS(t.font) + ";}";
+  // Buttons: preset first, then the member's own button CSS on top.
+  if (t.button_style && BUTTON_STYLES[t.button_style]) css += BUTTON_STYLES[t.button_style].css;
+  if (t.button_css) css += sanitizeLayoutCss(t.button_css);
+  // MySpace effects (opt-in toggles).
+  (t.effects || []).forEach(function (e) { if (MYSPACE_EFFECTS[e]) css += MYSPACE_EFFECTS[e].css; });
   return css;
 }
 
@@ -1406,6 +1485,29 @@ var LAYOUT_VIBES = {
 // Named background colors — [bg, bg2, light?] so a member can say
 // "dark blue background" or "pink background" and actually get it.
 // Light backgrounds flip the text dark so it stays readable.
+// Button style presets — members pick one, or write their own button CSS.
+// Each preset's CSS targets the buttons on THEIR OWN member page only
+// (.dwc-myprofile .btn and .dwc-pill). Picked in Edit Profile, stored in
+// the theme JSON as button_style; custom CSS lives in button_css.
+var BUTTON_STYLES = {
+  neon: { label: "Neon Glow", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#ff2d95,#7c4dff);color:#fff;border:2px solid #ff2d95;box-shadow:0 0 12px rgba(255,45,149,.8),0 0 28px rgba(255,45,149,.45);border-radius:12px;}" },
+  arcade: { label: "Arcade", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#00e5ff,#ff2d95);color:#04122b;font-weight:900;border:3px solid #fff;border-radius:6px;box-shadow:0 4px 0 #7c4dff;}" },
+  gradient: { label: "RGB Gradient", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#ff2d95,#7c4dff,#00e5ff);color:#fff;border:none;border-radius:12px;}" },
+  rounded: { label: "Soft Pill", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{border-radius:999px;padding:10px 22px;}" },
+  retro: { label: "MySpace 2005", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:#003399;color:#fff;border:2px solid #6699cc;border-radius:4px;box-shadow:none;font-family:Verdana,Tahoma,Arial,sans-serif;}" },
+  gold: { label: "Gold Luxe", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#d4af37,#ffec99,#d4af37);color:#1a1405;border:2px solid #d4af37;box-shadow:0 0 12px rgba(212,175,55,.55);border-radius:10px;}" },
+  ghost: { label: "Ghost", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:transparent;border:2px solid currentColor;box-shadow:none;}" }
+};
+// MySpace effects — opt-in toggles, stored in the theme JSON as effects[].
+// Each effect is CSS scoped to .dwc-myprofile (their page only). GIF
+// backgrounds work through the background-image URL picker (any https URL,
+// GIF included) — no separate effect needed for that.
+var MYSPACE_EFFECTS = {
+  "animated-bg": { label: "Animated rainbow background", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}" },
+  "sparkle": { label: "Sparkle / glitter", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#00e5ff,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
+  "marquee": { label: "Scrolling name (marquee)", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}" },
+  "glow-text": { label: "Glowing headings", css: ".dwc-myprofile h2,.dwc-myprofile h3{text-shadow:0 0 8px currentColor,0 0 22px currentColor;}" }
+};
 var NAMED_BG = {
   "dark blue": ["#0a2a5e", "#061a3d", false], "light blue": ["#a8d8ff", "#7ab8f0", true],
   "blue": ["#1a5fb4", "#0d3f8a", false], "pink": ["#ff2d95", "#c40e6e", false],
@@ -1442,6 +1544,17 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
   var glow = v.glow;
   if (/\bglow|neon|bright|shine|lit\b/.test(m)) glow = "0 0 18px " + acc + ", 0 0 34px " + acc;
   if (/\bno glow|flat|plain|matte\b/.test(m)) glow = "none";
+  // --- glowing buttons ("glowing buttons", "glow buttons") ---
+  var btnGlow = "";
+  if (/\bglow(ing)? buttons?\b/.test(m)) btnGlow = "0 0 12px " + acc + ", 0 0 28px " + acc;
+  // --- MySpace effects ("sparkle", "animated background", "marquee", "font size") ---
+  var fxCss = "";
+  if (/\bsparkle|glitter|twinkle\b/.test(m)) fxCss += ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}";
+  if (/\banimated background|moving background|rainbow background\b/.test(m)) fxCss += ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}";
+  if (/\bmarquee|scrolling (text|name|heading)\b/.test(m)) fxCss += ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}";
+  var bodySize = "";
+  if (/\b(bigger|big|large) text\b/.test(m)) bodySize = "18px";
+  if (/\b(small|smaller|tiny) text\b/.test(m)) bodySize = "13px";
   // --- background color by name ("dark blue background", "pink bg", "background red") ---
   var bg = v.bg, bg2 = v.bg2, text = v.text, muted = v.muted, link = v.link, heading = v.heading;
   var bgKey = null;
@@ -1500,9 +1613,11 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
     ".dwc-myprofile .dwc-meta{color:" + muted + ";}" +
     ".dwc-myprofile a{color:" + link + ";}" +
     ".dwc-myprofile .dwc-avatar{border:" + avBorder + " solid " + acc + ";box-shadow:" + glow + ";}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg," + btnAcc + "," + v.accent2 + ");" + (btnRadius ? "border-radius:" + btnRadius + ";" : "") + (btnSize ? "font-size:" + btnSize + ";" : "") + (btnPad ? "padding:" + btnPad + ";" : "") + "}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg," + btnAcc + "," + v.accent2 + ");" + (btnRadius ? "border-radius:" + btnRadius + ";" : "") + (btnSize ? "font-size:" + btnSize + ";" : "") + (btnPad ? "padding:" + btnPad + ";" : "") + (btnGlow ? "box-shadow:" + btnGlow + ";" : "") + "}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid " + acc + ";border-radius:" + radius + ";}" +
-    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid " + acc + ";}"
+    ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid " + acc + ";}" +
+    (bodySize ? ".dwc-myprofile{font-size:" + bodySize + ";}" : "") +
+    fxCss
   );
 }
 
@@ -2703,11 +2818,12 @@ async function renderAgeBlock() {
 // right before the "After Dark — 18+" heading.
 var MATCH_BANNER_HTML =
   '<div class="dwc-match-banner">Get matched with buyers &amp; sellers fast!</div>';
-// "Get your nut, and protect it too!!" + neon 18+ only + a PayPal balance
+// "Welcome to the after dark reserve…" + neon 18+ only + a PayPal balance
 // rising demo (CSS/SVG animation — clearly labeled EXAMPLE, never a real
 // PayPal screenshot). Sits above the main 18+ welcome picture.
 var NUT_BANNER_HTML =
-  '<div class="dwc-nut-banner"><span class="dwc-nut-line">Get your nut, and protect it too!!</span><span class="dwc-18only">18+ only</span>' +
+  '<div class="dwc-nut-banner"><span class="dwc-nut-line">Welcome to the after dark reserve, where money flows &amp; your content is watermarked to prevent anyone using it!</span><span class="dwc-18only">18+ only</span>' +
+  '<p class="dwc-nut-sub">Optional blur face ability when uploading your content, but remember all digital files can be sold — not just your content, but your apps, 3D models, game assets, art, NFTs, and any digital file you can think of!</p>' +
   '<div class="dwc-paypal-demo"><div class="dwc-paypal-label">Example — illustration only, not a real PayPal screenshot</div>' +
   '<div class="dwc-paypal-balance">$1,240.00 <small>▲ +$12.50 just now</small></div>' +
   '<p class="dwc-paypal-note">PayPal balance rising — sales land here the moment buyers pay.</p>' +
@@ -3090,6 +3206,12 @@ window.DWC = {
       if (fd.get("theme_accent_use")) theme.accent_color = hexOk(fd.get("theme_accent_color"));
       var fontSel = String(fd.get("theme_font") || "");
       if (themeFontCSS(fontSel)) theme.font = fontSel;
+      var btnStyle = String(fd.get("theme_button_style") || "");
+      if (BUTTON_STYLES[btnStyle]) theme.button_style = btnStyle;
+      var btnCss = String(fd.get("theme_button_css") || "").slice(0, 4000);
+      if (btnCss.trim()) theme.button_css = btnCss;
+      var effs = fd.getAll ? fd.getAll("theme_effects") : [];
+      theme.effects = effs.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 4);
       body.profile_theme = JSON.stringify(theme);
     }
     // Music (v3.1) — A Steady Heart track picks (max 5) + the opt-in
@@ -3841,9 +3963,9 @@ window.DWC = {
       if (reply.ascend && tw) tw.classList.remove("taffy-working");
       // Only append if the chat log is still on screen (user may have
       // navigated away mid-thought — the message still lands in state).
-      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji);
+      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji, reply.css);
       else {
-        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "" });
+        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "", css: reply.css || "" });
         if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
       }
     }, delay);
@@ -3878,6 +4000,44 @@ window.DWC = {
   phoneSos: function () {
     DWC.phoneMinimize();
     DWC.go("reports");
+  },
+  // Button style picker — sets the hidden theme_button_style field and
+  // marks the picked pill active. Saved with the rest of the profile.
+  // Taffy "Apply this to my layout" — drops the snippet Taffy just gave
+  // into the Custom CSS box in Edit Profile and updates the live preview.
+  // Guests get sent to create an account first (layouts live on a profile).
+  taffyApplyCSS: function (idx) {
+    var m = state.phoneChat[idx];
+    var css = m && m.css;
+    if (!css) return;
+    if (!state.profile) {
+      DWC.phoneMinimize();
+      DWC.openSignup();
+      setNotice("Create your account first — layouts live on your profile, then Taffy can apply them for you.");
+      return;
+    }
+    DWC.phoneMinimize();
+    DWC.editProfile();
+    setTimeout(function () {
+      var ta = document.querySelector('textarea[name="layout_css"]');
+      if (!ta) { setNotice("Open Edit profile and paste this into Custom CSS."); return; }
+      var cur = ta.value || "";
+      if (cur && cur.slice(-1) !== "\n") cur += "\n";
+      ta.value = cur + css + "\n";
+      if (typeof DWC.layoutCssEdited === "function") DWC.layoutCssEdited(ta);
+      ta.scrollIntoView({ behavior: "smooth", block: "center" });
+      ta.focus();
+      setNotice("Added to your Custom CSS — hit Save profile to keep it.");
+    }, 150);
+  },
+  applyButtonStyle: function (id, btn) {
+    var form = btn ? btn.closest("form") : null;
+    if (!form) return;
+    var hidden = form.querySelector('input[name="theme_button_style"]');
+    if (hidden) hidden.value = id || "";
+    var pills = form.querySelectorAll('[onclick^="DWC.applyButtonStyle"]');
+    pills.forEach(function (p) { p.classList.remove("active"); });
+    if (btn) btn.classList.add("active");
   },
   phoneOpenEditor: function () {
     DWC.phoneMinimize();

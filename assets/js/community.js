@@ -537,7 +537,7 @@ function renderAccount() {
 }
 
 // ---------- Taffy — the little site helper (ONE helper, v5) ----------
-// v5: ASCENSION — inspired by Shawn Hocking's astral artwork (the reference
+// v5: WORKING — inspired by Shawn Hocking's astral artwork (the reference
 // Chris sent): a glowing figure, arms OUTSTRETCHED to the sides, radiant
 // head, inside a big glowing rune mandala, energy streaming up and down in
 // purple and gold. KEEP Taffy's v4 look (Game Boy-type creature, ORIGINAL
@@ -546,12 +546,11 @@ function renderAccount() {
 // keyboard, keys and cursor are GONE.
 // Idle/talking: adorable and helpful — smiling, winking, mouth moving when
 // talking, arms waving around a bit. Friendly, alive.
-// Working (loading information): ASCENSION. Taffy floats in a meditation
+// Working (loading information): Taffy floats in a meditation
 // pose, a radiant glowing mandala behind him, light rays streaming up and
 // down, and his ASTRAL FORM — a glowing spirit with arms OUTSTRETCHED and a
 // radiant head, just like the figure in the reference — rises out of him and
-// bobs up a bit, down, up, down, like he's stuck ascending while he loads
-// the information. The astral form shows the "904 Lokos" prison tattoos.
+// bobs up a bit, down, up, down, while he loads the information. The astral form shows the "904 Lokos" prison tattoos.
 // That is the .taffy-working loop. CSS only.
 // Mood swings are a FUTURE step.
 // The standalone asset lives at images/taffy-helper.svg.
@@ -771,7 +770,8 @@ function phoneHomeHTML() {
 // ---------- Taffy chat — lightweight, client-side only ----------
 // No AI API, no network, no heavy model. Pure keyword/pattern matching
 // over a small intent table. Fast, tiny, and honest about what it knows.
-// Returns { text, emoji, ascend }. `ascend` = play the ascension loop
+// Returns { text, emoji, working }. `working` = play the working animation
+// (the astral form rising, mandala glowing) while Taffy "thinks".
 // while Taffy "thinks" (layout builds + code questions).
 var TAFFY_EMOJI_IDX = 0;
 function taffyPickEmoji(list) {
@@ -798,152 +798,190 @@ function taffyColorWord(t) {
   var m = t.match(/\b(pink|blue|purple|green|red|orange|gold|yellow|black|white|teal|cyan|magenta|violet)\b/);
   return m ? m[1] : "";
 }
+// Build a whole profile theme from a natural request ("make me a profile
+// with rgb colors and gradient mixing, make the buttons flash like neon
+// signs"). Returns the raw CSS (for Apply) plus a self-contained <style>
+// block (for Copy HTML) with every keyframe the CSS uses, so it works
+// anywhere it's pasted — not just on this site.
+function buildProfileFromRequest(raw) {
+  var mood = String(raw || "").toLowerCase();
+  var css = buildLayoutFromVibe("neon", "", mood);
+  var feats = [];
+  if (/\brgb\b|\bgradient\b/.test(mood)) feats.push("RGB gradient");
+  if (/\b(flash|flashing|flicker|flickering)\b/.test(mood) && /\bbuttons?\b/.test(mood)) feats.push("flickering neon buttons");
+  if (/\bglow(ing)?\b/.test(mood)) feats.push("glow");
+  if (/\bsparkle|glitter|twinkle\b/.test(mood)) feats.push("sparkle");
+  if (/\bround buttons?\b/.test(mood)) feats.push("round buttons");
+  if (/\bmarquee|scrolling\b/.test(mood)) feats.push("scrolling name");
+  // Keyframes the CSS references but doesn't define (the site defines
+  // these globally; the copied HTML must carry them to work standalone).
+  // neonFlicker is already in the CSS itself, so it's not re-added here.
+  var keys = "";
+  if (/dwcBgShift/.test(css)) keys += "@keyframes dwcBgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}";
+  if (/dwcSparkleTwinkle/.test(css)) keys += "@keyframes dwcSparkleTwinkle{0%,100%{opacity:.25}50%{opacity:.9}}";
+  if (/dwcMarquee/.test(css)) keys += "@keyframes dwcMarquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}";
+  var html = "<style>\n" + css + (keys ? "\n" + keys : "") + "\n</style>";
+  return { css: css, html: html, feats: feats };
+}
 function taffyReply(raw) {
   var t = (" " + (raw || "").toLowerCase().replace(/[^a-z0-9' ]/g, " ") + " ");
   var has = function (re) { return re.test(t); };
   var wordCount = t.trim().split(/\s+/).filter(function (w) { return !!w; }).length;
   // Greeting (only when that's basically all they said)
   if (wordCount <= 4 && has(/\b(hi|hello|hey|yo|hiya|howdy|good morning|good afternoon|good evening|sup)\b/))
-    return { text: taffyPick(["Hey hey! Good to see you. Ask me about layouts, selling, reports, music, or code — or just say hi back.", "Hey! Taffy here. What's on your mind — a layout, selling something, or just saying hi?", "Hi hi! I'm all ears. Try \u201cbuild me a layout\u201d or \u201chow do I sell?\u201d — or just chat."]), emoji: taffyPickEmoji(["👋", "😊", "✨"]), ascend: false };
+    return { text: taffyPick(["Hey hey! Good to see you. Ask me about layouts, selling, reports, music, or code — or just say hi back.", "Hey! Taffy here. What's on your mind — a layout, selling something, or just saying hi?", "Hi hi! I'm all ears. Try \u201cbuild me a layout\u201d or \u201chow do I sell?\u201d — or just chat."]), emoji: taffyPickEmoji(["👋", "😊", "✨"]), working: false };
   // Who is Taffy / tattoos
   if (has(/\b(who are you|your name|what are you|what's your name)\b/) || has(/\btattoo|904|lokos|prison|jail\b/))
-    return { text: taffyPick(["I'm Taffy — your little site helper. Cute up front, and yes… my astral form has the 904 Lokos tattoos. Don't judge, I earned them. Ask me to build you a layout and watch me ascend.", "That's me — Taffy, the little helper that lives in the phone. I build layouts, help with code, and answer site questions. The tattoos are on my astral form, long story."]), emoji: taffyPickEmoji(["🍬", "😎"]), ascend: false };
+    return { text: taffyPick(["I'm Taffy — your little site helper. Cute up front, and yes… my astral form has the 904 Lokos tattoos. Don't judge, I earned them. Ask me to build you a layout and watch me work.", "That's me — Taffy, the little helper that lives in the phone. I build layouts, help with code, and answer site questions. The tattoos are on my astral form, long story."]), emoji: taffyPickEmoji(["🍬", "😎"]), working: false };
+  // ---- Build me a whole profile: a natural request -> full theme + copyable HTML ----
+  // "make me a profile with rgb colors and gradient mixing, make the buttons
+  // flash like neon signs, and write the html out for me to copy." This runs
+  // before the single-feature intents so a combined request builds the whole
+  // thing instead of answering just one piece of it.
+  if (has(/\b(make|build|create|design)\b.{0,25}\b(my )?(profile|layout|theme|page)\b/) || (has(/\bhtml\b/) && has(/\b(copy|write|give|show|paste)\b/) && has(/\b(profile|layout|theme|page|my)\b/))) {
+    var prof = buildProfileFromRequest(raw);
+    var featText = prof.feats.length ? " — " + prof.feats.join(", ") : "";
+    return { text: "Built it" + featText + ". Tap Apply to drop it straight into your Custom CSS, or Copy HTML to take the whole thing with you.", css: prof.css, html: prof.html, emoji: "🎨", working: true };
+  }
   // ---- Layout help that actually helps: real CSS + an Apply button ----
   // Each of these returns a css snippet. The chat renders an
   // "Apply this to my layout" button under it, which drops the CSS into
   // the member's Custom CSS box (Edit Profile) and updates the preview.
   // font size (the one that stumped her before)
   if (has(/font size|bigger text|smaller text|text size|make.*text.*(bigger|smaller|larger)/))
-    return { text: "Easy — here's the CSS. Tap Apply and I'll drop it straight into your Custom CSS box, or paste it yourself in Edit Profile under MySpace layout.", css: ".dwc-myprofile{font-size:18px;} .dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", ascend: false };
+    return { text: "Easy — here's the CSS. Tap Apply and I'll drop it straight into your Custom CSS box, or paste it yourself in Edit Profile under MySpace layout.", css: ".dwc-myprofile{font-size:18px;} .dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", working: false };
   // background color
   if (has(/background color|change.*background|bg color|background.*(blue|pink|purple|black|dark|red|green)/))
-    return { text: "Background color, coming up. Apply it and your page goes dark purple — change the hex to any color you like in the Custom CSS box after.", css: ".dwc-myprofile{background:#12002e;}", emoji: "🎨", ascend: false };
+    return { text: "Background color, coming up. Apply it and your page goes dark purple — change the hex to any color you like in the Custom CSS box after.", css: ".dwc-myprofile{background:#12002e;}", emoji: "🎨", working: false };
   // background image / GIF
   if (has(/background image|background.*gif|gif background|add a gif|gif.*background|wallpaper/))
-    return { text: "GIF backgrounds work! Put the GIF link in the Background image URL box in Edit Profile (any https:// link), or use this CSS — swap in your own GIF link. It shows behind everything on your page.", css: '.dwc-myprofile{background-image:url("https://example.com/my-background.gif");background-size:cover;background-position:center;}', emoji: "🖼️", ascend: false };
+    return { text: "GIF backgrounds work! Put the GIF link in the Background image URL box in Edit Profile (any https:// link), or use this CSS — swap in your own GIF link. It shows behind everything on your page.", css: '.dwc-myprofile{background-image:url("https://example.com/my-background.gif");background-size:cover;background-position:center;}', emoji: "🖼️", working: false };
+  // buttons flicker / flash like neon signs
+  if (has(/\b(flash|flashing|flicker|flickering)\b/) && has(/\bbuttons?\b/))
+    return { text: "Flickering neon buttons — yes. Apply this and your buttons flash like a neon sign. The keyframes come with it, so it works wherever you paste it.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{box-shadow:0 0 12px #ff2d95,0 0 28px #ff2d95;animation:neonFlicker 2.4s infinite;}@keyframes neonFlicker{0%,91%,94%,98%,100%{opacity:1}92%{opacity:.3}96%{opacity:.6}}", html: "<style>\n.dwc-myprofile .btn,.dwc-myprofile .dwc-pill{box-shadow:0 0 12px #ff2d95,0 0 28px #ff2d95;animation:neonFlicker 2.4s infinite;}\n@keyframes neonFlicker{0%,91%,94%,98%,100%{opacity:1}92%{opacity:.3}96%{opacity:.6}}\n</style>", emoji: "✨", working: true };
   // buttons glow
   if (has(/glow.*button|button.*glow|glowing buttons|neon buttons/))
-    return { text: "Glowing buttons — yes. Apply this and every button on your page glows pink. Change the hex to glow any color.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{box-shadow:0 0 12px #ff2d95,0 0 28px #ff2d95;}", emoji: "✨", ascend: true };
+    return { text: "Glowing buttons — yes. Apply this and every button on your page glows pink. Change the hex to glow any color.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{box-shadow:0 0 12px #ff2d95,0 0 28px #ff2d95;}", emoji: "✨", working: true };
   // buttons round
-  if (has(/round buttons|rounded buttons|circle buttons/))
-    return { text: "Round buttons, done. Apply it and they all go pill-shaped. There's also a Soft Pill button preset in Edit Profile if you want it without code.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{border-radius:999px;}", emoji: "🔘", ascend: false };
+  if (has(/round buttons|rounded buttons|circle buttons|buttons?.{0,12}\bround\b/))
+    return { text: "Round buttons, done. Apply it and they all go pill-shaped. There's also a Soft Pill button preset in Edit Profile if you want it without code.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{border-radius:999px;}", emoji: "🔘", working: false };
   // buttons color
   if (has(/button color|colored buttons|change.*button|button.*color|make.*buttons.*(pink|blue|purple|red|green|gold)/))
-    return { text: "Here's a gradient for your buttons — pink to purple. Apply it, or pick a button preset in Edit Profile (Neon Glow, Arcade, RGB Gradient, Gold Luxe…) and skip the code entirely.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#ff2d95,#7c4dff);color:#fff;}", emoji: "🔘", ascend: false };
+    return { text: "Here's a gradient for your buttons — pink to purple. Apply it, or pick a button preset in Edit Profile (Neon Glow, Arcade, RGB Gradient, Gold Luxe…) and skip the code entirely.", css: ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{background:linear-gradient(90deg,#ff2d95,#7c4dff);color:#fff;}", emoji: "🔘", working: false };
   // headings
   if (has(/heading.*(size|bigger|smaller)|bigger heading|change.*heading|heading.*font/))
-    return { text: "Bigger headings, here you go. Apply it and your h2s jump to 32px. Tweak the numbers to whatever size you like.", css: ".dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", ascend: false };
+    return { text: "Bigger headings, here you go. Apply it and your h2s jump to 32px. Tweak the numbers to whatever size you like.", css: ".dwc-myprofile h2{font-size:32px;} .dwc-myprofile h3{font-size:24px;}", emoji: "🔠", working: false };
   // borders
   if (has(/border|thick border|no border|borderless/))
-    return { text: "Borders — this makes your cards pop with a thick pink border. Change the px for thicker or thinner, or the hex for a different color.", css: ".dwc-myprofile .card{border:3px solid #ff2d95;}", emoji: "🖼️", ascend: false };
+    return { text: "Borders — this makes your cards pop with a thick pink border. Change the px for thicker or thinner, or the hex for a different color.", css: ".dwc-myprofile .card{border:3px solid #ff2d95;}", emoji: "🖼️", working: false };
   // avatar ring
   if (has(/avatar ring|ring around|picture border|profile pic.*border|border.*(avatar|picture|pfp)/))
-    return { text: "A ring around your picture — apply this and your avatar gets a glowing pink ring. There's also a ring thickness option in the Layout Bot.", css: ".dwc-myprofile .dwc-avatar{border:4px solid #ff2d95;box-shadow:0 0 14px #ff2d95;}", emoji: "⭕", ascend: false };
+    return { text: "A ring around your picture — apply this and your avatar gets a glowing pink ring. There's also a ring thickness option in the Layout Bot.", css: ".dwc-myprofile .dwc-avatar{border:4px solid #ff2d95;box-shadow:0 0 14px #ff2d95;}", emoji: "⭕", working: false };
   // spacing
   if (has(/more space|spacing|padding|roomy|compact/))
-    return { text: "More breathing room — this pads your cards out to 28px. Lower the number for tighter, raise it for roomier.", css: ".dwc-myprofile .card{padding:28px;}", emoji: "📐", ascend: false };
+    return { text: "More breathing room — this pads your cards out to 28px. Lower the number for tighter, raise it for roomier.", css: ".dwc-myprofile .card{padding:28px;}", emoji: "📐", working: false };
   // sparkle / glitter
   if (has(/sparkle|glitter|twinkle|stars/))
-    return { text: "Sparkle! Apply this and your page gets a twinkling star field over it. There's also a Sparkle toggle in Edit Profile under MySpace effects.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", ascend: true };
+    return { text: "Sparkle! Apply this and your page gets a twinkling star field over it. There's also a Sparkle toggle in Edit Profile under MySpace effects.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", working: true };
   // animated background
   if (has(/animated background|moving background|rainbow background|animated.*bg/))
-    return { text: "Animated rainbow background — it slowly shifts through pink, purple, blue and green. Apply it and watch it move. There's a toggle for it in Edit Profile too.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", emoji: "🌈", ascend: true };
+    return { text: "Animated rainbow background — it slowly shifts through pink, purple, blue and green. Apply it and watch it move. There's a toggle for it in Edit Profile too.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", emoji: "🌈", working: true };
   // marquee / scrolling text
   if (has(/marquee|scrolling text|scrolling name|scrolling heading/))
-    return { text: "Old-school scrolling name — apply this and your page heading scrolls across like a 2005 MySpace page. Toggle in Edit Profile under MySpace effects too.", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}", emoji: "➡️", ascend: false };
+    return { text: "Old-school scrolling name — apply this and your page heading scrolls across like a 2005 MySpace page. Toggle in Edit Profile under MySpace effects too.", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}", emoji: "➡️", working: false };
   // change font (family)
   if (has(/change.*font|different font|font.*(family|style)|comic.*font|serif/))
-    return { text: "Fonts — the Font picker in Edit Profile has Comic, Typewriter, and more. Or apply this CSS for a Georgia serif look. Swap the family name for any font you like.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", emoji: "🔠", ascend: false };
+    return { text: "Fonts — the Font picker in Edit Profile has Comic, Typewriter, and more. Or apply this CSS for a Georgia serif look. Swap the family name for any font you like.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", emoji: "🔠", working: false };
   // change colors (general)
   if (has(/change.*color|change my colors|my colors|page colors/))
-    return { text: "Colors are yours to pick — Edit Profile has color pickers for background, text, and accent, and they sit on top of your preset. Or tell me a color and a place (like \u201cpink background\u201d) and I'll build it.", emoji: taffyPickEmoji(["🎨", "✨"]), ascend: false };
+    return { text: "Colors are yours to pick — Edit Profile has color pickers for background, text, and accent, and they sit on top of your preset. Or tell me a color and a place (like \u201cpink background\u201d) and I'll build it.", emoji: taffyPickEmoji(["🎨", "✨"]), working: false };
   // Joke
   if (has(/\bjoke|funny|make me laugh\b/))
-    return { text: taffyPick(["Okay, one: why did the Game Boy go to therapy? It had too many unresolved pixels. …I'll stick to layouts.", "What do you call a candy that fixes your page? Taffy — that's literally my job. …Okay, I'll keep the day job."]), emoji: taffyPickEmoji(["😄", "🤣"]), ascend: false };
+    return { text: taffyPick(["Okay, one: why did the Game Boy go to therapy? It had too many unresolved pixels. …I'll stick to layouts.", "What do you call a candy that fixes your page? Taffy — that's literally my job. …Okay, I'll keep the day job."]), emoji: taffyPickEmoji(["😄", "🤣"]), working: false };
   // Report / flag / block / bothering
   if (has(/\breport|flag|block|bother|harass|spam|scam|abuse|rude|mean to me|stalking\b/))
-    return { text: taffyPick(["Got it — flag it and an admin will see it. Tap \u201cFile a report\u201d below (or head to Reports), and tell them the comment, profile, or message that doesn't belong. For anything still unresolved, email TheRarecandyreserve@proton.me.", "Say no more — that's what Reports is for. Tap \u201cFile a report\u201d, say what happened and where, and Chris will see it in the operator inbox. Blocking happens through reports too."]), emoji: taffyPickEmoji(["🛡️", "🚩"]), ascend: false };
+    return { text: taffyPick(["Got it — flag it and an admin will see it. Tap \u201cFile a report\u201d below (or head to Reports), and tell them the comment, profile, or message that doesn't belong. For anything still unresolved, email TheRarecandyreserve@proton.me.", "Say no more — that's what Reports is for. Tap \u201cFile a report\u201d, say what happened and where, and Chris will see it in the operator inbox. Blocking happens through reports too."]), emoji: taffyPickEmoji(["🛡️", "🚩"]), working: false };
   // Contact admin / support / email / mod
   if (has(/\b(admin|support|contact|email|mod|moderator|owner|human|someone real)\b/))
-    return { text: taffyPick(["You can reach an admin two ways: tap \u201cEmail an admin / mod\u201d below (TheRarecandyreserve@proton.me), or \u201cContact support\u201d to message Chris directly. For reports, use the Reports area — that's the operator flag inbox.", "Chris is the one who runs this place. \u201cContact support\u201d messages him directly, or email TheRarecandyreserve@proton.me. If something doesn't belong on the site, file a report instead — that's the fastest way to an admin."]), emoji: taffyPickEmoji(["✉️", "💬"]), ascend: false };
+    return { text: taffyPick(["You can reach an admin two ways: tap \u201cEmail an admin / mod\u201d below (TheRarecandyreserve@proton.me), or \u201cContact support\u201d to message Chris directly. For reports, use the Reports area — that's the operator flag inbox.", "Chris is the one who runs this place. \u201cContact support\u201d messages him directly, or email TheRarecandyreserve@proton.me. If something doesn't belong on the site, file a report instead — that's the fastest way to an admin."]), emoji: taffyPickEmoji(["✉️", "💬"]), working: false };
   // Profile picture
   if (has(/\b(profile picture|pfp|avatar|change my picture|upload a photo|upload a picture|profile pic|change my pfp)\b/))
-    return { text: taffyPick(["Edit Profile, tap the picture box, pick a JPG, PNG, or WebP under 1.5 MB, and hit Save. If your photo's too big, a screenshot of it is usually small enough.", "Your picture lives in Edit Profile — pick a file under 1.5 MB (JPG, PNG, or WebP) and save. It'll show on your page right away. Too big? Screenshot it first."]), emoji: taffyPickEmoji(["🖼️", "✨"]), ascend: false };
+    return { text: taffyPick(["Edit Profile, tap the picture box, pick a JPG, PNG, or WebP under 1.5 MB, and hit Save. If your photo's too big, a screenshot of it is usually small enough.", "Your picture lives in Edit Profile — pick a file under 1.5 MB (JPG, PNG, or WebP) and save. It'll show on your page right away. Too big? Screenshot it first."]), emoji: taffyPickEmoji(["🖼️", "✨"]), working: false };
   // My links
   if (has(/\b(add a link|my links|links on my page|attach a link|add links|add a button)\b/))
-    return { text: taffyPick(["Edit Profile, find \u201cMy links\u201d, type a label and a URL, hit \u201c+ Add a link\u201d, and save — they show up as buttons on your page. Up to 5.", "Adding a link is easy: Edit Profile \u2192 My links \u2192 label + URL \u2192 save. They show as clean buttons on your page. You can have up to 5."]), emoji: taffyPickEmoji(["🔗", "✨"]), ascend: false };
+    return { text: taffyPick(["Edit Profile, find \u201cMy links\u201d, type a label and a URL, hit \u201c+ Add a link\u201d, and save — they show up as buttons on your page. Up to 5.", "Adding a link is easy: Edit Profile \u2192 My links \u2192 label + URL \u2192 save. They show as clean buttons on your page. You can have up to 5."]), emoji: taffyPickEmoji(["🔗", "✨"]), working: false };
   // Delete a post (before the post intent)
   if (has(/\b(delete|remove) (a |my |the )?post\b/))
-    return { text: taffyPick(["Open your own post and hit Delete — it's yours, it goes away. If it's someone else's post that doesn't belong, report it instead.", "Your post, your call — open it and delete it. Someone else's post bothering you? That's a report, not a delete."]), emoji: taffyPickEmoji(["🗑️", "✨"]), ascend: false };
+    return { text: taffyPick(["Open your own post and hit Delete — it's yours, it goes away. If it's someone else's post that doesn't belong, report it instead.", "Your post, your call — open it and delete it. Someone else's post bothering you? That's a report, not a delete."]), emoji: taffyPickEmoji(["🗑️", "✨"]), working: false };
   // 18+ post (before the general post intent)
   if (has(/\b(18\+|adult|after dark)\b/))
-    return { text: taffyPick(["You need to be age-verified first — that's an ID check Chris reviews. Once you're verified, the 18+ area lets you Create a post with a genre and a price.", "The 18+ area is age-verified only. Get verified, then hit Create, pick Photos, Videos, or whatever you're selling, set a price, and post."]), emoji: taffyPickEmoji(["🔞", "✨"]), ascend: false };
+    return { text: taffyPick(["You need to be age-verified first — that's an ID check Chris reviews. Once you're verified, the 18+ area lets you Create a post with a genre and a price.", "The 18+ area is age-verified only. Get verified, then hit Create, pick Photos, Videos, or whatever you're selling, set a price, and post."]), emoji: taffyPickEmoji(["🔞", "✨"]), working: false };
   // Post / list an item
   if (has(/\b(post|create a post|make a post|list an item|list something|make a listing|create a listing|how do i list)\b/))
-    return { text: taffyPick(["To list something, go to the 18+ area and hit Create — pick Photos, Videos, or whatever you're selling, add a price (0 is free), and post it. Buyers find you through Find a Seller.", "Posting is simple: in the 18+ area, hit Create, pick a genre, set your price, add your tags, and post. Age-verified members only."]), emoji: taffyPickEmoji(["📝", "✨"]), ascend: false };
+    return { text: taffyPick(["To list something, go to the 18+ area and hit Create — pick Photos, Videos, or whatever you're selling, add a price (0 is free), and post it. Buyers find you through Find a Seller.", "Posting is simple: in the 18+ area, hit Create, pick a genre, set your price, add your tags, and post. Age-verified members only."]), emoji: taffyPickEmoji(["📝", "✨"]), working: false };
   // Buy
   if (has(/\b(buy|purchase|how do i buy|buying)\b/))
-    return { text: taffyPick(["Find a post you like, tap it, and message the seller in a private chat to sort out payment. Once it's done, tap \u201cTransaction done\u201d in the chat so you both get a receipt.", "Buying works through private chat — find the post, message the seller, agree on payment, and mark it done with the receipt button so there's a record."]), emoji: taffyPickEmoji(["🛒", "💰"]), ascend: false };
+    return { text: taffyPick(["Find a post you like, tap it, and message the seller in a private chat to sort out payment. Once it's done, tap \u201cTransaction done\u201d in the chat so you both get a receipt.", "Buying works through private chat — find the post, message the seller, agree on payment, and mark it done with the receipt button so there's a record."]), emoji: taffyPickEmoji(["🛒", "💰"]), working: false };
   // Pay / payment
   if (has(/\b(pay|payment|paypal|stripe|checkout|how do i pay)\b/))
-    return { text: taffyPick(["The shop takes PayPal and Stripe — hit Buy with PayPal or the Stripe button on any listing. In the Community, you and the seller agree payment in private chat.", "For shop stuff, it's PayPal or Stripe right on the listing. For Community sales, you pay the seller however you both agree in private chat — then mark the receipt done."]), emoji: taffyPickEmoji(["💳", "💰"]), ascend: false };
+    return { text: taffyPick(["The shop takes PayPal and Stripe — hit Buy with PayPal or the Stripe button on any listing. In the Community, you and the seller agree payment in private chat.", "For shop stuff, it's PayPal or Stripe right on the listing. For Community sales, you pay the seller however you both agree in private chat — then mark the receipt done."]), emoji: taffyPickEmoji(["💳", "💰"]), working: false };
   // Find a seller / buyer
   if (has(/\b(find a seller|find a buyer|find someone|find sellers|find buyers|find a match)\b/))
-    return { text: taffyPick(["Hit Find (or Find a Seller / Find a Buyer) and tell it what you want or what you sell — it matches you up and you message them privately.", "The Find area is your matchmaker — set what you're after or what you sell, and it shows you the best matches. Message them privately from there."]), emoji: taffyPickEmoji(["🔍", "✨"]), ascend: false };
+    return { text: taffyPick(["Hit Find (or Find a Seller / Find a Buyer) and tell it what you want or what you sell — it matches you up and you message them privately.", "The Find area is your matchmaker — set what you're after or what you sell, and it shows you the best matches. Message them privately from there."]), emoji: taffyPickEmoji(["🔍", "✨"]), working: false };
   // Payout / get paid
   if (has(/\b(payout|get paid|receive money|how do i get paid|how do i receive)\b/))
-    return { text: taffyPick(["Set your payout method and handle in Edit Profile — that's how sellers get paid. The Community takes 1.5% once when the sale completes and you're paid.", "Getting paid starts in Edit Profile — put in your payout method and handle. When a sale completes, the buyer pays you, and the Community takes its 1.5% once."]), emoji: taffyPickEmoji(["💰", "✨"]), ascend: false };
+    return { text: taffyPick(["Set your payout method and handle in Edit Profile — that's how sellers get paid. The Community takes 1.5% once when the sale completes and you're paid.", "Getting paid starts in Edit Profile — put in your payout method and handle. When a sale completes, the buyer pays you, and the Community takes its 1.5% once."]), emoji: taffyPickEmoji(["💰", "✨"]), working: false };
   // Fee
   if (has(/\b(fee|fees|1\.5|commission|what do you take|how much does it cost)\b/))
-    return { text: taffyPick(["The Community takes 1.5% once — and only once — when a sale completes and you've been paid. No monthly fee, no listing fee, no cut on the way in.", "Just 1.5%, once, when the sale is done and you're paid. That's it — no listing fees, no monthly fees."]), emoji: taffyPickEmoji(["💰", "🍬"]), ascend: false };
+    return { text: taffyPick(["The Community takes 1.5% once — and only once — when a sale completes and you've been paid. No monthly fee, no listing fee, no cut on the way in.", "Just 1.5%, once, when the sale is done and you're paid. That's it — no listing fees, no monthly fees."]), emoji: taffyPickEmoji(["💰", "🍬"]), working: false };
   // Receipts
   if (has(/\b(receipt|receipts|proof of purchase|transaction done)\b/))
-    return { text: taffyPick(["In a private chat, tap \u201cTransaction done\u201d, put in the amount and whether you bought or sold — it saves a receipt for both of you before the chat deletes. You can see yours under My receipts.", "Receipts live in the chat — tap \u201cTransaction done\u201d, add the amount, and it records it for both sides. Find all your receipts under My receipts."]), emoji: taffyPickEmoji(["🧾", "✨"]), ascend: false };
+    return { text: taffyPick(["In a private chat, tap \u201cTransaction done\u201d, put in the amount and whether you bought or sold — it saves a receipt for both of you before the chat deletes. You can see yours under My receipts.", "Receipts live in the chat — tap \u201cTransaction done\u201d, add the amount, and it records it for both sides. Find all your receipts under My receipts."]), emoji: taffyPickEmoji(["🧾", "✨"]), working: false };
   // Change name / bio
   if (has(/\b(change my name|change my bio|edit my bio|change my username|change my chat name|update my bio)\b/))
-    return { text: taffyPick(["Edit Profile — your chat name, bio, and occupation are all right there. Save and it updates everywhere.", "All in Edit Profile: chat name, bio, occupation, even your birthday. Change it, save it, done."]), emoji: taffyPickEmoji(["✏️", "✨"]), ascend: false };
+    return { text: taffyPick(["Edit Profile — your chat name, bio, and occupation are all right there. Save and it updates everywhere.", "All in Edit Profile: chat name, bio, occupation, even your birthday. Change it, save it, done."]), emoji: taffyPickEmoji(["✏️", "✨"]), working: false };
   // Subscribe
   if (has(/\b(subscribe|follow a seller|subscribe to)\b/))
-    return { text: taffyPick(["On a seller's page, hit their Subscribe button — the label is theirs, so it might say something custom. It's how you follow a seller.", "Find a seller you like and tap Subscribe on their page. The button text is theirs, so it might say anything — but it means follow them."]), emoji: taffyPickEmoji(["⭐", "✨"]), ascend: false };
+    return { text: taffyPick(["On a seller's page, hit their Subscribe button — the label is theirs, so it might say something custom. It's how you follow a seller.", "Find a seller you like and tap Subscribe on their page. The button text is theirs, so it might say anything — but it means follow them."]), emoji: taffyPickEmoji(["⭐", "✨"]), working: false };
   // Top Friends
   if (has(/\b(top friends|top 8|top eight)\b/))
-    return { text: taffyPick(["Edit Profile, pick up to 8 Top Friends — they show up as tiles on your page, MySpace-style. Your friends, front and center.", "Top Friends are your Top 8 — pick them in Edit Profile and they show as tiles on your page. Change them anytime."]), emoji: taffyPickEmoji(["🌟", "✨"]), ascend: false };
+    return { text: taffyPick(["Edit Profile, pick up to 8 Top Friends — they show up as tiles on your page, MySpace-style. Your friends, front and center.", "Top Friends are your Top 8 — pick them in Edit Profile and they show as tiles on your page. Change them anytime."]), emoji: taffyPickEmoji(["🌟", "✨"]), working: false };
   // Phone
   if (has(/\b(phone|my phone|the phone|apps|gallery|notes app)\b/))
-    return { text: taffyPick(["The green button opens my phone — 8 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, and Tutorial. Tap the \u2014 to minimize me back to the button.", "My phone has 8 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, and Tutorial. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), ascend: false };
+    return { text: taffyPick(["The green button opens my phone — 8 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, and Tutorial. Tap the \u2014 to minimize me back to the button.", "My phone has 8 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, and Tutorial. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
   // Shop (where is it)
   if (has(/\bwhere\b.{0,15}\b(shop|store)\b|\b(go to|take me to|visit|open)\b.{0,15}\b(shop|store)\b|\b(shop|store) page\b/))
-    return { text: taffyPick(["Hit Shop in the top nav — that's the Rare Candy Reserve store, cards, handhelds, and all.", "The shop is one tap away — Shop in the top nav takes you to the store. Cards, pins, handhelds, the lot."]), emoji: taffyPickEmoji(["🛍️", "🍬"]), ascend: false };
+    return { text: taffyPick(["Hit Shop in the top nav — that's the Rare Candy Reserve store, cards, handhelds, and all.", "The shop is one tap away — Shop in the top nav takes you to the store. Cards, pins, handhelds, the lot."]), emoji: taffyPickEmoji(["🛍️", "🍬"]), working: false };
   // Donate
   if (has(/\b(donate|donation|donations)\b/))
-    return { text: taffyPick(["Hit Donate in the top nav — it goes to the shop and keeps this place running. Early supporters get first access to new drops.", "Donate in the top nav. It keeps the lights on here, and early supporters get first access to new drops."]), emoji: taffyPickEmoji(["❤️", "🍬"]), ascend: false };
+    return { text: taffyPick(["Hit Donate in the top nav — it goes to the shop and keeps this place running. Early supporters get first access to new drops.", "Donate in the top nav. It keeps the lights on here, and early supporters get first access to new drops."]), emoji: taffyPickEmoji(["❤️", "🍬"]), working: false };
   // Layout / theme / customize my page (echoes a color word when they name one)
   if (has(/\blayout|theme|customi[sz]e|my page|profile.*(look|design|color|style)|background|wallpaper\b/)) {
     var cw = taffyColorWord(t);
     if (cw) {
       var cap = cw.charAt(0).toUpperCase() + cw.slice(1);
-      return { text: cap + ", got it — that's a great pick. Type it into the mood box in the Layout Bot (like \u201c" + cw + " background\u201d or \u201c" + cw + " buttons\u201d) and I'll build your theme around it. Hit \u201cOpen the Layout Bot\u201d and I'll do the rest.", emoji: taffyPickEmoji(["🎨", "✨"]), ascend: true };
+      return { text: cap + ", got it — that's a great pick. Type it into the mood box in the Layout Bot (like \u201c" + cw + " background\u201d or \u201c" + cw + " buttons\u201d) and I'll build your theme around it. Hit \u201cOpen the Layout Bot\u201d and I'll do the rest.", emoji: taffyPickEmoji(["🎨", "✨"]), working: true };
     }
-    return { text: taffyPick(["Let's make your page yours! Hit \u201cOpen the Layout Bot\u201d and I'll build you a theme — pick a vibe, an accent color, and a few mood words. Or open Edit Profile and use the layout presets and custom CSS yourself.", "Oh, I love this part — tell me the vibe and the mood and I'll build you a whole theme. \u201cDark blue background, big headings, round buttons\u201d — that kind of thing. The Layout Bot does the writing."]), emoji: taffyPickEmoji(["🎨", "✨"]), ascend: true };
+    return { text: taffyPick(["Let's make your page yours! Hit \u201cOpen the Layout Bot\u201d and I'll build you a theme — pick a vibe, an accent color, and a few mood words. Or open Edit Profile and use the layout presets and custom CSS yourself.", "Oh, I love this part — tell me the vibe and the mood and I'll build you a whole theme. \u201cDark blue background, big headings, round buttons\u201d — that kind of thing. The Layout Bot does the writing."]), emoji: taffyPickEmoji(["🎨", "✨"]), working: true };
   }
   // Code / CSS
   if (has(/\bcode|css|html|javascript|js\b|script|program|develop/))
-    return { text: taffyPick(["Code time! Open the Code app on the phone home screen — it opens the layout and custom-CSS editor — and I'll stay open alongside you. Tell me what you're trying to build and I'll point you to the right spot.", "The code editor lives in Edit Profile — your MySpace layout box, with custom CSS and a live preview. Open it from the phone's Code app and I'll hang out while you work."]), emoji: taffyPickEmoji(["💻", "💡"]), ascend: true };
+    return { text: taffyPick(["Code time! Open the Code app on the phone home screen — it opens the layout and custom-CSS editor — and I'll stay open alongside you. Tell me what you're trying to build and I'll point you to the right spot.", "The code editor lives in Edit Profile — your MySpace layout box, with custom CSS and a live preview. Open it from the phone's Code app and I'll hang out while you work."]), emoji: taffyPickEmoji(["💻", "💡"]), working: true };
   // Sell / list / price / money (general)
   if (has(/\bsell|listing|list it|price|pricing|how much|shop|store|earn|make money|marketplace\b/))
-    return { text: taffyPick(["Selling here is simple: your page is free, you list what you make or collect, and buyers find you. The Community takes just 1.5% once — and only once — when the sale completes and you're paid. Need a price? Tell me the item and I'll help you think it through.", "List it, sell it, get paid — that's the whole deal. Your page is free, the Community takes 1.5% once when the sale completes. If you're stuck on a price, tell me the item and we'll figure it out."]), emoji: taffyPickEmoji(["💰", "🍬"]), ascend: false };
+    return { text: taffyPick(["Selling here is simple: your page is free, you list what you make or collect, and buyers find you. The Community takes just 1.5% once — and only once — when the sale completes and you're paid. Need a price? Tell me the item and I'll help you think it through.", "List it, sell it, get paid — that's the whole deal. Your page is free, the Community takes 1.5% once when the sale completes. If you're stuck on a price, tell me the item and we'll figure it out."]), emoji: taffyPickEmoji(["💰", "🍬"]), working: false };
   // Music / radio / songs
   if (has(/\bmusic|radio|song|track|playlist|listen|play.*music|steady wave|vita nova\b/))
-    return { text: taffyPick(["Turn it up! The radio app on the phone plays Steady Wave live, and on your profile you can pick up to 5 A Steady Heart tracks to show off. More licensed songs and public-domain pieces like Canon in D are coming too.", "Steady Wave is live on the radio app — 24/7. And your profile can show off up to 5 A Steady Heart tracks. More songs are coming, licensed and public domain."]), emoji: taffyPickEmoji(["🎵", "🎶"]), ascend: false };
+    return { text: taffyPick(["Turn it up! The radio app on the phone plays Steady Wave live, and on your profile you can pick up to 5 A Steady Heart tracks to show off. More licensed songs and public-domain pieces like Canon in D are coming too.", "Steady Wave is live on the radio app — 24/7. And your profile can show off up to 5 A Steady Heart tracks. More songs are coming, licensed and public domain."]), emoji: taffyPickEmoji(["🎵", "🎶"]), working: false };
   // Help (narrowed — specific "how to" questions hit their own intent above)
   if (has(/\bhelp|what can you do|commands|what do you do\b/))
-    return { text: taffyPick(["Here's what I'm good at: building layouts and themes, helping with code, showing you how to sell and get paid, filing reports, and playing the radio. Try \u201cbuild me a layout\u201d or \u201chow do I sell?\u201d", "I can build you a layout, help with code, explain selling and payouts, point you to reports, or play the radio. Just ask — \u201chow do I add a link?\u201d works too."]), emoji: taffyPickEmoji(["💡", "✨"]), ascend: false };
+    return { text: taffyPick(["Here's what I'm good at: building you a whole profile from one message — try \u201cmake me a profile with rgb colors and flickering neon buttons\u201d and I'll write the HTML out for you to copy — plus helping with code, showing you how to sell and get paid, filing reports, and playing the radio.", "I can build you a whole profile, help with code, explain selling and payouts, point you to reports, or play the radio. Just ask — \u201cmake me a profile with rgb colors and flickering neon buttons\u201d works too."]), emoji: taffyPickEmoji(["💡", "✨"]), working: false };
   // Thanks (only when that's basically all they said)
   if (wordCount <= 4 && has(/\bthank|thanks|thx|\bty\b|appreciated\b/))
-    return { text: taffyPick(["Anytime! That's what I'm here for. Go make something cool.", "You got it! Now go make your page look amazing."]), emoji: taffyPickEmoji(["😊", "💜"]), ascend: false };
+    return { text: taffyPick(["Anytime! That's what I'm here for. Go make something cool.", "You got it! Now go make your page look amazing."]), emoji: taffyPickEmoji(["😊", "💜"]), working: false };
   // Bye (only when that's basically all they said)
   if (wordCount <= 4 && has(/\bbye|goodbye|good night|see you|later|gtg\b/))
-    return { text: taffyPick(["Bye for now! I'll be right here in the phone whenever you need me.", "See you soon! I'll be here, probably ascending."]), emoji: taffyPickEmoji(["👋", "🌙"]), ascend: false };
+    return { text: taffyPick(["Bye for now! I'll be right here in the phone whenever you need me.", "See you soon! I'll be here, probably working on something."]), emoji: taffyPickEmoji(["👋", "🌙"]), working: false };
   // Fallback — honest, never "I can only help with X, Y, Z."
   // Echo a word they actually said, steer to the closest place, offer Chris.
   var kw = taffyKeyWord(raw);
@@ -958,36 +996,50 @@ function taffyReply(raw) {
     "You got me on that one — I don't have \u201c" + qw + "\u201d in my little brain yet. " + steer + ".",
     "I'm not sure about \u201c" + qw + "\u201d yet, but I'm learning. " + steer + " — or ask Chris, he runs this place.",
     "Good question, and I don't want to guess — \u201c" + qw + "\u201d isn't something I know yet. " + steer + ". If it's urgent, the Reports area reaches an admin."
-  ]), emoji: taffyPickEmoji(["🤔", ""]), ascend: false };
+  ]), emoji: taffyPickEmoji(["🤔", ""]), working: false };
 }
 function phoneChatBubbleHTML(m, idx) {
   var cls = m.who === "me" ? "tp-bubble-me" : "tp-bubble-taffy";
   var body = (m.emoji ? esc(m.emoji) + " " : "") + esc(m.text);
   var apply = "";
-  if (m.who === "taffy" && m.css) {
-    apply = '<div style="margin-top:8px"><button type="button" class="btn small" onclick="DWC.taffyApplyCSS(' + idx + ')">✨ Apply this to my layout</button><div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all"><code>' + esc(m.css) + '</code></div></div>';
+  if (m.who === "taffy" && (m.css || m.html)) {
+    apply = '<div style="margin-top:8px">';
+    if (m.css) apply += '<button type="button" class="btn small" onclick="DWC.taffyApplyCSS(' + idx + ')">✨ Apply this to my layout</button>';
+    if (m.html) apply += ' <button type="button" class="btn ghost small" onclick="DWC.taffyCopyHTML(' + idx + ')">📋 Copy HTML</button>';
+    if (m.css) apply += '<div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all"><code>' + esc(m.css) + '</code></div>';
+    apply += '</div>';
   }
   return '<div class="tp-bubble ' + cls + '">' + body + apply + '</div>';
 }
 function phoneChatLogHTML() {
   return state.phoneChat.map(function (m, i) { return phoneChatBubbleHTML(m, i); }).join("");
 }
-function phoneChatAdd(who, text, emoji, css) {
-  state.phoneChat.push({ who: who, text: text, emoji: emoji || "", css: css || "" });
+function phoneChatAdd(who, text, emoji, css, html) {
+  state.phoneChat.push({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "" });
   if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
   var log = document.getElementById("tp-chat-log");
   if (log) {
-    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "", css: css || "" }, state.phoneChat.length - 1));
+    log.insertAdjacentHTML("beforeend", phoneChatBubbleHTML({ who: who, text: text, emoji: emoji || "", css: css || "", html: html || "" }, state.phoneChat.length - 1));
     while (log.children.length > state.phoneChat.length) log.removeChild(log.firstChild);
     log.scrollTop = log.scrollHeight;
   }
+}
+// Clipboard fallback for "Copy HTML" (older browsers / no clipboard API).
+function taffyCopyFallback(text) {
+  var ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed"; ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); } catch (e) {}
+  document.body.removeChild(ta);
 }
 function phoneTaffyHTML() {
   var chatOpen = !!state.phoneChatOpen;
   return phoneTopbarHTML("Vita Nova") + '<div class="tp-appview tp-taffy-full">' +
     '<div class="tp-taffy" id="dwc-phone-taffy" onclick="DWC.phoneChatClose()">' + taffySVG("taffy", "phone") + '</div>' +
     '<p class="tp-note">Hi, I’m Taffy! I build layouts, help with code, and answer questions about building your site.</p>' +
-    '<p><button type="button" class="btn small" onclick="DWC.phoneAscend()">✨ Make Taffy ascend</button> <button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
+    '<p><button type="button" class="btn ghost small" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
     taffyHelpHTML(true) +
     '<div class="tp-chat' + (chatOpen ? " open" : "") + '" id="tp-chat">' +
     '<button type="button" class="tp-chat-head" onclick="DWC.phoneChatToggle()"><span>💬 ' + (chatOpen ? "Chat with Taffy" : "Tap to chat with Taffy") + '</span><span class="tp-chat-chev">' + (chatOpen ? "⌄" : "⌃") + '</span></button>' +
@@ -1823,6 +1875,14 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
   // --- glowing buttons ("glowing buttons", "glow buttons") ---
   var btnGlow = "";
   if (/\bglow(ing)? buttons?\b/.test(m)) btnGlow = "0 0 12px " + acc + ", 0 0 28px " + acc;
+  // --- flickering / flashing neon buttons ("flicker", "flash", "flashing buttons") ---
+  // The keyframes ride along in the output so the flicker works anywhere
+  // the CSS is pasted, not just on this site.
+  var btnFlicker = "", flickerKeyframes = "";
+  if (/\b(flash|flashing|flicker|flickering)\b/.test(m) && /\bbuttons?\b/.test(m)) {
+    btnFlicker = "animation:neonFlicker 2.4s infinite;";
+    flickerKeyframes = "@keyframes neonFlicker{0%,91%,94%,98%,100%{opacity:1}92%{opacity:.3}96%{opacity:.6}}";
+  }
   // --- MySpace effects ("sparkle", "animated background", "marquee", "font size") ---
   var fxCss = "";
   if (/\bsparkle|glitter|twinkle\b/.test(m)) fxCss += ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}";
@@ -1849,6 +1909,11 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
   }
   // --- solid vs gradient background ---
   if (/\bsolid background|solid bg\b/.test(m)) bg2 = bg;
+  // --- RGB gradient background ("rgb", "gradient", "gradient mixing") ---
+  // An animated RGB gradient (pink -> purple -> blue -> green), the
+  // site's own look. Overrides the plain two-color background.
+  var rgbBg = false;
+  if (/\brgb\b|\bgradient\b/.test(m) && !/\bsolid background|solid bg\b/.test(m)) rgbBg = true;
   // --- accent color by name (keeps the old behavior: "pink" -> pink accent) ---
   Object.keys(NAMED_ACCENT).forEach(function (c) {
     if (new RegExp("\\b" + c + "\\b").test(m)) acc = NAMED_ACCENT[c];
@@ -1881,8 +1946,11 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
   var avBorder = "3px";
   if (/\bthick avatar ring\b/.test(m)) avBorder = "5px";
   if (/\bno avatar ring\b/.test(m)) avBorder = "0";
+  // --- background rule (RGB gradient wins over the plain two-color one) ---
+  var bgRule = ".dwc-myprofile{background:linear-gradient(160deg," + bg + " 0%," + bg2 + " 100%);}";
+  if (rgbBg) bgRule = ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}";
   return (
-    ".dwc-myprofile{background:linear-gradient(160deg," + bg + " 0%," + bg2 + " 100%);}" +
+    bgRule +
     ".dwc-myprofile .card{background:" + v.card + ";border:" + borderW + " solid " + v.cardBorder + ";border-radius:" + radius + ";" + (cardPad ? "padding:" + cardPad + ";" : "") + "}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:" + heading + ";font-family:" + font + ";text-shadow:" + glow + ";" + (headSize ? "font-size:" + headSize + ";" : "") + "}" +
     ".dwc-myprofile p,.dwc-myprofile li{color:" + text + ";}" +
@@ -1890,10 +1958,12 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
     ".dwc-myprofile a{color:" + link + ";}" +
     ".dwc-myprofile .dwc-avatar{border:" + avBorder + " solid " + acc + ";box-shadow:" + glow + ";}" +
     ".dwc-myprofile .btn{background:linear-gradient(90deg," + btnAcc + "," + v.accent2 + ");" + (btnRadius ? "border-radius:" + btnRadius + ";" : "") + (btnSize ? "font-size:" + btnSize + ";" : "") + (btnPad ? "padding:" + btnPad + ";" : "") + (btnGlow ? "box-shadow:" + btnGlow + ";" : "") + "}" +
+    (btnFlicker ? ".dwc-myprofile .btn,.dwc-myprofile .dwc-pill{" + btnFlicker + "box-shadow:0 0 12px " + btnAcc + ",0 0 28px " + btnAcc + ";}" : "") +
     ".dwc-myprofile .dwc-topfriend{border:2px solid " + acc + ";border-radius:" + radius + ";}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid " + acc + ";}" +
     (bodySize ? ".dwc-myprofile{font-size:" + bodySize + ";}" : "") +
-    fxCss
+    fxCss +
+    flickerKeyframes
   );
 }
 
@@ -4271,7 +4341,7 @@ window.DWC = {
     // pure energy around him while he summons the layout.
     if (tw) tw.classList.add("taffy-working");
     var host = $("dwc-bot-result");
-    if (host) host.innerHTML = '<p class="dwc-info">✨ Taffy is ascending… loading your layout.</p>';
+    if (host) host.innerHTML = '<p class="dwc-info">✨ Taffy is working… loading your layout.</p>';
     setTimeout(function () {
       botLayoutCSS = buildLayoutFromVibe(vibe, accent, mood);
       applyPreviewCSS(botLayoutCSS);
@@ -4395,12 +4465,6 @@ window.DWC = {
     savePhoneWallpaper(id);
     renderPhone();
   },
-  phoneAscend: function () {
-    var tw = $("dwc-phone-taffy");
-    if (!tw || tw.classList.contains("taffy-working")) return;
-    tw.classList.add("taffy-working");
-    setTimeout(function () { if (tw) tw.classList.remove("taffy-working"); }, 2500);
-  },
   phoneChatSend: function () {
     var input = document.getElementById("tp-chat-input");
     if (!input) return;
@@ -4417,17 +4481,17 @@ window.DWC = {
       log.scrollTop = log.scrollHeight;
     }
     var tw = document.getElementById("dwc-phone-taffy");
-    if (reply.ascend && tw) tw.classList.add("taffy-working");
+    if (reply.working && tw) tw.classList.add("taffy-working");
     var delay = 650 + Math.floor(Math.random() * 650);
     setTimeout(function () {
       var t = document.getElementById(typingId);
       if (t) t.remove();
-      if (reply.ascend && tw) tw.classList.remove("taffy-working");
+      if (reply.working && tw) tw.classList.remove("taffy-working");
       // Only append if the chat log is still on screen (user may have
       // navigated away mid-thought — the message still lands in state).
-      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji, reply.css);
+      if (document.getElementById("tp-chat-log")) phoneChatAdd("taffy", reply.text, reply.emoji, reply.css, reply.html);
       else {
-        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "", css: reply.css || "" });
+        state.phoneChat.push({ who: "taffy", text: reply.text, emoji: reply.emoji || "", css: reply.css || "", html: reply.html || "" });
         if (state.phoneChat.length > 60) state.phoneChat.splice(0, state.phoneChat.length - 60);
       }
     }, delay);
@@ -4491,6 +4555,21 @@ window.DWC = {
       ta.focus();
       setNotice("Added to your Custom CSS — hit Save profile to keep it.");
     }, 150);
+  },
+  // Taffy "Copy HTML" — copies the full <style> block Taffy just wrote
+  // to the clipboard so the member can paste it anywhere (their Custom
+  // CSS box, their own site, anywhere). Falls back to a hidden textarea
+  // when the clipboard API isn't available.
+  taffyCopyHTML: function (idx) {
+    var m = state.phoneChat[idx];
+    var html = m && m.html;
+    if (!html) return;
+    var done = function () { setNotice("HTML copied — paste it anywhere (your Custom CSS box, your own site, anywhere)."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(html).then(done, function () { taffyCopyFallback(html); done(); });
+    } else {
+      taffyCopyFallback(html); done();
+    }
   },
   applyButtonStyle: function (id, btn) {
     var form = btn ? btn.closest("form") : null;

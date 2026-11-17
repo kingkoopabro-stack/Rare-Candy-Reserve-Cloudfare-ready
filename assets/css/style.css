@@ -647,13 +647,12 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
    ORIGINAL RGB GRADIENT like Slabb's avatar — pink → purple → blue, cyan
    accents — hand-drawn show style, cute, hands and feet. NO PC AT ALL.
    Idle/talking: smiling, winking, mouth moving when talking, arms waving
-   around a bit. Working: ASCENSION — inspired by Shawn Hocking's astral
+   around a bit. Working — inspired by Shawn Hocking's astral
    artwork. Taffy floats in a meditation pose, a radiant glowing mandala
    (runes, gold + purple) behind him, light rays streaming up and down, and
    his ASTRAL FORM — a glowing spirit with arms OUTSTRETCHED to the sides
    and a radiant head, just like the figure in the reference — rises out of
-   him and bobs up a bit, down, up, down, like he's stuck ascending while he
-   loads the information. The astral form shows the "904 Lokos" prison
+   him and bobs up a bit, down, up, down, while he loads the information. The astral form shows the "904 Lokos" prison
    tattoos. That is the .taffy-working loop. CSS only. */
 .taffy{width:120px;height:auto;display:block;flex:0 0 auto}
 .taffy-small{width:56px;height:auto;display:block;flex:0 0 auto}
@@ -683,7 +682,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 @keyframes taffy-wave-l{0%{transform:rotate(-6deg)}100%{transform:rotate(7deg)}}
 @keyframes taffy-wave-r{0%{transform:rotate(6deg)}100%{transform:rotate(-7deg)}}
 /* Working: Taffy floats in meditation pose (Aang-style), pure energy
-   around him, astral form ascending. Loop. */
+   around him, astral form rising. Loop. */
 .taffy-working .taffy-body,.taffy-working .taffy-arms{animation:taffy-float 2.4s ease-in-out infinite}
 @keyframes taffy-float{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-8px) rotate(-1deg)}}
 .taffy-working .taffy-face{opacity:0}
@@ -691,9 +690,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 /* Working: arms come together into the meditation pose (hands in lap). */
 .taffy-working .taffy-arm-l{animation:none;transform:rotate(35deg) translateY(3px)}
 .taffy-working .taffy-arm-r{animation:none;transform:rotate(-35deg) translateY(3px)}
-/* Working: the astral form bobs up a bit, down, up, down — stuck ascending. */
-.taffy-working .taffy-astral{animation:taffy-ascend 3.2s ease-in-out infinite}
-@keyframes taffy-ascend{0%{opacity:.9;transform:translateY(8px)}25%{opacity:1;transform:translateY(-8px)}50%{opacity:.92;transform:translateY(3px)}75%{opacity:1;transform:translateY(-8px)}100%{opacity:.9;transform:translateY(8px)}}
+/* Working: the astral form bobs up a bit, down, up, down. */
+.taffy-working .taffy-astral{animation:taffy-work 3.2s ease-in-out infinite}
+@keyframes taffy-work{0%{opacity:.9;transform:translateY(8px)}25%{opacity:1;transform:translateY(-8px)}50%{opacity:.92;transform:translateY(3px)}75%{opacity:1;transform:translateY(-8px)}100%{opacity:.9;transform:translateY(8px)}}
 .taffy-astral{transform-box:view-box;transform-origin:120px 40px}
 /* Working: pure energy — mandala pulses, rays flicker, rings pulse outward, orbs orbit, sparkles twinkle. */
 .taffy-working .taffy-energy{opacity:1}

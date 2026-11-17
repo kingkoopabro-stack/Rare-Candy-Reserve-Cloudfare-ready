@@ -561,6 +561,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-nut-banner{text-align:center;margin:2px 0 14px}
 .dwc-nut-line{font-size:clamp(24px,4.8vw,40px);font-weight:900;line-height:1.2;vertical-align:middle;background:linear-gradient(90deg,#ff2d95,#ff9a00,#00e5ff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 12px rgba(255,45,149,.5))}
 .dwc-18only{display:inline-block;margin-left:10px;vertical-align:middle;font-size:clamp(18px,3.4vw,28px);font-weight:900;letter-spacing:.1em;color:#fff;text-shadow:0 0 8px #ff2ea6,0 0 20px #ff2ea6,0 0 36px #ff2ea6;animation:dwcNeonFlicker2 2.4s infinite}
+/* Big flickering 18+ at the top of the After Dark banner. */
+.dwc-18-flicker{text-align:center;font-size:clamp(40px,8vw,64px);font-weight:900;letter-spacing:.12em;line-height:1;margin:2px 0 10px;color:#fff;text-shadow:0 0 8px #ff2ea6,0 0 20px #ff2ea6,0 0 42px #ff2ea6;animation:dwcNeonFlicker2 2.4s infinite}
 .dwc-nut-sub{font-size:14px;line-height:1.5;color:var(--muted);max-width:640px;margin:8px auto 0;text-align:center}
 /* "Digital File Marketplace!" banner — vaporwave / retro arcade, centered. */
 .dwc-dfm-banner{text-align:center;margin:16px auto 6px;max-width:680px;padding:14px 18px 12px;border:2px solid #00e5ff;border-radius:14px;background:linear-gradient(180deg,rgba(255,45,149,.14),rgba(0,229,255,.10) 55%,rgba(122,0,255,.14));box-shadow:0 0 18px rgba(0,229,255,.45),0 0 34px rgba(255,45,149,.35),inset 0 0 22px rgba(0,229,255,.12)}

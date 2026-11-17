@@ -696,6 +696,8 @@ var PHONE_WALLPAPERS = [
   { id: "retro80s", label: "Retro 80s", bg: "radial-gradient(circle at 50% 36%,#ffd75e 0%,#ff9a3d 16%,#ff5e62 32%,transparent 34%),linear-gradient(180deg,#1a0b2e 0%,#3b1d5e 45%,#ff6b35 75%,#2b1055 100%)" },
   { id: "neon", label: "Neon", bg: "radial-gradient(circle at 22% 18%,rgba(0,229,255,.4),transparent 55%),radial-gradient(circle at 82% 82%,rgba(255,46,166,.4),transparent 55%),#05050a" },
   { id: "goth", label: "Goth", bg: "radial-gradient(circle at 50% 0%,rgba(124,77,255,.35),transparent 60%),linear-gradient(160deg,#000000 0%,#1a0b2e 55%,#3b0a3b 100%)" },
+  { id: "vitanova", label: "Vita Nova", bg: "radial-gradient(circle at 50% 12%,#ffd75e 0%,rgba(255,215,94,0) 30%),radial-gradient(circle at 85% 90%,rgba(255,45,149,.55),transparent 60%),linear-gradient(165deg,#150326 0%,#4c1d95 50%,#be185d 100%)" },
+  { id: "steadyheart", label: "Steady Heart", bg: "radial-gradient(circle at 50% 85%,rgba(170,255,0,.32),transparent 52%),linear-gradient(160deg,#0b0214 0%,#3b0764 45%,#7c3aed 75%,#ec4899 100%)" },
 ];
 var PHONE_WALLPAPER_KEY = "dwc-phone-wallpaper";
 function phoneWallpaperBg(id) {
@@ -3119,11 +3121,11 @@ async function renderAgeBlock() {
 // right before the "After Dark — 18+" heading.
 var MATCH_BANNER_HTML =
   '<div class="dwc-match-banner">Get matched with buyers &amp; sellers fast!</div>';
-// "Welcome to the after dark reserve…" + neon 18+ only + a PayPal balance
+// Flickering 18+ + "Digital File Marketplace!" banner + a PayPal balance
 // rising demo (CSS/SVG animation — clearly labeled EXAMPLE, never a real
 // PayPal screenshot). Sits above the main 18+ welcome picture.
 var NUT_BANNER_HTML =
-  '<div class="dwc-nut-banner"><span class="dwc-nut-line">Welcome to the after dark reserve, where money flows &amp; your content is watermarked to prevent anyone using it!</span><span class="dwc-18only">18+ only</span>' +
+  '<div class="dwc-nut-banner"><div class="dwc-18-flicker">18+</div>' +
   '<div class="dwc-dfm-banner"><span class="dwc-dfm-banner-title">🕹️ Digital File Marketplace!</span><span class="dwc-dfm-banner-sub">Sell any digital file — 3D models, developer files, designs, art, apps, game assets, photos, videos &amp; adult content. Optional blur on your uploads.</span></div>' +
   '<div class="dwc-paypal-demo"><div class="dwc-paypal-label">Example — illustration only, not a real PayPal screenshot</div>' +
   '<div class="dwc-paypal-balance">$1,240.00 <small>▲ +$12.50 just now</small></div>' +

@@ -7,7 +7,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
   checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
-  cleanTheme, cleanMyLinks,
+  cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -187,12 +187,57 @@ export async function onRequestPost({ env, request }) {
     v3Sets.push("my_links = ?");
     v3Vals.push(JSON.stringify(cleanMyLinks(a.my_links)));
   }
+  // v3.6 — profile action-button customization + custom page URL.
+  // Same graceful pattern: they ride in their own v36 columns, so if
+  // the v3.6 migration hasn't run yet the edit retries without them
+  // and the client is told via v36_pending.
+  const v36Sets = [];
+  const v36Vals = [];
+  let v36Pending = false;
+  if (typeof a.profile_buttons === "string" || (a.profile_buttons && typeof a.profile_buttons === "object")) {
+    v36Sets.push("profile_buttons = ?");
+    v36Vals.push(cleanProfileButtons(a.profile_buttons));
+  }
+  if (typeof a.page_slug === "string" && existing) {
+    const newSlug = String(a.page_slug || "").trim();
+    const currentSlug = String(existing.page_slug || "").trim();
+    if (newSlug === "" && currentSlug !== "") {
+      // Clearing the slug — free, doesn't count as a change.
+      v36Sets.push("page_slug = ?");
+      v36Vals.push("");
+    } else if (newSlug !== "") {
+      if (!SLUG_RE.test(newSlug)) return fail("Page URL needs 3–24 letters, numbers, _ . or - only.");
+      const check = slugChangeCheck(existing, newSlug, now);
+      if (!check.ok) return fail(check.error);
+      if (check.changed) {
+        // Uniqueness (case-insensitive). If the column doesn't exist
+        // yet the query throws "no such column" — the slug just can't
+        // stick, so tell the member via v36_pending and save the rest.
+        let slugTaken = false;
+        let slugColumnMissing = false;
+        try {
+          const clash = await db.prepare("SELECT id FROM profiles WHERE lower(page_slug) = lower(?) LIMIT 1").bind(newSlug).first();
+          if (clash && clash.id !== existing.id) slugTaken = true;
+        } catch (e) {
+          if (/no such column|no column named/i.test(String((e && e.message) || e))) slugColumnMissing = true;
+          else throw e;
+        }
+        if (slugTaken) return fail("That page URL is already taken — try another one.");
+        if (slugColumnMissing) {
+          v36Pending = true;
+        } else {
+          v36Sets.push("page_slug = ?", "page_slug_changes = ?", "page_slug_window_start = ?", "page_slug_changed_at = ?");
+          v36Vals.push(newSlug, check.newChanges, check.newWindowStart, check.newChangedAt);
+        }
+      }
+    }
+  }
   let row;
   let v2Pending = false;
   let v3Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals];
+    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
@@ -202,9 +247,9 @@ export async function onRequestPost({ env, request }) {
       await db.prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
     } catch (e) {
       // A migration column doesn't exist yet — retry without the new
-      // columns so an edit never breaks. First drop just the v3 columns
-      // (the live DB may have v2 but not v3 yet); if that still fails,
-      // drop v2 too. The client is told via v2_pending / v3_pending.
+      // columns so an edit never breaks. Drop one tier at a time: first
+      // just v3.6, then v3 + v3.6, then v2 + v3 + v3.6. The client is
+      // told via v2_pending / v3_pending / v36_pending.
       if (/no such column|no column named/i.test(String((e && e.message) || e))) {
         const without = (dropSets) => {
           const keep = [];
@@ -217,22 +262,25 @@ export async function onRequestPost({ env, request }) {
           keepVals.push(existing.id);
           return { keep, keepVals };
         };
+        const tryDrop = async (dropSets) => {
+          const r = without(dropSets);
+          await db.prepare(`UPDATE profiles SET ${r.keep.join(", ")} WHERE id = ?`).bind(...r.keepVals).run();
+        };
         let done = false;
-        if (v3Sets.length) {
-          try {
-            const r1 = without(v3Sets);
-            await db.prepare(`UPDATE profiles SET ${r1.keep.join(", ")} WHERE id = ?`).bind(...r1.keepVals).run();
-            v3Pending = true;
-            done = true;
-          } catch (e2) {
-            if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2;
-          }
+        if (v36Sets.length) {
+          try { await tryDrop(v36Sets); v36Pending = true; done = true; }
+          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
+        }
+        if (!done && v3Sets.length) {
+          try { await tryDrop([...v3Sets, ...v36Sets]); v3Pending = true; v36Pending = true; done = true; }
+          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v2Sets.length) {
-          const r2 = without([...v2Sets, ...v3Sets]);
+          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets]);
           await db.prepare(`UPDATE profiles SET ${r2.keep.join(", ")} WHERE id = ?`).bind(...r2.keepVals).run();
           v2Pending = true;
           if (v3Sets.length) v3Pending = true;
+          if (v36Sets.length) v36Pending = true;
           done = true;
         }
         if (!done) throw e;
@@ -252,5 +300,5 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
-  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, avatar_error: avatarError });
+  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, avatar_error: avatarError });
 }

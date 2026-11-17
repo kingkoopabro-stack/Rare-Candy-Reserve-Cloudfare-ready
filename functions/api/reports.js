@@ -25,6 +25,12 @@ export async function onRequestGet({ env, request }) {
     } else if (r.target_type === "comment") {
       const c = await db.prepare("SELECT body FROM comments WHERE id = ? LIMIT 1").bind(r.target_id).first();
       if (c) label = `Comment: “${String(c.body).slice(0, 60)}”`;
+    } else if (r.target_type === "profile") {
+      const u = byId.get(r.target_id)?.username;
+      label = u ? `Profile: @${u}` : `Profile #${r.target_id}`;
+    } else if (r.target_type === "slug_appeal") {
+      const u = byId.get(r.target_id)?.username;
+      label = u ? `Page URL appeal from @${u}` : `Page URL appeal #${r.target_id}`;
     }
     out.push({
       id: r.id, target_type: r.target_type, target_id: r.target_id, target_label: label,
@@ -43,9 +49,19 @@ export async function onRequestPost({ env, request }) {
   const a = await readJson(request);
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return json({ ok: false, error: "Create your account first — reports come from members so they're accountable." });
-  if (!["post", "comment", "listing"].includes(a.target_type)) return json({ ok: false, error: "Pick what you're reporting." });
+  if (!["post", "comment", "listing", "profile", "slug_appeal"].includes(a.target_type)) return json({ ok: false, error: "Pick what you're reporting." });
   const targetId = Math.round(Number(a.target_id) || 0);
   if (targetId <= 0) return json({ ok: false, error: "Missing item to report." });
+  // A profile report needs a real member; a page-URL appeal can only be
+  // filed by the member themself, for their own page.
+  if (a.target_type === "profile") {
+    const target = await db.prepare("SELECT id FROM profiles WHERE id = ? LIMIT 1").bind(targetId).first();
+    if (!target) return json({ ok: false, error: "That member doesn't exist." });
+    if (targetId === me.id) return json({ ok: false, error: "You can't report your own profile." });
+  }
+  if (a.target_type === "slug_appeal" && targetId !== me.id) {
+    return json({ ok: false, error: "You can only appeal for your own page URL." });
+  }
   const exists = await db.prepare(
     "SELECT id FROM reports WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'open' LIMIT 1",
   ).bind(me.id, a.target_type, targetId).first();

@@ -392,6 +392,52 @@ export function parseTopFriendIds(stored) {
   return out;
 }
 
+// My page URL (v3.6) — vanity slug rules. A slug is 3-24 chars of
+// letters, numbers, _ . -, unique across members (case-insensitive).
+// Changeable only 3 times in a 5-year window, with a 1-year cooldown
+// after each change. The first set (from empty) counts as change #1,
+// so a member gets 3 slug values per window.
+export const SLUG_RE = /^[A-Za-z0-9_.-]{3,24}$/;
+export const SLUG_CHANGE_LIMIT = 3;
+export const SLUG_WINDOW_MS = 5 * 365.25 * 24 * 60 * 60 * 1000;
+export const SLUG_COOLDOWN_MS = 365.25 * 24 * 60 * 60 * 1000;
+export function slugChangeCheck(row, newSlug, now) {
+  const current = String((row && row.page_slug) || "").trim();
+  const next = String(newSlug || "").trim();
+  // Unchanged (case-insensitive) — allowed, nothing to do.
+  if (next.toLowerCase() === current.toLowerCase()) {
+    return { ok: true, changed: false, newChanges: Number(row?.page_slug_changes || 0), newWindowStart: row?.page_slug_window_start ?? null, newChangedAt: row?.page_slug_changed_at ?? null, nextChangeAt: null };
+  }
+  let changes = Number(row?.page_slug_changes || 0);
+  let windowStart = row?.page_slug_window_start ?? null;
+  const changedAt = row?.page_slug_changed_at ?? null;
+  // Window expired (or never started) — reset the count and start fresh.
+  if (!windowStart || now - windowStart > SLUG_WINDOW_MS) {
+    changes = 0;
+    windowStart = now;
+  }
+  if (changes >= SLUG_CHANGE_LIMIT) {
+    const nextAt = windowStart + SLUG_WINDOW_MS;
+    return { ok: false, changed: false, nextChangeAt: nextAt, error: "You've used all 3 page URL changes for this 5-year window. You can pick a new one again on " + new Date(nextAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) + " — or appeal to Chris for another change." };
+  }
+  if (changedAt && now - changedAt < SLUG_COOLDOWN_MS) {
+    const nextAt = changedAt + SLUG_COOLDOWN_MS;
+    return { ok: false, changed: false, nextChangeAt: nextAt, error: "You can change your page URL again on " + new Date(nextAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) + " — or appeal to Chris for another change." };
+  }
+  return { ok: true, changed: true, newChanges: changes + 1, newWindowStart: windowStart, newChangedAt: now, nextChangeAt: null };
+}
+// When the owner can next change their slug (null = they can now).
+// Used so the Edit Profile form can show the date up front.
+export function slugNextChangeAt(row, now) {
+  const changes = Number(row?.page_slug_changes || 0);
+  const windowStart = row?.page_slug_window_start ?? null;
+  const changedAt = row?.page_slug_changed_at ?? null;
+  if (!windowStart || now - windowStart > SLUG_WINDOW_MS) return null;
+  if (changes >= SLUG_CHANGE_LIMIT) return windowStart + SLUG_WINDOW_MS;
+  if (changedAt && now - changedAt < SLUG_COOLDOWN_MS) return changedAt + SLUG_COOLDOWN_MS;
+  return null;
+}
+
 // Effective presence for a profile row: 'away' is explicit; 'online' only
 // counts if the heartbeat is fresh (<= 3 minutes); anything else is offline.
 export function presenceOf(row) {
@@ -469,6 +515,11 @@ export function shapeProfile(row) {
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),
+    // v3.6 — custom page URL + action-button customization.
+    page_slug: row.page_slug ?? "",
+    page_slug_changes: Number(row.page_slug_changes || 0),
+    page_slug_next_change_at: iso(slugNextChangeAt(row, Date.now())),
+    profile_buttons: parseProfileButtons(row.profile_buttons),
     created_at: iso(row.created_at),
   };
 }
@@ -501,6 +552,9 @@ export function shapeMember(row) {
     // v3.2 — custom "Subscribe to my page" button text + member-page theme.
     subscribe_label: row.subscribe_label ?? "Subscribe to my page",
     profile_theme: parseTheme(row.profile_theme),
+    // v3.6 — custom page URL + action-button customization (public).
+    page_slug: row.page_slug ?? "",
+    profile_buttons: parseProfileButtons(row.profile_buttons),
     created_at: iso(row.created_at),
   };
 }
@@ -662,6 +716,43 @@ export function cleanTheme(input) {
   const t = parseTheme(input);
   if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.button_style && !t.button_css && !(t.effects && t.effects.length)) return "";
   return JSON.stringify(t);
+}
+// Profile action buttons (v3.6) — one JSON blob describing the button
+// block on the owner's page: { mode: "buttons"|"image", image_url, buttons:
+// { add/message/favorite/group/report: { label, bg, color } } }.
+// Labels are plain text, max 30 chars; colors must be #rrggbb; the solid
+// image (mode "image") must be https://. Only keys the owner actually
+// set are kept; returns "" when nothing is set.
+export const PROFILE_BUTTON_IDS = ["add", "message", "favorite", "group", "report"];
+export function cleanProfileButtons(input) {
+  let obj = null;
+  try { obj = typeof input === "string" ? JSON.parse(input) : input; } catch { return ""; }
+  if (!obj || typeof obj !== "object") return "";
+  const hex = (v) => /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : "";
+  const out = { mode: "buttons", image_url: "", buttons: {} };
+  if (obj.mode === "image") out.mode = "image";
+  const img = String(obj.image_url || "").trim().slice(0, 500);
+  if (/^https:\/\//i.test(img)) out.image_url = img;
+  const src = (obj.buttons && typeof obj.buttons === "object") ? obj.buttons : {};
+  for (const key of PROFILE_BUTTON_IDS) {
+    const b = src[key];
+    if (!b || typeof b !== "object") continue;
+    const label = String(b.label || "").replace(/[<>\n\r]/g, "").trim().slice(0, 30);
+    const bg = hex(b.bg);
+    const color = hex(b.color);
+    if (!label && !bg && !color) continue;
+    out.buttons[key] = { label, bg, color };
+  }
+  const anyButton = Object.keys(out.buttons).length > 0;
+  if (out.mode === "buttons" && !out.image_url && !anyButton) return "";
+  if (out.mode === "image" && !out.image_url && !anyButton) return "";
+  return JSON.stringify(out);
+}
+export function parseProfileButtons(stored) {
+  if (!stored) return null;
+  const cleaned = cleanProfileButtons(stored);
+  if (!cleaned) return null;
+  try { return JSON.parse(cleaned); } catch { return null; }
 }
 export function cleanAshTracks(list) {
   const out = [];

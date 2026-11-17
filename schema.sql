@@ -70,6 +70,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   show_vnr_player INTEGER NOT NULL DEFAULT 0, -- opt-in Vita Nova Radio player on the member page
   autoplay_vnr INTEGER NOT NULL DEFAULT 0, -- opt-in autoplay for the Steady Wave player on the member page (v3.3)
   my_links TEXT NOT NULL DEFAULT '', -- My links (v3.4): JSON [{label, url}] buttons on the member page, max 5
+  -- Profile action buttons + My page URL (v3.6)
+  page_slug TEXT NOT NULL DEFAULT '', -- vanity slug for community.html#/u/<slug>
+  page_slug_changes INTEGER NOT NULL DEFAULT 0, -- changes used in the current 5-year window
+  page_slug_window_start INTEGER, -- ms: when the current 5-year window began
+  page_slug_changed_at INTEGER, -- ms: last slug change (1-year cooldown)
+  profile_buttons TEXT NOT NULL DEFAULT '', -- JSON: action-button block customization
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
@@ -91,6 +97,7 @@ CREATE TABLE IF NOT EXISTS posts (
   tags TEXT NOT NULL DEFAULT '', -- comma-separated, normalized lowercase
   allow_comments INTEGER NOT NULL DEFAULT 1,
   image_blob_key TEXT,
+  video_blob_key TEXT, -- v3.5: R2 key (videos/ prefix) for a short video clip
   gif_url TEXT,
   gif_label TEXT NOT NULL DEFAULT '',
   verification_status TEXT NOT NULL DEFAULT 'not_checked',
@@ -357,3 +364,40 @@ CREATE TABLE IF NOT EXISTS receipts (
 );
 CREATE INDEX IF NOT EXISTS idx_receipts_profile ON receipts (profile_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_receipts_conv ON receipts (conversation_id);
+
+-- v3.6 — profile action buttons: friends (both directions, instant),
+-- favorites (star, separate from Top 8), groups + group_members.
+CREATE TABLE IF NOT EXISTS friends (
+  profile_id INTEGER NOT NULL REFERENCES profiles(id),
+  friend_id INTEGER NOT NULL REFERENCES profiles(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, friend_id)
+);
+CREATE INDEX IF NOT EXISTS idx_friends_friend ON friends (friend_id);
+
+CREATE TABLE IF NOT EXISTS favorites (
+  profile_id INTEGER NOT NULL REFERENCES profiles(id),
+  favorite_id INTEGER NOT NULL REFERENCES profiles(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, favorite_id)
+);
+CREATE INDEX IF NOT EXISTS idx_favorites_fav ON favorites (favorite_id);
+
+CREATE TABLE IF NOT EXISTS groups (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_id INTEGER NOT NULL REFERENCES profiles(id),
+  name TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_groups_owner ON groups (owner_id);
+
+CREATE TABLE IF NOT EXISTS group_members (
+  group_id INTEGER NOT NULL REFERENCES groups(id),
+  profile_id INTEGER NOT NULL REFERENCES profiles(id),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (group_id, profile_id)
+);
+CREATE INDEX IF NOT EXISTS idx_group_members_profile ON group_members (profile_id);
+
+-- v3.6 — slugs are unique when set; empty slugs (never set one) may repeat.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_slug ON profiles(page_slug) WHERE page_slug != '';

@@ -444,6 +444,7 @@ function parseRoute() {
   if (n === "post" && parts[1]) return { name: "thread", postId: parts[1] };
   if (n === "listing" && parts[1]) return { name: "listing", listingId: parts[1] };
   if (n === "member" && parts[1]) return { name: "member", memberId: parts[1] };
+  if (n === "u" && parts[1]) return { name: "memberSlug", slug: parts[1] };
   if (n === "tag" && parts[1] === "adult" && parts[2]) return { name: "tag", tag: decodeURIComponent(parts[2]), adult: true };
   if (n === "tag" && parts[1]) return { name: "tag", tag: decodeURIComponent(parts[1]), adult: false };
   if (NAV.some(function (x) { return x[0] === n; })) return { name: n };
@@ -992,6 +993,9 @@ function taffyReply(raw) {
   // Top Friends
   if (has(/\b(top friends|top 8|top eight)\b/))
     return { text: taffyPick(["Edit Profile, pick up to 8 Top Friends — they show up as tiles on your page, MySpace-style. Your friends, front and center.", "Top Friends are your Top 8 — pick them in Edit Profile and they show as tiles on your page. Change them anytime."]), emoji: taffyPickEmoji(["🌟", "✨"]), working: false };
+  // Friends / favorites / page URL (v3.6) — the buttons on a member page.
+  if (has(/\b(add (a )?friend|add me|unfriend|favorite (someone|a member|them)|add to favorites|my page url|page url|custom (page )?url|change my (page )?url)\b/))
+    return { text: taffyPick(["On someone's page, hit “Add me” to add them as a friend — it flips to “Unfriend” once you're friends. The star next to “Add to Favorites” lights up gold when they're favorited. Your own page URL lives in Edit Profile under “My page URL” — 3 changes per 5 years, 1-year cooldown, or appeal to Chris.", "Friends and favorites live on the member page: “Add me” adds them (it turns into “Unfriend” when you're already friends), and the ☆ star fills gold when you favorite someone. Your custom page URL is in Edit Profile — “My page URL” — 3 changes in 5 years, 1-year cooldown after each one."]), emoji: taffyPickEmoji(["👥", "⭐"]), working: false };
   // Phone
   if (has(/\b(phone|my phone|the phone|apps|gallery|notes app)\b/))
     return { text: taffyPick(["The green button opens my phone — 8 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, and Tutorial. Tap the \u2014 to minimize me back to the button.", "My phone has 8 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, and Tutorial. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
@@ -1244,6 +1248,67 @@ function ensurePhoneRoot() {
   }
 }
 
+// v3.6 — the per-button customization rows for Edit Profile. Each of
+// the 5 action buttons gets a label + a background color + a text color.
+// A color only counts when its checkbox is ticked (a color input always
+// has a value, so the checkbox is what makes "no custom color" possible).
+function profileButtonsRowsHTML(p) {
+  var pb = (p && p.profile_buttons) || null;
+  var get = function (key) {
+    if (pb && pb.buttons && pb.buttons[key]) return pb.buttons[key];
+    return { label: "", bg: "", color: "" };
+  };
+  var labels = { add: "Add me", message: "Message me", favorite: "Add to Favorites", group: "Add to group", report: "Report profile" };
+  var rows = "";
+  ["add", "message", "favorite", "group", "report"].forEach(function (key) {
+    var b = get(key);
+    rows += '<div class="dwc-pb-row"><span class="dwc-pb-key">' + esc(labels[key]) + '</span>' +
+      '<input name="pb_label_' + key + '" maxlength="30" value="' + esc(b.label || "") + '" placeholder="' + esc(labels[key]) + '">' +
+      '<label class="dwc-pb-color"><input type="checkbox" name="pb_bg_use_' + key + '" style="width:auto"' + (b.bg ? " checked" : "") + '> BG</label>' +
+      '<input type="color" name="pb_bg_' + key + '" value="' + (b.bg || "#141424") + '" style="width:48px;height:34px;padding:2px">' +
+      '<label class="dwc-pb-color"><input type="checkbox" name="pb_color_use_' + key + '" style="width:auto"' + (b.color ? " checked" : "") + '> Text</label>' +
+      '<input type="color" name="pb_color_' + key + '" value="' + (b.color || "#f2f2f8") + '" style="width:48px;height:34px;padding:2px"></div>';
+  });
+  return rows;
+}
+function profileButtonsSectionHTML(p) {
+  var pb = (p && p.profile_buttons) || null;
+  var mode = (pb && pb.mode === "image") ? "image" : "buttons";
+  var img = (pb && pb.image_url) || "";
+  return '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔘 Profile buttons — your action buttons</h4>' +
+    "<p style=\"margin:0 0 8px\">These are the buttons visitors see on YOUR page — Add me, Message me, Add to Favorites, Add to group, Report profile. Change each one's wording and colors, or put one solid image behind the whole block instead.</p>" +
+    '<label><input type="radio" name="pb_mode" value="buttons" style="width:auto"' + (mode === "buttons" ? " checked" : "") + '> Individual buttons — style each one below</label>' +
+    '<label><input type="radio" name="pb_mode" value="image" style="width:auto"' + (mode === "image" ? " checked" : "") + '> One solid image — one picture behind the whole button block</label>' +
+    '<label>Button-block image URL (https:// — only used with “One solid image”)</label>' +
+    '<input name="pb_image_url" maxlength="500" value="' + esc(img) + '" placeholder="https://…">' +
+    '<div class="dwc-pb-rows">' + profileButtonsRowsHTML(p) + "</div>" +
+    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Leave a label blank to keep the standard wording, and leave a color unticked to keep the default. Colors are #rrggbb; the image must be https://.</p></div>';
+}
+// v3.6 — the My page URL section for Edit Profile. Shows the current
+// slug, how many of the 3 changes are used, and the next-change date
+// when the 1-year cooldown (or the 3-change limit) is in force. The
+// input is disabled while locked, and an Appeal button files a
+// slug_appeal report so Chris sees it in the Reports inbox.
+function pageSlugSectionHTML(p) {
+  var slug = (p && p.page_slug) || "";
+  var changes = (p && typeof p.page_slug_changes === "number") ? p.page_slug_changes : 0;
+  var nextAt = (p && p.page_slug_next_change_at) ? new Date(p.page_slug_next_change_at).getTime() : 0;
+  var locked = nextAt > Date.now();
+  var nextDate = locked ? new Date(nextAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }) : "";
+  var html = '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔗 My page URL</h4>' +
+    "<p style=\"margin:0 0 8px\">Your own page address — e.g. <strong>rarecandyreserve.org/community.html#/u/newuser420</strong>. 3–24 letters, numbers, _ . or -. You get 3 changes per 5 years, with a 1-year cooldown after each change.</p>" +
+    '<label>Your page URL slug</label>' +
+    '<input name="page_slug" maxlength="24" value="' + esc(slug) + '" placeholder="newuser420"' + (locked ? " disabled" : "") + ">" +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Changes used: <strong>' + changes + ' of 3</strong>' +
+    (locked ? ' · You can change it again on <strong>' + esc(nextDate) + '</strong>.' : "") + "</p>";
+  if (locked) {
+    html += '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.appealSlug()">Appeal for another change</button></p>' +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Appeals go to Chris — tell him the URL you want and why.</p>';
+  }
+  html += "</div>";
+  return html;
+}
+
 function profileFormHTML(p) {
   var isNew = !p;
   var v = function (k) { return p ? esc(p[k] || "") : ""; };
@@ -1282,6 +1347,8 @@ function profileFormHTML(p) {
       "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 8 friends to show on your page. Thanks for the add — now show it off.</p>" +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
       '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/8</p></div>') +
+    (isNew ? "" : profileButtonsSectionHTML(p)) +
+    (isNew ? "" : pageSlugSectionHTML(p)) +
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 What I sell — your creator card</h4>' +
     "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
     '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
@@ -2224,6 +2291,7 @@ function renderView() {
   if (r.name === "payouts") return viewPayouts(el);
   if (r.name === "members") return viewMembers(el);
   if (r.name === "member") return viewMember(el, Number(r.memberId));
+  if (r.name === "memberSlug") return viewMemberBySlug(el, r.slug);
   if (r.name === "chat") return viewChat(el);
   if (r.name === "find") return viewFind(el);
   if (r.name === "headlines") return viewHeadlines(el);
@@ -2763,6 +2831,105 @@ function topFriendsRowHTML(friends) {
       "<span>" + esc(topFriendLabel(f)) + "</span></a>";
   }).join("") + "</div>";
 }
+// Vanity page URL (v3.6) — #/u/<slug> resolves the slug to a member id,
+// then renders their page exactly like #/member/<id>.
+async function viewMemberBySlug(el, slug) {
+  el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
+  var data = await apiGet("/members/by-slug?slug=" + encodeURIComponent(slug));
+  var id = data && data.member_id;
+  if (!id) {
+    el.innerHTML = '<div class="note">That page doesn’t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
+    return;
+  }
+  return viewMember(el, id);
+}
+
+// ---------- Profile action buttons (v3.6) ----------
+// The 5-button block on someone else's member page: Add me / Message me /
+// Add to Favorites (star) / Add to group / Report profile. Rendered from
+// THAT member's profile_buttons (custom labels, colors, or a solid image
+// behind the whole block). Per-button inline styles win over the page
+// theme button CSS. Defaults are used for anything the owner didn't set.
+var ACTION_BUTTON_DEFS = [
+  { key: "add", icon: "➕", label: "Add me", friendIcon: "💔", friendLabel: "Unfriend" },
+  { key: "message", icon: "💬", label: "Message me" },
+  { key: "favorite", icon: "☆", label: "Add to Favorites", favIcon: "★", favLabel: "Favorited" },
+  { key: "group", icon: "👥", label: "Add to group" },
+  { key: "report", icon: "🚩", label: "Report profile" },
+];
+function actionButtonStyle(pb, key) {
+  if (!pb || !pb.buttons || !pb.buttons[key]) return "";
+  var b = pb.buttons[key];
+  var s = "";
+  if (b.bg) s += "background:" + b.bg + ";";
+  if (b.color) s += "color:" + b.color + ";";
+  return s ? ' style="' + s + '"' : "";
+}
+function actionButtonLabel(pb, key, fallback) {
+  if (pb && pb.buttons && pb.buttons[key] && pb.buttons[key].label) return pb.buttons[key].label;
+  return fallback;
+}
+function actionButtonsHTML(m) {
+  var pb = m.profile_buttons || null;
+  var blockStyle = "";
+  var blockClass = "dwc-action-buttons";
+  if (pb && pb.mode === "image" && pb.image_url) {
+    blockClass += " dwc-action-buttons-image";
+    blockStyle = ' style="background-image:url(' + esc(pb.image_url) + ')"';
+  }
+  var isFriend = !!m.is_friend;
+  var isFav = !!m.is_favorite;
+  var uname = esc(m.username.replace(/'/g, ""));
+  var html = '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
+  // Add me / Unfriend
+  var addDef = ACTION_BUTTON_DEFS[0];
+  html += '<button type="button" class="btn small" data-action-btn="add" onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
+    (isFriend ? addDef.friendIcon : addDef.icon) + " " + esc(actionButtonLabel(pb, "add", isFriend ? addDef.friendLabel : addDef.label)) + "</button>";
+  // Message me
+  html += '<button type="button" class="btn small" data-action-btn="message" onclick="DWC.imMember(' + m.id + ", '" + uname + "')" + actionButtonStyle(pb, "message") + ">" +
+    ACTION_BUTTON_DEFS[1].icon + " " + esc(actionButtonLabel(pb, "message", ACTION_BUTTON_DEFS[1].label)) + "</button>";
+  // Add to Favorites — star next to the wording: ☆ unfilled/uncolored
+  // before, ★ filled gold when already favorited.
+  html += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite" onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
+    '<span class="dwc-fav-star' + (isFav ? " on" : "") + '">' + (isFav ? ACTION_BUTTON_DEFS[2].favIcon : ACTION_BUTTON_DEFS[2].icon) + "</span> " +
+    esc(actionButtonLabel(pb, "favorite", isFav ? ACTION_BUTTON_DEFS[2].favLabel : ACTION_BUTTON_DEFS[2].label)) + "</button>";
+  // Add to group
+  html += '<button type="button" class="btn small" data-action-btn="group" onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
+    ACTION_BUTTON_DEFS[3].icon + " " + esc(actionButtonLabel(pb, "group", ACTION_BUTTON_DEFS[3].label)) + "</button>";
+  // Report profile
+  html += '<button type="button" class="btn ghost small" data-action-btn="report" onclick="DWC.report(\'profile\', ' + m.id + ')"' + actionButtonStyle(pb, "report") + ">" +
+    ACTION_BUTTON_DEFS[4].icon + " " + esc(actionButtonLabel(pb, "report", ACTION_BUTTON_DEFS[4].label)) + "</button>";
+  html += "</div>";
+  return html;
+}
+// Re-fetch one member and swap just the action-button block (and vanity
+// line) so a toggle updates in place without losing the visitor's scroll.
+async function refreshActionButtons(memberId) {
+  var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
+  var m = data && data.member;
+  if (!m) return;
+  state.viewingMember = m;
+  var box = document.getElementById("dwc-action-buttons");
+  if (box) {
+    var wrap = document.createElement("div");
+    wrap.innerHTML = actionButtonsHTML(m);
+    var fresh = wrap.firstChild;
+    box.replaceWith(fresh);
+  }
+  var van = document.getElementById("dwc-vanity");
+  if (van) {
+    var vwrap = document.createElement("div");
+    vwrap.innerHTML = vanityURLHTML(m);
+    van.replaceWith(vwrap.firstChild);
+  }
+}
+function vanityURLHTML(m) {
+  if (!m.page_slug) return '<div id="dwc-vanity"></div>';
+  var url = "https://rarecandyreserve.org/community.html#/u/" + encodeURIComponent(m.page_slug);
+  return '<div id="dwc-vanity" class="dwc-vanity-url">🔗 My page: <a href="' + esc(url) + '">' + esc(url) + '</a> ' +
+    '<button type="button" class="btn ghost small" onclick="DWC.copyVanityUrl(\'' + esc(m.page_slug.replace(/'/g, "")) + '\')">📋 Copy</button></div>';
+}
+
 async function viewMember(el, memberId) {
   el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
   var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
@@ -2771,6 +2938,7 @@ async function viewMember(el, memberId) {
     el.innerHTML = '<div class="note">That member doesn’t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
     return;
   }
+  state.viewingMember = m;
   // Their layout, scoped to this page only (removed on navigation).
   if (m.layout_css) {
     var st = document.createElement("style");
@@ -2805,9 +2973,13 @@ async function viewMember(el, memberId) {
     '<div class="dwc-actions" style="margin-top:14px">' +
     (m.is_mine
       ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
-      : '<button type="button" class="btn small" onclick="DWC.imMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">💬 IM @' + esc(m.username) + "</button>") +
+      : "") +
     '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
-    "</div></section>" +
+    "</div>" +
+    // v3.6 — the 5 action buttons (someone else's page) + their vanity
+    // URL. On my own page the vanity URL still shows, under Edit profile.
+    (m.is_mine ? vanityURLHTML(m) : actionButtonsHTML(m) + '<div id="dwc-group-picker"></div>' + vanityURLHTML(m)) +
+    "</section>" +
     // My links (v3.4) — only when the member actually has links.
     // No links, no section, no placeholder.
     (m.my_links && m.my_links.length ? '<section class="card"><h3 style="margin-top:0">🔗 My links</h3>' + myLinksButtonsHTML(m.my_links) + "</section>" : "") +
@@ -3670,6 +3842,27 @@ window.DWC = {
         body.my_links.push({ label: String(linkLabels[li].value || "").trim(), url: String(linkUrls[li].value || "").trim() });
       }
     }
+    // v3.6 — profile action-button customization + custom page URL.
+    // Buttons: mode radio + image URL + per-button label / colors (a
+    // color only counts when its checkbox is ticked). Slug: only sent
+    // when the input is enabled (it's disabled while locked).
+    if (form.querySelector('input[name="pb_mode"]')) {
+      var pb = { mode: "buttons", image_url: "", buttons: {} };
+      var modeEl = form.querySelector('input[name="pb_mode"]:checked');
+      if (modeEl && modeEl.value === "image") pb.mode = "image";
+      pb.image_url = String(fd.get("pb_image_url") || "").trim().slice(0, 500);
+      ["add", "message", "favorite", "group", "report"].forEach(function (key) {
+        var label = String(fd.get("pb_label_" + key) || "").trim().slice(0, 30);
+        var bg = fd.get("pb_bg_use_" + key) ? String(fd.get("pb_bg_" + key) || "").trim() : "";
+        var color = fd.get("pb_color_use_" + key) ? String(fd.get("pb_color_" + key) || "").trim() : "";
+        if (label || bg || color) pb.buttons[key] = { label: label, bg: bg, color: color };
+      });
+      body.profile_buttons = JSON.stringify(pb);
+    }
+    var slugEl = form.querySelector('input[name="page_slug"]');
+    if (slugEl && !slugEl.disabled) {
+      body.page_slug = String(fd.get("page_slug") || "").trim();
+    }
     if (isNew) {
       body.full_name = String(fd.get("full_name") || "").trim();
       body.terms_agreed = !!fd.get("terms_agreed");
@@ -3693,12 +3886,13 @@ window.DWC = {
     if (avatarError) avatarNote = " Your picture didn't save — " + avatarError;
     else if (data.avatar_error) avatarNote = " Your picture didn't save — " + data.avatar_error;
     else if (avatarUploaded) avatarNote = " Picture saved ✓";
-    if (data.v2_pending || data.v3_pending) {
-      setNotice("Profile saved — but " +
-        (data.v2_pending && data.v3_pending ? "your Top Friends / layout and your What I sell / Find prefs / music picks didn't stick yet."
-          : data.v2_pending ? "your Top Friends / layout didn't stick yet."
-          : "your What I sell / Find prefs / music picks didn't stick yet.") +
-        " The shop is still running a quick database update; try saving again later." + avatarNote);
+    if (data.v2_pending || data.v3_pending || data.v36_pending) {
+      var pendingParts = [];
+      if (data.v2_pending) pendingParts.push("your Top Friends / layout");
+      if (data.v3_pending) pendingParts.push("your What I sell / Find prefs / music picks");
+      if (data.v36_pending) pendingParts.push("your page URL / action buttons");
+      setNotice("Profile saved — but " + pendingParts.join(" and ") + " didn't stick yet. " +
+        "The shop is still running a quick database update; try saving again later." + avatarNote);
     } else {
       setNotice((isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote);
     }
@@ -4467,6 +4661,112 @@ window.DWC = {
   },
   imMember: function (id, username) {
     DWC.openIM(id, username);
+  },
+
+  // ---------- Profile action buttons (v3.6) ----------
+  // Add me / Unfriend — one click = friends (instant, no approval).
+  // Refreshes just the button block so the label flips in place.
+  toggleFriend: async function (id) {
+    if (!state.profile) { setNotice("Create your account first — friends are for members."); DWC.openSignup(); return; }
+    var m = state.viewingMember;
+    if (!m || m.id !== id) return;
+    var action = m.is_friend ? "remove" : "add";
+    var data = await apiPost("/friends", { device_id: deviceId(), friend_id: id, action: action });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't update that friendship."); return; }
+    m.is_friend = !!data.is_friend;
+    setNotice(data.is_friend ? "You're friends now — welcome to the crew." : "Unfriended. No hard feelings.");
+    await refreshActionButtons(id);
+  },
+  // Add to Favorites — the star. Toggles the favorite on/off; the star
+  // fills gold when favorited, goes back to an outline when it's not.
+  toggleFavorite: async function (id) {
+    if (!state.profile) { setNotice("Create your account first — favorites are for members."); DWC.openSignup(); return; }
+    var m = state.viewingMember;
+    if (!m || m.id !== id) return;
+    var action = m.is_favorite ? "remove" : "add";
+    var data = await apiPost("/favorites", { device_id: deviceId(), favorite_id: id, action: action });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't update that favorite."); return; }
+    m.is_favorite = !!data.is_favorite;
+    setNotice(data.is_favorite ? "⭐ Favorited — they're starred now." : "Star removed.");
+    await refreshActionButtons(id);
+  },
+  // Add to group — an inline picker under the buttons listing MY groups
+  // with Add/Remove per group, plus a create-a-group field. If I own no
+  // groups, the panel is just the create field.
+  toggleGroupPanel: async function (memberId) {
+    if (!state.profile) { setNotice("Create your account first — groups are for members."); DWC.openSignup(); return; }
+    var panel = document.getElementById("dwc-group-picker");
+    if (!panel) return;
+    if (panel.innerHTML.trim()) { panel.innerHTML = ""; return; }
+    panel.innerHTML = '<p style="color:var(--muted)">Loading your groups…</p>';
+    var data = await apiGet("/groups?device_id=" + encodeURIComponent(deviceId()));
+    var groups = (data && data.groups) || [];
+    var m = state.viewingMember;
+    var name = m ? m.username : "them";
+    var html = '<div class="dwc-group-picker"><h4 style="margin:0 0 8px">👥 Add @' + esc(name) + ' to a group</h4>';
+    if (!groups.length) {
+      html += '<p style="color:var(--muted);margin:0 0 8px">You don’t have any groups yet — make your first one:</p>';
+    } else {
+      html += groups.map(function (g) {
+        var inGroup = (g.member_ids || []).indexOf(memberId) >= 0;
+        return '<div class="dwc-group-row"><span>' + esc(g.name) + '</span>' +
+          '<button type="button" class="btn ' + (inGroup ? "ghost " : "") + 'small" onclick="DWC.toggleGroupMember(' + g.id + ", " + memberId + ", '" + (inGroup ? "remove" : "add") + "')\">" +
+          (inGroup ? "Remove" : "Add") + "</button></div>";
+      }).join("");
+    }
+    html += '<div class="dwc-group-create"><input id="dwc-new-group-name" maxlength="40" placeholder="New group name — e.g. My crew">' +
+      '<button type="button" class="btn small" onclick="DWC.createGroup(' + memberId + ')">+ Create group</button></div>' +
+      '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.toggleGroupPanel(' + memberId + ')">Done</button></p></div>';
+    panel.innerHTML = html;
+  },
+  createGroup: async function (memberId) {
+    var input = document.getElementById("dwc-new-group-name");
+    var name = input ? String(input.value || "").trim() : "";
+    if (!name) { setNotice("Give the group a name first."); return; }
+    var data = await apiPost("/groups", { device_id: deviceId(), name: name });
+    if (!data || !data.ok || !data.group) { setNotice((data && data.error) || "Couldn't create that group."); return; }
+    // New group, and the member goes straight in — that's why it's open.
+    var added = await apiPost("/groups", { device_id: deviceId(), group_id: data.group.id, member_id: memberId, action: "add" });
+    if (!added || !added.ok) { setNotice((added && added.error) || "Group made, but they didn't get added — try again."); }
+    else setNotice("Group “" + data.group.name + "” made, and @" + (state.viewingMember ? state.viewingMember.username : "them") + " is in it.");
+    DWC.toggleGroupPanel(memberId);
+    DWC.toggleGroupPanel(memberId);
+  },
+  toggleGroupMember: async function (groupId, memberId, action) {
+    var data = await apiPost("/groups", { device_id: deviceId(), group_id: groupId, member_id: memberId, action: action });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't update that group."); return; }
+    setNotice(action === "add" ? "Added to the group." : "Removed from the group.");
+    // Re-open the picker with fresh data (toggle twice: close, then open).
+    DWC.toggleGroupPanel(memberId);
+    DWC.toggleGroupPanel(memberId);
+  },
+  // Page URL appeal (v3.6) — when the 3-change limit or the 1-year
+  // cooldown blocks a new slug, the member appeals to Chris. Filed as a
+  // 'slug_appeal' report so it lands in the operator's Reports inbox.
+  appealSlug: async function () {
+    if (!state.profile) { setNotice("Create your account first."); DWC.openSignup(); return; }
+    var wanted = prompt("What page URL do you want? (3–24 letters, numbers, _ . or -)");
+    if (wanted === null) return;
+    wanted = String(wanted || "").trim();
+    if (!wanted) return;
+    var data = await apiPost("/reports", { device_id: deviceId(), target_type: "slug_appeal", target_id: state.profile.id, reason: wanted });
+    if (data && data.ok) setNotice("Appeal sent — Chris reviews page URL appeals himself. He'll let you know.");
+    else if (data && data.error) setNotice(data.error);
+  },
+  // Copy the vanity page URL (full link) to the clipboard.
+  copyVanityUrl: function (slug) {
+    var url = "https://rarecandyreserve.org/community.html#/u/" + slug;
+    var done = function () { setNotice("Copied — " + url); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(done, function () { setNotice("Copy didn't work — the link is: " + url); });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = url;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { setNotice("Copy didn't work — the link is: " + url); }
+      document.body.removeChild(ta);
+    }
   },
 
   // ---------- Steady Wave player ----------

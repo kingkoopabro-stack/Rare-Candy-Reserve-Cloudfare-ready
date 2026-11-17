@@ -322,24 +322,22 @@ function injectChrome(){
       '</div>';
     document.body.appendChild(d);
   }
-  /* ---------- "It's your space, so do whatever!" flickering entry (Do Whatever Community) ----------
-     Chris's design (2026-11-14, wording updated 2026-11-16): a standalone
-     flickering neon entry in the FOOTER area — NOT in the main navigation.
-     Carnie-pink flickering text button reading "It's your space, so do
-     whatever!", with "18+" in bold smaller lettering directly under it,
-     and the description line under that. Clicking it takes the member to
-     the Community (community.html#/adult), which gates the 18+ area on
-     age verification. */
+  /* ---------- "18+ ZONE" big neon sign (Do Whatever Community) ----------
+     Chris's design (2026-11-14, sign redesign 2026-11-16): a standalone
+     big flickering neon sign in the FOOTER area — NOT in the main
+     navigation. Reads "18+ ZONE" in huge neon letters, with "After Dark
+     Reserve. Profit from your work." underneath. Clicking it takes the
+     member to the Community (community.html#/adult), which gates the 18+
+     area on age verification. */
   if(!document.querySelector(".dwc-18-entry")){
     var dwcFoot = document.querySelector("footer.site .wrap");
     if(dwcFoot){
       var dwcEntry = document.createElement("div");
       dwcEntry.className = "dwc-18-entry";
       dwcEntry.innerHTML =
-        '<a class="dwc-18-link" href="community.html#/adult" aria-label="It\'s your space, so do whatever! — enter the Community (age-verified adults only)">' +
-        '<span class="dwc-18-btn">It\'s your space, so do whatever!</span>' +
-        '<span class="dwc-18-age">18+</span>' +
-        '<span class="dwc-18-desc">Build your brand, show off your art, customize your page, and make friends!</span>' +
+        '<a class="dwc-18-link" href="community.html#/adult" aria-label="18+ Zone — After Dark Reserve — enter the Community (age-verified adults only)">' +
+        '<span class="dwc-18-sign">18+ ZONE</span>' +
+        '<span class="dwc-18-sub">After Dark Reserve. Profit from your work.</span>' +
         '</a>';
       dwcFoot.appendChild(dwcEntry);
     }

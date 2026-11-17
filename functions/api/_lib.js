@@ -41,10 +41,10 @@ export const FLAIRS = ["Question", "Card Check", "Show & Tell", "Price Check", "
 
 // Creator/Seller area (v3) — digital-content genres a seller picks when
 // they make a creator post or set up "What I sell" on their profile.
-export const CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Print Files", "Other"];
+export const CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Other"];
 // One-tap seller tag chips for the creator composer (the seller can also
 // type their own tags — these are just the quick ones).
-export const CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos"];
+export const CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos", "Selling 3D Models", "Developer Files", "Designs & Art", "Game Assets"];
 // A Steady Heart — "End of the year" (21 tracks, in order). Members pick
 // up to 5 to feature on their profile. Track names are exact — never
 // re-title or alter them. Chris gives full permission to use all of it.

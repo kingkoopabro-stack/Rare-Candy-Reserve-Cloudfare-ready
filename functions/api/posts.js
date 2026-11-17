@@ -148,7 +148,7 @@ export async function onRequestPost({ env, request }) {
   }
   if (isCreator) {
     const genre = CREATOR_GENRES.includes(a.content_genre) ? a.content_genre : "";
-    if (!genre) return fail("Pick what kind of content this is — photos, videos, custom, audio, 3D print files, or other.");
+    if (!genre) return fail("Pick what kind of content this is — photos, videos, custom, audio, 3D models, 3D print files, developer files, designs, art, apps, game assets, adult content, or other.");
     const priceCents = Number.isInteger(a.price_cents) ? a.price_cents : Math.round(Number(a.price_cents || 0));
     if (!Number.isFinite(priceCents) || priceCents < 0 || priceCents > 10000000) {
       return fail("Price needs to be 0 (free) up to $100,000, in whole dollars.");

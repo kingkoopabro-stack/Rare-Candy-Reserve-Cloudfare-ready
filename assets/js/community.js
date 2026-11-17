@@ -58,8 +58,8 @@ var MODEL_INK_OPTIONS = ["None", "Tattoos", "Piercings", "Tattoos & piercings"];
 // Creator/Seller area (v3) — digital-content genres, one-tap seller tag
 // chips, and the emoji flair row for creator-post titles. Titles keep
 // emojis as-is (never stripped); the picker just inserts them.
-var CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Print Files", "Other"];
-var CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos"];
+var CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Other"];
+var CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos", "Selling 3D Models", "Developer Files", "Designs & Art", "Game Assets"];
 var TITLE_EMOJIS = ["🔥", "💖", "✨", "🌙", "🍬", "💋", "😈", "😘", "🎀", "🌸", "💎", "👑", "🍓", "🍑", "🌶️", "💦", "🎥", "📸", "🖨️", "🎵"];
 
 // A Steady Heart — "End of the year" (21 tracks, in order). Chris gives
@@ -3124,7 +3124,7 @@ var MATCH_BANNER_HTML =
 // PayPal screenshot). Sits above the main 18+ welcome picture.
 var NUT_BANNER_HTML =
   '<div class="dwc-nut-banner"><span class="dwc-nut-line">Welcome to the after dark reserve, where money flows &amp; your content is watermarked to prevent anyone using it!</span><span class="dwc-18only">18+ only</span>' +
-  '<p class="dwc-nut-sub">Optional blur face ability when uploading your content, but remember all digital files can be sold — not just your content, but your apps, 3D models, game assets, art, NFTs, and any digital file you can think of!</p>' +
+  '<div class="dwc-dfm-banner"><span class="dwc-dfm-banner-title">🕹️ Digital File Marketplace!</span><span class="dwc-dfm-banner-sub">Sell any digital file — 3D models, developer files, designs, art, apps, game assets, photos, videos &amp; adult content. Optional blur on your uploads.</span></div>' +
   '<div class="dwc-paypal-demo"><div class="dwc-paypal-label">Example — illustration only, not a real PayPal screenshot</div>' +
   '<div class="dwc-paypal-balance">$1,240.00 <small>▲ +$12.50 just now</small></div>' +
   '<p class="dwc-paypal-note">PayPal balance rising — sales land here the moment buyers pay.</p>' +
@@ -3268,10 +3268,10 @@ function renderCreatorComposer() {
   if (!host) return;
   host.innerHTML =
     '<section class="card dwc-creatorbox" aria-label="New creator post"><h3 style="margin-top:0">🎨 Creator post — sell your digital content</h3>' +
-    '<p style="color:var(--muted)">Selling photos, videos, custom content, audio, or 3D print files? Post it here. Age-verified members only — your post shows in the 18+ forum and its tag pages, with a Creator badge and your price. Payment is arranged privately with the buyer in a private chat.</p>' +
+    '<p style="color:var(--muted)">Selling a digital file? Post it here — 3D models, developer files, designs, art, apps, game assets, photos, videos, audio, custom content, or adult content. Age-verified members only — your post shows in the 18+ forum and its tag pages, with a Creator badge and your price. Payment is arranged privately with the buyer in a private chat.</p>' +
     '<form onsubmit="DWC.submitCreatorPost(this); return false;">' +
     '<input type="hidden" name="kind" value="adult">' +
-    '<label>Corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
+    '<label>Forum corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>Title (3–120 characters) — tap an emoji to add flair</label>' +
     '<input name="title" required minlength="3" maxlength="120" placeholder="e.g. New set — 20 photos 🔥">' +
     '<div class="dwc-emojirow" aria-label="Emoji flair — tap to add to the title">' +

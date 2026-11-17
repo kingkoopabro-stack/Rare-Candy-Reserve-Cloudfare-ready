@@ -322,24 +322,24 @@ function injectChrome(){
       '</div>';
     document.body.appendChild(d);
   }
-  /* ---------- "Do whatever 18+" flickering entry (Do Whatever Community) ----------
-     Chris's design (2026-11-14): a standalone flickering neon entry in the
-     FOOTER area — NOT in the main navigation. Carnie-pink flickering text
-     button reading "Do whatever", with "18+" in bold smaller lettering
-     directly under it, and the description line under that — so the whole
-     entry reads as "Do whatever 18+" with the description beneath it.
-     Clicking it takes the member to the Community (community.html#/adult),
-     which gates the 18+ area on age verification. */
+  /* ---------- "It's your space, so do whatever!" flickering entry (Do Whatever Community) ----------
+     Chris's design (2026-11-14, wording updated 2026-11-16): a standalone
+     flickering neon entry in the FOOTER area — NOT in the main navigation.
+     Carnie-pink flickering text button reading "It's your space, so do
+     whatever!", with "18+" in bold smaller lettering directly under it,
+     and the description line under that. Clicking it takes the member to
+     the Community (community.html#/adult), which gates the 18+ area on
+     age verification. */
   if(!document.querySelector(".dwc-18-entry")){
     var dwcFoot = document.querySelector("footer.site .wrap");
     if(dwcFoot){
       var dwcEntry = document.createElement("div");
       dwcEntry.className = "dwc-18-entry";
       dwcEntry.innerHTML =
-        '<a class="dwc-18-link" href="community.html#/adult" aria-label="Do whatever 18+ — enter the Community (age-verified adults only)">' +
-        '<span class="dwc-18-btn">Do whatever</span>' +
+        '<a class="dwc-18-link" href="community.html#/adult" aria-label="It\'s your space, so do whatever! — enter the Community (age-verified adults only)">' +
+        '<span class="dwc-18-btn">It\'s your space, so do whatever!</span>' +
         '<span class="dwc-18-age">18+</span>' +
-        '<span class="dwc-18-desc">Sell your content for free, no matter what it is, and keep it yours, protected, and keep yourself safe most of all! Hold retribution of your hard work and those responsible accountable!</span>' +
+        '<span class="dwc-18-desc">Build your brand, show off your art, customize your page, and make friends!</span>' +
         '</a>';
       dwcFoot.appendChild(dwcEntry);
     }

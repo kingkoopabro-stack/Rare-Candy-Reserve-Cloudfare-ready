@@ -816,6 +816,7 @@ function submitSiteForm(e, subject){
 /* ---------- boot ---------- */
 function boot(){
   injectChrome();
+  syncProfileButton();
   const page = document.body.dataset.page || "";
   document.querySelectorAll("#mainNav a").forEach(a => a.classList.toggle("active", a.dataset.page === page));
   renderPageSections();
@@ -833,3 +834,33 @@ function boot(){
   }
 }
 document.addEventListener("DOMContentLoaded", boot);
+
+// Community sign-in state for the header button (spec §15): while signed
+// in to the Community, the "Make a profile!" header button becomes a
+// "Sign out" button instead. Signed out (or no profile on this device),
+// it stays "Make a profile!". Signing out clears the Community device
+// id — the account itself is untouched, so signing back in on the
+// Community page restores it on that device.
+function syncProfileButton() {
+  var btn = document.querySelector('a.aml-btn[href="community.html"]');
+  if (!btn) return;
+  var deviceId = null;
+  try { deviceId = localStorage.getItem("dwc-device-id"); } catch (e) {}
+  if (!deviceId) return; // never signed in on this device — leave the button
+  fetch("/api/profile?device_id=" + encodeURIComponent(deviceId))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.profile) return; // device id exists but no profile
+      var logo = btn.querySelector(".aml-logo");
+      var sub = btn.querySelector(".aml-sub");
+      if (logo) logo.textContent = "👋 Sign out";
+      if (sub) sub.textContent = "@" + data.profile.username;
+      btn.href = "#";
+      btn.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        try { localStorage.removeItem("dwc-device-id"); } catch (e) {}
+        location.reload();
+      });
+    })
+    .catch(function () { /* offline — leave the button as-is */ });
+}

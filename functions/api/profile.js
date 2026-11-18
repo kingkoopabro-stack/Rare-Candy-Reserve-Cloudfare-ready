@@ -64,6 +64,16 @@ export async function onRequestPost({ env, request }) {
     if (!up.ok) avatarError = up.error;
     else avatarKey = up.key;
   }
+  // v3.7 — banner / cover photo: same pattern as the avatar. A bad
+  // banner never kills the whole save; the client shows banner_error.
+  let bannerKey = undefined; // undefined = keep
+  let bannerError = null;
+  if (a.remove_banner) bannerKey = null;
+  else if (a.banner) {
+    const up = await putImage(env, "banners", deviceId, a.banner, 2500000);
+    if (!up.ok) bannerError = up.error;
+    else bannerKey = up.key;
+  }
 
   const now = nowMs();
   const str = (v, max) => String(v ?? "").trim().slice(0, max);
@@ -232,12 +242,36 @@ export async function onRequestPost({ env, request }) {
       }
     }
   }
+  // v3.7 — custom text ticker / marquee (optional, off by default; custom
+  // text only, never the member's name) + banner blob key. Same graceful
+  // pattern: they ride in their own v37 columns, so if the v3.7 migration
+  // hasn't run yet the edit retries without them and the client is told
+  // via v37_pending.
+  const v37Sets = [];
+  const v37Vals = [];
+  let v37Pending = false;
+  if (typeof a.ticker_text === "string") {
+    v37Sets.push("ticker_text = ?");
+    v37Vals.push(str(a.ticker_text, 200));
+  }
+  if (typeof a.ticker_enabled === "boolean" || a.ticker_enabled === 0 || a.ticker_enabled === 1) {
+    v37Sets.push("ticker_enabled = ?");
+    v37Vals.push(a.ticker_enabled === true || a.ticker_enabled === 1 ? 1 : 0);
+  }
+  if (typeof a.ticker_color === "string") {
+    v37Sets.push("ticker_color = ?");
+    v37Vals.push(str(a.ticker_color, 20));
+  }
+  if (bannerKey !== undefined) {
+    v37Sets.push("banner_blob_key = ?");
+    v37Vals.push(bannerKey);
+  }
   let row;
   let v2Pending = false;
   let v3Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals];
+    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
@@ -267,20 +301,25 @@ export async function onRequestPost({ env, request }) {
           await db.prepare(`UPDATE profiles SET ${r.keep.join(", ")} WHERE id = ?`).bind(...r.keepVals).run();
         };
         let done = false;
-        if (v36Sets.length) {
-          try { await tryDrop(v36Sets); v36Pending = true; done = true; }
+        if (v37Sets.length) {
+          try { await tryDrop(v37Sets); v37Pending = true; done = true; }
+          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
+        }
+        if (!done && v36Sets.length) {
+          try { await tryDrop([...v36Sets, ...v37Sets]); v36Pending = true; v37Pending = true; done = true; }
           catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v3Sets.length) {
-          try { await tryDrop([...v3Sets, ...v36Sets]); v3Pending = true; v36Pending = true; done = true; }
+          try { await tryDrop([...v3Sets, ...v36Sets, ...v37Sets]); v3Pending = true; v36Pending = true; v37Pending = true; done = true; }
           catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v2Sets.length) {
-          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets]);
+          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets]);
           await db.prepare(`UPDATE profiles SET ${r2.keep.join(", ")} WHERE id = ?`).bind(...r2.keepVals).run();
           v2Pending = true;
           if (v3Sets.length) v3Pending = true;
           if (v36Sets.length) v36Pending = true;
+          if (v37Sets.length) v37Pending = true;
           done = true;
         }
         if (!done) throw e;
@@ -300,5 +339,5 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
-  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, avatar_error: avatarError });
+  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, avatar_error: avatarError, banner_error: bannerError });
 }

@@ -520,6 +520,13 @@ export function shapeProfile(row) {
     page_slug_changes: Number(row.page_slug_changes || 0),
     page_slug_next_change_at: iso(slugNextChangeAt(row, Date.now())),
     profile_buttons: parseProfileButtons(row.profile_buttons),
+    // v3.7 — role/badges, banner/cover photo, custom ticker, bans.
+    role: row.role ?? (row.is_operator === 1 ? "operator" : "member"),
+    banner_url: imageUrl(row.banner_blob_key ?? null),
+    ticker_text: row.ticker_text ?? "",
+    ticker_enabled: row.ticker_enabled === 1,
+    ticker_color: row.ticker_color ?? "",
+    banned: row.banned === 1,
     created_at: iso(row.created_at),
   };
 }
@@ -555,8 +562,31 @@ export function shapeMember(row) {
     // v3.6 — custom page URL + action-button customization (public).
     page_slug: row.page_slug ?? "",
     profile_buttons: parseProfileButtons(row.profile_buttons),
+    // v3.7 — role/badges, banner/cover photo, custom ticker, bans (public).
+    role: row.role ?? (row.is_operator === 1 ? "operator" : "member"),
+    banner_url: imageUrl(row.banner_blob_key ?? null),
+    ticker_text: row.ticker_text ?? "",
+    ticker_enabled: row.ticker_enabled === 1,
+    ticker_color: row.ticker_color ?? "",
+    banned: row.banned === 1,
     created_at: iso(row.created_at),
   };
+}
+
+// --- v3.7 roles ------------------------------------------------------------
+// role is 'operator' | 'admin' | 'mod' | 'member'. is_operator stays as the
+// legacy operator flag; role is the source of truth for badges + access.
+export function roleOf(row) {
+  if (!row) return "member";
+  const r = String(row.role || "").toLowerCase();
+  if (r === "operator" || r === "admin" || r === "mod") return r;
+  return row.is_operator === 1 ? "operator" : "member";
+}
+export function isTeamRole(role) {
+  return role === "operator" || role === "admin" || role === "mod";
+}
+export function isOperatorRow(row) {
+  return roleOf(row) === "operator";
 }
 
 export function shapeModelCard(row) {

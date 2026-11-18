@@ -435,6 +435,7 @@ var NAV = [
   ["trade", "⇄ Up for Trade"], ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
   ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
+  ["admin", "🛡️ Admin"], ["team", "👥 Team"],
 ];
 function parseRoute() {
   var h = (location.hash || "").replace(/^#\/?/, "");
@@ -477,8 +478,16 @@ function render() {
     html += '<div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div>';
   }
   html += '<div id="dwc-notice" class="dwc-notice" role="status" style="display:' + (state.notice ? "" : "none") + '">' + (state.notice ? esc(state.notice) : "") + '</div>';
+  // Post-signup unlock card — only right after a basic account is created.
+  if (state.showUnlock && state.profile) html += unlockCardHTML();
   html += '<div id="dwc-account"></div>';
-  html += '<nav class="dwc-pills" aria-label="Community sections">' + NAV.map(function (item) {
+  html += '<nav class="dwc-pills" aria-label="Community sections">' + NAV.filter(function (item) {
+    // Admin + Team are role-gated: Admin is operator-only, Team is
+    // operator/admin/mod. Everyone else never sees the pills.
+    if (item[0] === "admin") return !!(state.profile && (state.profile.role === "operator" || state.profile.is_operator));
+    if (item[0] === "team") return !!(state.profile && (state.profile.role === "operator" || state.profile.role === "admin" || state.profile.role === "mod" || state.profile.is_operator));
+    return true;
+  }).map(function (item) {
     var label = item[1];
     if (item[0] === "reports" && state.stats && state.stats.open_reports > 0) label = "🚩 Reports (" + state.stats.open_reports + ")";
     return '<button type="button" class="dwc-pill' + (active === item[0] ? " active" : "") + (item[0] === "find" ? " dwc-pill-find" : "") + '" onclick="DWC.go(\'' + item[0] + '\')">' + esc(label) + "</button>";
@@ -518,7 +527,7 @@ function renderAccount() {
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
       (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(p.layout_preset) + "</span>" : "") + "</p>" +
       "</div>" +
-      '<div style="margin-left:auto"><button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button></div>' +
+      '<div style="margin-left:auto"><button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button> <button type="button" class="btn ghost small" onclick="DWC.signOut()">Sign out</button></div>' +
       "</div></section>";
     return;
   }
@@ -813,7 +822,6 @@ function buildProfileFromRequest(raw) {
   if (/\bglow(ing)?\b/.test(mood)) feats.push("glow");
   if (/\bsparkle|glitter|twinkle\b/.test(mood)) feats.push("sparkle");
   if (/\bround buttons?\b/.test(mood)) feats.push("round buttons");
-  if (/\bmarquee|scrolling\b/.test(mood)) feats.push("scrolling name");
   // Keyframes the CSS references but doesn't define (the site defines
   // these globally; the copied HTML must carry them to work standalone).
   // neonFlicker is already in the CSS itself, so it's not re-added here.
@@ -881,15 +889,16 @@ function taffyReply(raw) {
   // spacing
   if (has(/more space|spacing|padding|roomy|compact/))
     return { text: "More breathing room — this pads your cards out to 28px. Lower the number for tighter, raise it for roomier.", css: ".dwc-myprofile .card{padding:28px;}", emoji: "📐", working: false };
-  // sparkle / glitter
+  // sparkle
   if (has(/sparkle|glitter|twinkle|stars/))
     return { text: "Sparkle! Apply this and your page gets a twinkling star field over it. There's also a Sparkle toggle in Edit Profile under MySpace effects.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", working: true };
   // animated background
   if (has(/animated background|moving background|rainbow background|animated.*bg/))
     return { text: "Animated rainbow background — it slowly shifts through pink, purple, blue and green. Apply it and watch it move. There's a toggle for it in Edit Profile too.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", emoji: "🌈", working: true };
-  // marquee / scrolling text
+  // marquee / scrolling text — the ticker, not the name. The name stays
+  // put; scrolling text lives in the optional ticker above your page.
   if (has(/marquee|scrolling text|scrolling name|scrolling heading/))
-    return { text: "Old-school scrolling name — apply this and your page heading scrolls across like a 2005 MySpace page. Toggle in Edit Profile under MySpace effects too.", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}", emoji: "➡️", working: false };
+    return { text: "Scrolling text lives in the ticker — Edit Profile has a Ticker box where you type your own text (up to 200 characters) and it scrolls above your page. Your name stays put.", css: "", emoji: "➡️", working: false };
   // change font (family)
   if (has(/change.*font|different font|font.*(family|style)|comic.*font|serif/))
     return { text: "Fonts — the Font picker in Edit Profile has Comic, Typewriter, and more. Or apply this CSS for a Georgia serif look. Swap the family name for any font you like.", css: ".dwc-myprofile{font-family:Georgia,'Times New Roman',serif;}", emoji: "🔠", working: false };
@@ -1317,17 +1326,23 @@ function profileFormHTML(p) {
   var th = parseThemeClient(p && p.profile_theme);
   return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
     "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
+    (isNew ? '<p style="color:var(--muted);margin-top:0">Just 4 things and you’re in — username, birthday, your name, and a quick human check. Picture, bio, links, layout, and payout can all wait until after — hit Edit profile any time.</p>' : "") +
     '<form onsubmit="DWC.saveProfile(this); return false;">' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
+    // Basic account: new signups only see the essentials. Everything
+    // optional (chat name, bio, payout, picture, banner, ticker, links,
+    // layout, music, buttons, page URL) lives in Edit profile after.
+    (isNew ? "" :
     '<label>Chat name (shown in Live Chat — defaults to your username)</label>' +
     '<input name="chat_name" maxlength="24" value="' + v("chat_name") + '" placeholder="What should chat call you?">' +
     '<label>Occupation (optional)</label>' +
     '<input name="occupation" maxlength="60" value="' + v("occupation") + '" placeholder="What do you do?">' +
     '<label>About you / your shop</label>' +
-    '<textarea name="bio" maxlength="280" placeholder="What do you collect and sell?">' + v("bio") + "</textarea>" +
+    '<textarea name="bio" maxlength="280" placeholder="What do you collect and sell?">' + v("bio") + "</textarea>") +
     '<label>Birthday — month / day only shows publicly, never the year' + (isNew ? " (required — one account per person)" : "") + "</label>" +
     '<input name="birthday" type="date" value="' + (p && p.birthday ? esc(p.birthday) : "") + '"' + (isNew ? " required" : "") + ">" +
+    (isNew ? "" :
     '<label>Payout method (how you want to be paid — needed to sell)</label>' +
     '<input name="payout_method" maxlength="40" value="' + v("payout_method") + '" placeholder="e.g. PayPal, Cash App, Chime…">' +
     '<label>Payout handle</label>' +
@@ -1336,7 +1351,20 @@ function profileFormHTML(p) {
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically (a GIF becomes a still image). iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
     '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.avatarPicked(this)">' +
     '<p id="dwc-avatar-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
-    (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
+    (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "")) +
+    // v3.7 — banner / cover photo (centered at the top of the page) +
+    // optional custom-text ticker (above the main page; the name stays put).
+    (isNew ? "" :
+    '<label>🖼️ Banner / cover photo — shows centered at the top of your page</label>' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to fit across the top of your page. A banner is optional.</p>' +
+    '<input name="banner" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    (p && p.banner_url ? '<label><input type="checkbox" name="remove_banner" style="width:auto"> Remove my current banner</label>' : "") +
+    '<label>📜 Ticker — optional scrolling text above your page</label>' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page. Your name stays put — it never scrolls.</p>' +
+    '<input name="ticker_text" maxlength="200" value="' + esc(p ? (p.ticker_text || "") : "") + '" placeholder="e.g. New drops every Friday — check the Flea Market!">' +
+    '<label><input type="checkbox" name="ticker_enabled" style="width:auto"' + (p && p.ticker_enabled ? " checked" : "") + '> Show the ticker on my page</label>' +
+    '<label>Ticker color</label>' +
+    '<input name="ticker_color" type="color" value="' + esc((p && /^#[0-9a-fA-F]{6}$/.test(p.ticker_color || "")) ? p.ticker_color : "#00e5ff") + '" style="width:64px;height:36px;padding:2px">') +
     (isNew ? "" :
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔗 My links — buttons on your page</h4>' +
     "<p style=\"margin:0 0 8px\">Add links that show as buttons on your member page — your shop, Instagram, whatever. Up to 5. A label and a full link starting with http:// or https://.</p>" +
@@ -1349,6 +1377,7 @@ function profileFormHTML(p) {
       '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/8</p></div>') +
     (isNew ? "" : profileButtonsSectionHTML(p)) +
     (isNew ? "" : pageSlugSectionHTML(p)) +
+    (isNew ? "" :
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 What I sell — your creator card</h4>' +
     "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
     '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
@@ -1370,7 +1399,7 @@ function profileFormHTML(p) {
     '<label>Tags I’m after (comma separated, up to 8)</label>' +
     '<input name="buyer_tags" maxlength="240" value="' + esc(p ? (p.buyer_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, amateur">' +
     '<label>My budget — up to ($)</label>' +
-    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>' +
+    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') +
     (isNew ? "" :
       '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎵 Music — A Steady Heart + Steady Wave</h4>' +
       "<p style=\"margin:0 0 8px\">Feature A Steady Heart on your page — pick up to 5 tracks from “End of the year”. Track names only, no audio player for individual tracks yet. The radio player is the live station stream. Either, both, or neither — your call.</p>" +
@@ -1383,6 +1412,7 @@ function profileFormHTML(p) {
       '<label><input type="checkbox" name="show_vnr_player" style="width:auto"' + (p && p.show_vnr_player ? " checked" : "") + '> 📻 Show Steady Wave player on my profile</label>' +
       '<label><input type="checkbox" name="autoplay_vnr" style="width:auto"' + (p && p.autoplay_vnr ? " checked" : "") + '> ▶️ Autoplay the Steady Wave player when someone visits my page</label>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A small live player for the Steady Wave stream shows on your page. It just streams the station — no track selection, no playlist.</p></div>') +
+    (isNew ? "" :
     '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎨 MySpace layout — make this page yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a preset, or paste your own CSS. Your layout shows on <strong>your page only</strong> — it never touches anyone else's.</p>" +
     '<div class="dwc-presets">' +
@@ -1422,7 +1452,8 @@ function profileFormHTML(p) {
     "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF background goes in the background-image URL box above — any https:// GIF works.</p>" +
     '<div class="dwc-checkgrid">' +
     Object.keys(MYSPACE_EFFECTS).map(function (k) {
-      return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> " + esc(MYSPACE_EFFECTS[k].label) + "</label>";
+      var fx = MYSPACE_EFFECTS[k];
+      return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
     }).join("") + "</div>" +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div></div>" +
     '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🍬 Meet Taffy — your little site helper</h4>' +
@@ -1437,7 +1468,7 @@ function profileFormHTML(p) {
     '<input id="dwc-bot-mood" maxlength="80" placeholder="e.g. dark blue background, big headings, round buttons">' +
     '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.runLayoutBot()">Generate my layout →</button></p>' +
     taffyHelpHTML() +
-    '<div id="dwc-bot-result"></div></div>' +
+    '<div id="dwc-bot-result"></div></div>') +
     (isNew ?
       '<label>Full name (required — one account per person; never shown publicly)</label>' +
       '<input name="full_name" required minlength="2" maxlength="80" placeholder="Your full name">' +
@@ -1455,7 +1486,27 @@ async function loadChallenge() {
   var data = await apiGet("/challenge");
   state.challenge = data && data.token ? data : null;
   var el = $("dwc-challenge");
-  if (el) el.innerHTML = state.challenge ? esc(state.challenge.question) : "Human check couldn't load — try again.";
+  if (el) el.innerHTML = state.challenge ? esc(state.challenge.question) : 'Human check didn\'t load — <button type="button" class="btn ghost small" onclick="DWC.retryChallenge()">Tap to retry</button>';
+}
+
+// Post-signup unlock card — after a basic account is created, show the
+// member exactly what they can unlock next, in plain words. No ID is
+// needed unless they want the 18+ areas. Dismissable; it only appears
+// right after a new signup.
+function unlockCardHTML() {
+  var p = state.profile || {};
+  var name = p.username ? "@" + p.username : "you";
+  return '<section class="card dwc-unlock" aria-label="You\'re in — unlock more">' +
+    '<h3 style="margin-top:0">🎉 You\'re in, ' + esc(name) + '!</h3>' +
+    '<p style="margin:0 0 10px">That was the whole signup. Everything below is optional — unlock it whenever you want, or skip it and just hang out.</p>' +
+    '<div class="dwc-unlock-grid">' +
+    '<button type="button" class="btn" onclick="DWC.editProfile()">🎨 Make it yours<br><span style="font-weight:400;font-size:13px">picture, bio, layout, links</span></button>' +
+    '<button type="button" class="btn" onclick="DWC.editProfile()">💰 Start selling<br><span style="font-weight:400;font-size:13px">add how you get paid</span></button>' +
+    '<button type="button" class="btn" onclick="DWC.go(\'adult\')">🔞 18+ areas<br><span style="font-weight:400;font-size:13px">ID check — only if you want in</span></button>' +
+    '</div>' +
+    '<p style="margin:10px 0 0;color:var(--muted);font-size:13px">No ID needed unless you want the 18+ areas. No rush on any of it.</p>' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.dismissUnlock()">I\'ll do this later →</button></p>' +
+    '</section>';
 }
 
 // ---------- MySpace throwback v2: Top Friends picker + layout editor ----------
@@ -1945,10 +1996,9 @@ var BUTTON_STYLES = {
 // backgrounds work through the background-image URL picker (any https URL,
 // GIF included) — no separate effect needed for that.
 var MYSPACE_EFFECTS = {
-  "animated-bg": { label: "Animated rainbow background", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}" },
-  "sparkle": { label: "Sparkle / glitter", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#00e5ff,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
-  "marquee": { label: "Scrolling name (marquee)", css: ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}" },
-  "glow-text": { label: "Glowing headings", css: ".dwc-myprofile h2,.dwc-myprofile h3{text-shadow:0 0 8px currentColor,0 0 22px currentColor;}" }
+  "animated-bg": { label: "Animated rainbow background", desc: "Your page background slowly shifts through pink, purple, blue and green.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}" },
+  "sparkle": { label: "Sparkle", desc: "A twinkling star field over your page.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#00e5ff,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
+  "glow-text": { label: "Glowing headings", desc: "Your headings glow.", css: ".dwc-myprofile h2,.dwc-myprofile h3{text-shadow:0 0 8px currentColor,0 0 22px currentColor;}" }
 };
 var NAMED_BG = {
   "dark blue": ["#0a2a5e", "#061a3d", false], "light blue": ["#a8d8ff", "#7ab8f0", true],
@@ -1997,11 +2047,12 @@ function buildLayoutFromVibe(vibeId, accent, mood) {
     btnFlicker = "animation:neonFlicker 2.4s infinite;";
     flickerKeyframes = "@keyframes neonFlicker{0%,91%,94%,98%,100%{opacity:1}92%{opacity:.3}96%{opacity:.6}}";
   }
-  // --- MySpace effects ("sparkle", "animated background", "marquee", "font size") ---
+  // --- MySpace effects ("sparkle", "animated background", "font size") ---
+  // (No marquee/scrolling-name — the name stays put; scrolling text lives
+  // in the optional ticker above the page, set in Edit Profile.)
   var fxCss = "";
   if (/\bsparkle|glitter|twinkle\b/.test(m)) fxCss += ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}";
   if (/\banimated background|moving background|rainbow background\b/.test(m)) fxCss += ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}";
-  if (/\bmarquee|scrolling (text|name|heading)\b/.test(m)) fxCss += ".dwc-myprofile h2{overflow:hidden;white-space:nowrap;animation:dwcMarquee 9s linear infinite;}";
   var bodySize = "";
   if (/\b(bigger|big|large) text\b/.test(m)) bodySize = "18px";
   if (/\b(small|smaller|tiny) text\b/.test(m)) bodySize = "13px";
@@ -2298,6 +2349,8 @@ function renderView() {
   if (r.name === "receipts") return viewReceipts(el);
   if (r.name === "reports") return viewReports(el);
   if (r.name === "rules") return viewRules(el);
+  if (r.name === "admin") return viewAdmin(el);
+  if (r.name === "team") return viewTeam(el);
   if (r.name === "adult") return viewAdult(el);
   if (r.name === "tag") return viewTag(el, r.tag, r.adult);
   if (r.name === "thread") return viewThread(el, Number(r.postId));
@@ -2822,6 +2875,35 @@ function presenceDot(m) {
   var label = p === "online" ? "Online" : p === "away" ? "Away" : "Offline";
   return '<span class="dwc-dot ' + cls + '" title="' + label + (m.away_message && p === "away" ? " — " + esc(m.away_message) : "") + '"></span>';
 }
+// v3.7 badges — all in the same place, right by the name + online dot.
+// Operator: the VNR symbol (gradient heart + EKG). Admin: a peace yin and
+// yang with "admin" in small text under it. Mod: "Moderator" in glowing
+// green small letters. Everyone else: no badge.
+function badgeHTML(m) {
+  var role = m.role || (m.is_operator ? "operator" : "member");
+  if (role === "operator") {
+    return '<img class="dwc-badge-op" src="images/steady-heart.svg" alt="Operator" title="Operator — runs Rare Candy Reserve">';
+  }
+  if (role === "admin") {
+    return '<span class="dwc-badge-admin" title="Admin">☯<small>admin</small></span>';
+  }
+  if (role === "mod") {
+    return '<span class="dwc-badge-mod" title="Moderator">Moderator</span>';
+  }
+  return "";
+}
+// v3.7 ticker — optional custom text, up to 200 chars, scrolling above
+// the main page. The name never scrolls; it stays put.
+function tickerHTML(m) {
+  if (!m || !m.ticker_enabled || !m.ticker_text) return "";
+  var color = /^#[0-9a-fA-F]{6}$/.test(m.ticker_color || "") ? m.ticker_color : "#00e5ff";
+  return '<div class="dwc-ticker" style="color:' + esc(color) + '"><div class="dwc-ticker-inner">' + esc(m.ticker_text) + "</div></div>";
+}
+// v3.7 banner / cover photo — centered at the top of the profile.
+function bannerHTML(m) {
+  if (!m || !m.banner_url) return "";
+  return '<div class="dwc-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo"></div>';
+}
 // Chris (member id 1) is the site's Tom — every new member's first Top
 // Friend by default. His tile says "Chris (Ash)" with his profile picture,
 // not @RareCandyReserve.
@@ -2961,15 +3043,18 @@ async function viewMember(el, memberId) {
   }
   el.innerHTML =
     '<div class="dwc-myprofile">' +
+    // v3.7 — banner / cover photo first, centered at the top; then the
+    // optional custom-text ticker above the main page. The name stays
+    // put (it never scrolls).
+    bannerHTML(m) + tickerHTML(m) +
     '<section class="card dwc-mypage-head"><div class="dwc-profile-row">' +
     (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:84px;height:84px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:84px;height:84px;font-size:38px">🍬</span>') +
-    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + "</h2>" +
+    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + "</h2>" +
     (m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
     (m.bio ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(m.bio) + "</p>" : "") +
     '<p class="dwc-meta" style="margin:4px 0">' +
     (m.birthday ? "🎂 " + esc(m.birthday) + " · " : "") + "Joined " + fmtDate(m.created_at) +
     (m.age_verified ? ' · <span style="color:var(--green)">Age verified ✓</span>' : "") +
-    (m.is_operator ? ' · <span style="color:var(--amber)">Operator</span>' : "") +
     (m.payout_ready ? ' · <span style="color:var(--green)">✓ Payout ready</span>' : "") + "</p>" +
     (m.presence === "away" && m.away_message ? '<p style="margin:4px 0">🌙 Away: “' + esc(m.away_message) + "”</p>" : "") +
     "</div></div>" +
@@ -3019,10 +3104,54 @@ async function viewMember(el, memberId) {
     '<section class="card"><h3 style="margin-top:0">About</h3>' +
     (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
     (m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
-    "</section></div>";
+    "</section>" +
+    // v3.7 — page comments (spec section 9): anyone who added this
+    // member can leave a comment — public, friends-only, or private.
+    '<section class="card" id="dwc-page-comments"><h3 style="margin-top:0">💬 Page comments</h3><div id="dwc-page-comments-list"><p style="color:var(--muted)">Loading comments…</p></div><div id="dwc-page-comments-form"></div></section>' +
+    "</div>";
   // Start the Steady Wave stream on the visitor's first tap/click/scroll
   // (browsers block autoplay with sound until a real gesture).
   DWC.armVNRAutoplay();
+  loadPageComments(m.id, m.is_mine, m.is_friend);
+}
+
+// ---------- v3.7 page comments ----------
+async function loadPageComments(profileId, isMine, isFriend) {
+  var list = $("dwc-page-comments-list");
+  var formHost = $("dwc-page-comments-form");
+  if (!list) return;
+  var data = await apiGet("/profile-comments?profile_id=" + profileId + (state.profile ? "&device_id=" + encodeURIComponent(deviceId()) : ""));
+  var comments = (data && data.comments) || [];
+  list.innerHTML = comments.length
+    ? comments.map(function (c) {
+        return '<div class="dwc-page-comment">' +
+          (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
+          '<div><strong>@' + esc(c.author_username) + '</strong> <span class="dwc-meta">' + fmtDate(c.created_at) + '</span>' +
+          (c.visibility !== "public" ? ' <span class="dwc-meta">· ' + (c.visibility === "friends" ? "friends-only" : "private") + '</span>' : "") +
+          (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+          (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
+          (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
+          ((c.is_mine || isMine) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "") +
+          "</div></div>";
+      }).join("")
+    : "<p style=\"color:var(--muted)\">No page comments yet — be the first.</p>";
+  if (!formHost) return;
+  if (!state.profile) {
+    formHost.innerHTML = '<p style="color:var(--muted)">Sign in to leave a page comment.</p>';
+    return;
+  }
+  if (!data.can_comment) {
+    formHost.innerHTML = '<p style="color:var(--muted)">Add them as a friend first — only friends can leave page comments.</p>';
+    return;
+  }
+  formHost.innerHTML =
+    '<form class="dwc-rowform" onsubmit="DWC.sendPageComment(this,' + profileId + '); return false;" style="flex-wrap:wrap">' +
+    '<textarea name="body" rows="2" maxlength="500" placeholder="Leave a comment on this page…" style="flex:1;min-width:200px"></textarea>' +
+    '<select name="visibility" title="Who can see this comment"><option value="public">🌍 Public</option><option value="friends">👥 Friends-only</option><option value="private">🔒 Private (just them)</option></select>' +
+    '<input type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif" title="Attach a picture">' +
+    '<input type="url" name="gif_url" placeholder="GIF link (https://…)" style="min-width:180px">' +
+    '<button class="btn" type="submit">Post comment</button></form>' +
+    '<p class="dwc-form-err" data-err hidden></p>';
 }
 
 // ---------- Live Chat — AIM throwback ----------
@@ -3354,6 +3483,84 @@ async function viewReports(el) {
           : "") +
         "</article>";
     }).join("") : '<div class="note">No ID reviews waiting.</div>') + "</section>";
+}
+
+// ---------- v3.7 Admin panel (operator only) ----------
+async function viewAdmin(el) {
+  if (!state.profile || !(state.profile.role === "operator" || state.profile.is_operator)) {
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin</h2><p>Only the operator (Chris) can open the admin panel — this is where he bans, grants mod/admin, and approves or denies requests.</p></section>';
+    return;
+  }
+  el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">Members, bans, roles, and requests — all in one place. Only you can see this.</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>' +
+    '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>';
+  var data = await apiGet("/admin/members?device_id=" + encodeURIComponent(deviceId()));
+  var host = $("dwc-admin-members");
+  if (!host) return;
+  if (!data || !data.ok) { host.innerHTML = '<p style="color:var(--muted)">' + esc((data && data.error) || "Couldn't load members.") + "</p>"; return; }
+  var members = data.members || [];
+  host.innerHTML = members.length
+    ? '<div class="dwc-admin-list">' + members.map(function (m) {
+        var isOp = m.role === "operator";
+        return '<div class="dwc-admin-row">' +
+          (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
+          '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
+          '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + "</div></div>" +
+          (isOp ? '<span style="color:var(--muted);font-size:12px">Operator</span>'
+            : '<select onchange="DWC.adminSetRole(' + m.id + ', this.value)" title="Grant a role">' +
+              '<option value="member"' + (m.role === "member" ? " selected" : "") + '>Member</option>' +
+              '<option value="mod"' + (m.role === "mod" ? " selected" : "") + '>Mod</option>' +
+              '<option value="admin"' + (m.role === "admin" ? " selected" : "") + '>Admin</option></select> ' +
+              (m.banned
+                ? '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", false)\">Unban</button>"
+                : '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", true)\">Ban</button>")) +
+          "</div>";
+      }).join("") + "</div>"
+    : '<p style="color:var(--muted)">No members yet.</p>';
+}
+
+// ---------- v3.7 Team (operator + admin + mod) ----------
+async function viewTeam(el) {
+  var role = state.profile ? (state.profile.role || (state.profile.is_operator ? "operator" : "member")) : "member";
+  var isTeam = role === "operator" || role === "admin" || role === "mod";
+  if (!isTeam) {
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">👥 Team</h2><p>The team area is only for the operator, admins, and mods — it has the team chat and the roster of who’s online.</p></section>';
+    return;
+  }
+  el.innerHTML =
+    '<section class="card"><h2 style="margin-top:0">👥 Team roster</h2><p style="color:var(--muted)">Everyone on the RCR website team — who’s online and who’s not.</p><div id="dwc-team-roster"><p style="color:var(--muted)">Loading roster…</p></div></section>' +
+    '<section class="card"><h2 style="margin-top:0">💬 Team chat</h2><p style="color:var(--muted)">Check in here — leave a note about what you handled and who dealt with it, so the rest of the team knows.</p>' +
+    '<div id="dwc-team-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading team chat…</p></div>' +
+    '<form class="dwc-rowform" onsubmit="DWC.sendTeamChat(this); return false;">' +
+    '<input name="body" required maxlength="500" placeholder="What did you handle?" style="flex:1">' +
+    '<button class="btn" type="submit">Send</button></form>' +
+    '<p class="dwc-form-err" data-err hidden></p></section>';
+  var roster = await apiGet("/team?device_id=" + encodeURIComponent(deviceId()));
+  var rosterHost = $("dwc-team-roster");
+  if (rosterHost) {
+    var team = (roster && roster.team) || [];
+    rosterHost.innerHTML = team.length
+      ? '<div class="dwc-admin-list">' + team.map(function (t) {
+          return '<div class="dwc-admin-row">' +
+            (t.avatar_url ? '<img class="dwc-avatar" src="' + esc(t.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
+            '<div style="flex:1;min-width:0"><strong>@' + esc(t.username) + "</strong> " + presenceDot(t) + " " + badgeHTML(t) +
+            '<div style="color:var(--muted);font-size:12px">' + (t.presence === "online" ? "🟢 Online" : t.presence === "away" ? "🌙 Away" + (t.away_message ? " — “" + esc(t.away_message) + "”" : "") : "⚫ Offline") + "</div></div></div>";
+        }).join("") + "</div>"
+      : '<p style="color:var(--muted)">No team members yet.</p>';
+  }
+  await loadTeamChat();
+  state.chatTimer = setInterval(function () { loadTeamChat(); }, 15000);
+}
+async function loadTeamChat() {
+  var log = $("dwc-team-log");
+  if (!log) return;
+  var data = await apiGet("/team-chat?device_id=" + encodeURIComponent(deviceId()) + "&limit=60");
+  var msgs = (data && data.messages) || [];
+  log.innerHTML = msgs.length
+    ? msgs.map(function (m) {
+        return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + '</strong>: <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+      }).join("")
+    : "<p>No team notes yet — say what you handled.</p>";
+  log.scrollTop = log.scrollHeight;
 }
 
 // ---------- Rules & After Dark ----------
@@ -3706,6 +3913,19 @@ window.DWC = {
   setSort: function (s) { state.sort = s; renderView(); },
   openSignup: function () { state.signupOpen = true; state.editingProfile = false; state.challenge = null; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
+  // Human check didn't load (slow mobile) — reload it without losing the form.
+  retryChallenge: function () { var el = $("dwc-challenge"); if (el) el.innerHTML = "Loading human check…"; state.challenge = null; loadChallenge(); },
+  // Dismiss the post-signup unlock card.
+  dismissUnlock: function () { state.showUnlock = false; render(); },
+  signOut: function () {
+    if (!confirm("Sign out of the Community on this device? Your account stays — you can sign back in here any time.")) return;
+    try { localStorage.removeItem(DEVICE_KEY); } catch (e) {}
+    state.profile = null;
+    state.editingProfile = false;
+    state.signupOpen = false;
+    setNotice("Signed out on this device.");
+    render();
+  },
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },
@@ -3750,6 +3970,10 @@ window.DWC = {
     var avatar = await shrinkAvatarImage(fd.get("avatar") && fd.get("avatar").size ? fd.get("avatar") : null);
     var avatarError = (avatar && avatar.error) || null;
     var avatarUploaded = false;
+    // v3.7 — banner / cover photo: same shrink as the avatar (wide).
+    var banner = await shrinkAvatarImage(fd.get("banner") && fd.get("banner").size ? fd.get("banner") : null);
+    var bannerError = (banner && banner.error) || null;
+    var bannerUploaded = false;
     var body = {
       device_id: deviceId(),
       username: String(fd.get("username") || "").trim(),
@@ -3760,8 +3984,16 @@ window.DWC = {
       payout_method: String(fd.get("payout_method") || "").trim(),
       payout_handle: String(fd.get("payout_handle") || "").trim(),
       remove_avatar: !!fd.get("remove_avatar"),
+      remove_banner: !!fd.get("remove_banner"),
     };
     if (avatar) body.avatar = { dataBase64: avatar.dataBase64, mimeType: avatar.mimeType };
+    if (banner) body.banner = { dataBase64: banner.dataBase64, mimeType: banner.mimeType };
+    // v3.7 — ticker: optional custom text (up to 200 chars) + on/off + color.
+    if (form.querySelector('input[name="ticker_text"]')) {
+      body.ticker_text = String(fd.get("ticker_text") || "").trim().slice(0, 200);
+      body.ticker_enabled = !!fd.get("ticker_enabled");
+      body.ticker_color = String(fd.get("ticker_color") || "").trim();
+    }
     // MySpace throwback v2 — Top Friends (only if the picker actually
     // rendered, so a failed member load never wipes the list), plus the
     // custom layout CSS + preset.
@@ -3882,6 +4114,9 @@ window.DWC = {
     state.profile = data.profile;
     state.editingProfile = false;
     state.signupOpen = false;
+    // Basic signup done — show the unlock card so the member can add
+    // the rest (picture, payout, 18+ ID) whenever they want.
+    if (isNew) state.showUnlock = true;
     // Avatar feedback: the picture either saved, or the member gets the
     // exact reason it didn't (too big / wrong type / upload failed) —
     // without losing the rest of the save.
@@ -3890,15 +4125,22 @@ window.DWC = {
     if (avatarError) avatarNote = " Your picture didn't save — " + avatarError;
     else if (data.avatar_error) avatarNote = " Your picture didn't save — " + data.avatar_error;
     else if (avatarUploaded) avatarNote = " Picture saved ✓";
-    if (data.v2_pending || data.v3_pending || data.v36_pending) {
+    // v3.7 — banner feedback, same pattern as the avatar.
+    if (banner) bannerUploaded = !!(data.profile && data.profile.banner_url);
+    var bannerNote = "";
+    if (bannerError) bannerNote = " Your banner didn't save — " + bannerError;
+    else if (data.banner_error) bannerNote = " Your banner didn't save — " + data.banner_error;
+    else if (bannerUploaded) bannerNote = " Banner saved ✓";
+    if (data.v2_pending || data.v3_pending || data.v36_pending || data.v37_pending) {
       var pendingParts = [];
       if (data.v2_pending) pendingParts.push("your Top Friends / layout");
       if (data.v3_pending) pendingParts.push("your What I sell / Find prefs / music picks");
       if (data.v36_pending) pendingParts.push("your page URL / action buttons");
+      if (data.v37_pending) pendingParts.push("your banner / ticker");
       setNotice("Profile saved — but " + pendingParts.join(" and ") + " didn't stick yet. " +
-        "The shop is still running a quick database update; try saving again later." + avatarNote);
+        "The shop is still running a quick database update; try saving again later." + avatarNote + bannerNote);
     } else {
-      setNotice((isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote);
+      setNotice((isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote + bannerNote);
     }
     render();
     await refreshStats();
@@ -4481,6 +4723,65 @@ window.DWC = {
     form.reset();
     if (data.censored) setNotice("Sent — guests are auto-censored, so a word in your message was starred out.");
     await loadChatAim();
+    return false;
+  },
+
+  // v3.7 page comments — post + delete.
+  sendPageComment: async function (form, profileId) {
+    var fd = new FormData(form);
+    var err = form.parentElement.querySelector("[data-err]");
+    // Optional picture: shrink it first (same as avatar/banner) so a
+    // big phone photo never kills the comment.
+    var img = await shrinkAvatarImage(fd.get("image") && fd.get("image").size ? fd.get("image") : null);
+    if (img && img.error) { if (err) { err.hidden = false; err.textContent = "Picture didn't attach — " + img.error; } return false; }
+    var body = {
+      device_id: deviceId(),
+      profile_id: profileId,
+      body: String(fd.get("body") || "").trim(),
+      visibility: String(fd.get("visibility") || "public"),
+      gif_url: String(fd.get("gif_url") || "").trim(),
+    };
+    if (img) body.image = { dataBase64: img.dataBase64, mimeType: img.mimeType };
+    var data = await apiPost("/profile-comments", body);
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't post that comment."; } return false; }
+    form.reset();
+    await loadPageComments(profileId, state.profile && state.profile.id === profileId, false);
+    return false;
+  },
+  deletePageComment: async function (commentId, profileId) {
+    if (!confirm("Delete this page comment?")) return;
+    var data = await apiDelete("/profile-comments?id=" + commentId + "&device_id=" + encodeURIComponent(deviceId()));
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't delete that comment."); return; }
+    await loadPageComments(profileId, state.profile && state.profile.id === profileId, false);
+  },
+
+  // v3.7 admin panel — grant a role, ban/unban.
+  adminSetRole: async function (profileId, role) {
+    var data = await apiPost("/admin/set-role", { device_id: deviceId(), action: "set-role", profile_id: profileId, role: role });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't change that role."); renderView(); return; }
+    setNotice("Role updated to " + role + ".");
+    renderView();
+  },
+  adminBan: async function (profileId, ban) {
+    var reason = "";
+    if (ban) {
+      reason = prompt("Ban reason (optional — shown to the team):", "") || "";
+    }
+    if (ban && !confirm("Ban this member? They won't be able to post or list until you unban them.")) return;
+    var data = await apiPost("/admin/ban", { device_id: deviceId(), action: "ban", profile_id: profileId, banned: ban, reason: reason });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't change that ban."); return; }
+    setNotice(ban ? "Member banned." : "Member unbanned.");
+    renderView();
+  },
+
+  // v3.7 team chat.
+  sendTeamChat: async function (form) {
+    var fd = new FormData(form);
+    var err = form.parentElement.querySelector("[data-err]");
+    var data = await apiPost("/team-chat", { device_id: deviceId(), body: String(fd.get("body") || "").trim() });
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send that."; } return false; }
+    form.reset();
+    await loadTeamChat();
     return false;
   },
 

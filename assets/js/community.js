@@ -1434,8 +1434,8 @@ function profileFormHTML(p) {
       return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
     }).join("") + "</div>" +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div></div>" +
-    '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🍬 Meet Taffy — your little site helper</h4>' +
-    "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related, I'm on it.</p></div></div>" +
+    '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🎨 Taffy Layout Builder — build your page theme</h4>' +
+    "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts and help with code. Pick a vibe, pick a color, then describe what you want in plain words and I'll write the whole theme for you.</p></div></div>" +
     "<p style=\"margin:8px 0\">Pick a vibe, pick a color, then describe what you want in plain words — a color for the background, bigger headings, round buttons, no borders — and I'll write the whole theme for you. Preview it, then hit “Use this layout”. No AI service involved — I build it right here from real palettes.</p>" +
     '<label>Vibe</label><select id="dwc-bot-vibe">' + Object.keys(LAYOUT_VIBES).map(function (k) { return '<option value="' + k + '">' + esc(LAYOUT_VIBES[k].label) + "</option>"; }).join("") + "</select>" +
     '<label>Accent color</label><div class="dwc-rowform"><input type="color" id="dwc-bot-accent" value="#ff2d95" style="flex:0 0 auto;width:64px;height:40px;padding:2px">' +
@@ -1445,7 +1445,6 @@ function profileFormHTML(p) {
     '<label>Mood — describe it your way (optional)</label>' +
     '<input id="dwc-bot-mood" maxlength="80" placeholder="e.g. dark blue background, big headings, round buttons">' +
     '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.runLayoutBot()">Generate my layout →</button></p>' +
-    taffyHelpHTML() +
     '<div id="dwc-bot-result"></div></div>') +
     (isNew ?
       '<label>Full name (required — one account per person; never shown publicly)</label>' +

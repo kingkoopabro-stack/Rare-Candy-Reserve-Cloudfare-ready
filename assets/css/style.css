@@ -230,7 +230,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .logo-banner{margin:26px auto 0;max-width:760px;border-radius:18px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.5),0 0 44px rgba(0,229,255,.3);animation:neonPulse 3s ease-in-out infinite}
 .logo-banner img{display:block;width:100%;height:auto;aspect-ratio:1076 / 591;object-fit:contain;background:#000;border-radius:14px}
 .logo-banner-wrap{position:relative}
-.logo-banner .logo-banner-mark{position:absolute;left:62.7%;top:19.75%;width:28%;height:auto;aspect-ratio:1;object-fit:contain;background:transparent;border-radius:0;pointer-events:none}
+
 .logo-mark{width:16px;height:16px;vertical-align:-4px;margin-right:2px;filter:drop-shadow(0 0 5px rgba(0,192,240,.55))}
 .logo-banner figcaption{padding:10px 14px 12px;text-align:center;font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);background:#0b0b14;border-radius:0 0 14px 14px}
 /* Steady Wave banner — FIXED art (2026-11-16, time-of-day swap removed).

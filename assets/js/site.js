@@ -273,12 +273,6 @@ const SERVICES = [
   ["🗡","Cosplay & LARP gear","Props and weapons printed for more than display — built to actually hold up."],
   ["🔧","Tech & gadgets","Printed Raspberry Pi shells, wiring, and small custom electronics builds."],
 ];
-const GALLERY = [
-  ["🎨","Airbrush & paint-station stands","Sculpted holders for airbrushes, paints and tools"],
-  ["🗄","Booth shelving inserts","Riser inserts sized to existing shelves"],
-  ["🌀","Filament dryer with spool","Replacement parts & shop upkeep"],
-  ["🃏","Pokémon graded cards & booster flatlay","Collector display gear"],
-];
 const SLABS = [
   ["images/copperajah-ex-front.jpg","Copperajah ex","Snow Hazard · CGC 10 GEM MINT"],
   ["images/vulpix-v-front.jpg","Alolan Vulpix V","Silver Tempest · CGC 8.5"],
@@ -575,9 +569,6 @@ function renderPageSections(){
     <div class="tag">${s.tag}</div><h3>${s.name}</h3>
     <p><b style="color:var(--ink)">${s.price}</b>${s.note ? " · "+s.note : ""}</p></div>`).join(""));
   set("catalogGrid", CATALOG.map(catalogCard).join(""));
-  set("galleryGrid", GALLERY.map(g => `<div class="card"><div class="photo" style="cursor:default"><div class="big">${g[0]}</div>
-    <div class="lbl">Photo — not uploaded yet</div><div class="sub">${g[1]}</div></div>
-    <h3 style="margin-top:10px">${g[1]}</h3><p>${g[2]}</p></div>`).join(""));
   set("slabGrid", SLABS.map(s => `<div class="card"><div class="photo" style="cursor:default"><img src="${s[0]}" alt="${s[1]}"></div>
     <h3 style="margin-top:10px">${s[1]}</h3><p>${s[2]}<br>Individual market-based listing</p></div>`).join(""));
   set("vendorGrid", VENDOR.map(v => `<div class="card"><div style="font-size:28px">${v[0]}</div><h3>${v[1]}</h3><p>${v[2]}</p></div>`).join(""));

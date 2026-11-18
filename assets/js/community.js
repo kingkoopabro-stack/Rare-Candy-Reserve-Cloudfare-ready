@@ -68,15 +68,6 @@ var TITLE_EMOJIS = ["🔥", "💖", "✨", "🌙", "🍬", "💋", "😈", "😘
 // (Track names only — no audio player for individual tracks yet; the
 // player comes later. The Steady Wave player below is the live
 // station stream, not per-track audio.)
-var ASH_TRACKS = [
-  "Break habits, not hearts", "Untold weapons", "Voice inside my head original",
-  "Sunk for you", "I'll prove everything", "Mr.Selfish", "Sweet BBgirl",
-  "Let's Travel", "Straight to pieces", "The day she came to be",
-  "Djentlemen Thief", "Guess how it ends", "On top of it Feat. Chest Club",
-  "Monster in disguise", "Stay until sunrise", "Read between the lines",
-  "Introduction to heartache", "We will meet again I swear",
-  "Dance till they drop", "Aiming to tease part 2", "Give them the world",
-];
 // Steady Wave — the live Icecast MP3 stream. The only stream URL the
 // site uses; never invent another one.
 var VNR_STREAM_URL = "https://radio.rarecandyreserve.org/vitanova";
@@ -1171,19 +1162,12 @@ function phoneNotesHTML() {
     '</div>';
 }
 function phoneRadioHTML() {
-  var picks = (state.profile && state.profile.ash_tracks) || [];
-  var picksHTML = picks.length
-    ? '<ol class="tp-picks">' + picks.map(function (n) { return '<li>' + esc(ASH_TRACKS[n - 1] || ("Track " + n)) + '</li>'; }).join("") + '</ol>'
-    : '<p class="tp-note">No picks yet — pick up to 5 A Steady Heart tracks in Edit profile.</p>';
   return phoneTopbarHTML("radio") + '<div class="tp-appview">' +
     '<div class="tp-radio-logo">♪</div>' +
     '<p class="tp-radio-name">Steady Wave</p>' +
     '<p class="tp-note" style="text-align:center">Chris’s station — live, 24/7.</p>' +
     '<audio controls preload="none" src="' + VNR_STREAM_URL + '"></audio>' +
     '<p class="tp-note"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p>' +
-    '<h4 style="margin:14px 0 6px">🎵 Your A Steady Heart picks</h4>' +
-    '<p class="tp-note">Track names only for now — the individual-track player comes later.</p>' +
-    picksHTML +
     '</div>';
 }
 function phoneCodeHTML() {
@@ -1401,14 +1385,8 @@ function profileFormHTML(p) {
     '<label>My budget — up to ($)</label>' +
     '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') +
     (isNew ? "" :
-      '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🎵 Music — A Steady Heart + Steady Wave</h4>' +
-      "<p style=\"margin:0 0 8px\">Feature A Steady Heart on your page — pick up to 5 tracks from “End of the year”. Track names only, no audio player for individual tracks yet. The radio player is the live station stream. Either, both, or neither — your call.</p>" +
-      '<label>My A Steady Heart tracks (pick up to 5)</label><div class="dwc-checkgrid dwc-trackgrid">' + ASH_TRACKS.map(function (t, i) {
-        var n = i + 1;
-        return '<label><input type="checkbox" name="ash_tracks" value="' + n + '" style="width:auto"' + ((p && p.ash_tracks || []).includes(n) ? " checked" : "") + ' onchange="DWC.ashTrackChanged(this)"> ' + n + ". " + esc(t) + "</label>";
-      }).join("") + "</div>" +
-      '<p class="dwc-minihead">Picked: <span id="dwc-ash-count">' + ((p && p.ash_tracks || []).length) + "</span>/5</p>" +
-      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">More songs coming — I’ll keep adding legally available, licensed songs besides my own, from other artists with secured licenses and public domain pieces like Canon in D. I like working to stuff like that.</p>' +
+      '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">📻 Steady Wave</h4>' +
+      "<p style=\"margin:0 0 8px\">The live station stream on your page — one button, SteadyWave Live.</p>" +
       '<label><input type="checkbox" name="show_vnr_player" style="width:auto"' + (p && p.show_vnr_player ? " checked" : "") + '> 📻 Show Steady Wave player on my profile</label>' +
       '<label><input type="checkbox" name="autoplay_vnr" style="width:auto"' + (p && p.autoplay_vnr ? " checked" : "") + '> ▶️ Autoplay the Steady Wave player when someone visits my page</label>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A small live player for the Steady Wave stream shows on your page. It just streams the station — no track selection, no playlist.</p></div>') +
@@ -1530,13 +1508,6 @@ function updateTop8Count() {
   var el = $("dwc-top8-count");
   if (!el) return;
   el.textContent = document.querySelectorAll('input[name="top_friend"]:checked').length;
-}
-// A Steady Heart picker — max 5 tracks. If a 6th is ticked, untick it
-// and say so (the server also caps at 5, so nothing can sneak through).
-function updateAshCount() {
-  var el = $("dwc-ash-count");
-  if (!el) return;
-  el.textContent = document.querySelectorAll('input[name="ash_tracks"]:checked').length;
 }
 function updateLinksCount() {
   var el = $("dwc-links-count");
@@ -3086,14 +3057,6 @@ async function viewMember(el, memberId) {
         (m.is_mine ? "" : '<p><button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> <button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
         "</section>"
       : "") +
-    ((m.ash_tracks && m.ash_tracks.length)
-      ? '<section class="card dwc-musiccard"><h3 style="margin-top:0">🎵 A Steady Heart picks</h3><p style="color:var(--muted);font-size:13px;margin-top:0">From “End of the year” — ' + esc(m.username) + '’s picks. Track names only for now; the player comes later.</p><ol class="dwc-music-picks">' +
-        m.ash_tracks.map(function (n) {
-          var title = ASH_TRACKS[n - 1] || ("Track " + n);
-          return '<li><span class="dwc-track-num">' + n + '.</span> ' + esc(title) + "</li>";
-        }).join("") +
-        "</ol></section>"
-      : "") +
     (m.show_vnr_player
       ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — tap play (browsers won’t start sound on their own until you tap something).</p>' +
         '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
@@ -4050,17 +4013,9 @@ window.DWC = {
       theme.effects = effs.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 4);
       body.profile_theme = JSON.stringify(theme);
     }
-    // Music (v3.1) — A Steady Heart track picks (max 5) + the opt-in
-    // Steady Wave player. Edit-only fields (the picker only renders
-    // on edit), so only send them when the form has them.
-    if (form.querySelectorAll('input[name="ash_tracks"]').length) {
-      body.ash_tracks = [];
-      form.querySelectorAll('input[name="ash_tracks"]:checked').forEach(function (cb) {
-        var n = parseInt(cb.value, 10);
-        if (n >= 1 && n <= ASH_TRACKS.length && body.ash_tracks.indexOf(n) === -1) body.ash_tracks.push(n);
-      });
-      body.ash_tracks = body.ash_tracks.slice(0, 5);
-    }
+    // Steady Wave player (v3.1) — opt-in radio on the profile.
+    // Edit-only fields (the toggles only render on edit), so only send
+    // them when the form has them.
     if (form.querySelector('input[name="show_vnr_player"]')) {
       body.show_vnr_player = !!fd.get("show_vnr_player");
     }
@@ -4793,14 +4748,6 @@ window.DWC = {
       setNotice("Top 8 means 8 — unpick one first.");
     }
     updateTop8Count();
-  },
-  ashTrackChanged: function (cb) {
-    var n = document.querySelectorAll('input[name="ash_tracks"]:checked').length;
-    if (n > 5) {
-      cb.checked = false;
-      setNotice("Pick up to 5 tracks — unpick one first.");
-    }
-    updateAshCount();
   },
   // Avatar picker feedback (v3.4) — the moment Chris picks a file, show
   // its size and whether it will work, instead of failing silently on save.

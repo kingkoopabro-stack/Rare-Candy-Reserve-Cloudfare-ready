@@ -3413,11 +3413,12 @@ async function renderAgeBlock() {
 // right before the "After Dark — 18+" heading.
 var MATCH_BANNER_HTML =
   '<div class="dwc-match-banner">Get matched with buyers &amp; sellers fast!</div>';
-// Flickering 18+ + "Digital File Marketplace!" banner + a PayPal balance
-// rising demo (CSS/SVG animation — clearly labeled EXAMPLE, never a real
-// PayPal screenshot). Sits above the main 18+ welcome picture.
+// "Digital File Marketplace!" banner + a PayPal balance rising demo
+// (CSS/SVG animation — clearly labeled EXAMPLE, never a real PayPal
+// screenshot). Sits above the main 18+ welcome picture. The flickering
+// 18+ lives in the After Dark heading itself (viewAdult), not here.
 var NUT_BANNER_HTML =
-  '<div class="dwc-nut-banner"><div class="dwc-18-flicker">18+</div>' +
+  '<div class="dwc-nut-banner">' +
   '<div class="dwc-dfm-banner"><span class="dwc-dfm-banner-title">🕹️ Digital File Marketplace!</span><span class="dwc-dfm-banner-sub">Sell any digital file — 3D models, developer files, designs, art, apps, game assets, photos, videos &amp; adult content. Optional blur on your uploads.</span></div>' +
   '<div class="dwc-paypal-demo"><div class="dwc-paypal-label">Example — illustration only, not a real PayPal screenshot</div>' +
   '<div class="dwc-paypal-balance">$1,240.00 <small>▲ +$12.50 just now</small></div>' +
@@ -3452,7 +3453,7 @@ async function viewAdult(el) {
     var wimg = welcome && welcome.image_url;
     el.innerHTML =
       MATCH_BANNER_HTML +
-      '<section class="card" style="text-align:center"><h2 style="margin-top:0">🌙 After Dark — 18+ only</h2>' +
+      '<section class="card" style="text-align:center"><h2 style="margin-top:0"><span class="dwc-18-flicker">18+</span><br>🌙 After dark</h2>' +
       NUT_BANNER_HTML +
       (wimg
         ? '<img src="' + esc(wimg) + '" alt="Welcome to the 18+ area" class="dwc-welcome-img">'
@@ -3470,7 +3471,7 @@ async function viewAdult(el) {
   try { localStorage.setItem(ADULT_KEY, "1"); } catch (e) {}
   el.innerHTML =
     MATCH_BANNER_HTML +
-    '<section class="card" style="text-align:center"><h2 style="margin-top:0">🌙 After Dark — 18+</h2>' + NUT_BANNER_HTML + '<div id="dwc-welcome"></div></section>' +
+    '<section class="card" style="text-align:center"><h2 style="margin-top:0"><span class="dwc-18-flicker">18+</span><br>🌙 After dark</h2>' + NUT_BANNER_HTML + '<div id="dwc-welcome"></div></section>' +
     DFM_HTML +
     FIND_CTA_HTML +
     '<div class="dwc-adultnav"><button type="button" class="dwc-pill active" data-adulttab="forum" onclick="DWC.adultTab(this, \'forum\')">💬 18+ Forum</button>' +

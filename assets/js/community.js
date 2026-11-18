@@ -431,8 +431,8 @@ function fileDownloadUrl(url) {
 
 // ---------- routing ----------
 var NAV = [
-  ["street", "The Street"], ["chat", "💬 Live Chat"], ["market", "Market"],
-  ["trade", "⇄ Up for Trade"], ["flea", "🔨 Flea Market"], ["cardcheck", "🔍 Card Check"],
+  ["street", "The Street"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
+  ["trade", "⇄ Up for Trade"], ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
   ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
 ];
@@ -512,7 +512,7 @@ function renderAccount() {
       (p.age_verified ? ' <strong style="color:var(--green)">· Age verified ✓</strong>' : "") +
       (p.is_operator ? ' <strong style="color:var(--amber)">· Operator</strong>' : "") + "</p>" +
       (p.payout_method && p.payout_handle
-        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Market, Trades, and Flea Market.</p>'
+        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Flea Market, Trades, and Auction House.</p>'
         : '<p style="margin:4px 0 0">Add a payout method + handle whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
@@ -2523,12 +2523,12 @@ async function showPriceChart(cardName) {
     "</div>";
 }
 
-// ---------- Market / Trade / Flea ----------
+// ---------- Flea Market / Trade / Auction House ----------
 async function viewMarket(el, kind) {
   var titles = {
-    market: ["🛒 Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell their own Pokémon cards and collectibles here once their account and payout method are set up. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
+    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell their own Pokémon cards and collectibles here once their account and payout method are set up. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
     trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it’s a good trade, a fair one, or a bad deal."],
-    flea: ["🔨 Flea Market — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online flea-market area with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
+    flea: ["🔨 Auction House — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online auction house with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
   };
   var t = titles[kind];
   el.innerHTML =
@@ -2549,7 +2549,7 @@ async function viewMarket(el, kind) {
 function renderListingForm(host, kind) {
   if (!host) return;
   var p = state.profile;
-  var kindLabel = kind === "sale" ? "for sale" : kind === "trade" ? "for trade" : "in the flea market";
+  var kindLabel = kind === "sale" ? "for sale" : kind === "trade" ? "for trade" : "in the auction house";
   host.innerHTML =
     '<section class="card"><div class="tag">List an item ' + kindLabel + '</div><h3 style="margin-top:10px">Put something up ' + kindLabel + "</h3>" +
     (p ? (p.payout_method && p.payout_handle ? "" : '<p class="dwc-warn">You’re not payout-ready yet — add a payout method + handle in your profile before listing, or the listing will be blocked. You can still fill everything in now.</p>')
@@ -2658,7 +2658,7 @@ async function viewListing(el, listingId) {
   var data = await apiGet("/listings/" + listingId);
   var l = data && data.listing;
   if (!l) {
-    el.innerHTML = '<div class="note">That listing is gone or sold.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'market\')">← Back to the Market</button></p>';
+    el.innerHTML = '<div class="note">That listing is gone or sold.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'market\')">← Back to the Flea Market</button></p>';
     return;
   }
   window.__dwcListingKind = l.kind === "sale" ? "market" : l.kind === "trade" ? "trade" : "flea";
@@ -2744,7 +2744,7 @@ async function viewOrders(el) {
     '<section aria-label="My Orders"><h2 style="margin-top:0">📦 My Orders</h2>' +
     "<h3>Buying</h3>" + (b.length ? b.map(orderCardHTML).join("") : '<div class="note">No purchases yet.</div>') +
     "<h3>Selling</h3>" + (s.length ? s.map(function (o) { return orderCardHTML(o, true); }).join("") : '<div class="note">No sales yet.</div>') +
-    "<h3>My listings</h3>" + (ml.length ? '<div class="grid">' + ml.map(listingCardHTML).join("") + "</div>" : '<div class="note">No listings yet — list something in the Market, Trades, or Flea Market and it shows up here.</div>') +
+    "<h3>My listings</h3>" + (ml.length ? '<div class="grid">' + ml.map(listingCardHTML).join("") + "</div>" : '<div class="note">No listings yet — list something in the Flea Market, Trades, or Auction House and it shows up here.</div>') +
     "</section>";
 }
 function orderCardHTML(o, isSeller) {
@@ -4348,7 +4348,7 @@ window.DWC = {
     var data = await apiPost("/listings", body);
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't list that.");
     state.listingCheck = null;
-    setNotice("Listed — it's live in the " + (kind === "sale" ? "Market" : kind === "trade" ? "Up for Trade" : "Flea Market") + ".");
+    setNotice("Listed — it's live in the " + (kind === "sale" ? "Flea Market" : kind === "trade" ? "Up for Trade" : "Auction House") + ".");
     go("listing/" + data.listing_id);
     await refreshStats();
     return false;

@@ -598,6 +598,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-dfm{margin:18px 0}
 .dwc-dfm h3{margin:0 0 8px;font-size:26px}
 .dwc-dfm p{font-size:15.5px;line-height:1.65;color:var(--ink)}
+.dwc-dfm h3,.dwc-dfm>p{text-align:center}
 /* Featured examples — the shop's own 3D prints, clearly labeled EXAMPLE. No fake members, no fake sales. */
 .dwc-examples{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:16px}
 .dwc-example{border:2px solid var(--violet);border-radius:14px;overflow:hidden;background:#0b0b14;text-align:left}

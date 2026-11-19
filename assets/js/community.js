@@ -3526,6 +3526,63 @@ async function viewReports(el) {
 }
 
 // ---------- v3.7 Admin panel (operator only) ----------
+
+// ---------- v3.8 Admin member filters (operator only) ----------
+// Client-side only: the full member list comes from /api/admin/members
+// once, and both filters combine (AND) over that array — no extra API
+// call. Filter choices persist while the page is open, so a role change
+// or ban (which re-renders the panel) doesn't lose them.
+var adminMembersAll = [];
+var adminSellsFilter = "";
+var adminWantsFilter = "";
+function renderAdminMembers() {
+  var host = $("dwc-admin-members");
+  if (!host) return;
+  if (!adminMembersAll.length) { host.innerHTML = '<p style="color:var(--muted)">No members yet.</p>'; return; }
+  var members = adminMembersAll.filter(function (m) {
+    if (adminSellsFilter && (m.seller_types || []).indexOf(adminSellsFilter) === -1) return false;
+    if (adminWantsFilter && (m.buyer_types || []).indexOf(adminWantsFilter) === -1) return false;
+    return true;
+  });
+  var filterActive = adminSellsFilter !== "" || adminWantsFilter !== "";
+  var opts = function (current) {
+    return '<option value=""' + (current === "" ? " selected" : "") + '>All</option>' +
+      CREATOR_GENRES.map(function (g) {
+        return '<option value="' + esc(g) + '"' + (current === g ? " selected" : "") + ">" + esc(g) + "</option>";
+      }).join("");
+  };
+  host.innerHTML =
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">' +
+      '<label style="font-size:13px">Sells <select onchange="DWC.adminFilter(\'sells\', this.value)">' + opts(adminSellsFilter) + "</select></label>" +
+      '<label style="font-size:13px">Wants <select onchange="DWC.adminFilter(\'wants\', this.value)">' + opts(adminWantsFilter) + "</select></label>" +
+      (filterActive ? '<button type="button" class="btn ghost small" onclick="DWC.adminFilter(\'clear\')">Clear filters</button>' : "") +
+      (filterActive ? '<span style="color:var(--muted);font-size:12px">Showing ' + members.length + " of " + adminMembersAll.length + " members</span>" : "") +
+    "</div>" +
+    (members.length
+      ? '<div class="dwc-admin-list">' + members.map(function (m) {
+          var isOp = m.role === "operator";
+          var sells = (m.seller_types || []).filter(Boolean);
+          var wants = (m.buyer_types || []).filter(Boolean);
+          return '<div class="dwc-admin-row">' +
+            (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
+            '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
+            '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + "</div>" +
+            (sells.length ? '<div style="font-size:12px">Sells: ' + sells.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
+            (wants.length ? '<div style="font-size:12px">Wants: ' + wants.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
+            "</div>" +
+            (isOp ? '<span style="color:var(--muted);font-size:12px">Operator</span>'
+              : '<select onchange="DWC.adminSetRole(' + m.id + ', this.value)" title="Grant a role">' +
+                '<option value="member"' + (m.role === "member" ? " selected" : "") + '>Member</option>' +
+                '<option value="mod"' + (m.role === "mod" ? " selected" : "") + '>Mod</option>' +
+                '<option value="admin"' + (m.role === "admin" ? " selected" : "") + '>Admin</option></select> ' +
+                (m.banned
+                  ? '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", false)\">Unban</button>"
+                  : '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", true)\">Ban</button>")) +
+            "</div>";
+        }).join("") + "</div>"
+      : '<p style="color:var(--muted)">No members match these filters.</p>');
+}
+
 async function viewAdmin(el) {
   if (!state.profile || !(state.profile.role === "operator" || state.profile.is_operator)) {
     el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin</h2><p>Only the operator (Chris) can open the admin panel — this is where he bans, grants mod/admin, and approves or denies requests.</p></section>';
@@ -3537,25 +3594,8 @@ async function viewAdmin(el) {
   var host = $("dwc-admin-members");
   if (!host) return;
   if (!data || !data.ok) { host.innerHTML = '<p style="color:var(--muted)">' + esc((data && data.error) || "Couldn't load members.") + "</p>"; return; }
-  var members = data.members || [];
-  host.innerHTML = members.length
-    ? '<div class="dwc-admin-list">' + members.map(function (m) {
-        var isOp = m.role === "operator";
-        return '<div class="dwc-admin-row">' +
-          (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
-          '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
-          '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + "</div></div>" +
-          (isOp ? '<span style="color:var(--muted);font-size:12px">Operator</span>'
-            : '<select onchange="DWC.adminSetRole(' + m.id + ', this.value)" title="Grant a role">' +
-              '<option value="member"' + (m.role === "member" ? " selected" : "") + '>Member</option>' +
-              '<option value="mod"' + (m.role === "mod" ? " selected" : "") + '>Mod</option>' +
-              '<option value="admin"' + (m.role === "admin" ? " selected" : "") + '>Admin</option></select> ' +
-              (m.banned
-                ? '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", false)\">Unban</button>"
-                : '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", true)\">Ban</button>")) +
-          "</div>";
-      }).join("") + "</div>"
-    : '<p style="color:var(--muted)">No members yet.</p>';
+  adminMembersAll = data.members || [];
+  renderAdminMembers();
 }
 
 // ---------- v3.7 Team (operator + admin + mod) ----------
@@ -4804,6 +4844,14 @@ window.DWC = {
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't change that ban."); return; }
     setNotice(ban ? "Member banned." : "Member unbanned.");
     renderView();
+  },
+  // v3.8 admin member filters — client-side only, re-renders the cached
+  // member list. "clear" resets both filters.
+  adminFilter: function (which, value) {
+    if (which === "sells") adminSellsFilter = value || "";
+    else if (which === "wants") adminWantsFilter = value || "";
+    else if (which === "clear") { adminSellsFilter = ""; adminWantsFilter = ""; }
+    renderAdminMembers();
   },
 
   // v3.7 team chat.

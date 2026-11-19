@@ -1,13 +1,15 @@
 // Admin panel (v3.7) — operator-only (Chris).
 // GET /api/admin/members?device_id= — list all members with role, ban
-// status, presence, age verification. The operator uses this to keep an
-// eye on things, ban, and grant mod/admin.
+// status, presence, age verification, and what they sell / are after
+// (seller_types, buyer_types — v3.8, so the operator can sort members
+// by offer and want). The operator uses this to keep an eye on things,
+// ban, and grant mod/admin.
 // POST /api/admin/set-role — grant/revoke a role (admin/mod/member).
 //   Only the operator. Cannot change the operator (id 1) or yourself.
 // POST /api/admin/ban — ban/unban a member with a reason. Only the
 //   operator. Cannot ban the operator or yourself. A banned member's
 //   posts/listings are hidden by the frontend; the flag is the record.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, roleOf, imageUrl, presenceOf, iso, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, roleOf, imageUrl, presenceOf, iso, nowMs, parsePrefs } from "./_lib.js";
 
 function needOperator(env, me) {
   return me && isOperator(env, me);
@@ -20,15 +22,32 @@ export async function onRequestGet({ env, request }) {
   const deviceId = url.searchParams.get("device_id") || "";
   const me = await profileByDevice(db, deviceId);
   if (!needOperator(env, me)) return json({ ok: false, error: "Operator only.", members: [] });
-  const { results } = await db.prepare(
-    "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, age_verified, presence_status, last_seen, created_at FROM profiles ORDER BY id ASC",
-  ).all();
+  // v3.8 — seller_types / buyer_types ride along so the admin panel can
+  // sort members by what they offer and what they're after. If the v3
+  // columns aren't in the live table yet, fall back to the v1 columns so
+  // the panel still loads (with empty types) instead of breaking.
+  const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+  var results;
+  try {
+    const q = await db.prepare(
+      "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, age_verified, presence_status, last_seen, created_at, seller_types, buyer_types FROM profiles ORDER BY id ASC",
+    ).all();
+    results = q.results;
+  } catch (e) {
+    if (!noCol(e)) throw e;
+    const q = await db.prepare(
+      "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, age_verified, presence_status, last_seen, created_at FROM profiles ORDER BY id ASC",
+    ).all();
+    results = q.results;
+  }
   return json({
     ok: true,
     members: (results || []).map((r) => ({
       id: r.id, username: r.username, avatar_url: imageUrl(r.avatar_blob_key),
       role: roleOf(r), banned: r.banned === 1, banned_reason: r.banned_reason ?? "",
       age_verified: r.age_verified === 1, presence: presenceOf(r),
+      seller_types: parsePrefs(r.seller_types),
+      buyer_types: parsePrefs(r.buyer_types),
       created_at: iso(r.created_at),
     })),
   });

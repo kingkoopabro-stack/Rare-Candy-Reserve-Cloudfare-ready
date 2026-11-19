@@ -7,7 +7,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, nowMs,
   SQUAD_MAX_PLAYERS, squadIsExpired, shapeSquad,
-} from "./_lib.js";
+} from "../_lib.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);

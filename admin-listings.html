@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Edit shop listings — Rare Candy Reserve</title>
+<meta name="description" content="Operator-only shop listing editor — change photos, prices, descriptions, dropdowns, and videos on Rare Candy Reserve listings.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="canonical" href="https://rarecandyreserve.org/admin-listings.html">
+<link rel="stylesheet" href="assets/css/style.css?v=notifcss1">
+<style>
+  #ed-app input, #ed-app select, #ed-app textarea{font-size:16px;min-height:48px}
+  #ed-app .btn{min-height:48px;padding:12px 18px}
+  #ed-app textarea{min-height:140px}
+</style>
+</head>
+<body data-page="admin-listings">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html"><img class="logo-mark" src="images/steady-heart.svg" alt="">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="merch.html" data-page="merch">Merch</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="create.html" data-page="create">Create</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="community.html"><span class="aml-logo">🍬 Make a profile!</span><span class="aml-sub">Join the Community</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="kicker">🛍️ Shop admin — operator only</div>
+  <h1>Edit shop <span class="grad-text">listings.</span></h1>
+  <p style="color:var(--muted)">Change photos, prices, descriptions, and dropdowns right from your phone — no code, no waiting. Saves go live on the shop straight away.</p>
+
+  <div id="ed-gate" class="card">
+    <h2 style="margin-top:0">Operator only</h2>
+    <p id="ed-gate-msg">Checking who you are…</p>
+    <p><a class="btn" href="community.html">Go to the Community to sign in →</a></p>
+  </div>
+
+  <div id="ed-app" hidden>
+    <p><button class="btn" type="button" onclick="edNew()">+ Add new listing</button></p>
+    <div id="ed-list"><p style="color:var(--muted)">Loading listings…</p></div>
+
+    <section class="card" id="ed-form-card" hidden>
+      <h2 id="ed-form-title" style="margin-top:0">Edit listing</h2>
+      <p id="ed-form-note" style="color:var(--muted)"></p>
+
+      <label for="ed-f-id">Listing id</label>
+      <input id="ed-f-id" placeholder="shop-my-new-item" autocomplete="off">
+      <div class="field-msg" id="ed-f-id-msg"></div>
+
+      <label for="ed-f-name">Name</label>
+      <input id="ed-f-name" placeholder="What buyers see" maxlength="120" autocomplete="off">
+
+      <label for="ed-f-price">Price ($)</label>
+      <input id="ed-f-price" type="number" min="0.01" step="0.01" placeholder="20.00" inputmode="decimal">
+
+      <label for="ed-f-desc">Description — what buyers read</label>
+      <textarea id="ed-f-desc" rows="6" placeholder="Tell buyers what it is, what's included, condition — everything they'd want to know."></textarea>
+
+      <label>Photos — up to 3</label>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">First photo is the one buyers see on the card. JPG, PNG, WebP, or GIF, under 2.5 MB each. If your photo is HEIC, screenshot it first.</p>
+      <div id="ed-photos"></div>
+
+      <label>Video — one clip, optional</label>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Show it in action — a spin, a demo, a closer look. MP4, WebM, or MOV, under 15 MB. Buyers watch it on the listing's detail page.</p>
+      <div id="ed-video"></div>
+
+      <label>Dropdowns — colors, sizes, add-ons</label>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">Each dropdown is one choice buyers make. The price change is added to the base price — 0 for no change, 10 for +$10, -5 for $5 off. If a dropdown changes the price, buyers pay by PayPal (Stripe links are fixed-price, so the Stripe button hides itself when the total moves).</p>
+      <div id="ed-options"></div>
+
+      <label for="ed-f-stripe">Stripe payment link (optional)</label>
+      <input id="ed-f-stripe" placeholder="https://buy.stripe.com/…" inputmode="url" autocomplete="off">
+      <p style="color:var(--muted);font-size:13px;margin:0">Paste a Stripe payment link made for this listing's base price. Leave it blank for PayPal-only.</p>
+
+      <p style="margin-top:18px">
+        <button class="btn" type="button" onclick="edSave()">💾 Save listing</button>
+        <button class="btn ghost" type="button" onclick="edCancel()">Cancel</button>
+      </p>
+      <p>
+        <button class="btn ghost" type="button" id="ed-delete-btn" onclick="edDelete()">Revert to original</button>
+        <a class="btn ghost" id="ed-view-link" href="shop.html" target="_blank" rel="noopener">View on shop ↗</a>
+      </p>
+      <p id="ed-msg" style="font-weight:700"></p>
+    </section>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <div class="foot-bottom">
+      <div class="foot-links">
+        <a class="fb-like" href="https://www.facebook.com/RareCandyReserve" target="_blank" rel="noopener">Like us on Facebook</a>
+        <a href="businesses-we-support.html">🤝 Businesses we support</a>
+      </div>
+    <p><img class="logo-mark" src="images/steady-heart.svg" alt=""> <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>PayPal · Stripe (Card · Cash App Pay · Bank)</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/site.js?v=listed1"></script>
+<script>
+/* Listing editor — operator only (Chris). Edits save as overrides in
+   D1 (shop_listing_overrides) and go live on the shop on next load.
+   The hardcoded site.js data stays as the fallback: deleting an
+   override reverts the listing to its original photos/price/words. */
+var edDeviceId = null;
+var edForm = null; /* {id, isNew, base, photos:[v,v,v], video:"", options:[...]} */
+var edIdTouched = false;
+
+function edEsc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+function edSlugify(s){ return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40); }
+function edMoney(n){ return "$" + Number(n || 0).toFixed(2); }
+function edDevice(){ try { return localStorage.getItem("dwc-device-id"); } catch(e){ return null; } }
+function edIsUrl(s){ return /^https:\/\//.test(String(s || "")) || String(s || "").indexOf("/api/images?key=") === 0; }
+function edMsg(t, ok){
+  var el = document.getElementById("ed-msg");
+  if(el){ el.textContent = t || ""; el.style.color = ok ? "var(--ink)" : "var(--pink)"; }
+}
+async function edFetch(path, body, method){
+  var res = await fetch(path, { method: method || (body ? "POST" : "GET"), headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  return res.json().catch(function(){ return { ok: false, error: "Request failed." }; });
+}
+function edGate(msg){
+  var g = document.getElementById("ed-gate"), a = document.getElementById("ed-app");
+  if(g) g.hidden = false;
+  if(a) a.hidden = true;
+  var m = document.getElementById("ed-gate-msg");
+  if(m) m.textContent = msg;
+}
+async function edInit(){
+  edDeviceId = edDevice();
+  if(!edDeviceId) return edGate("Sign in to the Community first — the editor needs your operator account on this device.");
+  var prof = await fetch("/api/profile?device_id=" + encodeURIComponent(edDeviceId)).then(function(r){ return r.json(); }).catch(function(){ return null; });
+  if(!prof || !prof.profile || !(prof.profile.role === "operator" || prof.profile.is_operator)){
+    return edGate("Operator only — sign in as Chris to edit listings.");
+  }
+  document.getElementById("ed-gate").hidden = true;
+  document.getElementById("ed-app").hidden = false;
+  try { await loadShopOverrides(); } catch(e){}
+  edRefreshList();
+}
+function edAllListings(){
+  var p = (typeof PRODUCTS !== "undefined" ? PRODUCTS : []);
+  var c = (typeof CATALOG !== "undefined" ? CATALOG : []);
+  return p.concat(c);
+}
+function edFindBase(id){
+  return edAllListings().find(function(x){ return x.id === id; }) || null;
+}
+function edRefreshList(){
+  var host = document.getElementById("ed-list");
+  if(!host) return;
+  edFetch("/api/shop-listings").then(function(d){
+    var edited = {};
+    ((d && d.listings) || []).forEach(function(o){ edited[o.id] = 1; });
+    host.innerHTML = edAllListings().map(function(it){
+      var thumb = (it.imgs && it.imgs[0])
+        ? '<img src="' + edEsc(it.imgs[0]) + '" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px">'
+        : '<span style="font-size:32px">' + edEsc(it.icon || "🛍️") + '</span>';
+      var badges = [];
+      if(it.outOfStock) badges.push("🔴 SOLD OUT");
+      if(it.draft) badges.push("✏️ DRAFT");
+      if(it.comingSoon) badges.push("🕐 PRICE COMING SOON");
+      if(edited[it.id]) badges.push("✏️ Edited");
+      if(it.video) badges.push("🎬 Video");
+      if(it.options) badges.push("🔽 Dropdowns");
+      return '<div class="card" style="margin-bottom:12px"><div style="display:flex;gap:12px;align-items:center">'
+        + thumb
+        + '<div style="flex:1;min-width:0"><b>' + edEsc(it.name) + '</b><br><span style="color:var(--muted);font-size:13px">' + edEsc(it.tag || "") + '</span><br><b>' + (it.price != null ? edMoney(it.price) : "No price") + '</b> '
+        + badges.map(function(b){ return '<span class="pill">' + edEsc(b) + '</span>'; }).join(" ")
+        + '</div><button class="btn" type="button" onclick="edEdit(\'' + edEsc(it.id) + '\')">Edit</button></div></div>';
+    }).join("");
+  }).catch(function(){
+    host.innerHTML = '<p style="color:var(--muted)">Couldn\'t load the list — try refreshing the page.</p>';
+  });
+}
+function edVariationsToOptions(base){
+  if(!base || !base.variations || !base.variations.length) return [];
+  return [{ label: "Choose", options: base.variations.map(function(v){
+    return { label: v.label, price_delta: Math.round(((Number(v.price) || 0) - (Number(base.price) || 0)) * 100) / 100 };
+  })}];
+}
+function edEdit(id){
+  var base = edFindBase(id);
+  if(!base) return;
+  edForm = {
+    id: base.id, isNew: false, base: base,
+    photos: [0, 1, 2].map(function(i){ return (base.imgs && base.imgs[i]) || ""; }),
+    video: base.video || "",
+    options: base.options ? JSON.parse(JSON.stringify(base.options)) : edVariationsToOptions(base),
+  };
+  document.getElementById("ed-f-id").value = base.id;
+  document.getElementById("ed-f-id").readOnly = true;
+  document.getElementById("ed-f-name").value = base.name || "";
+  document.getElementById("ed-f-price").value = (base.price != null ? base.price : "");
+  document.getElementById("ed-f-desc").value = base.desc || "";
+  document.getElementById("ed-f-stripe").value = base.stripe || "";
+  document.getElementById("ed-form-title").textContent = "Edit: " + base.name;
+  var note = "";
+  if(base.outOfStock) note = "🔴 This listing is marked SOLD OUT in the shop code — your edits save, but buyers can't buy it until that flag is cleared (ask Slabb).";
+  else if(base.draft) note = "✏️ This listing is a DRAFT in the shop code — your edits save, but buyers can't buy it until it's posted.";
+  else if(base.comingSoon) note = "🕐 This listing has no price yet in the shop code — set a price here and it becomes buyable.";
+  document.getElementById("ed-form-note").textContent = note;
+  document.getElementById("ed-delete-btn").textContent = "Revert to original";
+  document.getElementById("ed-view-link").href = "shop.html?item=" + encodeURIComponent(base.id);
+  edRenderPhotos(); edRenderVideo(); edRenderOptions();
+  edMsg("");
+  document.getElementById("ed-form-card").hidden = false;
+  document.getElementById("ed-form-card").scrollIntoView();
+}
+function edNew(){
+  edForm = { id: "", isNew: true, base: null, photos: ["", "", ""], video: "", options: [] };
+  edIdTouched = false;
+  document.getElementById("ed-f-id").value = "";
+  document.getElementById("ed-f-id").readOnly = false;
+  document.getElementById("ed-f-name").value = "";
+  document.getElementById("ed-f-price").value = "";
+  document.getElementById("ed-f-desc").value = "";
+  document.getElementById("ed-f-stripe").value = "";
+  document.getElementById("ed-form-title").textContent = "Add a new listing";
+  document.getElementById("ed-form-note").textContent = "A brand-new listing shows up in the full catalog once you save it.";
+  document.getElementById("ed-delete-btn").textContent = "Delete this listing";
+  document.getElementById("ed-view-link").href = "shop.html";
+  edRenderPhotos(); edRenderVideo(); edRenderOptions();
+  edMsg("");
+  document.getElementById("ed-form-card").hidden = false;
+  document.getElementById("ed-form-card").scrollIntoView();
+  document.getElementById("ed-f-name").focus();
+}
+function edCancel(){
+  edForm = null;
+  document.getElementById("ed-form-card").hidden = true;
+  edMsg("");
+}
+function edRenderPhotos(){
+  var host = document.getElementById("ed-photos");
+  host.innerHTML = [0, 1, 2].map(function(i){
+    var v = edForm.photos[i] || "";
+    var prev = v
+      ? '<img src="' + edEsc(v) + '" alt="Photo ' + (i + 1) + '" style="width:100%;max-width:280px;border-radius:10px;margin:8px 0">'
+      : '<p style="color:var(--muted);font-size:13px;margin:8px 0">No photo in slot ' + (i + 1) + ' yet.</p>';
+    return '<div class="card" style="margin:8px 0;padding:12px">'
+      + '<b>Photo ' + (i + 1) + (i === 0 ? ' — main photo' : '') + '</b>' + prev
+      + '<label class="btn ghost" style="display:inline-block;cursor:pointer">📷 Upload new<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none" onchange="edPhotoFile(' + i + ', this)"></label> '
+      + '<input type="text" placeholder="…or paste an image URL (https://…)" value="' + edEsc(v) + '" onchange="edPhotoUrl(' + i + ', this.value)" style="margin-top:8px" autocomplete="off">'
+      + '<p style="margin:8px 0 0">'
+      + (i > 0 ? '<button type="button" class="btn ghost small" onclick="edPhotoUp(' + i + ')">↑ Move up</button> ' : '')
+      + (v ? '<button type="button" class="btn ghost small" onclick="edPhotoRemove(' + i + ')">Remove</button>' : '')
+      + '</p></div>';
+  }).join("");
+}
+function edPhotoUrl(i, val){ edForm.photos[i] = String(val || "").trim(); edRenderPhotos(); }
+function edPhotoRemove(i){ edForm.photos[i] = ""; edRenderPhotos(); }
+function edPhotoUp(i){
+  if(i <= 0) return;
+  var t = edForm.photos[i - 1];
+  edForm.photos[i - 1] = edForm.photos[i];
+  edForm.photos[i] = t;
+  edRenderPhotos();
+}
+async function edPhotoFile(i, input){
+  var f = input.files && input.files[0];
+  if(!f) return;
+  var url = await edUpload("image", f);
+  input.value = "";
+  if(url){ edForm.photos[i] = url; edRenderPhotos(); }
+}
+function edRenderVideo(){
+  var host = document.getElementById("ed-video");
+  var v = edForm.video || "";
+  var prev = v
+    ? '<video src="' + edEsc(v) + '" controls muted playsinline preload="metadata" style="width:100%;max-width:420px;border-radius:10px;background:#000;margin:8px 0"></video>'
+    : '<p style="color:var(--muted);font-size:13px;margin:8px 0">No video clip yet.</p>';
+  host.innerHTML = '<div class="card" style="margin:8px 0;padding:12px"><b>Video clip</b>' + prev
+    + '<label class="btn ghost" style="display:inline-block;cursor:pointer">🎬 Upload a clip<input type="file" accept="video/mp4,video/webm,video/quicktime" style="display:none" onchange="edVideoFile(this)"></label> '
+    + '<input type="text" placeholder="…or paste a video URL (https://…)" value="' + edEsc(v) + '" onchange="edVideoUrl(this.value)" style="margin-top:8px" autocomplete="off">'
+    + (v ? '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="edVideoRemove()">Remove</button></p>' : '')
+    + '</div>';
+}
+function edVideoUrl(val){ edForm.video = String(val || "").trim(); edRenderVideo(); }
+function edVideoRemove(){ edForm.video = ""; edRenderVideo(); }
+async function edVideoFile(input){
+  var f = input.files && input.files[0];
+  if(!f) return;
+  var url = await edUpload("video", f);
+  input.value = "";
+  if(url){ edForm.video = url; edRenderVideo(); }
+}
+function edReadFile(file){
+  return new Promise(function(resolve, reject){
+    var r = new FileReader();
+    r.onload = function(){
+      var s = String(r.result || "");
+      var parts = s.split(",");
+      resolve({ dataBase64: parts[1] || "", mimeType: file.type });
+    };
+    r.onerror = function(){ reject(new Error("Couldn't read that file.")); };
+    r.readAsDataURL(file);
+  });
+}
+async function edUpload(kind, file){
+  var okTypes = kind === "image"
+    ? ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    : ["video/mp4", "video/webm", "video/quicktime"];
+  if(okTypes.indexOf(file.type) === -1){
+    edMsg(kind === "image" ? "Photo must be JPG, PNG, WebP, or GIF." : "Video must be MP4, WebM, or MOV.");
+    return null;
+  }
+  var max = kind === "image" ? 2500000 : 15000000;
+  if(file.size > max){
+    edMsg(kind === "image" ? "That photo is too big — keep it under 2.5 MB." : "That video is too big — keep it under 15 MB.");
+    return null;
+  }
+  edMsg("Uploading…", true);
+  try {
+    var data = await edReadFile(file);
+    var body = { device_id: edDeviceId };
+    body[kind] = data;
+    var res = await edFetch("/api/shop-listings/upload", body);
+    if(!res || !res.ok){ edMsg((res && res.error) || "Upload failed — try again."); return null; }
+    edMsg("", true);
+    return res.url;
+  } catch(e){ edMsg("Upload failed — try again."); return null; }
+}
+function edRenderOptions(){
+  var host = document.getElementById("ed-options");
+  host.innerHTML = edForm.options.map(function(g, gi){
+    return '<div class="card" style="margin:8px 0;padding:12px">'
+      + '<label>Dropdown name</label>'
+      + '<input value="' + edEsc(g.label) + '" maxlength="40" placeholder="Color" oninput="edForm.options[' + gi + '].label=this.value" autocomplete="off">'
+      + g.options.map(function(o, oi){
+        return '<div style="display:flex;gap:8px;margin-top:8px">'
+          + '<input value="' + edEsc(o.label) + '" maxlength="60" placeholder="Option (e.g. Black)" style="flex:2" oninput="edForm.options[' + gi + '].options[' + oi + '].label=this.value" autocomplete="off">'
+          + '<input type="number" step="0.01" value="' + o.price_delta + '" placeholder="+0.00" style="flex:1" title="Price change vs the base price" oninput="edForm.options[' + gi + '].options[' + oi + '].price_delta=parseFloat(this.value)||0" inputmode="decimal">'
+          + '<button type="button" class="btn ghost small" onclick="edRemoveOption(' + gi + ',' + oi + ')">✕</button></div>';
+      }).join("")
+      + '<p style="margin:10px 0 0"><button type="button" class="btn ghost small" onclick="edAddOption(' + gi + ')">+ Add option</button> '
+      + '<button type="button" class="btn ghost small" onclick="edRemoveGroup(' + gi + ')">Remove this dropdown</button></p></div>';
+  }).join("")
+  + (edForm.options.length < 4
+    ? '<p><button type="button" class="btn ghost" onclick="edAddGroup()">+ Add a dropdown (Color, Size, Add-ons…)</button></p>'
+    : '<p style="color:var(--muted)">Max 4 dropdowns per listing.</p>');
+}
+function edAddGroup(){
+  if(edForm.options.length >= 4) return;
+  edForm.options.push({ label: "", options: [{ label: "", price_delta: 0 }] });
+  edRenderOptions();
+}
+function edRemoveGroup(gi){ edForm.options.splice(gi, 1); edRenderOptions(); }
+function edAddOption(gi){
+  if(edForm.options[gi].options.length >= 12) return;
+  edForm.options[gi].options.push({ label: "", price_delta: 0 });
+  edRenderOptions();
+}
+function edRemoveOption(gi, oi){ edForm.options[gi].options.splice(oi, 1); edRenderOptions(); }
+function edCollectOptions(){
+  var out = [];
+  for(var gi = 0; gi < edForm.options.length && out.length < 4; gi++){
+    var g = edForm.options[gi];
+    var label = String(g.label || "").trim().slice(0, 40);
+    if(!label) continue;
+    var opts = [];
+    for(var oi = 0; oi < (g.options || []).length && opts.length < 12; oi++){
+      var o = g.options[oi];
+      var ol = String(o.label || "").trim().slice(0, 60);
+      if(!ol) continue;
+      var d = Number(o.price_delta);
+      opts.push({ label: ol, price_delta: isFinite(d) ? Math.round(d * 100) / 100 : 0 });
+    }
+    if(opts.length) out.push({ label: label, options: opts });
+  }
+  return out;
+}
+function edApplySaved(ov){
+  if(!ov) return;
+  var base = edFindBase(ov.id);
+  if(base){
+    base.name = ov.name;
+    base.price = ov.price;
+    base.desc = ov.description;
+    if(ov.photos && ov.photos.length) base.imgs = ov.photos.slice(0, 3);
+    base.options = (ov.options && ov.options.length) ? ov.options : null;
+    base.video = ov.video || null;
+    base.stripe = ov.stripe_link || null;
+  } else {
+    CATALOG.push({
+      id: ov.id, slug: ov.id, icon: "🛍️", tag: "Shop listing",
+      name: ov.name, price: ov.price, desc: ov.description || "",
+      imgs: ov.photos || [], options: ov.options || null, video: ov.video || null,
+      stripe: ov.stripe_link || null, ship: "+ shipping (by location)", ebay: null,
+    });
+  }
+}
+async function edSave(){
+  if(!edForm) return;
+  var id = document.getElementById("ed-f-id").value.trim().toLowerCase();
+  var name = document.getElementById("ed-f-name").value.trim();
+  var price = parseFloat(document.getElementById("ed-f-price").value);
+  var desc = document.getElementById("ed-f-desc").value;
+  var stripe = document.getElementById("ed-f-stripe").value.trim();
+  if(!/^[a-z0-9-]{3,60}$/.test(id)){ edMsg("Listing id must be 3–60 characters of lowercase letters, numbers, and dashes."); return; }
+  if(name.length < 3){ edMsg("Name must be at least 3 characters."); return; }
+  if(!isFinite(price) || price <= 0){ edMsg("Price must be more than $0."); return; }
+  if(stripe && !/^https:\/\//.test(stripe)){ edMsg("Stripe link must start with https:// — paste the full payment link."); return; }
+  var photos = edForm.photos.map(function(p){ return String(p || "").trim(); }).filter(Boolean).slice(0, 3);
+  for(var i = 0; i < photos.length; i++){
+    if(!edIsUrl(photos[i])){ edMsg("Photo " + (i + 1) + " isn't a valid URL — upload it or paste a full https:// link."); return; }
+  }
+  var video = String(edForm.video || "").trim() || null;
+  if(video && !edIsUrl(video)){ edMsg("Video URL must start with https:// — upload a clip or paste a full link."); return; }
+  var res = await edFetch("/api/shop-listings", {
+    device_id: edDeviceId, id: id, name: name, price: price, description: desc,
+    photos: photos, options: edCollectOptions(), video: video, stripe_link: stripe || null,
+  });
+  if(!res || !res.ok){ edMsg((res && res.error) || "Couldn't save — try again."); return; }
+  edApplySaved(res.listing);
+  edForm.id = id;
+  edForm.isNew = false;
+  document.getElementById("ed-f-id").readOnly = true;
+  document.getElementById("ed-delete-btn").textContent = "Revert to original";
+  document.getElementById("ed-view-link").href = "shop.html?item=" + encodeURIComponent(id);
+  edRefreshList();
+  edMsg("✓ Saved — live on the shop now. Hard-refresh the shop page if you still see the old version.", true);
+}
+async function edDelete(){
+  if(!edForm) return;
+  var label = edForm.isNew
+    ? "Delete this listing? It will disappear from the shop."
+    : "Delete your edits? This listing goes back to its original photos, price, and description.";
+  if(!confirm(label)) return;
+  var res = await edFetch("/api/shop-listings/" + encodeURIComponent(edForm.id), { device_id: edDeviceId }, "DELETE");
+  if(!res || !res.ok){ edMsg((res && res.error) || "Couldn't delete — try again."); return; }
+  edMsg("✓ Done.", true);
+  edCancel();
+  location.reload();
+}
+document.getElementById("ed-f-name").addEventListener("input", function(){
+  if(!edForm || !edForm.isNew || edIdTouched) return;
+  var slug = edSlugify(this.value);
+  document.getElementById("ed-f-id").value = slug ? "shop-" + slug : "";
+});
+document.getElementById("ed-f-id").addEventListener("input", function(){ edIdTouched = true; });
+document.addEventListener("DOMContentLoaded", edInit);
+</script>
+</body>
+</html>

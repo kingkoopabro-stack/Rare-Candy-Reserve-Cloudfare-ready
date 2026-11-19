@@ -300,6 +300,127 @@ const PRICE_TABLE =
 const money = n => "$" + n.toFixed(2);
 const PLACEHOLDER_IMG = "images/placeholder.svg";
 
+/* ---------- shop listing overrides (listing editor) ----------
+   Overrides live in D1 (shop_listing_overrides) and are fetched on
+   every page load (2.5s timeout — a slow or missing endpoint never
+   blocks the shop). They layer over the hardcoded PRODUCTS/CATALOG
+   below: same id → name/price/description/photos/options/video/
+   Stripe link replaced; unknown id → appended to CATALOG as a brand-
+   new listing. Empty/missing table → hardcoded data renders as before. */
+let SHOP_OVERRIDES = [];
+let shopOverridesPromise = null;
+function loadShopOverrides(){
+  if(shopOverridesPromise) return shopOverridesPromise;
+  shopOverridesPromise = (async () => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2500);
+      const r = await fetch("/api/shop-listings", { cache: "no-store", signal: ctrl.signal });
+      clearTimeout(t);
+      const d = await r.json();
+      SHOP_OVERRIDES = (d && Array.isArray(d.listings)) ? d.listings : [];
+    } catch(e){ SHOP_OVERRIDES = []; }
+    applyShopOverrides();
+    return SHOP_OVERRIDES;
+  })();
+  return shopOverridesPromise;
+}
+function applyShopOverrides(){
+  for(const ov of SHOP_OVERRIDES){
+    if(!ov || !ov.id) continue;
+    const target = PRODUCTS.find(p => p.id === ov.id) || CATALOG.find(c => c.id === ov.id);
+    if(target){
+      if(ov.name) target.name = ov.name;
+      if(typeof ov.price === "number") target.price = ov.price;
+      if(ov.description != null) target.desc = ov.description;
+      if(ov.photos && ov.photos.length) target.imgs = ov.photos.slice(0, 3);
+      if(ov.options) target.options = ov.options;
+      if(ov.video !== undefined) target.video = ov.video || null;
+      if(ov.stripe_link !== undefined) target.stripe = ov.stripe_link || null;
+    } else {
+      CATALOG.push({
+        id: ov.id, slug: ov.id, icon: "🛍️", tag: "Shop listing",
+        name: ov.name || ov.id, price: (typeof ov.price === "number" ? ov.price : 0),
+        desc: ov.description || "",
+        imgs: (ov.photos && ov.photos.length ? ov.photos.slice(0, 3) : []),
+        options: ov.options || null, video: ov.video || null,
+        stripe: ov.stripe_link || null, ship: "+ shipping (by location)", ebay: null,
+      });
+    }
+  }
+}
+
+/* ---------- listing option groups (listing editor) ----------
+   An "options" listing has dropdown groups [{label, options:[{label,
+   price_delta}]}]. Total = base price + selected deltas. Stripe
+   payment links are FIXED-price, so the Stripe button only shows
+   when the selected total equals the base price; anything else goes
+   through PayPal with the computed total. Handhelds have no Stripe
+   link, so they stay PayPal-only exactly as before. When a listing
+   has BOTH hardcoded variations and an options override, options win
+   (the editor converts variations into one options group on first
+   edit, so the two never fight in practice). */
+function optSel(id, gi){
+  const det = document.getElementById("detailView");
+  if(det && det.style.display === "block"){
+    const d = det.querySelector('[id="opt-'+id+'-'+gi+'"]');
+    if(d) return d;
+  }
+  const all = document.querySelectorAll('[id="opt-'+id+'-'+gi+'"]');
+  for(const s of all){
+    if(det && det.contains(s)) continue;
+    return s;
+  }
+  return all[0] || null;
+}
+function optPrice(item){
+  let total = (typeof item.price === "number" ? item.price : 0);
+  const labels = [];
+  if(item.options){
+    item.options.forEach((g, gi) => {
+      const sel = optSel(item.id, gi);
+      const idx = sel ? parseInt(sel.value, 10) : 0;
+      const opt = g.options && g.options[idx];
+      if(opt){
+        total += (Number(opt.price_delta) || 0);
+        labels.push(g.label + ": " + opt.label);
+      }
+    });
+  }
+  return { total, labels };
+}
+function optDefaultTotal(item){
+  let total = (typeof item.price === "number" ? item.price : 0);
+  if(item.options) item.options.forEach(g => {
+    const o = g.options && g.options[0];
+    if(o) total += (Number(o.price_delta) || 0);
+  });
+  return total;
+}
+function optGroupsHTML(item){
+  return item.options.map((g, gi) => {
+    const opts = g.options.map((o, oi) => {
+      const d = Number(o.price_delta) || 0;
+      const suffix = d > 0 ? " (+$" + d.toFixed(2) + ")" : d < 0 ? " (−$" + Math.abs(d).toFixed(2) + ")" : "";
+      return `<option value="${oi}">${o.label}${suffix}</option>`;
+    }).join("");
+    return `<label style="margin-top:2px">${g.label}:</label><select id="opt-${item.id}-${gi}" onchange="updateOptPrice('${item.id}')">${opts}</select>`;
+  }).join("");
+}
+function updateOptPrice(id){
+  const item = findItem(id); if(!item || !item.options) return;
+  const o = optPrice(item);
+  document.querySelectorAll('[data-opt-price="' + id + '"]').forEach(el => { el.textContent = money(o.total); });
+  const showStripe = !!item.stripe && o.total === item.price;
+  document.querySelectorAll('[data-stripe-btn="' + id + '"]').forEach(el => { el.style.display = showStripe ? "" : "none"; });
+}
+function refreshOptPrices(){
+  const seen = {};
+  PRODUCTS.concat(CATALOG).forEach(it => {
+    if(it.options && !seen[it.id]){ seen[it.id] = 1; updateOptPrice(it.id); }
+  });
+}
+
 /* ---------- shared chrome: cart drawer + lightbox (injected on every page) ---------- */
 function injectChrome(){
   if(!document.getElementById("cartDrawer")){
@@ -380,7 +501,10 @@ function varSel(id){
 function addProductVarToCart(id){
   const p = PRODUCTS.find(x => x.id === id); if(!p) return;
   let varLabel = null, varPrice = null;
-  if(p.variations){
+  if(p.options){
+    const o = optPrice(p);
+    varLabel = o.labels.join(" · ") || null; varPrice = o.total;
+  } else if(p.variations){
     const sel = varSel(id);
     const v = p.variations[parseInt(sel.value, 10)];
     varLabel = v.label; varPrice = v.price;
@@ -392,7 +516,10 @@ function addProductVarToCart(id){
 function addCatalogToCart(catId){
   const c = CATALOG.find(x => x.id === catId); if(!c || c.outOfStock || c.comingSoon || c.draft) return;
   let varLabel = null, varPrice = null;
-  if(c.variations){
+  if(c.options){
+    const o = optPrice(c);
+    varLabel = o.labels.join(" · ") || null; varPrice = o.total;
+  } else if(c.variations){
     const sel = varSel(catId);
     const v = c.variations[parseInt(sel.value, 10)];
     varLabel = v.label; varPrice = v.price;
@@ -404,7 +531,11 @@ function addCatalogToCart(catId){
 function buyWithPayPal(id){
   const item = findItem(id); if(!item || item.outOfStock || item.comingSoon || item.draft) return;
   let label = item.name, price = item.price;
-  if(item.variations){
+  if(item.options){
+    const o = optPrice(item);
+    price = o.total;
+    if(o.labels.length) label = item.name + " — " + o.labels.join(" · ");
+  } else if(item.variations){
     const sel = varSel(id);
     if(sel){
       const v = item.variations[parseInt(sel.value, 10)];
@@ -501,8 +632,15 @@ function productCard(p){
   const galleryHint = photoTotal > 1
     ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">📷 ${photoTotal} photos — tap the photo, then use Prev / Next to browse</p>`
     : "";
+  const videoHint = p.video
+    ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">🎬 Video — tap Read more to watch</p>`
+    : "";
   let priceLine, buyBtn;
-  if(p.variations){
+  if(p.options){
+    const initTotal = optDefaultTotal(p);
+    priceLine = `<p><span class="price" data-opt-price="${p.id}">${money(initTotal)}</span> <span class="ship">${p.ship}</span></p>` + optGroupsHTML(p);
+    buyBtn = `<button class="btn" onclick="addProductVarToCart('${p.id}')">Add to cart</button>`;
+  } else if(p.variations){
     const opts = p.variations.map((v,i)=>`<option value="${i}">${v.label} — ${money(v.price)}</option>`).join("");
     const lo = Math.min(...p.variations.map(v=>v.price)), hi = Math.max(...p.variations.map(v=>v.price));
     priceLine = `<p><span class="price">${lo===hi ? money(lo) : money(lo)+" – "+money(hi)}</span> <span class="ship">${p.ship}</span></p>
@@ -515,11 +653,12 @@ function productCard(p){
   return `<div class="card">
     ${photoHTML(p,0)}
     ${galleryHint}
+    ${videoHint}
     <div class="tag" style="margin-top:12px">${p.tag}</div>
     <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
     ${priceLine}
-    <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" href="${p.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
+    <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" data-stripe-btn="${p.id}" href="${p.stripe}" target="_blank" rel="noopener"${(p.options && optDefaultTotal(p) !== p.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
   </div>`;
 }
 function catalogCard(c){
@@ -546,6 +685,10 @@ function catalogCard(c){
     priceLine = `<p><span class="pill">🕐 PRICE COMING SOON</span></p>
       <p style="font-size:13px">Photo + assessment on file — Ash prices it before it goes on sale.</p>`;
     buyBtn = `<button class="btn" disabled>Price coming soon</button>`;
+  } else if(c.options){
+    const initTotal = optDefaultTotal(c);
+    priceLine = `<p><span class="price" data-opt-price="${c.id}">${money(initTotal)}</span></p>` + optGroupsHTML(c);
+    buyBtn = `<button class="btn" onclick="addCatalogToCart('${c.id}')">Add to cart</button>`;
   } else if(c.variations){
     const opts = c.variations.map((v,i)=>`<option value="${i}">${v.label} — ${money(v.price)}</option>`).join("");
     const lo = Math.min(...c.variations.map(v=>v.price)), hi = Math.max(...c.variations.map(v=>v.price));
@@ -557,12 +700,16 @@ function catalogCard(c){
     buyBtn = `<button class="btn" onclick="addCatalogToCart('${c.id}')">Add to cart</button>`;
   }
   const ebayLink = c.ebay ? ` <a href="https://www.ebay.com/itm/${c.ebay}" target="_blank" rel="noopener" style="font-size:13px">View on eBay ↗</a>` : "";
+  const videoHint = c.video
+    ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">🎬 Video — tap Read more to watch</p>`
+    : "";
   return `<div class="card">${photo}
+    ${videoHint}
     <div class="tag" style="margin-top:12px">${c.tag}</div>
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p><p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
     ${priceLine}
-    <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" href="${c.stripe}" target="_blank" rel="noopener">Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
+    <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" data-stripe-btn="${c.id}" href="${c.stripe}" target="_blank" rel="noopener"${(c.options && optDefaultTotal(c) !== c.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
   </div>`;
 }
 function renderPageSections(){
@@ -651,6 +798,12 @@ function showDetail(id){
     buyHtml = `<p><span class="pill">🕐 PRICE COMING SOON</span></p>
       <p style="font-size:14px">Photo + assessment on file — Ash prices it before it goes on sale.</p>
       <button class="btn" disabled>Price coming soon</button>`;
+  } else if(c.options){
+    const initTotal = optDefaultTotal(c);
+    const addFn = CATALOG.includes(c) ? "addCatalogToCart" : "addToCart";
+    buyHtml = `<p><span class="price" data-opt-price="${c.id}">${money(initTotal)}</span></p>
+      ${optGroupsHTML(c)}
+      <p style="margin-top:12px"><button class="btn" onclick="${addFn}('${c.id}')">Add to cart</button> <button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button></p>`;
   } else if(c.variations){
     const opts = c.variations.map((v,i)=>`<option value="${i}">${v.label} — ${money(v.price)}</option>`).join("");
     const lo = Math.min(...c.variations.map(v=>v.price)), hi = Math.max(...c.variations.map(v=>v.price));
@@ -665,12 +818,16 @@ function showDetail(id){
   const detHint = detTotal > 1
     ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">📷 ${detTotal} photos — tap the photo, then use Prev / Next to browse</p>`
     : "";
+  const videoHtml = c.video
+    ? `<div style="margin-top:14px"><video src="${c.video}" controls muted playsinline preload="metadata" style="width:100%;border-radius:10px;background:#000"></video><p style="font-size:12px;color:var(--muted);margin:6px 0 0">🎬 Video — see it in action</p></div>`
+    : "";
   det.innerHTML = `
     <p><a href="shop.html" onclick="hideDetail(event)">← Back to the full catalog</a></p>
     <div class="detail">
       <div>
         ${photoHTML(c,0)}
         ${detHint}
+        ${videoHtml}
       </div>
       <div>
         <div class="tag">${c.tag}</div>
@@ -812,12 +969,14 @@ function submitSiteForm(e, subject){
 }
 
 /* ---------- boot ---------- */
-function boot(){
+async function boot(){
   injectChrome();
   syncProfileButton();
+  await loadShopOverrides();
   const page = document.body.dataset.page || "";
   document.querySelectorAll("#mainNav a").forEach(a => a.classList.toggle("active", a.dataset.page === page));
   renderPageSections();
+  refreshOptPrices();
   updateCount();
   estimate();
   forgePreview();

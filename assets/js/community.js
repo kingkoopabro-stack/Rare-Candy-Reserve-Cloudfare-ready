@@ -3589,7 +3589,8 @@ async function viewAdmin(el) {
     return;
   }
   el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">Members, bans, roles, and requests — all in one place. Only you can see this.</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>' +
-    '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>';
+    '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
+    '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>';
   var data = await apiGet("/admin/members?device_id=" + encodeURIComponent(deviceId()));
   var host = $("dwc-admin-members");
   if (!host) return;

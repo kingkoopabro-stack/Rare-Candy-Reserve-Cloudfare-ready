@@ -21,6 +21,41 @@ export const PLATFORM_FEE_PERCENT = 5; // ⚠ UNCONFIRMED by Chris — kept at t
 
 export const CATEGORIES = ["General", "News", "Question", "Questions & Help", "Shop Talk", "Music", "Video", "Plants & Garden", "Tech & Builds", "Dank Meme", "Off Topic"];
 
+// Group Up — Nerd Hub squad finder. Small 4-person gaming groups with an
+// ephemeral text chat room and optional voice chat. Tables: squads,
+// squad_members, squad_messages, squad_signals (groups-migration.sql).
+// NOTE: these are NOT the Community Groups (functions/api/groups.js +
+// the v3.6 groups/group_members tables) — different feature, different
+// tables, so the two never collide.
+export const SQUAD_PLATFORMS = ["Switch", "Switch 2", "PS4", "PS5", "PC", "Xbox One", "Retro gaming", "Stream", "Crossplay"];
+export const SQUAD_PLAYTIMES = ["An hour or two", "A few hours", "Campaign length"];
+export const SQUAD_PLAYTIME_MS = { "An hour or two": 2 * 3600 * 1000, "A few hours": 5 * 3600 * 1000, "Campaign length": 24 * 3600 * 1000 };
+export const SQUAD_MAX_PLAYERS = 4;
+export function squadExpiresAt(row) {
+  const dur = SQUAD_PLAYTIME_MS[row.playtime] || SQUAD_PLAYTIME_MS["A few hours"];
+  return Number(row.created_at || 0) + dur;
+}
+export function squadIsExpired(row, now) { return (now || Date.now()) > squadExpiresAt(row); }
+// Public shape for a squad row + its members. Never leaks device ids or
+// the private PIN (the PIN is only ever checked server-side, never sent).
+export async function shapeSquad(db, row, meId) {
+  const { results: members } = await db.prepare(
+    `SELECT p.id, p.username FROM squad_members sm JOIN profiles p ON p.id = sm.profile_id WHERE sm.squad_id = ? ORDER BY sm.joined_at ASC`,
+  ).bind(row.id).all();
+  const creator = await db.prepare("SELECT username FROM profiles WHERE id = ? LIMIT 1").bind(row.creator_profile_id).first();
+  const list = (members || []).map((m) => ({ id: m.id, username: m.username }));
+  return {
+    id: row.id, platform: row.platform, game: row.game, title: row.title,
+    description: row.description ?? "", is_private: row.is_private === 1,
+    playtime: row.playtime, max_players: row.max_players || SQUAD_MAX_PLAYERS,
+    member_count: list.length, members: list,
+    creator_id: row.creator_profile_id, creator_username: creator?.username ?? "member",
+    created_at: iso(row.created_at), expires_at: iso(squadExpiresAt(row)),
+    expired: squadIsExpired(row), is_member: meId ? list.some((m) => m.id === meId) : false,
+    is_creator: meId ? row.creator_profile_id === meId : false,
+  };
+}
+
 // Chris's exact list of 18+ adult forum categories — browsable tiles for
 // posts AND models. Brand/category names only; no real model names anywhere.
 export const ADULT_CATEGORIES = [

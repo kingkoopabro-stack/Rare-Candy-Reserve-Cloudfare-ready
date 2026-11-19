@@ -44,6 +44,30 @@
 .status-ticker{overflow:hidden;white-space:nowrap;margin-top:10px;border-top:1px solid #fff2;border-bottom:1px solid #fff2;padding:8px 0}
 .status-ticker span{display:inline-block;padding-left:100%;animation:liveTick 28s linear infinite;font-weight:800;color:var(--muted)}
 @keyframes liveTick{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}
+/* Group Up — squad finder (hidden must win over any display rule) */
+[hidden]{display:none!important}
+.grp-frame{border-radius:16px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.45),0 0 44px rgba(0,229,255,.28)}
+.grp-inner{background:#0b0b14;border-radius:12px;padding:18px}
+.grp-btn-row{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.grp-filters{display:flex;flex-wrap:wrap;gap:10px;margin:14px 0}
+.grp-filters select,.grp-filters input{flex:1;min-width:140px}
+.grp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-top:14px}
+.grp-meta{color:var(--muted);font-size:14px;margin:8px 0 0}
+.grp-check{display:flex;align-items:center;gap:8px;margin-top:14px}
+.grp-check input{width:auto}
+.grp-member{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #fff2;border-radius:10px;margin-bottom:8px}
+.grp-member .grp-name{font-weight:900}
+.grp-mic{font-size:13px;color:var(--muted);font-weight:700}
+.grp-mic.grp-speaking{color:#39ff88}
+.grp-chat-log{height:260px;overflow-y:auto;border:1px solid #fff2;border-radius:12px;padding:12px;margin:12px 0;background:#08080f}
+.grp-chat-msg{margin-bottom:10px;line-height:1.45}
+.grp-chat-name{font-weight:900}
+.grp-chat-time{font-size:12px;color:var(--muted)}
+.grp-chat-row{display:flex;gap:8px}
+.grp-chat-row input{flex:1;min-width:0}
+.grp-voice-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0}
+.grp-voice-status{font-size:13px;font-weight:700;color:var(--muted)}
+.grp-note{color:var(--muted);font-size:14px}
 </style>
 </head>
 <body data-page="nerd">
@@ -193,6 +217,105 @@
     <p style="margin-top:14px"><a class="btn" href="shop.html">Shop the handhelds →</a></p>
   </section>
 
+  <section id="groupup">
+    <div class="kicker">🎮 Group Up — find your squad</div>
+    <h2>Group Up — <span class="grad-text">find your squad.</span></h2>
+    <p style="color:var(--muted)">Small 4-person gaming groups — pick a platform and a game, say what you're up for, and play together. Text chat in the room, voice chat if everyone wants it. Groups disappear when everybody leaves, so nothing hangs around.</p>
+    <div class="grp-frame" style="max-width:860px;margin:18px auto 0">
+      <div class="grp-inner">
+        <p id="grpWho" class="grp-note"></p>
+        <div id="grpGate" hidden>
+          <p><b>Members only — <a href="community.html">sign up</a> to create or join a group.</b></p>
+          <p class="grp-note">You can still browse the open groups below — join the Community to jump in.</p>
+        </div>
+        <div id="grpControls" class="grp-btn-row" hidden>
+          <button type="button" class="btn" id="grpBtnFind">🔍 Find group</button>
+          <button type="button" class="btn ghost" id="grpBtnCreate">➕ Create group</button>
+          <button type="button" class="btn ghost" id="grpBtnPin">🔑 Join with PIN</button>
+        </div>
+        <p id="grpMsg" style="font-weight:700"></p>
+
+        <div id="grpFind">
+          <div class="grp-filters">
+            <select id="grpFilterPlatform" aria-label="Filter by platform">
+              <option value="">All platforms</option>
+              <option>Switch</option>
+              <option>Switch 2</option>
+              <option>PS4</option>
+              <option>PS5</option>
+              <option>PC</option>
+              <option>Xbox One</option>
+              <option>Retro gaming</option>
+              <option>Stream</option>
+              <option>Crossplay</option>
+            </select>
+            <input id="grpFilterGame" type="text" placeholder="Search a game… e.g. Borderlands 2" aria-label="Search by game">
+            <select id="grpFilterPlaytime" aria-label="Filter by playtime">
+              <option value="">Any playtime</option>
+              <option>An hour or two</option>
+              <option>A few hours</option>
+              <option>Campaign length</option>
+            </select>
+            <button type="button" class="btn ghost" id="grpRefresh">↻ Refresh</button>
+          </div>
+          <div id="grpCards" class="grp-cards"></div>
+        </div>
+
+        <div id="grpCreate" hidden>
+          <form id="grpCreateForm">
+            <label for="grpPlatform">Platform</label>
+            <select id="grpPlatform" required></select>
+            <label for="grpGame">Game title</label>
+            <input id="grpGame" type="text" maxlength="100" required placeholder="e.g. Borderlands 2">
+            <label for="grpTitle">Group name</label>
+            <input id="grpTitle" type="text" maxlength="60" required placeholder="e.g. Borderlands 2 crew">
+            <label for="grpDesc">Short description</label>
+            <input id="grpDesc" type="text" maxlength="200" placeholder="e.g. Looking for homies to quest with!">
+            <label class="grp-check"><input id="grpPrivate" type="checkbox"> Private group (needs a PIN to join)</label>
+            <div id="grpPinRow" hidden>
+              <label for="grpPin">PIN code (4 digits)</label>
+              <input id="grpPin" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" placeholder="e.g. 4821">
+            </div>
+            <label for="grpPlaytime">Playtime — how long are you playing?</label>
+            <select id="grpPlaytime" required></select>
+            <p style="margin-top:16px"><button class="btn" type="submit">Create group →</button></p>
+          </form>
+        </div>
+
+        <div id="grpPinView" hidden>
+          <form id="grpPinForm">
+            <label for="grpPinInput">Join with PIN</label>
+            <input id="grpPinInput" type="text" inputmode="numeric" maxlength="4" pattern="\d{4}" required placeholder="4-digit PIN code">
+            <p style="margin-top:14px"><button class="btn" type="submit">Join group →</button></p>
+            <p class="grp-note">The host shares the PIN — type it in and you're in, open or private.</p>
+          </form>
+        </div>
+
+        <div id="grpRoom" hidden>
+          <div id="grpRoomHeader"></div>
+          <h3 style="margin-top:18px">Who's in</h3>
+          <div id="grpMembers"></div>
+          <h3 style="margin-top:18px">Squad chat</h3>
+          <div id="grpChatLog" class="grp-chat-log"></div>
+          <form id="grpChatForm" class="grp-chat-row">
+            <input id="grpChatInput" type="text" maxlength="500" placeholder="Say something to the squad…" autocomplete="off">
+            <button class="btn" type="submit">Send</button>
+          </form>
+          <div class="grp-voice-row">
+            <button type="button" class="btn ghost" id="grpVoiceJoin">🎙️ Join voice</button>
+            <button type="button" class="btn ghost" id="grpVoiceMute" hidden>🎙️ Mute</button>
+            <button type="button" class="btn ghost" id="grpVoiceLeave" hidden>🔇 Leave voice</button>
+            <span id="grpVoiceStatus" class="grp-voice-status"></span>
+          </div>
+          <p class="grp-note">Voice is optional — text chat works without it. Your mic only turns on when you tap Join voice.</p>
+          <div id="grpAudioWrap" hidden></div>
+          <p id="grpRoomMsg" style="font-weight:700"></p>
+          <p style="margin-top:14px"><button type="button" class="btn ghost" id="grpLeaveBtn">🚪 Leave group</button></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section>
     <div class="kicker">📰 New games &amp; releases</div>
     <h2>What’s new. <span class="grad-text">What’s dropping.</span></h2>
@@ -324,6 +447,7 @@
 </footer>
 
 <script src="assets/js/site.js?v=flipmini1"></script>
+<script src="assets/js/groups.js?v=groups1"></script>
 <script>
 /* Nerd Hub — radio live status preview. Checks the stream URL; if it answers, the station is live. */
 (function(){

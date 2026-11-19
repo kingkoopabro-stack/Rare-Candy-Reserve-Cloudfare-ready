@@ -19,7 +19,7 @@
 
 export const PLATFORM_FEE_PERCENT = 5; // ⚠ UNCONFIRMED by Chris — kept at the artifact's 5%; flag before launch
 
-export const CATEGORIES = ["General", "Questions & Help", "Shop Talk", "Music", "Plants & Garden", "Tech & Builds", "Off Topic"];
+export const CATEGORIES = ["General", "Question", "Questions & Help", "Shop Talk", "Music", "Video", "Plants & Garden", "Tech & Builds", "Dank Meme", "Off Topic"];
 
 // Chris's exact list of 18+ adult forum categories — browsable tiles for
 // posts AND models. Brand/category names only; no real model names anywhere.

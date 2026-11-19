@@ -58,7 +58,7 @@ var MODEL_INK_OPTIONS = ["None", "Tattoos", "Piercings", "Tattoos & piercings"];
 // Creator/Seller area (v3) — digital-content genres, one-tap seller tag
 // chips, and the emoji flair row for creator-post titles. Titles keep
 // emojis as-is (never stripped); the picker just inserts them.
-var CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Other"];
+var CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Video games", "Refurbished tech", "3D prints", "Car parts", "Collectibles", "Tutor work", "Other"];
 var CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos", "Selling 3D Models", "Developer Files", "Designs & Art", "Game Assets"];
 var TITLE_EMOJIS = ["🔥", "💖", "✨", "🌙", "🍬", "💋", "😈", "😘", "🎀", "🌸", "💎", "👑", "🍓", "🍑", "🌶️", "💦", "🎥", "📸", "🖨️", "🎵"];
 
@@ -2939,7 +2939,7 @@ function actionButtonLabel(pb, key, fallback) {
   if (pb && pb.buttons && pb.buttons[key] && pb.buttons[key].label) return pb.buttons[key].label;
   return fallback;
 }
-function actionButtonsHTML(m) {
+function actionButtonsHTML(m, preview) {
   var pb = m.profile_buttons || null;
   var blockStyle = "";
   var blockClass = "dwc-action-buttons";
@@ -2950,24 +2950,28 @@ function actionButtonsHTML(m) {
   var isFriend = !!m.is_friend;
   var isFav = !!m.is_favorite;
   var uname = esc(m.username.replace(/'/g, ""));
-  var html = '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
+  // Preview mode (your own page): buttons are disabled so you can't
+  // friend/message yourself — they only show how visitors see them.
+  var dis = preview ? " disabled" : "";
+  var html = (preview ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
+    '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
   // Add me / Unfriend
   var addDef = ACTION_BUTTON_DEFS[0];
-  html += '<button type="button" class="btn small" data-action-btn="add" onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
+  html += '<button type="button" class="btn small" data-action-btn="add"' + dis + ' onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
     (isFriend ? addDef.friendIcon : addDef.icon) + " " + esc(actionButtonLabel(pb, "add", isFriend ? addDef.friendLabel : addDef.label)) + "</button>";
   // Message me
-  html += '<button type="button" class="btn small" data-action-btn="message" onclick="DWC.imMember(' + m.id + ", '" + uname + "')" + actionButtonStyle(pb, "message") + ">" +
+  html += '<button type="button" class="btn small" data-action-btn="message"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')" + actionButtonStyle(pb, "message") + ">" +
     ACTION_BUTTON_DEFS[1].icon + " " + esc(actionButtonLabel(pb, "message", ACTION_BUTTON_DEFS[1].label)) + "</button>";
   // Add to Favorites — star next to the wording: ☆ unfilled/uncolored
   // before, ★ filled gold when already favorited.
-  html += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite" onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
+  html += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite"' + dis + ' onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
     '<span class="dwc-fav-star' + (isFav ? " on" : "") + '">' + (isFav ? ACTION_BUTTON_DEFS[2].favIcon : ACTION_BUTTON_DEFS[2].icon) + "</span> " +
     esc(actionButtonLabel(pb, "favorite", isFav ? ACTION_BUTTON_DEFS[2].favLabel : ACTION_BUTTON_DEFS[2].label)) + "</button>";
   // Add to group
-  html += '<button type="button" class="btn small" data-action-btn="group" onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
+  html += '<button type="button" class="btn small" data-action-btn="group"' + dis + ' onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
     ACTION_BUTTON_DEFS[3].icon + " " + esc(actionButtonLabel(pb, "group", ACTION_BUTTON_DEFS[3].label)) + "</button>";
   // Report profile
-  html += '<button type="button" class="btn ghost small" data-action-btn="report" onclick="DWC.report(\'profile\', ' + m.id + ')"' + actionButtonStyle(pb, "report") + ">" +
+  html += '<button type="button" class="btn ghost small" data-action-btn="report"' + dis + ' onclick="DWC.report(\'profile\', ' + m.id + ')"' + actionButtonStyle(pb, "report") + ">" +
     ACTION_BUTTON_DEFS[4].icon + " " + esc(actionButtonLabel(pb, "report", ACTION_BUTTON_DEFS[4].label)) + "</button>";
   html += "</div>";
   return html;
@@ -3050,8 +3054,9 @@ async function viewMember(el, memberId) {
     '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
     "</div>" +
     // v3.6 — the 5 action buttons (someone else's page) + their vanity
-    // URL. On my own page the vanity URL still shows, under Edit profile.
-    (m.is_mine ? vanityURLHTML(m) : actionButtonsHTML(m) + '<div id="dwc-group-picker"></div>' + vanityURLHTML(m)) +
+    // URL. On my own page the buttons show as a disabled preview so I
+    // can see how visitors see them while customizing, then the vanity URL.
+    (m.is_mine ? actionButtonsHTML(m, true) + vanityURLHTML(m) : actionButtonsHTML(m) + '<div id="dwc-group-picker"></div>' + vanityURLHTML(m)) +
     "</section>" +
     // My links (v3.4) — only when the member actually has links.
     // No links, no section, no placeholder.

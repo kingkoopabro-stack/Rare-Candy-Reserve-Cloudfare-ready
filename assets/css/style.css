@@ -175,6 +175,13 @@ th{background:var(--panel2)}
 
 /* footer + follow row */
 footer.site{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--muted);font-size:14px}
+/* centered footer bottom (2026-11-19): from "Like us on Facebook" down,
+   the links sit side by side and the rest stacks centered below — nothing
+   left-aligned. The Listen & follow row above stays as it is. */
+.foot-bottom{text-align:center;margin-top:20px}
+.foot-links{display:flex;justify-content:center;align-items:center;gap:28px;flex-wrap:wrap}
+.foot-links a{display:inline-flex;align-items:center;gap:7px}
+.foot-bottom p{margin:10px 0}
 .follow-row{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px}
 .follow-row a{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-weight:800;font-size:14px;color:var(--ink);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:9px 15px}
 .follow-row a:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.3)}

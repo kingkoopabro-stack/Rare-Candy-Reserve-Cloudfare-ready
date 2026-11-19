@@ -56,7 +56,7 @@ const PRODUCTS = [
   {id:"amby-flip", slug:"modded-amby-flip", tag:"HANDHELD · Modded Amby FLIP", name:"Amby FLIP — Modded Flip Handheld (Android 12, 3.5-inch Touchscreen)",
    desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Amby FLIP — the flip handheld. Flip it open to play, spin the screen, close it up and it doubles as a clock. Gorgeous 3.5-inch IPS touchscreen at 720×720, Unisoc Tiger T618 chip, 3GB RAM + 32GB storage, Android 12, 2000mAh battery. WiFi 5 + Bluetooth 5.0, USB-C DAC to 3.5mm headphone jack, high-fidelity stereo speakers, D-pad joystick mapping, swappable high/low L2/R2 shoulder buttons. Plays PS2, Wii, GameCube, 3DS, PSP, Dreamcast, Saturn, PS1, DS, N64, Arcade, NeoGeo, GBA, GBC, GB, SNES, NES, Genesis, Master System, Game Gear, MSX, PC Engine, WonderSwan and N-Gage, plus Android games and PC games via streaming. Four ways to play: cast to TV like a home console, stream and play AAA titles, handheld mode, or Wi-Fi multiplayer with a friend. Switch watch faces, raise a virtual pet, and grab games with the RixelHK game downloader and AI assistant. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Modded to order — ready to play out of the box. Choose Polar Black (aluminum alloy + ABS plastic), Aurora Silver (full aluminum alloy), or Polar Black + Bag with the carry bag included. In the box: console, USB charging cable, lanyard, high shoulder buttons (L2/R2), user manual, color box, screen protector — bag variant adds the bag. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. Buyer pays shipping. (we do not condone piracy of any kind)",
    price:105.00, ship:"+ shipping (by location)", icon:"🎮",
-   imgs:["images/amby-flip-01-modes.jpg","images/amby-flip-03-spin.jpg","images/amby-flip-05-black-specs.jpg","images/amby-flip-06-silver-specs.jpg","images/amby-flip-07-black-bag.jpg","images/amby-flip-02-emulators.jpg","images/amby-flip-04-watch.jpg","images/amby-flip-08-features.jpg"],
+   imgs:["images/amby-flip-01-modes.jpg","images/amby-flip-02-emulators.jpg","images/amby-flip-03-spin.jpg","images/amby-flip-04-watch.jpg","images/amby-flip-05-black-specs.jpg","images/amby-flip-06-silver-specs.jpg","images/amby-flip-07-black-bag.jpg","images/amby-flip-08-features.jpg"],
    variations:[{label:"Polar Black — Modded, machine only", price:105.00},{label:"Aurora Silver — Modded, machine only", price:105.00},{label:"Polar Black + Bag — Modded, machine only + carry bag", price:115.00}]},
   {id:"bricktsp", slug:"modded-bricktsp", tag:"HANDHELD · Modded BrickTSP", name:"BrickTSP — Modded Pocket Handheld (CrossMix, 128GB Card)",
    desc:"BrickTSP — a pocket-size vertical handheld, modded and ready to play. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Sharp 3.2-inch 4:3 screen, 3000mAh battery, WiFi + Bluetooth. Plays PS1, SNES, Genesis, GBA and more full speed, plus light N64/Dreamcast. Loaded with free ports and cool stuff. Fully decked out ($105) comes with everything — protective case + wrist strap included. Machine only ($90) is just the handheld — add the protective case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)",
@@ -211,7 +211,7 @@ const CATALOG = [
    variations:[{label:"Modded — fully decked out (case + wrist wrap + anti-shock case)", price:165.00},{label:"Modded — machine only", price:145.00},{label:"Stock — unmodded, ordered when you buy (allow extra time)", price:105.00}],
    desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Amby Duo — two screens, the way DS games were meant to be played. Dual 4-inch IPS touch screens, Rockchip RK3568 chip, 3GB RAM + 32GB storage, Android 14 / Linux dual OS, 4000mAh battery (about 6 hours). Capacitive stylus included, Hall switch puts it to sleep when you close it, TF card up to 2TB. Plays DS natively plus PS1, N64 and light 3DS/Dreamcast. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Decked-out version has the case applied, wrist wrap installed, and anti-shock case included. Modded to order — ready to play out of the box. Stock version is unmodded and ordered when you buy — please allow a little extra time. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)"},
   {id:"cat-amby-flip", slug:"amby-flip-modded", ebay:null, icon:"🎮", tag:"Handheld · Modded Amby FLIP", name:"Amby FLIP — Modded Flip Handheld (Android 12, 3.5-inch Touchscreen)", price:105.00, img:null,
-   imgs:["images/amby-flip-01-modes.jpg","images/amby-flip-03-spin.jpg","images/amby-flip-05-black-specs.jpg","images/amby-flip-06-silver-specs.jpg","images/amby-flip-07-black-bag.jpg","images/amby-flip-02-emulators.jpg","images/amby-flip-04-watch.jpg","images/amby-flip-08-features.jpg"],
+   imgs:["images/amby-flip-01-modes.jpg","images/amby-flip-02-emulators.jpg","images/amby-flip-03-spin.jpg","images/amby-flip-04-watch.jpg","images/amby-flip-05-black-specs.jpg","images/amby-flip-06-silver-specs.jpg","images/amby-flip-07-black-bag.jpg","images/amby-flip-08-features.jpg"],
    variations:[{label:"Polar Black — Modded, machine only", price:105.00},{label:"Aurora Silver — Modded, machine only", price:105.00},{label:"Polar Black + Bag — Modded, machine only + carry bag", price:115.00}],
    desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. Immediate payment required. 12-day money-back guarantee. Amby FLIP — the flip handheld. Flip it open to play, spin the screen, close it up and it doubles as a clock. Gorgeous 3.5-inch IPS touchscreen at 720×720, Unisoc Tiger T618 chip, 3GB RAM + 32GB storage, Android 12, 2000mAh battery. WiFi 5 + Bluetooth 5.0, USB-C DAC to 3.5mm headphone jack, high-fidelity stereo speakers, D-pad joystick mapping, swappable high/low L2/R2 shoulder buttons. Plays PS2, Wii, GameCube, 3DS, PSP, Dreamcast, Saturn, PS1, DS, N64, Arcade, NeoGeo, GBA, GBC, GB, SNES, NES, Genesis, Master System, Game Gear, MSX, PC Engine, WonderSwan and N-Gage, plus Android games and PC games via streaming. Four ways to play: cast to TV like a home console, stream and play AAA titles, handheld mode, or Wi-Fi multiplayer with a friend. Switch watch faces, raise a virtual pet, and grab games with the RixelHK game downloader and AI assistant. Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Modded to order — ready to play out of the box. Choose Polar Black (aluminum alloy + ABS plastic), Aurora Silver (full aluminum alloy), or Polar Black + Bag with the carry bag included. In the box: console, USB charging cable, lanyard, high shoulder buttons (L2/R2), user manual, color box, screen protector — bag variant adds the bag. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. Buyer pays shipping. (we do not condone piracy of any kind)"},
   {id:"cat-amby-pro", slug:"amby-pro", ebay:null, icon:"🎮", tag:"Handheld · Modded Amby Pro", name:"Amby Pro — Modded Dual-Boot Handheld", price:204.00, img:null,
@@ -497,8 +497,9 @@ function photoHTML(p, idx){
   </div>`;
 }
 function productCard(p){
-  const thumbs = (p.imgs && p.imgs.length > 1)
-    ? p.imgs.slice(1).map((_,i)=>photoHTML(p,i+1)).join("")
+  const photoTotal = (p.imgs && p.imgs.length) || 3;
+  const galleryHint = photoTotal > 1
+    ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">📷 ${photoTotal} photos — tap the photo, then use Prev / Next to browse</p>`
     : "";
   let priceLine, buyBtn;
   if(p.variations){
@@ -513,7 +514,7 @@ function productCard(p){
   }
   return `<div class="card">
     ${photoHTML(p,0)}
-    <div class="thumbs">${thumbs}</div>
+    ${galleryHint}
     <div class="tag" style="margin-top:12px">${p.tag}</div>
     <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
@@ -660,15 +661,16 @@ function showDetail(id){
     buyHtml = `<p><span class="price">${money(c.price)}</span>${c.ship ? ` <span class="ship">${c.ship}</span>` : ""}</p>
       <p><button class="btn" onclick="${CATALOG.includes(c) ? "addCatalogToCart" : "addToCart"}('${c.id}')">Add to cart</button> <button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button></p>`;
   }
-  const detThumbs = (c.imgs && c.imgs.length > 1)
-    ? c.imgs.slice(1).map((_,i)=>photoHTML(c,i+1)).join("")
-    : photoHTML(c,1)+photoHTML(c,2);
+  const detTotal = (c.imgs && c.imgs.length) || 3;
+  const detHint = detTotal > 1
+    ? `<p style="font-size:12px;color:var(--muted);margin:6px 0 0">📷 ${detTotal} photos — tap the photo, then use Prev / Next to browse</p>`
+    : "";
   det.innerHTML = `
     <p><a href="shop.html" onclick="hideDetail(event)">← Back to the full catalog</a></p>
     <div class="detail">
       <div>
         ${photoHTML(c,0)}
-        <div class="thumbs">${detThumbs}</div>
+        ${detHint}
       </div>
       <div>
         <div class="tag">${c.tag}</div>

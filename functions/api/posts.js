@@ -10,7 +10,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
-  parseTags, putImage, putVideo, putPrintFile, nowMs,
+  parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -188,6 +188,8 @@ export async function onRequestPost({ env, request }) {
       if (missingCol(e)) return fail("Creator posts aren't set up yet — the shop is still running a quick database update. Try again later.");
       throw e;
     }
+    // @mentions in the post body (v3.8) — skips quietly if the table isn't there yet.
+    await notifyMentions(db, me, body, { ref_type: "post", ref_id: creatorRes.post_id, label: "in a post", link: `#/thread/${creatorRes.post_id}` });
     return insertDone(creatorRes);
   }
 
@@ -206,5 +208,7 @@ export async function onRequestPost({ env, request }) {
     { drop: ["blur_photo"] },
     { drop: ["video_blob_key", "blur_photo"] },
   ]);
+  // @mentions in the post body (v3.8) — skips quietly if the table isn't there yet.
+  await notifyMentions(db, me, body, { ref_type: "post", ref_id: regRes.post_id, label: "in a post", link: `#/thread/${regRes.post_id}` });
   return insertDone(regRes);
 }

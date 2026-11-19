@@ -160,6 +160,8 @@ var state = {
   phoneGallery: [], // [{ url, name, timer }] — session only, auto-deleted after 10 min
   phoneNotes: "", // session notes — this tab only, gone when you leave
   phoneMsgList: null, // cached member list for the MSG contacts view
+  phoneAlertsList: null, // cached notifications for the Alerts app view
+  phoneAlertsStamp: 0, // bumps when alerts reload, so renderPhone rebuilds
   phoneChat: [], // [{ who: "me"|"taffy", text, emoji }] — session only, gone when you leave
   phoneChatOpen: false, // chat bar expanded (tap-to-reveal); conversation stays in phoneChat when closed
   phoneRenderedKey: "", // app|open|wallpaper|galleryCount — avoids rebuilding the radio
@@ -738,6 +740,7 @@ var TP_ICON_MSG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.
 var TP_ICON_GALLERY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="#fff"/><path d="M5 17l4.5-4.5L12 15l3-3 4 4" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.6" fill="#f59e0b"/></svg>';
 var TP_ICON_NOTES = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" fill="#fff"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"/></svg>';
 var TP_ICON_TUTORIAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg>';
+var TP_ICON_ALERTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" fill="#fff"/></svg>';
 
 function phoneTopbarHTML(title) {
   return '<div class="tp-topbar"><button type="button" class="tp-back" onclick="DWC.phoneGo(\'home\')">‹ Home</button><strong>' + esc(title) + '</strong><button type="button" class="tp-min" onclick="DWC.phoneMinimize()" title="Minimize the phone">—</button></div>';
@@ -759,6 +762,7 @@ function phoneHomeHTML() {
     phoneAppTile("radio", "radio", '<span class="tp-icon tp-icon-radio"><span class="tp-glyph">♪</span></span>') +
     phoneAppTile("code", "Code", '<span class="tp-icon tp-icon-code"><span class="tp-glyph">&lt;/&gt;</span></span>') +
     phoneAppTile("tutorial", "Available soon — check back later!", '<span class="tp-icon tp-icon-tutorial">' + TP_ICON_TUTORIAL + '</span>') +
+    phoneAppTile("alerts", "Alerts", '<span class="tp-icon tp-icon-alerts">' + TP_ICON_ALERTS + '</span>') +
     '</div>' +
     '<div class="tp-wall"><span>Wallpaper</span><div class="tp-wall-swatches">' +
     PHONE_WALLPAPERS.map(function (w) {
@@ -998,7 +1002,7 @@ function taffyReply(raw) {
     return { text: taffyPick(["On someone's page, hit “Add me” to add them as a friend — it flips to “Unfriend” once you're friends. The star next to “Add to Favorites” lights up gold when they're favorited. Your own page URL lives in Edit Profile under “My page URL” — 3 changes per 5 years, 1-year cooldown, or appeal to Chris.", "Friends and favorites live on the member page: “Add me” adds them (it turns into “Unfriend” when you're already friends), and the ☆ star fills gold when you favorite someone. Your custom page URL is in Edit Profile — “My page URL” — 3 changes in 5 years, 1-year cooldown after each one."]), emoji: taffyPickEmoji(["👥", "⭐"]), working: false };
   // Phone
   if (has(/\b(phone|my phone|the phone|apps|gallery|notes app)\b/))
-    return { text: taffyPick(["The green button opens my phone — 8 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, and Tutorial. Tap the \u2014 to minimize me back to the button.", "My phone has 8 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, and Tutorial. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
+    return { text: taffyPick(["The green button opens my phone — 9 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, Tutorial, and Alerts. Tap the \u2014 to minimize me back to the button.", "My phone has 9 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, Tutorial, and Alerts. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
   // Shop (where is it)
   if (has(/\bwhere\b.{0,15}\b(shop|store)\b|\b(go to|take me to|visit|open)\b.{0,15}\b(shop|store)\b|\b(shop|store) page\b/))
     return { text: taffyPick(["Hit Shop in the top nav — that's the Rare Candy Reserve store, cards, handhelds, and all.", "The shop is one tap away — Shop in the top nav takes you to the store. Cards, pins, handhelds, the lot."]), emoji: taffyPickEmoji(["🛍️", "🍬"]), working: false };
@@ -1184,6 +1188,59 @@ function phoneTutorialHTML() {
     '<p class="tp-note">A short video tour of everything Taffy can do is coming — Chris will add it here. It won’t be long, just the gist.</p>' +
     '</div>';
 }
+// ---------- Alerts app (v3.8) — the same notifications as the header
+// bell: mentions, tags, likes, replies, new adds, unfollows, heart
+// reacts, comments, and messages. Newest first, unread highlighted.
+function phoneNotifKindIcon(kind) {
+  switch (kind) {
+    case "message": return "💬";
+    case "reply": return "↩️";
+    case "comment": return "💬";
+    case "heart": return "❤️";
+    case "like": return "👍";
+    case "friend": return "🤝";
+    case "favorite": return "⭐";
+    case "mention": return "@";
+    case "tag": return "🏷️";
+    case "follow": return "➕";
+    case "unfollow": return "➖";
+    default: return "🔔";
+  }
+}
+function phoneNotifTime(ms) {
+  if (!ms) return "";
+  var diff = Date.now() - Number(ms);
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
+  if (diff < 86400000) return Math.floor(diff / 3600000) + "h ago";
+  return new Date(ms).toLocaleDateString();
+}
+async function loadPhoneAlerts() {
+  if (!state.profile) return;
+  var data = await apiGet("/notifications?device_id=" + encodeURIComponent(deviceId()));
+  state.phoneAlertsList = (data && data.notifications) || [];
+  state.phoneAlertsStamp = Date.now();
+  if (state.phone.open && state.phone.app === "alerts") renderPhone();
+}
+function phoneAlertsHTML() {
+  var rows = "";
+  if (!state.profile) {
+    rows = '<p class="tp-note">Create your account to get alerts — Taffy is here either way.</p><p><button type="button" class="btn small" onclick="DWC.phoneMinimize();DWC.openSignup()">Create account — it’s free</button></p>';
+  } else if (!state.phoneAlertsList) {
+    rows = '<p class="tp-note">Loading alerts…</p>';
+    loadPhoneAlerts();
+  } else if (!state.phoneAlertsList.length) {
+    rows = '<p class="tp-note">No alerts yet — when someone comments, messages, hearts, or mentions you, it’ll show up here.</p>';
+  } else {
+    rows = state.phoneAlertsList.map(function (n) {
+      return '<button type="button" class="tp-contact' + (n.read ? "" : " tp-notif-unread") + '" onclick="DWC.phoneAlertOpen(' + n.id + ', \'' + String(n.link || "").replace(/'/g, "") + '\')">' +
+        '<span class="tp-contact-av">' + phoneNotifKindIcon(n.kind) + '</span>' +
+        '<span><strong>' + esc(n.text || "") + '</strong><em>' + phoneNotifTime(n.created_at) + '</em></span><span class="tp-contact-go">›</span></button>';
+    }).join("");
+  }
+  return phoneTopbarHTML("Alerts") + '<div class="tp-appview">' +
+    '<p><button type="button" class="btn ghost small" onclick="DWC.phoneAlertsMarkAll()">Mark all read</button></p>' + rows + '</div>';
+}
 function phoneScreenHTML() {
   var app = state.phone.app;
   var inner = "";
@@ -1195,6 +1252,7 @@ function phoneScreenHTML() {
   else if (app === "radio") inner = phoneRadioHTML();
   else if (app === "code") inner = phoneCodeHTML();
   else if (app === "tutorial") inner = phoneTutorialHTML();
+  else if (app === "alerts") inner = phoneAlertsHTML();
   else inner = phoneHomeHTML();
   return '<div class="tp-screen" style="background:' + phoneWallpaperBg(state.phone.wallpaper) + '">' +
     '<div class="tp-island"></div>' +
@@ -1204,7 +1262,7 @@ function phoneScreenHTML() {
     '</div>';
 }
 function phoneRenderedKey() {
-  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x");
+  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x") + "|" + (state.phoneAlertsList ? state.phoneAlertsList.length : "x") + "|" + state.phoneAlertsStamp;
 }
 function renderPhone() {
   var root = $("dwc-phone-root");
@@ -5076,7 +5134,27 @@ window.DWC = {
   phoneGo: function (app) {
     state.phone.app = app;
     if (app === "msg") loadPhoneMsgList();
+    if (app === "alerts") loadPhoneAlerts();
     renderPhone();
+  },
+  // Alerts app (v3.8) — tap an alert: mark it read, close the phone,
+  // and jump to what it points at.
+  phoneAlertOpen: function (id, link) {
+    if (state.profile) {
+      apiPost("/notifications", { device_id: deviceId(), action: "read", id: id });
+      if (state.phoneAlertsList) {
+        state.phoneAlertsList.forEach(function (n) { if (n.id === id) n.read = true; });
+      }
+    }
+    state.phone.open = false;
+    renderPhone();
+    if (link) location.hash = link;
+  },
+  phoneAlertsMarkAll: function () {
+    if (!state.profile) return;
+    apiPost("/notifications", { device_id: deviceId(), action: "read_all" }).then(function () {
+      loadPhoneAlerts();
+    });
   },
   phoneWallpaper: function (id) {
     state.phone.wallpaper = id;

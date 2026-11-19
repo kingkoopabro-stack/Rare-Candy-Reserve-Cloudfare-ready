@@ -1,6 +1,6 @@
 // POST /api/posts/:id/comments/:commentId/vote — voteComment.
 // Hearts (or un-hearts) a comment — the only reaction comments have.
-import { json, noDb, getDb, readJson, profileByDevice } from "../../../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, createNotification } from "../../../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);
@@ -27,5 +27,14 @@ export async function onRequestPost({ env, request, params }) {
     myHeart = true;
   }
   const row = await db.prepare("SELECT COUNT(*) AS n FROM comment_votes WHERE comment_id = ? AND value = 1").bind(commentId).first();
+  // Notification (v3.8) — only on a NEW heart, never on an un-heart.
+  if (myHeart) {
+    await createNotification(db, {
+      profile_id: comment.profile_id, actor_profile_id: me.id, kind: "heart",
+      ref_type: "comment", ref_id: commentId,
+      text: `@${me.username} hearted your reply`,
+      link: `#/thread/${comment.post_id}`,
+    });
+  }
   return json({ ok: true, error: null, hearts: row?.n ?? 0, my_heart: myHeart });
 }

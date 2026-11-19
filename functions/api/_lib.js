@@ -119,6 +119,51 @@ export function isOperator(env, profile) {
   return false;
 }
 
+// --- Notifications (v3.8) ------------------------------------------------
+// createNotification inserts one row into the notifications table. It
+// never throws and never notifies the actor about their own action, so a
+// missing table (migration not run yet) can never break posting, liking,
+// or messaging — the notification is just skipped.
+export async function createNotification(db, n) {
+  if (!db || !n || !n.profile_id) return;
+  if (n.actor_profile_id && n.actor_profile_id === n.profile_id) return;
+  try {
+    await db.prepare(
+      "INSERT INTO notifications (profile_id, actor_profile_id, kind, ref_type, ref_id, text, link, read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)",
+    ).bind(
+      n.profile_id, n.actor_profile_id || null,
+      String(n.kind || "comment").slice(0, 30),
+      n.ref_type ? String(n.ref_type).slice(0, 30) : null,
+      n.ref_id || null,
+      String(n.text || "").slice(0, 200),
+      n.link ? String(n.link).slice(0, 300) : null,
+      nowMs(),
+    ).run();
+  } catch { /* notifications table not there yet — skip quietly */ }
+}
+
+// notifyMentions scans a body for @username mentions and notifies each
+// matching profile (once each, never the author). Simple scan: @ followed
+// by the username characters the signup form allows.
+export async function notifyMentions(db, actor, body, opts) {
+  if (!db || !actor || !body) return;
+  const names = [...new Set([...String(body).matchAll(/@([A-Za-z0-9_.-]{2,24})/g)].map((m) => m[1]))];
+  if (!names.length) return;
+  const o = opts || {};
+  for (const name of names) {
+    try {
+      const target = await db.prepare("SELECT id, username FROM profiles WHERE username = ? COLLATE NOCASE LIMIT 1").bind(name).first();
+      if (!target || target.id === actor.id) continue;
+      await createNotification(db, {
+        profile_id: target.id, actor_profile_id: actor.id, kind: "mention",
+        ref_type: o.ref_type, ref_id: o.ref_id,
+        text: `@${actor.username} mentioned you${o.label ? " " + o.label : ""}`,
+        link: o.link,
+      });
+    } catch { /* keep going — one bad lookup never blocks the rest */ }
+  }
+}
+
 export const nowMs = () => Date.now();
 export const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 export const money = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;

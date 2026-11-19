@@ -2,7 +2,7 @@
 // POST /api/favorites — add or remove a favorite (the star on a member
 // page). Separate from Top 8: a favorite is a one-way star, Top 8 is a
 // public tile row. Requires the v3.6 migration (favorites table).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -36,6 +36,13 @@ export async function onRequestPost({ env, request }) {
   try {
     if (action === "add") {
       await db.prepare("INSERT OR IGNORE INTO favorites (profile_id, favorite_id, created_at) VALUES (?, ?, ?)").bind(me.id, favoriteId, nowMs()).run();
+      // Notification (v3.8) — skips quietly if the table isn't there yet.
+      await createNotification(db, {
+        profile_id: favoriteId, actor_profile_id: me.id, kind: "favorite",
+        ref_type: "favorite", ref_id: me.id,
+        text: `@${me.username} favorited you`,
+        link: `#/member/${me.id}`,
+      });
       return json({ ok: true, error: null, is_favorite: true });
     }
     await db.prepare("DELETE FROM favorites WHERE profile_id = ? AND favorite_id = ?").bind(me.id, favoriteId).run();

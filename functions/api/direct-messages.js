@@ -7,7 +7,7 @@
 // Members only (guests can't IM — the main room is the guest area).
 // If the v2 migration hasn't run yet, every call answers a clean
 // "not set up yet" instead of crashing.
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, iso, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, iso, nowMs, createNotification } from "./_lib.js";
 
 function dmShape(r, meId) {
   return {
@@ -93,6 +93,13 @@ export async function onRequestPost({ env, request }) {
     const r = await db.prepare(
       "INSERT INTO direct_messages (sender_id, recipient_id, body, is_read, created_at) VALUES (?, ?, ?, 0, ?)",
     ).bind(me.id, toId, body, now).run();
+    // Notification (v3.8) — skips quietly if the table isn't there yet.
+    await createNotification(db, {
+      profile_id: toId, actor_profile_id: me.id, kind: "message",
+      ref_type: "direct_message", ref_id: r.meta.last_row_id,
+      text: `@${me.username} sent you a message`,
+      link: `#/member/${me.id}`,
+    });
     return json({
       ok: true, error: null,
       message: { id: r.meta.last_row_id, from_me: true, sender_id: me.id, sender_username: me.username, body, is_read: false, created_at: iso(now) },

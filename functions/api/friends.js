@@ -4,7 +4,7 @@
 // directions so "are we friends" is one lookup; unfriend deletes both.
 // Requires the v3.6 migration (friends table); without it, writes fail
 // with a clear error instead of silently doing nothing.
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -40,9 +40,23 @@ export async function onRequestPost({ env, request }) {
       const now = nowMs();
       await db.prepare("INSERT OR IGNORE INTO friends (profile_id, friend_id, created_at) VALUES (?, ?, ?)").bind(me.id, friendId, now).run();
       await db.prepare("INSERT OR IGNORE INTO friends (profile_id, friend_id, created_at) VALUES (?, ?, ?)").bind(friendId, me.id, now).run();
+      // Notification (v3.8) — skips quietly if the table isn't there yet.
+      await createNotification(db, {
+        profile_id: friendId, actor_profile_id: me.id, kind: "friend",
+        ref_type: "friend", ref_id: me.id,
+        text: `@${me.username} added you as a friend`,
+        link: `#/member/${me.id}`,
+      });
       return json({ ok: true, error: null, is_friend: true });
     }
     await db.prepare("DELETE FROM friends WHERE (profile_id = ? AND friend_id = ?) OR (profile_id = ? AND friend_id = ?)").bind(me.id, friendId, friendId, me.id).run();
+    // Notification (v3.8) — the other person gets told they were removed.
+    await createNotification(db, {
+      profile_id: friendId, actor_profile_id: me.id, kind: "unfollow",
+      ref_type: "friend", ref_id: me.id,
+      text: `@${me.username} removed you as a friend`,
+      link: `#/member/${me.id}`,
+    });
     return json({ ok: true, error: null, is_friend: false });
   } catch (e) {
     if (/no such table/i.test(String((e && e.message) || e))) {

@@ -40,6 +40,20 @@ nav.main a.active{background:var(--grad);color:#0b0b14}
 .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .cart-btn{border:2px solid var(--cyan);background:transparent;color:var(--cyan);font-weight:800;border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px}
 .cart-btn:hover{background:var(--cyan);color:#0b0b14}
+/* Notifications bell (v3.8) — sits between Sign out and Cart in the header. */
+.notif-bell{position:relative;border:2px solid var(--violet);background:transparent;color:#fff;font-weight:800;border-radius:999px;padding:8px 12px;cursor:pointer;font-size:16px;line-height:1}
+.notif-bell:hover{background:var(--violet)}
+.notif-badge{position:absolute;top:-7px;right:-7px;min-width:20px;height:20px;border-radius:999px;background:#ff2d55;color:#fff;font-size:11px;font-weight:900;display:inline-flex;align-items:center;justify-content:center;padding:0 5px;border:2px solid #0b0b14}
+.notif-panel{position:fixed;top:64px;right:16px;width:min(360px,calc(100vw - 32px));max-height:70vh;overflow:auto;background:var(--panel);border:2px solid var(--violet);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.6);z-index:9999}
+.notif-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.notif-list{padding:6px}
+.notif-item{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;text-decoration:none;color:var(--ink)}
+.notif-item:hover{background:#ffffff14}
+.notif-item.unread{background:#7c4dff22;font-weight:700}
+.notif-ic{font-size:18px;line-height:1.2;flex:none}
+.notif-tx{flex:1;font-size:14px;line-height:1.4}
+.notif-tx em{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px}
+.notif-empty{padding:18px;text-align:center;color:var(--muted)}
 
 /* AllMyLinks button — RGB gradient neon, logo text treatment */
 .aml-btn{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-weight:900;border-radius:999px;padding:9px 18px;font-size:15px;color:#0b0b14;background:var(--grad);box-shadow:0 0 18px rgba(255,45,149,.55),0 0 28px rgba(0,229,255,.35);border:2px solid #fff2;white-space:nowrap}
@@ -759,6 +773,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-icon-radio{background:#ff2ea6}
 .tp-icon-code{background:#1f2937}
 .tp-icon-tutorial{background:#4b5563}
+.tp-icon-alerts{background:#ff2d55}
+.tp-contact.tp-notif-unread{background:rgba(124,77,255,.45)}
 .tp-glyph{color:#fff;font-weight:800;font-size:20px;line-height:1}
 .tp-icon-vitanova{background:linear-gradient(135deg,#ff2ea6,#7c4dff 55%,#0066ff);padding:4px}
 .tp-wall{margin-top:18px;background:rgba(0,0,0,.35);border-radius:14px;padding:10px 12px}

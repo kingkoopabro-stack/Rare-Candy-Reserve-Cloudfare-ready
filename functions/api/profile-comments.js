@@ -10,7 +10,7 @@
 //   public / friends / private (default public).
 // DELETE /api/profile-comments?id=&device_id= — the page owner, the
 //   author, or the operator can delete a comment.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions } from "./_lib.js";
 
 async function isFriendOf(db, viewerId, ownerId) {
   if (!viewerId || viewerId === ownerId) return viewerId === ownerId;
@@ -93,12 +93,23 @@ export async function onRequestPost({ env, request }) {
   }
   const gifUrl = String(a.gif_url || "").trim().slice(0, 500);
   if (gifUrl && !/^https:\/\//i.test(gifUrl)) return json({ ok: false, error: "GIF needs an https:// link." });
+  let commentId = null;
   try {
-    await db.prepare("INSERT INTO profile_comments (profile_id, author_id, body, image_blob_key, gif_url, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    const r = await db.prepare("INSERT INTO profile_comments (profile_id, author_id, body, image_blob_key, gif_url, visibility, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .bind(profileId, me.id, body, imageKey, gifUrl || null, visibility, nowMs()).run();
+    commentId = r.meta.last_row_id;
   } catch (e) {
     return json({ ok: false, error: "Page comments aren't switched on yet — run the v3.7 update first." });
   }
+  // Notifications (v3.8) — never block the response; createNotification
+  // skips quietly when the table isn't there yet or it's your own page.
+  await createNotification(db, {
+    profile_id: profileId, actor_profile_id: me.id, kind: "comment",
+    ref_type: "profile_comment", ref_id: commentId,
+    text: `@${me.username} commented on your page`,
+    link: `#/member/${profileId}`,
+  });
+  await notifyMentions(db, me, body, { ref_type: "profile_comment", ref_id: commentId, label: "in a page comment", link: `#/member/${profileId}` });
   return json({ ok: true, error: null });
 }
 

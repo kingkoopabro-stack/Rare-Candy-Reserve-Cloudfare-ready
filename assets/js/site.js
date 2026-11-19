@@ -849,6 +849,8 @@ function syncProfileButton() {
     .then(function (r) { return r.json(); })
     .then(function (data) {
       if (!data || !data.profile) return; // device id exists but no profile
+      notifDeviceId = deviceId;
+      initNotifBell();
       var logo = btn.querySelector(".aml-logo");
       var sub = btn.querySelector(".aml-sub");
       if (logo) logo.textContent = "👋 Sign out";
@@ -861,4 +863,143 @@ function syncProfileButton() {
       });
     })
     .catch(function () { /* offline — leave the button as-is */ });
+}
+
+/* ---------- notifications bell (v3.8) ----------
+   A 🔔 in the header between the Sign out button and the Cart button,
+   only when signed in to the Community. Badge = unread count; click
+   opens a dropdown of the newest notifications. Polls every 60s. If the
+   notifications table isn't live yet, the bell shows with no badge and
+   an empty panel ("No notifications yet") — nothing breaks. */
+var notifDeviceId = null;
+var notifTimer = null;
+var notifOpen = false;
+function notifEsc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+function notifKindIcon(kind) {
+  switch (kind) {
+    case "message": return "💬";
+    case "reply": return "↩️";
+    case "comment": return "💬";
+    case "heart": return "❤️";
+    case "like": return "👍";
+    case "friend": return "🤝";
+    case "favorite": return "⭐";
+    case "mention": return "@";
+    case "tag": return "🏷️";
+    case "follow": return "➕";
+    case "unfollow": return "➖";
+    default: return "🔔";
+  }
+}
+function notifTime(ms) {
+  if (!ms) return "";
+  var diff = Date.now() - Number(ms);
+  if (diff < 60000) return "just now";
+  if (diff < 3600000) return Math.floor(diff / 60000) + "m ago";
+  if (diff < 86400000) return Math.floor(diff / 3600000) + "h ago";
+  return new Date(ms).toLocaleDateString();
+}
+function notifLinkHref(link) {
+  if (!link) return "community.html";
+  if (location.pathname.indexOf("community.html") !== -1) return link;
+  return "community.html" + link;
+}
+function renderNotifPanel(list) {
+  var panel = document.getElementById("notifPanel");
+  if (!panel) return;
+  var body = panel.querySelector(".notif-list");
+  if (!body) return;
+  if (!list || !list.length) {
+    body.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
+    return;
+  }
+  body.innerHTML = list.map(function (n) {
+    return '<a class="notif-item' + (n.read ? "" : " unread") + '" href="' + notifEsc(notifLinkHref(n.link)) + '" data-notif-id="' + n.id + '">' +
+      '<span class="notif-ic">' + notifKindIcon(n.kind) + '</span>' +
+      '<span class="notif-tx">' + notifEsc(n.text || "") + '<em>' + notifTime(n.created_at) + '</em></span>' +
+      '</a>';
+  }).join("");
+}
+function fetchNotifs() {
+  if (!notifDeviceId) return Promise.resolve(null);
+  return fetch("/api/notifications?device_id=" + encodeURIComponent(notifDeviceId))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var list = (data && data.notifications) || [];
+      var unread = (data && typeof data.unread === "number")
+        ? data.unread
+        : list.filter(function (n) { return !n.read; }).length;
+      var badge = document.getElementById("notifBadge");
+      if (badge) {
+        badge.textContent = unread > 99 ? "99+" : String(unread);
+        badge.hidden = unread <= 0;
+      }
+      if (notifOpen) renderNotifPanel(list);
+      return data;
+    })
+    .catch(function () { return null; });
+}
+function markAllNotifRead() {
+  if (!notifDeviceId) return;
+  fetch("/api/notifications", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ device_id: notifDeviceId, action: "read_all" }),
+  }).then(function () { fetchNotifs(); }).catch(function () {});
+}
+function toggleNotifPanel() {
+  var panel = document.getElementById("notifPanel");
+  if (!panel) return;
+  notifOpen = !notifOpen;
+  panel.hidden = !notifOpen;
+  if (notifOpen) fetchNotifs();
+}
+function initNotifBell() {
+  if (document.getElementById("notifBell")) return;
+  var cartBtn = document.querySelector(".head-actions .cart-btn");
+  if (!cartBtn) return;
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "notif-bell";
+  btn.id = "notifBell";
+  btn.setAttribute("aria-label", "Notifications");
+  btn.innerHTML = '🔔<span class="notif-badge" id="notifBadge" hidden>0</span>';
+  btn.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    toggleNotifPanel();
+  });
+  cartBtn.parentNode.insertBefore(btn, cartBtn);
+  var panel = document.createElement("div");
+  panel.className = "notif-panel";
+  panel.id = "notifPanel";
+  panel.hidden = true;
+  panel.innerHTML =
+    '<div class="notif-head"><b>🔔 Notifications</b><button type="button" class="btn ghost small" id="notifMarkAll">Mark all read</button></div>' +
+    '<div class="notif-list"><p class="notif-empty">No notifications yet.</p></div>';
+  document.body.appendChild(panel);
+  panel.querySelector("#notifMarkAll").addEventListener("click", function () { markAllNotifRead(); });
+  // Tapping a notification marks it read (fire-and-forget) then follows the link.
+  panel.addEventListener("click", function (ev) {
+    var item = ev.target.closest ? ev.target.closest("[data-notif-id]") : null;
+    if (!item || !notifDeviceId) return;
+    fetch("/api/notifications", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ device_id: notifDeviceId, action: "read", id: Number(item.getAttribute("data-notif-id")) }),
+    }).catch(function () {});
+  });
+  // Clicking anywhere else closes the panel.
+  document.addEventListener("click", function (ev) {
+    var p = document.getElementById("notifPanel");
+    if (!p || p.hidden) return;
+    if (ev.target.closest && (ev.target.closest("#notifPanel") || ev.target.closest("#notifBell"))) return;
+    p.hidden = true;
+    notifOpen = false;
+  });
+  fetchNotifs();
+  if (!notifTimer) notifTimer = setInterval(fetchNotifs, 60000);
 }

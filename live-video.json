@@ -1,1 +1,14 @@
-{"mode":"live","src":"","title":"No stream scheduled right now","type":"off"}
+{
+  "mode": "live",
+  "src": "",
+  "title": "No stream scheduled right now",
+  "type": "off",
+  "schedule": [
+    {
+      "date": "2026-12-18",
+      "start": "8:00 PM",
+      "end": "11:00 PM",
+      "title": "Celebratory launch show and stream + guest appearance!"
+    }
+  ]
+}

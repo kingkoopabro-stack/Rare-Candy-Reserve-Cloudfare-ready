@@ -44,20 +44,51 @@
 .live-video-share-note{color:var(--muted);font-size:13px;margin:6px 0 0}
 .live-video-preview{max-width:860px;margin:12px auto 0;border:1px solid #fff2;border-radius:12px;padding:12px 16px;color:var(--muted);font-size:14px}
 .live-video-preview summary{cursor:pointer;font-weight:800;color:var(--ink)}
-.live-video-comments{max-width:860px;margin:18px auto 0}
-.live-video-comments h3{margin:0 0 4px}
-.live-video-comments-note{color:var(--muted);font-size:13px;margin:0 0 12px}
-.live-video-comment-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-.live-video-comment{border:1px solid #fff2;border-radius:10px;padding:10px 12px;background:#10101d}
-.live-video-comment b{color:var(--ink)}
-.live-video-comment time{color:var(--muted);font-size:12px;margin-left:8px}
-.live-video-comment p{margin:4px 0 0;color:var(--ink)}
-.live-video-comment-empty{color:var(--muted);font-size:14px}
-.live-video-comment-form{display:flex;flex-direction:column;gap:8px}
-.live-video-comment-form input,.live-video-comment-form textarea{padding:10px 12px;border-radius:10px;border:1px solid #fff2;background:#171728;color:var(--ink);font:inherit}
-.live-video-comment-form textarea{min-height:64px;resize:vertical}
-.live-video-comment-form button{align-self:flex-start;font-weight:800;border-radius:999px;padding:10px 20px;border:0;background:var(--grad);color:#0b0b14;cursor:pointer}
-@media (prefers-reduced-motion:reduce){.live-video-frame{animation:none}.live-video-badge.on .dot{animation:none}}
+/* Live video + schedule — side by side on desktop, stacked on phones */
+.live-video-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:20px;align-items:start}
+.live-video-grid .live-video-frame{max-width:none;margin:0}
+.live-video-schedule{border:1px solid #fff2;border-radius:16px;padding:16px;background:#10101d}
+.live-video-schedule h3{margin:0 0 4px;font-size:17px}
+.live-video-schedule-note{color:var(--muted);font-size:13px;margin:12px 0 0}
+.lv-sched-event{border-top:1px solid #fff2;padding:12px 0}
+.lv-sched-event:first-of-type{border-top:0}
+.lv-sched-date{color:var(--muted);font-size:13px;font-weight:700}
+.lv-sched-time{color:var(--muted);font-size:13px}
+.lv-sched-title{display:block;font-size:19px;font-weight:900;line-height:1.25;margin-top:4px}
+.lv-sched-empty{color:var(--muted);font-size:14px}
+@media (max-width:860px){.live-video-grid{grid-template-columns:1fr}}
+/* Live chat — new-age AIM: retro IM window shape, modern polish */
+.lv-chat{max-width:860px;margin:18px auto 0;border-radius:20px;padding:4px;background:linear-gradient(90deg,#ff2d95,#ff9a00,#00e5ff,#7c4dff,#ff2d95);background-size:300% 100%;animation:liveVideoBorder 6s linear infinite;box-shadow:0 0 28px rgba(255,45,149,.45),0 0 48px rgba(0,229,255,.3)}
+.lv-chat-inner{background:#0b0b14;border-radius:16px;overflow:hidden}
+.lv-chat-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #fff2;flex-wrap:wrap}
+.lv-chat-logo{width:30px;height:30px;flex:0 0 auto}
+.lv-chat-title{font-weight:900;font-size:16px}
+.lv-chat-online{font-size:13px;font-weight:800;color:#39ff88}
+.lv-chat-who{margin-left:auto;font-size:13px;color:var(--muted)}
+.lv-chat-who a{color:var(--ink);font-weight:800}
+.lv-chat-log{max-height:360px;overflow-y:auto;padding:12px 14px;background:#0b0b14}
+.lv-chatmsg{padding:6px 0;border-top:1px solid #fff2;font-size:14px;line-height:1.45}
+.lv-chatmsg:first-child{border-top:0}
+.lv-chat-name{font-weight:900}
+.lv-chat-guesttag{font-size:11px;color:var(--muted);border:1px solid #fff2;border-radius:999px;padding:1px 7px;margin-left:4px}
+.lv-chat-time{color:var(--muted);font-size:12px;margin-left:6px}
+.lv-chat-body{color:var(--ink)}
+.lv-chat-new{display:block;margin:10px auto 0;font-weight:800;border-radius:999px;padding:6px 14px;border:1px solid #fff2;background:#171728;color:var(--ink);cursor:pointer}
+.lv-emoji-row{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid #fff2}
+.lv-emoji-row button{background:transparent;border:0;font-size:20px;cursor:pointer;padding:4px 6px;border-radius:8px}
+.lv-emoji-row button:hover{background:#ffffff14}
+.lv-chat-bar{display:flex;gap:8px;padding:12px;border-top:1px solid #fff2;align-items:center}
+.lv-chat-bar input{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid #fff2;background:#171728;color:var(--ink);font:inherit}
+.lv-chat-guestname{max-width:150px}
+.lv-chat-emoji-btn{background:transparent;border:1px solid #fff2;border-radius:10px;font-size:18px;cursor:pointer;padding:8px 10px;color:var(--ink)}
+.lv-chat-send{font-weight:800;border-radius:999px;padding:10px 18px;border:0;background:var(--grad);color:#0b0b14;cursor:pointer;white-space:nowrap}
+.lv-chat-err{color:#ff5c5c;font-weight:700;font-size:13px;margin:0;padding:0 14px 12px}
+/* Vita Nova Records label under the chat */
+.lv-vnr-label{display:flex;align-items:center;justify-content:center;gap:12px;margin:20px auto 0}
+.lv-vnr-label .grad-text{font-size:24px;font-weight:900;letter-spacing:.03em}
+.lv-vnr-mask{width:54px;height:auto;animation:lvMaskFloat 3.4s ease-in-out infinite;filter:drop-shadow(0 0 10px rgba(255,45,149,.45))}
+@keyframes lvMaskFloat{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
+@media (prefers-reduced-motion:reduce){.live-video-frame{animation:none}.live-video-badge.on .dot{animation:none}.lv-chat{animation:none}.lv-vnr-mask{animation:none}}
 </style>
 </head>
 <body data-page="music">
@@ -101,17 +132,18 @@
       <div class="kicker">🎥 Live video — concerts, shows &amp; interviews</div>
       <h2>Watch live — <span class="grad-text">a steady heart, on stage.</span></h2>
       <p style="color:var(--muted)">Live streaming concerts, shows and interviews — at home, in the studio, wherever I am. Music or gaming, it all lands here. This stage is open for anyone to stream to, and streaming is coming to all Community profiles who opt in.</p>
+      <div class="live-video-grid">
       <div class="live-video-frame" id="liveVideoFrame">
         <div class="live-video-inner">
           <div class="live-video-top">
-            <span class="live-video-badge" id="liveVideoBadge"><span class="dot"></span><span id="liveVideoBadgeText">OFF AIR</span></span>
+            <span class="live-video-badge" id="liveVideoBadge"><span class="dot"></span><span id="liveVideoBadgeText">OFFLINE</span></span>
             <span class="live-video-title" id="liveVideoTitle">No stream scheduled right now</span>
             <button class="live-video-fs" type="button" id="liveVideoFsBtn" aria-label="Full screen">⛶ Full screen</button>
           </div>
           <div class="live-video-stage" id="liveVideoStage">
             <div class="live-video-offair">
-              <div class="live-video-offair-big">📺 OFF AIR</div>
-              <p>No stream is scheduled right now — check back, or catch the next show here.</p>
+              <div class="live-video-offair-big">● OFFLINE</div>
+              <p>Chris isn't streaming right now — check the schedule, or catch the next show here.</p>
               <p class="live-video-how"><b>How a stream goes live here:</b> stream from OBS to YouTube Live (easiest), then send the link — it shows up in this box. Or drop a video file in <code>videos/</code> and it plays here on loop.</p>
             </div>
           </div>
@@ -125,6 +157,12 @@
           </div>
         </div>
       </div>
+      <aside class="live-video-schedule" aria-label="Schedule for streams, shows and interviews">
+        <h3>📅 Schedule for streams/shows/interviews</h3>
+        <div id="liveVideoScheduleList"><p class="lv-sched-empty">Loading schedule…</p></div>
+        <p class="live-video-schedule-note">More shows get added here — check back for new dates.</p>
+      </aside>
+      </div>
       <details class="live-video-preview">
         <summary>Stream setup preview (Chris only — tests a link in your browser only)</summary>
         <p>Paste a video or stream link to preview it in the player above. This only affects your own browser — to put it live for everyone, send the link to Slabb and it goes into live-video.json.</p>
@@ -134,16 +172,27 @@
           <button type="button" id="liveVideoPreviewClear">Clear preview</button>
         </div>
       </details>
-      <div class="live-video-comments">
-        <h3>💬 Stream comments</h3>
-        <p class="live-video-comments-note">Comments reset every day at midnight — today's comments only.</p>
-        <div id="liveVideoCommentList" class="live-video-comment-list"></div>
-        <div class="live-video-comment-form">
-          <input id="liveVideoCommentName" placeholder="Your name" maxlength="40">
-          <textarea id="liveVideoCommentText" placeholder="Say something about the stream…" maxlength="500"></textarea>
-          <button type="button" id="liveVideoCommentPost">Post comment</button>
+      <div class="lv-chat" id="liveVideoChat">
+        <div class="lv-chat-inner">
+          <div class="lv-chat-head">
+            <img src="images/steady-heart.svg" alt="A Steady Heart" class="lv-chat-logo">
+            <span class="lv-chat-title">Live Chat — The Street</span>
+            <span class="lv-chat-online" id="liveVideoChatOnline" hidden></span>
+            <span class="lv-chat-who" id="liveVideoChatWho">Loading…</span>
+          </div>
+          <div class="lv-chat-log" id="liveVideoChatLog"><p style="color:var(--muted)">Loading chat…</p></div>
+          <button type="button" class="lv-chat-new" id="liveVideoChatNew" style="display:none">↓ New messages</button>
+          <div class="lv-emoji-row" id="liveVideoEmojiRow" style="display:none"></div>
+          <form class="lv-chat-bar" id="liveVideoChatForm">
+            <input id="liveVideoChatGuestName" class="lv-chat-guestname" maxlength="24" placeholder="Guest name (optional)" hidden>
+            <input id="liveVideoChatInput" maxlength="500" placeholder="Say something…" autocomplete="off">
+            <button type="button" class="lv-chat-emoji-btn" id="liveVideoChatEmojiBtn" aria-label="Show emoji picker">😀</button>
+            <button class="lv-chat-send" type="submit">Send</button>
+          </form>
+          <p class="lv-chat-err" id="liveVideoChatErr" hidden></p>
         </div>
       </div>
+      <div class="lv-vnr-label"><img src="images/fox-mask-icon.jpg" alt="Kitsune mask" class="lv-vnr-mask"><span class="grad-text">Vita Nova Records</span></div>
     </div>
     <div class="vnr-album-list">
       <div class="kicker">Full album — End of the year</div>
@@ -200,10 +249,12 @@
 <script>
 /* Live video — universal player (music page). Config lives in live-video.json,
    fetched on load and every 30s (same pattern as radio-now.txt).
-   Config: {"type":"youtube"|"twitch"|"mp4"|"embed"|"off","src":"...","title":"...","mode":"live"|"loop"}
-   NOTE: comments below are per-browser (localStorage) for now — each visitor
-   sees their own. Shared comments across visitors need the Community backend;
-   that is a follow-up, not part of this build. */
+   Config: {"type":"youtube"|"twitch"|"mp4"|"embed"|"off","src":"...","title":"...","mode":"live"|"loop",
+            "schedule":[{"date":"2026-12-18","start":"8:00 PM","end":"11:00 PM","title":"..."}]}
+   Live Chat below uses the SAME Community chatroom API as community.html #/chat
+   (GET /api/chat + POST /api/chat) — one shared room, everyone sees it.
+   Guests post with an optional guest name (auto-censored server-side, per the
+   Community's rules); members post under their Community chat name. */
 (function(){
   var stage=document.getElementById("liveVideoStage");
   var badge=document.getElementById("liveVideoBadge");
@@ -271,13 +322,13 @@
     return PAGE_URL;
   }
   function offAirHTML(){
-    return '<div class="live-video-offair"><div class="live-video-offair-big">📺 OFF AIR</div><p>No stream is scheduled right now — check back, or catch the next show here.</p><p class="live-video-how"><b>How a stream goes live here:</b> stream from OBS to YouTube Live (easiest), then send the link — it shows up in this box. Or drop a video file in <code>videos/</code> and it plays here on loop.</p></div>';
+    return '<div class="live-video-offair"><div class="live-video-offair-big">● OFFLINE</div><p>Chris isn\'t streaming right now — check the schedule, or catch the next show here.</p><p class="live-video-how"><b>How a stream goes live here:</b> stream from OBS to YouTube Live (easiest), then send the link — it shows up in this box. Or drop a video file in <code>videos/</code> and it plays here on loop.</p></div>';
   }
   function render(cfg){
     stage.innerHTML="";
     var live=cfg&&cfg.type&&cfg.type!=="off";
     badge.classList.toggle("on",!!live);
-    badgeText.textContent=live?"● LIVE":"OFF AIR";
+    badgeText.textContent=live?"● LIVE":"OFFLINE";
     titleEl.textContent=(cfg&&cfg.title)||(live?"Live now":"No stream scheduled right now");
     shareInput.value=shareUrlFor(cfg||{type:"off"});
     shareNote.textContent=live?"Share this stream — it plays right here on the music page.":"Share the music page — the stream plays right here when it goes live.";
@@ -323,6 +374,7 @@
       .then(function(cfg){
         current=normalize(cfg||{type:"off"});
         render(current);
+        renderSchedule((cfg&&cfg.schedule)||[]);
       })
       .catch(function(){ /* keep whatever is showing */ });
   }
@@ -364,61 +416,207 @@
     });
   }
 
-  /* Comments — daily reset. Stored in localStorage under today's date, so a
-     new day means a fresh, empty list: comments only last until next day.
-     Per-browser for now (each visitor sees their own comments). */
-  var listEl=document.getElementById("liveVideoCommentList");
-  var nameEl=document.getElementById("liveVideoCommentName");
-  var textEl=document.getElementById("liveVideoCommentText");
-  var postBtn=document.getElementById("liveVideoCommentPost");
-  function todayKey(){
-    var d=new Date();
-    return "rce-live-comments-"+d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
-  }
-  function loadComments(){
-    try{ return JSON.parse(localStorage.getItem(todayKey())||"[]"); }catch(e){ return []; }
-  }
-  function saveComments(arr){
-    try{ localStorage.setItem(todayKey(),JSON.stringify(arr)); }catch(e){}
-  }
-  function drawComments(){
-    var arr=loadComments();
-    listEl.innerHTML="";
-    if(!arr.length){
-      var em=document.createElement("p");
-      em.className="live-video-comment-empty";
-      em.textContent="No comments yet today — be the first to say something about the stream.";
-      listEl.appendChild(em);
+  /* ---------- Schedule — rendered from live-video.json ---------- */
+  function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+  function renderSchedule(events){
+    var host=document.getElementById("liveVideoScheduleList");
+    if(!host) return;
+    if(!events||!events.length){
+      host.innerHTML='<p class="lv-sched-empty">No shows scheduled yet — check back.</p>';
       return;
     }
-    arr.forEach(function(c){
-      var div=document.createElement("div");
-      div.className="live-video-comment";
-      var b=document.createElement("b");
-      b.textContent=c.name||"Anonymous";
-      var time=document.createElement("time");
-      time.textContent=c.when||"";
-      var p=document.createElement("p");
-      p.textContent=c.text||"";
-      div.appendChild(b); div.appendChild(time); div.appendChild(p);
-      listEl.appendChild(div);
+    host.innerHTML=events.map(function(ev){
+      var d=new Date((ev.date||"")+"T12:00:00");
+      var dateStr=isNaN(d.getTime())?esc(ev.date||""):d.toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+      var timeStr=esc(ev.start||"")+(ev.end?" \u2013 "+esc(ev.end):"");
+      return '<div class="lv-sched-event"><div class="lv-sched-date">'+dateStr+'</div>'+
+        '<span class="lv-sched-title grad-text">'+esc(ev.title||"")+'</span>'+
+        (timeStr?'<div class="lv-sched-time">'+timeStr+'</div>':"")+"</div>";
+    }).join("");
+  }
+
+  /* ---------- Live Chat — same room as the Community's Live Chat (#/chat).
+     GET /api/chat?limit=60 to read, POST /api/chat to send. Same origin, so
+     the Community's device_id (localStorage "dwc-device-id") is shared.
+     Display names are colored per user (stable hash -> palette, IRC/AIM style). */
+  var NICK_COLORS=["#ff2d95","#00e5ff","#ff9a00","#7c4dff","#39ff88","#ffd75e","#ff5c5c","#00c2ff","#e060f0","#7dff5e","#ff7ad9","#5ee6ff"];
+  function nickColor(name){
+    var h=0,s=String(name||"?");
+    for(var i=0;i<s.length;i++){ h=((h<<5)-h+s.charCodeAt(i))|0; }
+    return NICK_COLORS[Math.abs(h)%NICK_COLORS.length];
+  }
+  function chatDeviceId(){
+    try{
+      var ex=localStorage.getItem("dwc-device-id");
+      if(ex) return ex;
+      var id=(typeof crypto!=="undefined"&&crypto.randomUUID)?crypto.randomUUID():"dev-"+Date.now()+"-"+Math.random().toString(36).slice(2);
+      localStorage.setItem("dwc-device-id",id);
+      return id;
+    }catch(e){ return "dev-shared-fallback"; }
+  }
+  var chatLog=document.getElementById("liveVideoChatLog");
+  var chatWho=document.getElementById("liveVideoChatWho");
+  var chatOnline=document.getElementById("liveVideoChatOnline");
+  var chatForm=document.getElementById("liveVideoChatForm");
+  var chatInput=document.getElementById("liveVideoChatInput");
+  var chatGuestName=document.getElementById("liveVideoChatGuestName");
+  var chatErr=document.getElementById("liveVideoChatErr");
+  var chatNewBtn=document.getElementById("liveVideoChatNew");
+  var chatProfile=null;
+  var chatFirstLoad=true;
+  function chatTime(iso){
+    var d=new Date(iso||"");
+    if(isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"});
+  }
+  function nearBottom(){
+    if(!chatLog) return true;
+    return (chatLog.scrollHeight-chatLog.scrollTop-chatLog.clientHeight)<90;
+  }
+  function drawChat(msgs){
+    if(!chatLog) return;
+    var stick=chatFirstLoad||nearBottom();
+    chatLog.innerHTML="";
+    if(!msgs.length){
+      var em=document.createElement("p");
+      em.style.color="var(--muted)";
+      em.textContent="No messages yet — say hi.";
+      chatLog.appendChild(em);
+    }else{
+      msgs.forEach(function(m){
+        var div=document.createElement("div");
+        div.className="lv-chatmsg";
+        var b=document.createElement("strong");
+        b.className="lv-chat-name";
+        b.style.color=nickColor(m.author_name);
+        b.textContent=m.author_name||"Guest";
+        div.appendChild(b);
+        if(!m.is_member){
+          var g=document.createElement("span");
+          g.className="lv-chat-guesttag";
+          g.textContent="guest";
+          div.appendChild(g);
+        }
+        div.appendChild(document.createTextNode(": "));
+        var sp=document.createElement("span");
+        sp.className="lv-chat-body";
+        sp.textContent=m.body||"";
+        div.appendChild(sp);
+        var t=document.createElement("span");
+        t.className="lv-chat-time";
+        t.textContent=chatTime(m.created_at);
+        div.appendChild(t);
+        chatLog.appendChild(div);
+      });
+    }
+    if(stick){ chatLog.scrollTop=chatLog.scrollHeight; if(chatNewBtn) chatNewBtn.style.display="none"; }
+    else if(chatNewBtn && msgs.length){ chatNewBtn.style.display="block"; }
+    chatFirstLoad=false;
+  }
+  function loadChat(){
+    fetch("/api/chat?limit=60")
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(data){ drawChat((data&&data.messages)||[]); })
+      .catch(function(){ /* keep whatever is showing */ });
+  }
+  function loadPresence(){
+    if(!chatProfile) return;
+    fetch("/api/presence?limit=60")
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(data){
+        var buds=(data&&data.buddies)||[];
+        var n=buds.filter(function(b){ return b.presence==="online"; }).length;
+        if(chatOnline){ chatOnline.hidden=false; chatOnline.textContent="\uD83D\uDFE2 "+n+" online"; }
+      })
+      .catch(function(){ /* no count — do not invent one */ });
+  }
+  function loadChatProfile(){
+    fetch("/api/profile?device_id="+encodeURIComponent(chatDeviceId()))
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(data){
+        chatProfile=(data&&data.profile)||null;
+        if(chatWho){
+          if(chatProfile){
+            chatWho.textContent="You're chatting as @"+(chatProfile.chat_name||chatProfile.username);
+            if(chatGuestName) chatGuestName.hidden=true;
+          }else{
+            chatWho.innerHTML='Chatting as a guest — <a href="community.html">create an account</a> to chat uncensored';
+            if(chatGuestName) chatGuestName.hidden=false;
+          }
+        }
+        loadPresence();
+      })
+      .catch(function(){
+        if(chatWho) chatWho.innerHTML='Chatting as a guest — <a href="community.html">create an account</a> to chat uncensored';
+        if(chatGuestName) chatGuestName.hidden=false;
+      });
+  }
+  if(chatNewBtn){
+    chatNewBtn.addEventListener("click",function(){
+      if(chatLog){ chatLog.scrollTop=chatLog.scrollHeight; }
+      chatNewBtn.style.display="none";
     });
   }
-  if(postBtn){
-    postBtn.addEventListener("click",function(){
-      var text=(textEl.value||"").trim();
-      if(!text){ textEl.focus(); return; }
-      var arr=loadComments();
-      var now=new Date();
-      arr.push({name:(nameEl.value||"").trim()||"Anonymous",text:text,when:String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0")});
-      saveComments(arr);
-      textEl.value="";
-      try{ localStorage.setItem("rce-live-comment-name",nameEl.value||""); }catch(e){}
-      drawComments();
+  if(chatForm){
+    chatForm.addEventListener("submit",function(ev){
+      ev.preventDefault();
+      var text=(chatInput.value||"").trim();
+      if(!text){ chatInput.focus(); return; }
+      if(chatErr) chatErr.hidden=true;
+      fetch("/api/chat",{
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          device_id: chatProfile ? chatDeviceId() : "",
+          guest_name: chatProfile ? "" : String((chatGuestName.value||"").trim()),
+          body: text
+        })
+      })
+      .then(function(r){ return r.json().catch(function(){ return null; }); })
+      .then(function(data){
+        if(!data||!data.ok){
+          if(chatErr){ chatErr.hidden=false; chatErr.textContent=(data&&data.error)||"Couldn't send that."; }
+          return;
+        }
+        chatInput.value="";
+        loadChat();
+      })
+      .catch(function(){
+        if(chatErr){ chatErr.hidden=false; chatErr.textContent="Couldn't reach the Community — check your connection and try again."; }
+      });
     });
   }
-  try{ var savedName=localStorage.getItem("rce-live-comment-name"); if(savedName&&nameEl) nameEl.value=savedName; }catch(e){}
-  drawComments();
+  /* Emoji picker — tap an emoji to drop it into the message box. */
+  var EMOJIS=["\uD83D\uDE00","\uD83D\uDE02","\uD83D\uDE0D","\uD83D\uDD25","\u2764\uFE0F","\uD83C\uDFB5","\uD83C\uDFB8","\uD83D\uDE4C","\uD83D\uDC4F","\uD83D\uDE2E","\uD83D\uDE22","\uD83D\uDC4D","\uD83C\uDF89","\uD83D\uDC9C","\u2728","\uD83C\uDF6C","\uD83D\uDE0E","\uD83E\uDD18","\uD83C\uDFA4","\uD83D\uDCAC"];
+  var emojiRow=document.getElementById("liveVideoEmojiRow");
+  var emojiBtn=document.getElementById("liveVideoChatEmojiBtn");
+  if(emojiRow){
+    EMOJIS.forEach(function(e){
+      var b=document.createElement("button");
+      b.type="button";
+      b.textContent=e;
+      b.setAttribute("aria-label","Insert "+e);
+      b.addEventListener("click",function(){
+        if(!chatInput) return;
+        var s=(chatInput.selectionStart==null)?chatInput.value.length:chatInput.selectionStart;
+        var en=(chatInput.selectionEnd==null)?chatInput.value.length:chatInput.selectionEnd;
+        chatInput.value=chatInput.value.slice(0,s)+e+chatInput.value.slice(en);
+        chatInput.focus();
+        var pos=s+e.length;
+        try{ chatInput.setSelectionRange(pos,pos); }catch(err){}
+      });
+      emojiRow.appendChild(b);
+    });
+  }
+  if(emojiBtn&&emojiRow){
+    emojiBtn.addEventListener("click",function(){
+      emojiRow.style.display=(emojiRow.style.display==="none"||!emojiRow.style.display)?"flex":"none";
+    });
+  }
+  loadChatProfile();
+  loadChat();
+  setInterval(loadChat,15000);
+  setInterval(loadPresence,30000);
 })();
 </script>
 </body>

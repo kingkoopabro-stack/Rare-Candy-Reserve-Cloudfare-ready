@@ -892,6 +892,9 @@ function notifKindIcon(kind) {
     case "tag": return "🏷️";
     case "follow": return "➕";
     case "unfollow": return "➖";
+    case "new_member": return "👋";
+    case "new_content": return "🛒";
+    case "new_post": return "📝";
     default: return "🔔";
   }
 }

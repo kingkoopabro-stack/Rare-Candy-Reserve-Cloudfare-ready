@@ -11,6 +11,7 @@ import {
   json, noDb, getDb, readJson, profileByDevice, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
+  createNotification,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -190,6 +191,15 @@ export async function onRequestPost({ env, request }) {
     }
     // @mentions in the post body (v3.8) — skips quietly if the table isn't there yet.
     await notifyMentions(db, me, body, { ref_type: "post", ref_id: creatorRes.post_id, label: "in a post", link: `#/thread/${creatorRes.post_id}` });
+    // Operator alert (v3.8) — new sellable content: tell Chris so he can
+    // check it against the rules. Skips quietly if the table isn't there
+    // yet, and never notifies him about his own posts.
+    await createNotification(db, {
+      profile_id: 1, actor_profile_id: me.id, kind: "new_content",
+      ref_type: "post", ref_id: creatorRes.post_id,
+      text: `@${me.username} listed new content — ${title}`,
+      link: `#/thread/${creatorRes.post_id}`,
+    });
     return insertDone(creatorRes);
   }
 
@@ -210,5 +220,14 @@ export async function onRequestPost({ env, request }) {
   ]);
   // @mentions in the post body (v3.8) — skips quietly if the table isn't there yet.
   await notifyMentions(db, me, body, { ref_type: "post", ref_id: regRes.post_id, label: "in a post", link: `#/thread/${regRes.post_id}` });
+  // Operator alert (v3.8) — a new post went up: tell Chris so he can
+  // check it against the rules. Skips quietly if the table isn't there
+  // yet, and never notifies him about his own posts.
+  await createNotification(db, {
+    profile_id: 1, actor_profile_id: me.id, kind: "new_post",
+    ref_type: "post", ref_id: regRes.post_id,
+    text: `@${me.username} posted — ${title}`,
+    link: `#/thread/${regRes.post_id}`,
+  });
   return insertDone(regRes);
 }

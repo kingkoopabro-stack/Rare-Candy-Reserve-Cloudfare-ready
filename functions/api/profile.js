@@ -8,6 +8,7 @@ import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
   checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
+  createNotification,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -339,5 +340,17 @@ export async function onRequestPost({ env, request }) {
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
   }
   if (!row) return fail("Couldn't save that profile — try again.");
+  // Notifications (v3.8) — a brand-new member just joined: tell the
+  // operator (Chris, member id 1). Fresh signups only, never a profile
+  // edit. createNotification skips quietly when the table isn't there
+  // yet, and never notifies the operator about his own signup.
+  if (!existing) {
+    await createNotification(db, {
+      profile_id: 1, actor_profile_id: row.id, kind: "new_member",
+      ref_type: "profile", ref_id: row.id,
+      text: `@${row.username} just joined the Wall Market`,
+      link: `#/member/${row.id}`,
+    });
+  }
   return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, avatar_error: avatarError, banner_error: bannerError });
 }

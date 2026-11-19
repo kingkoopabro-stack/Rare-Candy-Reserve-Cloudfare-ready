@@ -382,6 +382,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-gif-note{width:100%;font-size:11px;color:var(--muted)}
 .dwc-gifview iframe{width:100%;max-width:320px;height:180px;border:0;border-radius:10px}
 .dwc-gifview p{font-size:11px;color:var(--muted);margin:4px 0}
+.dwc-ytview{margin:12px 0}
+.dwc-ytview iframe{width:100%;max-width:640px;aspect-ratio:16/9;border:0;border-radius:10px;display:block}
+.dwc-ytview p{font-size:11px;color:var(--muted);margin:4px 0}
 .dwc-filters{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;margin:16px 0}
 .dwc-comment{display:flex;gap:10px;border-top:1px solid var(--line);padding:12px 0}
 .dwc-comment:first-of-type{border-top:0}

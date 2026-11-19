@@ -1541,6 +1541,20 @@ function gifEmbedHTML(url, label) {
     '<p>GIF via GIPHY' + (label ? " · " + esc(label) : "") + "</p></div>";
 }
 
+// YouTube embed (v3.8) — a post body may carry a YouTube watch / shorts /
+// youtu.be link. We extract ONLY a validated 11-char video id and build a
+// privacy-enhanced (nocookie) embed in code. No raw user HTML is ever
+// inserted, so the iframe strip for user-supplied content still applies
+// everywhere else. Returns "" when the body has no YouTube link.
+function youtubeEmbedHTML(body) {
+  if (!body) return "";
+  var m = String(body).match(/(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return "";
+  var id = m[1];
+  return '<div class="dwc-ytview"><iframe src="https://www.youtube-nocookie.com/embed/' + id + '" loading="lazy" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>' +
+    '<p>Video via YouTube · <a href="https://www.youtube.com/watch?v=' + id + '" target="_blank" rel="noopener">Watch on YouTube ↗</a></p></div>';
+}
+
 // ---------- Photo cropper + short video clips (v3.5) ----------
 // Crop: when a photo is picked in any post composer, a modal opens and
 // the member drags a box over it (move inside, resize by the corners).
@@ -2627,6 +2641,7 @@ async function viewThread(el, postId) {
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file — ' + esc(p.file_name || "download") + "</span>" : "") + "</p>" +
       '<p style="color:var(--muted);font-size:14px">' + (p.pay_unlock && p.price_cents > 0 ? 'This post is pay-to-unlock — hit “Pay to unlock” and sort out payment in a private chat. The receipt marked done in that chat is your proof of purchase.' : 'Payment is arranged privately with the seller — hit “Buy / Message seller” and sort it out in a private chat.') + ' No money moves in this app.</p>' : "") +
     '<p style="white-space:pre-wrap">' + esc(p.body) + "</p>" +
+    youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
     '<p class="dwc-meta">by @' + esc(p.author_username) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +

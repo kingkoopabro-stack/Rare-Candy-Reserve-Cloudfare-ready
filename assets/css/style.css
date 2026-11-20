@@ -846,6 +846,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 
 /* Member-page MySpace effects (v3.5): keyframes used by theme-generated CSS. */
 @keyframes dwcBgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes dwcStarDrift{from{background-position:0 0}to{background-position:-512px 0}}
 @keyframes dwcMarquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
 @keyframes dwcSparkleTwinkle{0%,100%{opacity:.25}50%{opacity:.9}}
 @keyframes dwcRgbBorderGlow{0%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}25%{border-color:#7c4dff;box-shadow:0 0 8px #7c4dff}50%{border-color:#00e5ff;box-shadow:0 0 8px #00e5ff}75%{border-color:#39ff88;box-shadow:0 0 8px #39ff88}100%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}}

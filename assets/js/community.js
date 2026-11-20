@@ -5655,15 +5655,18 @@ window.DWC = {
     if (gb) gb.hidden = !(id === "gb" || id === "gba");
   },
   // Badge slot picker (v3.9): a regular seller only gets a second slot
-  // while slot 1 is Regular Seller. Hiding the slot also disables it
-  // (and clears it) so a stale second badge never submits.
+  // while slot 1 is Regular Seller. Adult sellers ALWAYS get a second
+  // slot (18+ is locked in slot 1 + one pick), so never hide it for
+  // them — their slot 1 is a hidden input, not a select, so checking
+  // s1.value alone would wrongly hide/clear slot 2 on every change.
   badgeSlotChanged: function () {
     var form = document.querySelector("#dwc-account form");
     if (!form) return;
     var s1 = form.querySelector('select[name="theme_display_badge_1"]');
     var slot2 = $("dwc-badge-slot2");
     if (!slot2) return;
-    var show = !!(state.profile && state.profile.is_regular_seller) && s1 && s1.value === "badge:sales-5";
+    var isAdult = !!(state.profile && state.profile.is_adult_seller);
+    var show = isAdult || (!!(state.profile && state.profile.is_regular_seller) && s1 && s1.value === "badge:sales-5");
     slot2.hidden = !show;
     var s2 = slot2.querySelector("select");
     if (s2) {

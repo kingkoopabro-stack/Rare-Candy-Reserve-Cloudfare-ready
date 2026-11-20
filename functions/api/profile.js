@@ -120,7 +120,9 @@ export async function onRequestPost({ env, request }) {
     "store:rainy-night", "store:clean-professional", "store:facebook-style",
     "store:instagram-style", "store:80s-arcade", "store:kitsune-shrine",
     "store:horror-lover", "store:stardust-diner", "store:deep-forest",
-    "store:cyber-street", "store:neon-rain", "store:golden-shrine"];
+    "store:cyber-street", "store:neon-rain", "store:golden-shrine",
+    "store:vaporwave-sunset", "store:retro-terminal", "store:candy-pop",
+    "store:midnight-garden"];
   const v2Sets = [];
   const v2Vals = [];
   if (Array.isArray(a.top_friends)) {
@@ -132,7 +134,11 @@ export async function onRequestPost({ env, request }) {
     v2Sets.push("layout_css = ?");
     v2Vals.push(sanitizeLayoutCss(a.layout_css));
   }
-  if (typeof a.layout_preset === "string" && LAYOUT_PRESETS.includes(a.layout_preset)) {
+  // Layout preset (v3.10, store v3.11, user layouts v3.12) — a known
+  // store preset, "custom" for hand-written CSS, or a member-published
+  // layout "user:<id>" (validated as a real published layout below).
+  // Anything else is ignored, never stored.
+  if (typeof a.layout_preset === "string" && (LAYOUT_PRESETS.includes(a.layout_preset) || /^user:\d+$/.test(a.layout_preset))) {
     v2Sets.push("layout_preset = ?");
     v2Vals.push(a.layout_preset);
   }
@@ -274,7 +280,7 @@ export async function onRequestPost({ env, request }) {
   }
   // v3.4 — My links (label + URL buttons on the member page). Stored as
   // JSON; cleanMyLinks drops bad rows (no label, non-http(s) URL, dupes)
-  // and caps at 5. Same graceful pattern: rides with the v3 columns.
+  // and caps at 6. Same graceful pattern: rides with the v3 columns.
   if (Array.isArray(a.my_links)) {
     v3Sets.push("my_links = ?");
     v3Vals.push(JSON.stringify(cleanMyLinks(a.my_links)));

@@ -412,9 +412,10 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-rowform{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .dwc-rowform input,.dwc-rowform select{flex:1;min-width:140px}
 /* My links (v3.4) — editor rows in Edit Profile + buttons on the page. */
-.dwc-linkrow{display:flex;gap:8px;align-items:center;margin:0 0 8px}
+.dwc-linkrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px}
 .dwc-linkrow input[name="link_label"]{flex:0 0 150px;min-width:110px}
 .dwc-linkrow input[name="link_url"]{flex:1;min-width:140px}
+.dwc-linkrow select[name="link_style"]{flex:0 0 140px;min-width:110px}
 .dwc-linkrow .btn{flex:none}
 .dwc-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px}
 .dwc-linkbtn{flex:none}
@@ -1054,6 +1055,10 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-store-desc{margin:6px 0 0;font-size:13.5px;line-height:1.45}
 .dwc-store-conflict{margin:6px 0 0;font-size:12.5px;color:#ffb347}
 .dwc-store-btns{margin:8px 0 0;display:flex;gap:8px;align-items:center}
+.dwc-store-code{margin:8px 0 0;font-size:12.5px;opacity:.9}
+.dwc-store-code code{background:rgba(255,255,255,.14);padding:1px 6px;border-radius:6px;font-weight:700;letter-spacing:.04em}
+.dwc-store-codebox{display:flex;gap:8px;align-items:center;margin:0 0 10px}
+.dwc-store-codebox input{flex:1;min-width:0}
 .dwc-store-wearing{font-size:13px;color:#39ff88;font-weight:700}
 .dwc-store-preview{margin:0 0 10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px;padding:10px;background:rgba(0,0,0,.25)}
 .dwc-store-preview .dwc-previewbox{margin:0}

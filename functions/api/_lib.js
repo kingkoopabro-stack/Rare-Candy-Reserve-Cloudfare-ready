@@ -767,9 +767,12 @@ export function parsePrefs(stored) {
   if (!stored) return [];
   return String(stored).split(",").map((t) => t.trim()).filter(Boolean);
 }
-// My links (v3.4) — stored as JSON [{label, url}] in profiles.my_links.
-// Label 1–40 chars, URL must start with http:// or https://, max 5.
-// Bad rows are dropped, never stored; a bad stored value parses to [].
+// My links (v3.4, button system v3.12) — stored as JSON
+// [{label, url, style}] in profiles.my_links. Label 1–40 chars, URL
+// must start with http:// or https://, max 6. style is one of the
+// button-style ids ("" = the page's own button look); anything else
+// falls back to "". Bad rows are dropped, never stored; a bad stored
+// value parses to [].
 export function cleanMyLinks(list) {
   const out = [];
   for (const item of (Array.isArray(list) ? list : [])) {
@@ -777,8 +780,9 @@ export function cleanMyLinks(list) {
     const url = String((item && item.url) || "").trim().slice(0, 500);
     if (!label || !/^https?:\/\//i.test(url)) continue;
     if (out.some((l) => l.url === url)) continue;
-    out.push({ label, url });
-    if (out.length >= 5) break;
+    const style = BUTTON_STYLE_IDS.includes(item && item.style) ? item.style : "";
+    out.push({ label, url, style });
+    if (out.length >= 6) break;
   }
   return out;
 }

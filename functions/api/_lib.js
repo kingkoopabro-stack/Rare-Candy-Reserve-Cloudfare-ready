@@ -76,7 +76,7 @@ export const FLAIRS = ["Question", "Card Check", "Show & Tell", "Price Check", "
 
 // Creator/Seller area (v3) — digital-content genres a seller picks when
 // they make a creator post or set up "What I sell" on their profile.
-export const CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Other"];
+export const CREATOR_GENRES = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Video games", "Refurbished tech", "3D prints", "Car parts", "Collectibles", "Tutor work", "Other"];
 // One-tap seller tag chips for the creator composer (the seller can also
 // type their own tags — these are just the quick ones).
 export const CREATOR_TAG_CHIPS = ["Selling Uncensored Nudes", "Selling Videos", "Custom Content", "3D Print Files", "Selling Photos", "Selling 3D Models", "Developer Files", "Designs & Art", "Game Assets"];

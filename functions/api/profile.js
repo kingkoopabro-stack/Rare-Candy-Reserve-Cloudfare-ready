@@ -165,7 +165,7 @@ export async function onRequestPost({ env, request }) {
     }
     return out;
   };
-  const CREATOR_GENRES_LOCAL = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Other"];
+  const CREATOR_GENRES_LOCAL = ["Photos", "Videos", "Custom Content", "Audio", "3D Models", "3D Print Files", "Developer Files", "Designs", "Art", "Apps", "Game Assets", "Adult Content", "Video games", "Refurbished tech", "3D prints", "Car parts", "Collectibles", "Tutor work", "Other"];
   if (Array.isArray(a.seller_types)) {
     v3Sets.push("seller_types = ?");
     v3Vals.push(cleanTypes(a.seller_types).filter((t) => CREATOR_GENRES_LOCAL.includes(t)).join(","));

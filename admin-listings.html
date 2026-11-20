@@ -73,7 +73,7 @@
       <textarea id="ed-f-desc" rows="6" placeholder="Tell buyers what it is, what's included, condition — everything they'd want to know."></textarea>
 
       <label>Photos — up to 3</label>
-      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">First photo is the one buyers see on the card. JPG, PNG, WebP, or GIF, under 2.5 MB each. If your photo is HEIC, screenshot it first.</p>
+      <p style="color:var(--muted);font-size:13px;margin:0 0 8px">First photo is the one buyers see on the card. JPG, PNG, WebP, or GIF — resized automatically to fit. If your photo is HEIC, screenshot it first.</p>
       <div id="ed-photos"></div>
 
       <label>Video — one clip, optional</label>
@@ -318,6 +318,89 @@ function edReadFile(file){
     r.readAsDataURL(file);
   });
 }
+// Auto-fit for shop listing photos — same tool as the Community's
+// fitImageForUpload, self-contained because this page doesn't load
+// community.js. Downscales to 1600px longest side + a JPEG quality
+// ladder until under 2.5 MB; already fits? Returns the original file
+// untouched. PNGs with real transparency stay PNG. Returns { file },
+// { error }, or null when the image can't be decoded (e.g. HEIC).
+function edFitImage(file){
+  return new Promise(function(resolve){
+    if(!file) return resolve(null);
+    var maxDim = 1600, maxBytes = 2500000;
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function(){
+      URL.revokeObjectURL(url);
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if(!w || !h) return resolve(null);
+      if(file.size <= maxBytes && w <= maxDim && h <= maxDim) return resolve({ file: file });
+      var scale = Math.min(1, maxDim / Math.max(w, h));
+      var tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+      var transparent = false;
+      if(file.type === "image/png"){
+        try {
+          var s = Math.min(1, 200 / Math.max(w, h));
+          var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+          var scv = document.createElement("canvas");
+          scv.width = cw; scv.height = ch;
+          var sctx = scv.getContext("2d");
+          sctx.drawImage(img, 0, 0, cw, ch);
+          var d = sctx.getImageData(0, 0, cw, ch).data;
+          for(var i = 3; i < d.length; i += 4){ if(d[i] < 255){ transparent = true; break; } }
+        } catch(e){}
+      }
+      var best = null;
+      function draw(bw, bh, fillWhite){
+        var cv = document.createElement("canvas");
+        cv.width = bw; cv.height = bh;
+        var ctx = cv.getContext("2d");
+        if(fillWhite){ ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, bw, bh); }
+        ctx.drawImage(img, 0, 0, bw, bh);
+        return cv;
+      }
+      function toBlob(cv, type, q){
+        return new Promise(function(res){
+          try { cv.toBlob(function(b){ res(b || null); }, type, q); } catch(e){ res(null); }
+        });
+      }
+      (async function(){
+        if(transparent){
+          var pw = tw, ph = th;
+          for(var pi = 0; pi < 4; pi++){
+            var pblob = await toBlob(draw(pw, ph, false), "image/png");
+            if(pblob && (!best || pblob.size < best.blob.size)) best = { blob: pblob, type: "image/png" };
+            if(pblob && pblob.size <= maxBytes) break;
+            if(Math.max(pw, ph) <= 400) break;
+            pw = Math.max(1, Math.round(pw * 0.5)); ph = Math.max(1, Math.round(ph * 0.5));
+          }
+          if(!best || best.blob.size > maxBytes) transparent = false;
+        }
+        if(!transparent){
+          var jw = tw, jh = th, fitted = false;
+          var ladder = [0.92, 0.8, 0.68, 0.55];
+          for(var di = 0; di < 4 && !fitted; di++){
+            var jcv = draw(jw, jh, true);
+            for(var qi = 0; qi < ladder.length; qi++){
+              var jblob = await toBlob(jcv, "image/jpeg", ladder[qi]);
+              if(jblob && (!best || jblob.size < best.blob.size)) best = { blob: jblob, type: "image/jpeg" };
+              if(jblob && jblob.size <= maxBytes){ fitted = true; break; }
+            }
+            if(fitted) break;
+            if(Math.max(jw, jh) <= 400) break;
+            jw = Math.max(1, Math.round(jw * 0.7)); jh = Math.max(1, Math.round(jh * 0.7));
+          }
+        }
+        if(!best || !best.blob) return resolve(null);
+        if(best.blob.size > maxBytes) return resolve({ error: "That photo is too big — even resized it stays over 2.5 MB. Try a smaller photo." });
+        var name = (file.name || "photo").replace(/\.[^.]+$/, "") + (best.type === "image/png" ? ".png" : ".jpg");
+        resolve({ file: new File([best.blob], name, { type: best.type }) });
+      })();
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
 async function edUpload(kind, file){
   var okTypes = kind === "image"
     ? ["image/jpeg", "image/png", "image/webp", "image/gif"]
@@ -326,9 +409,18 @@ async function edUpload(kind, file){
     edMsg(kind === "image" ? "Photo must be JPG, PNG, WebP, or GIF." : "Video must be MP4, WebM, or MOV.");
     return null;
   }
+  if(kind === "image"){
+    // Auto-fit before the size check, so a big phone photo gets resized
+    // to fit instead of being rejected.
+    edMsg("Resizing photo to fit…", true);
+    var fitted = await edFitImage(file);
+    if(!fitted){ edMsg("That photo couldn't be read — it may be a HEIC. Screenshot it and use that."); return null; }
+    if(fitted.error){ edMsg(fitted.error); return null; }
+    file = fitted.file;
+  }
   var max = kind === "image" ? 2500000 : 15000000;
   if(file.size > max){
-    edMsg(kind === "image" ? "That photo is too big — keep it under 2.5 MB." : "That video is too big — keep it under 15 MB.");
+    edMsg(kind === "image" ? "That photo is too big — even resized it stays over 2.5 MB. Try a smaller photo." : "That video is too big — keep it under 15 MB.");
     return null;
   }
   edMsg("Uploading…", true);

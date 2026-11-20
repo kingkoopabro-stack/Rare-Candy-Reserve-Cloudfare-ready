@@ -253,24 +253,24 @@ async function apiDelete(path, body) {
   } catch (e) { return { ok: false, error: "Couldn't reach the Community — check your connection and try again." }; }
 }
 var IMAGE_MIMES_CLIENT = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-function fileToImage(file, maxBytes) {
-  return new Promise(function (resolve) {
-    if (!file) return resolve(null);
-    // Wrong file type (e.g. iPhone HEIC) — say so plainly instead of
-    // letting the server reject the whole save.
-    if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
-      return resolve({ error: "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that." });
-    }
-    var limitMB = ((maxBytes || 2500000) / 1000000).toFixed(1).replace(".0", "");
-    if (file.size > (maxBytes || 2500000)) return resolve({ error: "That photo is too large — keep it under about " + limitMB + " MB." });
-    var reader = new FileReader();
-    reader.onload = function () {
-      var dataUrl = String(reader.result || "");
-      var parts = dataUrl.split(",");
-      resolve({ dataBase64: parts[1] || "", mimeType: file.type });
-    };
-    reader.onerror = function () { resolve({ error: "That photo couldn't be read — try again." }); };
-    reader.readAsDataURL(file);
+// Reads a photo for upload — and resizes it first, so a big phone photo
+// never hits a "too large" error. Every photo runs through
+// fitImageForUpload (1600px longest side by default, under maxBytes);
+// opts can override per kind: { maxDim, minQuality, qualities }.
+// Only files the browser can't read at all (e.g. HEIC) still error.
+// Extra fields (origKB, newKB, width, height, shrunk) ride along so
+// callers can show a "resized to fit" note.
+function fileToImage(file, maxBytes, opts) {
+  var o = opts || {};
+  return fitImageForUpload(file, {
+    maxDim: o.maxDim || 1600,
+    maxBytes: maxBytes || 2500000,
+    minQuality: o.minQuality || 0.55,
+    qualities: o.qualities
+  }).then(function (r) {
+    if (!r) return null;
+    if (r.error) return { error: r.error };
+    return { dataBase64: r.dataBase64, mimeType: r.mimeType, origKB: r.origKB, newKB: r.newKB, width: r.width, height: r.height, shrunk: r.shrunk };
   });
 }
 // ---------- Short video clips (v3.5) ----------
@@ -323,63 +323,167 @@ function videoDuration(file) {
   });
 }
 
-// "Shrink my photo for profile size" — avatar resizer / converter.
-// Takes any JPG, PNG, or WebP, scales it down to fit within 512px on the
-// longest side (keeping the original aspect ratio), and converts it to JPEG
-// (quality 0.85) so a 2–5 MB phone photo becomes a small file well under the
-// 1.5 MB cap. Returns { dataBase64, mimeType, origKB, newKB, width, height,
-// shrunk } or { error }. Already profile-size and under the cap? Uses it
-// as-is, no re-encode. HEIC (iPhone default) can't be decoded by the browser,
-// so that still needs a screenshot — same plain message as before.
-var AVATAR_MAX_DIM = 512;
-function fmtKB(kb) { return kb >= 1000 ? (kb / 1000).toFixed(1).replace(".0", "") + " MB" : kb + " KB"; }
-function shrinkAvatarImage(file) {
+// ---------- Automatic image fitting ----------
+// fitImageForUpload(file, opts) — the one resizer every photo upload
+// runs through, so nobody ever sees a "too large" warning again.
+//   opts.maxDim     — longest side in px (default 1600; avatar 512)
+//   opts.maxBytes   — byte cap the output must fit under (default 2.5 MB,
+//                     matching the server's putImage caps)
+//   opts.minQuality — lowest JPEG quality tried (default 0.55; ID and
+//                     card photos pass 0.75–0.8 so text stays legible)
+//   opts.qualities  — explicit quality ladder (avatar passes [0.85])
+// How it works: decode (createImageBitmap with EXIF orientation when
+// available, else <img>), pass through untouched when already under both
+// limits (no re-encode, no quality loss), otherwise downscale on canvas
+// keeping aspect ratio and walk a JPEG quality ladder until under the
+// byte cap, shrinking dimensions further if needed. PNGs that actually
+// have transparent pixels stay PNG; everything else becomes JPEG.
+// GIFs become a still JPEG (same as the old avatar shrinker). HEIC and
+// other unreadable formats error plainly — screenshot the photo first.
+// Returns { dataBase64, mimeType, origKB, newKB, width, height, shrunk }
+// or { error }.
+var FIT_HEIC_ERROR = "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that.";
+function fitCanvasToBlob(cv, type, quality) {
   return new Promise(function (resolve) {
-    if (!file) return resolve(null);
-    if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
-      return resolve({ error: "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that." });
-    }
-    var origKB = Math.round(file.size / 1000);
+    try {
+      cv.toBlob(function (blob) { resolve(blob || null); }, type, quality);
+    } catch (e) { resolve(null); }
+  });
+}
+function fitBlobToBase64(blob) {
+  return new Promise(function (resolve) {
+    var r = new FileReader();
+    r.onload = function () {
+      var parts = String(r.result || "").split(",");
+      resolve(parts[1] || "");
+    };
+    r.onerror = function () { resolve(""); };
+    r.readAsDataURL(blob);
+  });
+}
+function fitDecodeImageViaImg(file) {
+  return new Promise(function (resolve) {
     var url = URL.createObjectURL(file);
     var img = new Image();
     img.onload = function () {
-      URL.revokeObjectURL(url);
       var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
-      if (!w || !h) return resolve({ error: "That photo couldn't be read — try a different one." });
-      if (file.size <= 1500000 && w <= AVATAR_MAX_DIM && h <= AVATAR_MAX_DIM) {
-        var reader = new FileReader();
-        reader.onload = function () {
-          var parts = String(reader.result || "").split(",");
-          resolve({ dataBase64: parts[1] || "", mimeType: file.type, origKB: origKB, newKB: origKB, width: w, height: h, shrunk: false });
-        };
-        reader.onerror = function () { resolve({ error: "That photo couldn't be read — try again." }); };
-        reader.readAsDataURL(file);
-        return;
-      }
-      var scale = Math.min(1, AVATAR_MAX_DIM / Math.max(w, h));
-      var nw = Math.max(1, Math.round(w * scale)), nh = Math.max(1, Math.round(h * scale));
-      var cv = document.createElement("canvas");
-      cv.width = nw; cv.height = nh;
-      var ctx = cv.getContext("2d");
-      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, nw, nh);
-      ctx.drawImage(img, 0, 0, nw, nh);
-      cv.toBlob(function (blob) {
-        if (!blob) return resolve({ error: "That photo couldn't be shrunk — try a different one." });
-        var r2 = new FileReader();
-        r2.onload = function () {
-          var parts = String(r2.result || "").split(",");
-          resolve({ dataBase64: parts[1] || "", mimeType: "image/jpeg", origKB: origKB, newKB: Math.round(blob.size / 1000), width: nw, height: nh, shrunk: true });
-        };
-        r2.onerror = function () { resolve({ error: "That photo couldn't be read — try again." }); };
-        r2.readAsDataURL(blob);
-      }, "image/jpeg", 0.85);
+      resolve({ src: img, w: w, h: h, close: function () { URL.revokeObjectURL(url); } });
     };
-    img.onerror = function () {
-      URL.revokeObjectURL(url);
-      resolve({ error: "That photo couldn't be read — it may be a HEIC or a format this browser can't open. Screenshot the photo and use that." });
-    };
+    img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
     img.src = url;
   });
+}
+function fitDecodeImage(file) {
+  // Prefer createImageBitmap — it applies EXIF orientation for us.
+  if (typeof createImageBitmap === "function") {
+    return createImageBitmap(file, { imageOrientation: "from-image" }).then(function (bmp) {
+      return { src: bmp, w: bmp.width, h: bmp.height, close: function () { try { bmp.close(); } catch (e) {} } };
+    }).catch(function () { return fitDecodeImageViaImg(file); });
+  }
+  return fitDecodeImageViaImg(file);
+}
+function fitHasTransparency(src, w, h) {
+  // Sample a small copy — cheap, and enough to catch real transparency.
+  try {
+    var s = Math.min(1, 200 / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s));
+    var cv = document.createElement("canvas");
+    cv.width = cw; cv.height = ch;
+    var ctx = cv.getContext("2d");
+    ctx.drawImage(src, 0, 0, cw, ch);
+    var d = ctx.getImageData(0, 0, cw, ch).data;
+    for (var i = 3; i < d.length; i += 4) { if (d[i] < 255) return true; }
+  } catch (e) {}
+  return false;
+}
+function fitDrawToCanvas(src, w, h, fillWhite) {
+  var cv = document.createElement("canvas");
+  cv.width = w; cv.height = h;
+  var ctx = cv.getContext("2d");
+  if (fillWhite) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h); }
+  ctx.drawImage(src, 0, 0, w, h);
+  return cv;
+}
+async function fitImageForUpload(file, opts) {
+  if (!file) return null;
+  if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) return { error: FIT_HEIC_ERROR };
+  var o = opts || {};
+  var maxDim = o.maxDim || 1600;
+  var maxBytes = o.maxBytes || 2500000;
+  var minQuality = (typeof o.minQuality === "number") ? o.minQuality : 0.55;
+  var ladder = (o.qualities && o.qualities.length ? o.qualities.slice() : [0.92, 0.8, 0.68, 0.55])
+    .filter(function (q) { return q >= minQuality; });
+  if (!ladder.length || ladder[ladder.length - 1] !== minQuality) ladder.push(minQuality);
+  var origKB = Math.round(file.size / 1000);
+  var dec;
+  try { dec = await fitDecodeImage(file); } catch (e) { dec = null; }
+  if (!dec || !dec.w || !dec.h) {
+    return { error: "That photo couldn't be read — it may be a HEIC or a format this browser can't open. Screenshot the photo and use that." };
+  }
+  var w = dec.w, h = dec.h;
+  // Already fits? Pass it through untouched — no re-encode, no loss.
+  if (file.size <= maxBytes && w <= maxDim && h <= maxDim) {
+    var asIs = await fitBlobToBase64(file);
+    dec.close();
+    if (!asIs) return { error: "That photo couldn't be read — try again." };
+    return { dataBase64: asIs, mimeType: file.type, origKB: origKB, newKB: origKB, width: w, height: h, shrunk: false };
+  }
+  var scale = Math.min(1, maxDim / Math.max(w, h));
+  var tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(h * scale));
+  var transparent = file.type === "image/png" && fitHasTransparency(dec.src, w, h);
+  var best = null; // smallest blob produced so far
+  function noteBlob(blob, mime, bw, bh) {
+    if (!blob) return;
+    if (!best || blob.size < best.blob.size) best = { blob: blob, mime: mime, w: bw, h: bh };
+  }
+  if (transparent) {
+    // Stay PNG while it fits; halve dimensions until it does.
+    var pw = tw, ph = th;
+    for (var pi = 0; pi < 4; pi++) {
+      var pcv = fitDrawToCanvas(dec.src, pw, ph, false);
+      var pblob = await fitCanvasToBlob(pcv, "image/png");
+      noteBlob(pblob, "image/png", pw, ph);
+      if (pblob && pblob.size <= maxBytes) break;
+      if (Math.max(pw, ph) <= 400) break;
+      pw = Math.max(1, Math.round(pw * 0.5)); ph = Math.max(1, Math.round(ph * 0.5));
+    }
+    // Still too big as PNG? Fall through to JPEG (loses transparency,
+    // but a photo that fits beats a photo that errors).
+    if (!best || best.blob.size > maxBytes) transparent = false;
+  }
+  if (!transparent) {
+    var jw = tw, jh = th;
+    var fitted = false;
+    for (var di = 0; di < 4 && !fitted; di++) {
+      var jcv = fitDrawToCanvas(dec.src, jw, jh, true);
+      for (var qi = 0; qi < ladder.length; qi++) {
+        var jblob = await fitCanvasToBlob(jcv, "image/jpeg", ladder[qi]);
+        noteBlob(jblob, "image/jpeg", jw, jh);
+        if (jblob && jblob.size <= maxBytes) { fitted = true; break; }
+      }
+      if (fitted) break;
+      if (Math.max(jw, jh) <= 400) break;
+      jw = Math.max(1, Math.round(jw * 0.7)); jh = Math.max(1, Math.round(jh * 0.7));
+    }
+  }
+  dec.close();
+  if (!best || !best.blob) return { error: "That photo couldn't be shrunk — try a different one." };
+  if (best.blob.size > maxBytes) {
+    return { error: "That photo is too large — even resized it stays over about " + (maxBytes / 1000000).toFixed(1).replace(".0", "") + " MB. Try a smaller photo." };
+  }
+  var b64 = await fitBlobToBase64(best.blob);
+  if (!b64) return { error: "That photo couldn't be read — try again." };
+  return { dataBase64: b64, mimeType: best.mime, origKB: origKB, newKB: Math.round(best.blob.size / 1000), width: best.w, height: best.h, shrunk: true };
+}
+
+// "Shrink my photo for profile size" — avatar resizer / converter.
+// Now a thin wrapper over fitImageForUpload: 512px, JPEG 0.85, under
+// the 1.5 MB avatar cap. Same return shape as before, so avatar,
+// banner, and page-comment callers work unchanged.
+var AVATAR_MAX_DIM = 512;
+function fmtKB(kb) { return kb >= 1000 ? (kb / 1000).toFixed(1).replace(".0", "") + " MB" : kb + " KB"; }
+function shrinkAvatarImage(file) {
+  return fitImageForUpload(file, { maxDim: AVATAR_MAX_DIM, maxBytes: 1500000, qualities: [0.85], minQuality: 0.85 });
 }
 
 // 3D print file reader (v3) — .stl / .obj / .3mf / .zip, under 25 MB.
@@ -964,7 +1068,7 @@ function taffyReply(raw) {
     return { text: "We don't support AI customer support here, so let me get you to a human! Message Chris directly, email an admin, or file a report — all three are right here.", emoji: "🧑‍💻", human: true, working: false };
   // Profile picture
   if (has(/\b(profile picture|pfp|avatar|change my picture|upload a photo|upload a picture|profile pic|change my pfp)\b/))
-    return { text: taffyPick(["Edit Profile, tap the picture box, pick a JPG, PNG, or WebP under 1.5 MB, and hit Save. If your photo's too big, a screenshot of it is usually small enough.", "Your picture lives in Edit Profile — pick a file under 1.5 MB (JPG, PNG, or WebP) and save. It'll show on your page right away. Too big? Screenshot it first."]), emoji: taffyPickEmoji(["🖼️", "✨"]), working: false };
+    return { text: taffyPick(["Edit Profile, tap the picture box, pick a JPG, PNG, or WebP, and hit Save — big photos are shrunk to fit automatically. If your photo is a HEIC, screenshot it first.", "Your picture lives in Edit Profile — pick a JPG, PNG, or WebP and save. Big photos shrink to fit on their own. It'll show on your page right away."]), emoji: taffyPickEmoji(["🖼️", "✨"]), working: false };
   // My links
   if (has(/\b(add a link|my links|links on my page|attach a link|add links|add a button)\b/))
     return { text: taffyPick(["Edit Profile, find \u201cMy links\u201d, type a label and a URL, hit \u201c+ Add a link\u201d, and save — they show up as buttons on your page. Up to 5.", "Adding a link is easy: Edit Profile \u2192 My links \u2192 label + URL \u2192 save. They show as clean buttons on your page. You can have up to 5."]), emoji: taffyPickEmoji(["🔗", "✨"]), working: false };
@@ -1731,6 +1835,7 @@ function youtubeEmbedHTML(body) {
 var cropPick = {}; // formKey -> { dataBase64, mimeType } (cropped JPEG)
 var cropOrig = {}; // formKey -> object URL of the original photo (preview)
 var videoPick = {}; // formKey -> { file, name, url, duration }
+var listingPhotoFit = {}; // listing photo slot (1-3) -> { file, result } from the pick-time auto-fit, reused at submit so the photo is only resized once
 var cropState = null; // open modal: { file, key, form, img, iw, ih, dw, dh, scale, rect, aspect, drag }
 var CROP_MAX_SIDE = 1600;
 var CROP_ASPECTS = { "free": null, "1:1": [1, 1], "4:3": [4, 3], "16:9": [16, 9] };
@@ -2753,7 +2858,7 @@ function renderComposer(context) {
     '<label>Event time (e.g. 12–6 PM)</label><input name="event_time" maxlength="120" placeholder="12–6 PM">' +
     '<label>Event place (venue / city)</label><input name="event_place" maxlength="120" placeholder="Where is it happening?">' +
     "</div>" +
-    '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — required for Card Check)</label>' +
+    '<label>Photo (JPG, PNG, WebP, or GIF — resized automatically to fit; required for Card Check)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-' + context + '\')">' +
     cropPreviewHTML("composer-" + context) +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
@@ -2881,10 +2986,13 @@ function renderListingForm(host, kind) {
     (kind === "trade" ? '<label>What you’re looking for in return</label><input name="trade_wanted" maxlength="500" placeholder="Card(s) you want in return">' : "") +
     '<label>Description &amp; condition (a little formatting is allowed: bold, italic, lists, links)</label>' +
     '<textarea name="description" required maxlength="6000" placeholder="Condition, set, what’s included…"></textarea>' +
-    '<label>Photos — up to 3 (JPG, PNG, or WebP, each under 2.5 MB)' + (kind === "trade" ? " — a photo is required for trades" : "") + "</label>" +
-    '<input name="photo1" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
-    '<input name="photo2" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
-    '<input name="photo3" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<label>Photos — up to 3 (JPG, PNG, or WebP — resized automatically to fit)' + (kind === "trade" ? " — a photo is required for trades" : "") + "</label>" +
+    '<input name="photo1" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.listingPhotoPicked(this, 1)">' +
+    '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingphotonote="1"></p>' +
+    '<input name="photo2" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.listingPhotoPicked(this, 2)">' +
+    '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingphotonote="2"></p>' +
+    '<input name="photo3" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.listingPhotoPicked(this, 3)">' +
+    '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingphotonote="3"></p>' +
     (kind === "trade" ? '<p class="dwc-warn">Trades need a photo AND a completed AI authenticity check on it before they go live — run the check on the cover photo first.</p>' : "") +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runListingCheck(this.form)">🔍 Run AI authenticity check on cover photo</button> <span data-checkresult></span></div>' +
     '<label><input type="checkbox" name="allow_comments" checked style="width:auto"> Allow comments on this listing</label>' +
@@ -4210,7 +4318,7 @@ async function renderAgeBlock() {
       ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself. You’ll see your age-verified mark here once it’s approved. Your photo is deleted the moment he decides.</p>'
       : "") +
     '<form onsubmit="DWC.submitId(this); return false;">' +
-    '<label>Upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport) — JPG or PNG, under 2.5 MB</label>' +
+    '<label>Upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport) — JPG or PNG (resized automatically to fit)</label>' +
     '<input name="id_photo" type="file" accept="image/jpeg,image/png" required>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Submit my ID for review →</button></p></form>';
@@ -4348,7 +4456,7 @@ function renderAdultComposer() {
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. cosplay, amateur">' +
-    '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — optional)</label>' +
+    '<label>Photo (JPG, PNG, WebP, or GIF — resized automatically to fit; optional)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-adult\')">' +
     cropPreviewHTML("composer-adult") +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
@@ -4395,7 +4503,7 @@ function renderCreatorComposer() {
     "</div>" +
     '<label>Price (USD — 0 = free). Tick “Pay to unlock” below and viewers see a locked preview with a “Pay to unlock” button at this price.</label>' +
     '<input name="price" type="number" step="1" min="0" max="100000" value="0" required>' +
-    '<label>Preview photo (JPG, PNG, or WebP, under 2.5 MB — optional)</label>' +
+    '<label>Preview photo (JPG, PNG, or WebP — resized automatically to fit; optional)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-creator\')">' +
     cropPreviewHTML("composer-creator") +
     '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
@@ -4476,7 +4584,7 @@ function renderModelMe() {
     '<label>Categories (up to 6)</label><div class="dwc-checkgrid">' + ADULT_CATEGORIES.map(function (c) {
       return '<label><input type="checkbox" name="model_categories" value="' + esc(c) + '" style="width:auto"' + ((p.model_categories || []).includes(c) ? " checked" : "") + "> " + esc(c) + "</label>";
     }).join("") + "</div>" +
-    '<label>Display picture (JPG, PNG, or WebP, under 2.5 MB)</label>' +
+    '<label>Display picture (JPG, PNG, or WebP — resized automatically to fit)</label>' +
     '<input name="display_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
     (p.model_display_url ? '<label><input type="checkbox" name="remove_display_image" style="width:auto"> Remove my display picture</label>' : "") +
     '<label>Gender (for the finder)</label><select name="model_gender"><option value="">Prefer not to say</option><option value="girl"' + (p.model_gender === "girl" ? " selected" : "") + ">Girl</option><option value=\"guy\"" + (p.model_gender === "guy" ? " selected" : "") + ">Guy</option></select>" +
@@ -4887,7 +4995,7 @@ window.DWC = {
     // validated the source file). No crop? Read the file input as before.
     var photo = cropPick[gk] || null;
     if (!photo) {
-      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
+      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000, { maxDim: 1600 });
       if (photo && photo.error) return formErr(form, photo.error);
     }
     var video = null;
@@ -4941,7 +5049,7 @@ window.DWC = {
     // validated the source file). No crop? Read the file input as before.
     var photo = cropPick[gk] || null;
     if (!photo) {
-      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000);
+      photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000, { maxDim: 1600 });
       if (photo && photo.error) return formErr(form, photo.error);
     }
     var video = null;
@@ -5027,18 +5135,14 @@ window.DWC = {
       : (isVideo ? "🙈 Blur this video again" : "🙈 Blur this photo again");
   },
   // Photo cropper (v3.5) — a photo picked in any post composer opens the
-  // crop modal. Same checks as fileToImage, on the SOURCE file, before
-  // cropping. Cancel keeps whatever was attached before.
+  // crop modal. No size rejection here anymore: the crop export caps at
+  // 1600px, and "use original" goes through the auto-fit in fileToImage
+  // at submit, so a big photo just gets resized instead of erroring.
   photoPicked: function (input, key) {
     var file = input.files && input.files[0];
     if (!file) return;
     if (file.type && IMAGE_MIMES_CLIENT.indexOf(file.type) === -1) {
       formErr(input.form, "That photo isn't a JPG, PNG, WebP, or GIF — iPhone photos often save as HEIC. Pick a JPG, PNG, WebP, or GIF, or screenshot the photo and use that.");
-      input.value = "";
-      return;
-    }
-    if (file.size > 2500000) {
-      formErr(input.form, "That photo is too large — keep it under about 2.5 MB.");
       input.value = "";
       return;
     }
@@ -5259,7 +5363,7 @@ window.DWC = {
     var file = photoInput && photoInput.files ? photoInput.files[0] : null;
     if (!file) { if (slot) slot.textContent = "Pick a photo first."; return; }
     if (slot) slot.textContent = "Running AI check…";
-    var img = await fileToImage(file, 2500000);
+    var img = await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.75 });
     if (img.error) { if (slot) slot.textContent = img.error; return; }
     var data = await apiPost("/card-check", { image: img, context: (form.querySelector('input[name="title"]') || {}).value || "" });
     if (!data || !data.ok) {
@@ -5283,7 +5387,9 @@ window.DWC = {
     var file = photoInput && photoInput.files ? photoInput.files[0] : null;
     if (!file) { if (slot) slot.textContent = "Pick the cover photo first."; return; }
     if (slot) slot.textContent = "Running AI check…";
-    var img = await fileToImage(file, 2500000);
+    // Reuse the pick-time fit for the cover photo when it's the same file.
+    var cachedCheck = listingPhotoFit[1];
+    var img = (cachedCheck && cachedCheck.file === file) ? cachedCheck.result : await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.75 });
     if (img.error) { if (slot) slot.textContent = img.error; return; }
     var data = await apiPost("/card-check", { image: img, context: (form.querySelector('input[name="title"]') || {}).value || "" });
     if (!data || !data.ok) {
@@ -5295,14 +5401,47 @@ window.DWC = {
     if (slot) slot.textContent = (data.status === "looks_consistent" ? "✓ Looks consistent" : data.status === "suspicious" ? "⚠ Suspicious" : data.status === "likely_fake_or_proxy" ? "⛔ Likely fake / proxy — this can't be listed for trade" : "📷 Needs a clearer photo") + (data.summary ? " — " + data.summary : "");
   },
 
+  // Market listing photo pick — auto-fit the moment a photo is picked,
+  // so the member sees it worked ("Resized to fit") instead of hitting
+  // a "too large" wall at submit. The fit is cached per slot and reused
+  // at submit (same File object) so the photo is only resized once.
+  // minQuality 0.75: listing photos are product photos — keep the detail.
+  listingPhotoPicked: async function (input, n) {
+    var file = input && input.files && input.files[0];
+    var form = input && input.form;
+    var note = form && form.querySelector('[data-listingphotonote="' + n + '"]');
+    delete listingPhotoFit[n];
+    if (!file) { if (note) note.textContent = ""; return; }
+    if (note) { note.textContent = "Resizing “" + file.name + "” to fit…"; note.style.color = "var(--muted)"; }
+    var img = await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.75 });
+    if (!img) { if (note) note.textContent = ""; return; }
+    if (img.error) {
+      if (note) { note.textContent = "“" + file.name + "” — " + img.error; note.style.color = "var(--amber)"; }
+      input.value = "";
+      return;
+    }
+    listingPhotoFit[n] = { file: file, result: img };
+    if (note) {
+      note.textContent = img.shrunk
+        ? "✓ “" + file.name + "” resized to fit — " + img.width + "×" + img.height + ", " + fmtKB(img.newKB) + " (was " + fmtKB(img.origKB) + ")"
+        : "✓ “" + file.name + "” good to go — " + img.width + "×" + img.height + ", " + fmtKB(img.newKB);
+      note.style.color = "var(--green)";
+    }
+  },
+
   submitListing: async function (form, kind) {
     var fd = new FormData(form);
     var photos = [];
+    var anyShrunk = false;
     for (var i = 1; i <= 3; i++) {
       var f = fd.get("photo" + i);
       if (f && f.size) {
-        var img = await fileToImage(f, 2500000);
+        // Pick-time fit wins when the file hasn't changed since picking
+        // (same File object) — no double resize.
+        var cached = listingPhotoFit[i];
+        var img = (cached && cached.file === f) ? cached.result : await fileToImage(f, 2500000, { maxDim: 1600, minQuality: 0.75 });
         if (img.error) return formErr(form, img.error);
+        if (img.shrunk) anyShrunk = true;
         photos.push({ dataBase64: img.dataBase64, mimeType: img.mimeType });
       }
     }
@@ -5322,7 +5461,8 @@ window.DWC = {
     var data = await apiPost("/listings", body);
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't list that.");
     state.listingCheck = null;
-    setNotice("Listed — it's live in the " + (kind === "sale" ? "Flea Market" : kind === "trade" ? "Up for Trade" : "Auction House") + ".");
+    listingPhotoFit = {};
+    setNotice("Listed — it's live in the " + (kind === "sale" ? "Flea Market" : kind === "trade" ? "Up for Trade" : "Auction House") + "." + (anyShrunk ? " Photos were resized to fit." : ""));
     go("listing/" + data.listing_id);
     await refreshStats();
     return false;
@@ -6088,7 +6228,7 @@ window.DWC = {
     var file = input && input.files && input.files[0];
     if (!file) return;
     if (state.phoneGallery.length >= 6) { setNotice("The gallery holds 6 photos at a time — delete one first."); input.value = ""; return; }
-    var img = await fileToImage(file, 1500000);
+    var img = await fileToImage(file, 1500000, { maxDim: 1600 });
     if (!img || img.error) { setNotice((img && img.error) || "That photo couldn't be read."); input.value = ""; return; }
     var item = { url: "data:" + img.mimeType + ";base64," + img.dataBase64, name: file.name || "photo", timer: null };
     item.timer = setTimeout(function () {
@@ -6166,7 +6306,7 @@ window.DWC = {
     var fd = new FormData(form);
     var file = fd.get("id_photo");
     if (!file || !file.size) return formErr(form, "Pick a photo of your ID first.");
-    var img = await fileToImage(file, 2500000);
+    var img = await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.8 });
     if (img.error) return formErr(form, img.error);
     var data = await apiPost("/age-verification/submit", { device_id: deviceId(), id_image: { dataBase64: img.dataBase64, mimeType: img.mimeType } });
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't submit that ID.");
@@ -6186,7 +6326,7 @@ window.DWC = {
     input.type = "file";
     input.accept = "image/jpeg,image/png,image/webp";
     input.onchange = async function () {
-      var img = await fileToImage(input.files && input.files[0], 3000000);
+      var img = await fileToImage(input.files && input.files[0], 3000000, { maxDim: 1600 });
       if (!img) return;
       if (img.error) { setNotice(img.error); return; }
       var data = await apiPost("/adult-welcome", { device_id: deviceId(), image: { dataBase64: img.dataBase64, mimeType: img.mimeType } });
@@ -6238,7 +6378,7 @@ window.DWC = {
   },
   saveModelProfile: async function (form) {
     var fd = new FormData(form);
-    var img = await fileToImage(fd.get("display_image") && fd.get("display_image").size ? fd.get("display_image") : null, 2500000);
+    var img = await fileToImage(fd.get("display_image") && fd.get("display_image").size ? fd.get("display_image") : null, 2500000, { maxDim: 1200 });
     if (img && img.error) return formErr(form, img.error);
     var body = {
       device_id: deviceId(),

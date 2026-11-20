@@ -519,6 +519,10 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-creatorbox{border-color:var(--pink);background:linear-gradient(160deg,rgba(255,45,149,.08),rgba(124,77,255,.06))}
 .dwc-creator-line{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:6px 0}
 .dwc-creator-badge{display:inline-block;background:linear-gradient(90deg,#ff2d95,#7c4dff);color:#fff;font-weight:800;font-size:13px;border-radius:999px;padding:4px 12px}
+.dwc-post-announcement{border:2px solid var(--amber);box-shadow:0 0 0 1px rgba(255,154,0,.35),0 0 18px rgba(255,154,0,.18)}
+.dwc-event-line{color:#ffe9a8;font-weight:700;font-size:15px;margin:6px 0 0}
+.dwc-announce-line{margin:6px 0 0}
+.dwc-announce-badge{display:inline-block;background:linear-gradient(90deg,#ff9a00,#ff2d95);color:#fff;font-weight:800;font-size:13px;border-radius:999px;padding:4px 12px}
 .dwc-3d-badge{display:inline-block;background:rgba(0,229,255,.15);border:1px solid var(--cyan);color:#7dd8ff;font-weight:700;font-size:13px;border-radius:999px;padding:4px 12px}
 .dwc-emojirow{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 12px}
 .dwc-emoji{background:var(--panel2);border:1px solid var(--line);border-radius:8px;font-size:20px;line-height:1;padding:6px 8px;cursor:pointer}
@@ -838,6 +842,65 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 @keyframes dwcBgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 @keyframes dwcMarquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
 @keyframes dwcSparkleTwinkle{0%,100%{opacity:.25}50%{opacity:.9}}
+@keyframes dwcRgbBorderGlow{0%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}25%{border-color:#7c4dff;box-shadow:0 0 8px #7c4dff}50%{border-color:#00e5ff;box-shadow:0 0 8px #00e5ff}75%{border-color:#39ff88;box-shadow:0 0 8px #39ff88}100%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}}
+
+/* Profile customization (v3.9) — bigger avatars, picture frames,
+   website look, picture viewer, preset-background swatches. */
+.dwc-avatar-big{width:140px!important;height:140px!important;font-size:64px!important}
+.dwc-picwrap{display:inline-block;position:relative;cursor:pointer;flex:0 0 auto;border-radius:50%;padding:4px;line-height:0}
+.dwc-picwrap .dwc-avatar{border:none;margin:0}
+.dwc-picframe-none{padding:0}
+.dwc-picframe-none .dwc-avatar{border:2px solid var(--violet)}
+.dwc-picframe-neon{border:3px solid #00e5ff;box-shadow:0 0 12px #00e5ff,0 0 28px rgba(0,229,255,.55)}
+.dwc-picframe-rgb{border:4px solid transparent;background:linear-gradient(#0b0b14,#0b0b14) padding-box,linear-gradient(90deg,#ff2d95,#7c4dff,#00e5ff,#39ff88) border-box;background-size:100% 100%,300% 300%;animation:rgbSlide 3s linear infinite}
+.dwc-picframe-rgb-rotating::before{content:'';position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(#ff2d95,#7c4dff,#00e5ff,#39ff88,#ff2d95);animation:spin 3s linear infinite}
+.dwc-picframe-rgb-rotating .dwc-avatar{position:relative}
+.dwc-picframe-gold{border:4px solid #d4af37;box-shadow:0 0 12px rgba(212,175,55,.6),inset 0 0 8px rgba(212,175,55,.4)}
+.dwc-picframe-black{border:5px solid #000;box-shadow:0 2px 8px rgba(0,0,0,.6)}
+.dwc-picframe-wooden{border:8px solid transparent;background:linear-gradient(#8b5a2b,#6b4423) padding-box,linear-gradient(135deg,#a67c52,#6b4423,#c49a6c,#8b5a2b) border-box;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+.dwc-picframe-gothic{border:6px solid transparent;background:#000 padding-box,repeating-linear-gradient(45deg,#000 0 8px,#fff 8px 16px) border-box}
+.dwc-picframe-blood{border:3px solid var(--blood,#c41e1e)}
+.dwc-picframe-blood::after{content:'';position:absolute;left:10%;right:10%;bottom:-15px;height:17px;background-image:radial-gradient(circle at 12% 0,var(--blood,#c41e1e) 7px,transparent 8px),radial-gradient(circle at 32% 0,var(--blood,#c41e1e) 5px,transparent 6px),radial-gradient(circle at 52% 0,var(--blood,#c41e1e) 8px,transparent 9px),radial-gradient(circle at 72% 0,var(--blood,#c41e1e) 5px,transparent 6px),radial-gradient(circle at 90% 0,var(--blood,#c41e1e) 6px,transparent 7px);background-repeat:no-repeat;pointer-events:none}
+/* GB / GBA handheld frames — the picture sits in the screen, with a
+   D-pad, Start/Select, A/B buttons and speaker dots drawn around it. */
+.dwc-picframe-gb,.dwc-picframe-gba{border-radius:18px;padding:14px 14px 92px;width:220px;background:linear-gradient(160deg,var(--gb-c1,#5a5fcf),var(--gb-c2,#7c4dff) 55%,var(--gb-c3,#1a1a2e));box-shadow:0 8px 20px rgba(0,0,0,.55),inset 0 2px 0 rgba(255,255,255,.25)}
+.dwc-picframe-gba{width:280px;padding:14px 14px 78px}
+.dwc-gb-screen{display:block;background:#0f380f;border:6px solid #1a1a2e;border-radius:8px;overflow:hidden;aspect-ratio:10/9;line-height:0}
+.dwc-picframe-gba .dwc-gb-screen{aspect-ratio:3/2}
+.dwc-gb-screen .dwc-avatar{width:100%!important;height:100%!important;border:none;border-radius:0;object-fit:cover;font-size:40px}
+.dwc-gb-label{display:block;text-align:center;font-size:11px;font-weight:900;letter-spacing:.18em;color:rgba(255,255,255,.75);margin-top:8px;line-height:1.2}
+.dwc-gb-dpad{position:absolute;left:24px;bottom:36px;width:52px;height:52px}
+.dwc-gb-dpad::before{content:'';position:absolute;left:0;top:18px;width:52px;height:16px;background:#222;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.5)}
+.dwc-gb-dpad::after{content:'';position:absolute;left:18px;top:0;width:16px;height:52px;background:#222;border-radius:3px;box-shadow:0 2px 0 rgba(0,0,0,.5)}
+.dwc-gb-startselect{position:absolute;left:50%;bottom:16px;transform:translateX(-50%) rotate(-18deg);display:flex;gap:10px}
+.dwc-gb-startselect i{width:26px;height:8px;border-radius:99px;background:#333;box-shadow:0 1px 0 rgba(0,0,0,.5)}
+.dwc-gb-ab{position:absolute;right:22px;bottom:38px;width:66px;height:34px;transform:rotate(-20deg)}
+.dwc-gb-ab i{position:absolute;width:28px;height:28px;border-radius:50%;background:#8a1a2e;box-shadow:0 3px 0 rgba(0,0,0,.45),inset 0 2px 3px rgba(255,255,255,.3)}
+.dwc-gb-ab i:first-child{left:0;top:6px}
+.dwc-gb-ab i:last-child{right:0;top:0}
+.dwc-gb-speaker{position:absolute;right:18px;bottom:10px;display:flex;gap:3px;transform:rotate(-20deg)}
+.dwc-gb-speaker i{width:4px;height:4px;border-radius:50%;background:rgba(0,0,0,.5)}
+/* Website look — nav bar, sections, sign, top-position head. */
+.dwc-website-nav{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin:0 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+.dwc-website-nav .btn{margin:0}
+.dwc-website-section h3{margin-top:0}
+.dwc-sign{font-size:22px;font-weight:800}
+.dwc-mypage-top{padding:6px 2px 12px}
+.dwc-mypage-actionsbelow{margin:0 0 12px}
+.dwc-bg-swatch{display:inline-block;width:18px;height:18px;border-radius:5px;vertical-align:-3px;border:1px solid rgba(255,255,255,.35)}
+/* Picture viewer — lightbox with the picture large + comments. */
+.dwc-picviewer{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center}
+.dwc-picviewer[hidden]{display:none}
+.dwc-picviewer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.8)}
+.dwc-picviewer-card{position:relative;max-width:min(560px,94vw);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center}
+.dwc-picviewer-close{position:absolute;top:8px;right:8px;z-index:2}
+.dwc-picviewer-photo{margin:8px 0}
+.dwc-picviewer-img{width:min(320px,80vw);height:min(320px,80vw);object-fit:cover;border-radius:50%}
+.dwc-picviewer-photo .dwc-picframe-gb{width:min(300px,86vw)}
+.dwc-picviewer-photo .dwc-picframe-gba{width:min(340px,86vw)}
+.dwc-picviewer-label{color:var(--muted);font-size:13px;margin:6px 0}
+.dwc-picviewer-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:8px 0}
+.dwc-picviewer-comments{text-align:left}
 
 /* Profile action buttons (v3.6) — the 5-button block on a member page. */
 .dwc-action-buttons{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
@@ -864,6 +927,17 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-badge-admin{display:inline-flex;flex-direction:column;align-items:center;line-height:1;vertical-align:-6px;margin-left:2px;font-size:18px;color:#fff}
 .dwc-badge-admin small{font-size:9px;letter-spacing:.08em;color:var(--muted)}
 .dwc-badge-mod{font-size:12px;font-weight:800;letter-spacing:.06em;color:#39ff88;text-shadow:0 0 8px rgba(57,255,136,.9);vertical-align:2px;margin-left:4px}
+/* Achievement badges (v3.9) — inline icons next to a name, and the
+   Badge display grid (Edit Profile + phone Badges app). */
+.dwc-ach-badge{display:inline-block;font-size:15px;line-height:1;vertical-align:-2px;margin-left:2px;cursor:default}
+.dwc-badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:8px 0}
+.dwc-badge-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1px solid var(--border);border-radius:10px;text-align:center;background:var(--card)}
+.dwc-badge-ico{font-size:26px;line-height:1}
+.dwc-badge-lab{font-weight:700;font-size:13px}
+.dwc-badge-got{font-size:12px;color:#39ff88}
+.dwc-badge-req{font-size:12px;color:var(--muted)}
+.dwc-badge-locked{opacity:.55;filter:grayscale(.7)}
+.tp-icon-badges{background:linear-gradient(135deg,#ffd700,#ff9a00)}
 .dwc-banner{margin:0 0 12px;text-align:center}
 .dwc-banner img{max-width:100%;max-height:260px;border-radius:14px;object-fit:cover;display:block;margin:0 auto}
 .dwc-ticker{overflow:hidden;white-space:nowrap;border:1px solid var(--line);border-radius:10px;background:#0e0e1a;padding:8px 0;margin:0 0 12px;font-weight:800;letter-spacing:.04em}
@@ -893,6 +967,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
   .dwc-pill { padding: 9px 13px; font-size: 14px; }
   /* Profile header: avatar + name stack cleanly, name wraps. */
   .dwc-profile-row { gap: 10px; }
+  .dwc-avatar-big { width: 110px !important; height: 110px !important; font-size: 48px !important; }
+  .dwc-picframe-gb { width: 200px; }
+  .dwc-picframe-gba { width: 240px; }
   .dwc-myprofile h2 { font-size: 21px; line-height: 1.25; overflow-wrap: anywhere; }
   .dwc-badge-op { width: 19px; height: 19px; }
   /* Listings + cards: one comfortable column on narrow phones. */

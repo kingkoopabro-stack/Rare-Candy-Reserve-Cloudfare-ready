@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pocket DJ — Rare Candy Reserve</title>
+<meta name="description" content="Pocket DJ — the simple phone DJ console for Steady Wave. Music, mic, talk-over, soundboard, camera, and go-live, all in one place. Operator or admin only.">
+<meta name="robots" content="noindex,nofollow">
+<link rel="canonical" href="https://rarecandyreserve.org/dj-lite.html">
+<link rel="stylesheet" href="assets/css/style.css?v=badges1">
+<style>
+  #lite-app input, #lite-app select, #lite-app textarea{font-size:16px;min-height:48px}
+  #lite-app .btn{min-height:48px;padding:12px 18px}
+  #lite-app textarea{min-height:90px}
+  .lite-big{font-size:20px;font-weight:900;min-height:64px !important;padding:14px 22px !important;width:100%}
+  .lite-knob{width:100%;height:56px}
+  .lite-meter{height:14px;background:#171728;border:1px solid #fff2;border-radius:7px;overflow:hidden;margin-top:8px}
+  .lite-meter span{display:block;height:100%;width:0%;background:linear-gradient(90deg,#00e5ff,#7c4dff,#ff2d95)}
+  .lite-meter.speaking span{background:#39ff88}
+  .lite-talk-meter{display:inline-block;width:72px;height:12px;background:#171728;border:1px solid #fff2;border-radius:6px;overflow:hidden;vertical-align:middle;margin-left:10px}
+  .lite-talk-meter span{display:block;height:100%;width:0%;background:#00e5ff}
+  .lite-talk-meter.speaking span{background:#39ff88}
+  .lite-pad-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .lite-pad{position:relative;border:1px solid #fff2;background:#171728;color:var(--ink);border-radius:12px;min-height:84px;padding:12px 10px 10px;text-align:left;display:flex;flex-direction:column;gap:2px;font-size:16px;font-weight:800}
+  .lite-pad small{color:var(--muted);font-size:12px;font-weight:600}
+  .lite-pad.hit{border-color:#ff2d95;background:#1d1030}
+  .lite-pad .pad-load{position:absolute;top:6px;right:6px;border:1px solid #fff2;background:#0b0b14;color:var(--muted);border-radius:6px;font-size:11px;font-weight:700;padding:3px 7px;min-height:26px}
+  .lite-monitor{border:2px solid #ff2d95;border-radius:14px;padding:16px;background:#1d1030}
+  .lite-monitor.on{border-color:#39ff88;background:#0d2b1a}
+  .lite-note{color:var(--muted);font-size:13px;line-height:1.5}
+  .lite-queue{list-style:none;margin:0;padding:0}
+  .lite-queue li{padding:8px 0;border-top:1px solid #fff2;font-size:15px}
+  .lite-queue li:first-child{border-top:0}
+  #liteCamPreview, #liteScreenPreview{width:100%;border-radius:12px;background:#000;display:none}
+</style>
+</head>
+<body data-page="dj-lite">
+
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html"><img class="logo-mark" src="images/steady-heart.svg" alt="">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html" data-page="home">Home</a>
+      <a href="shop.html" data-page="shop">Shop</a>
+      <a href="merch.html" data-page="merch">Merch</a>
+      <a href="about.html" data-page="about">About</a>
+      <a href="music.html" data-page="music">Music</a>
+      <a href="create.html" data-page="create">Create</a>
+      <a href="podcast.html" data-page="podcast">Podcast</a>
+      <a href="radio.html" data-page="radio">VNR</a>
+      <a href="community.html" data-page="community">Community</a>
+      <a href="nerd.html" data-page="nerd">Nerd Hub</a>
+      <a href="contact.html" data-page="contact">Contact</a>
+      <a href="donate.html" data-page="donate">Donate</a>
+    </nav>
+    <div class="head-actions">
+      <a class="aml-btn" href="community.html"><span class="aml-logo">🍬 Make a profile!</span><span class="aml-sub">Join the Community</span></a>
+      <button class="cart-btn" onclick="openCart()">🛒 Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="kicker">🎧 Pocket DJ — the simple phone version</div>
+  <h1>Pocket <span class="grad-text">DJ.</span></h1>
+  <p style="color:var(--muted)">Music, mic, talk-over, soundboard, camera, and go-live — the necessities only. The full console (with the rundown, EQ, and routing) lives in the <a href="dj-console.html">DJ Console →</a></p>
+
+  <div id="lite-gate" class="card">
+    <h2 style="margin-top:0">Operator or admin only</h2>
+    <p id="lite-gate-msg">Checking who you are…</p>
+    <p><a class="btn" href="community.html">Go to the Community to sign in →</a></p>
+  </div>
+
+  <div id="lite-app" hidden>
+    <p class="lite-note" style="margin-top:0">Keep this tab open while you DJ — closing it stops the music. On a phone the browser plays to the default audio device (headphones when plugged in, or Bluetooth). The Anbernic RG476H has <b>no camera</b> — the phone is the camera.</p>
+
+    <!-- 1. Music knob -->
+    <section class="card">
+      <h2 style="margin-top:0">🎵 Music</h2>
+      <label for="liteMusicVol" style="font-weight:800">Music volume — the knob you turn down to talk over the music</label>
+      <input type="range" class="lite-knob" id="liteMusicVol" min="0" max="100" value="85" aria-label="Music volume">
+      <p style="margin:6px 0 0;font-weight:800"><span id="liteMusicVolVal">85%</span> <span id="liteDuckNote" style="color:var(--muted);font-weight:600"></span></p>
+    </section>
+
+    <!-- 2. Mic + Talk -->
+    <section class="card">
+      <h2 style="margin-top:0">🎙️ Mic &amp; Talk</h2>
+      <label for="liteMicSelect">Microphone</label>
+      <select id="liteMicSelect"><option value="">Default microphone</option></select>
+      <p style="margin:10px 0"><button class="btn ghost" type="button" id="liteMicFind">Find microphones</button></p>
+      <p><button class="btn lite-big" type="button" id="liteMicBtn">🎙️ Mic off — tap to go live</button></p>
+      <p><button class="btn lite-big" type="button" id="liteTalkBtn" style="border-color:#ff2d95">🎙️ Talk — tap to talk<span class="lite-talk-meter" id="liteTalkMeter" title="Mic level while talking"><span id="liteTalkMeterFill"></span></span></button></p>
+      <p class="lite-note">While Talk is on, your voice ducks the music to a quiet bed — the music follows your voice, and fades back up slowly when you stop. Tap Talk again to stop.</p>
+      <label for="liteMicLevel" style="font-weight:800">Mic level <span id="liteMicLevelVal" style="color:var(--muted)">80%</span></label>
+      <input type="range" class="lite-knob" id="liteMicLevel" min="0" max="100" value="80" aria-label="Mic level">
+      <div class="lite-meter" id="liteMicMeter"><span id="liteMicMeterFill"></span></div>
+      <p class="lite-note" id="liteMicStatus">Mic off.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:12px">
+        <div><label for="liteTalkBed" style="display:block;font-size:12px;font-weight:700;color:var(--muted)">Bed (dB)</label><input type="number" id="liteTalkBed" min="-40" max="0" step="1" value="-16" style="width:84px"></div>
+        <div><label for="liteTalkRelease" style="display:block;font-size:12px;font-weight:700;color:var(--muted)">Release (s)</label><input type="number" id="liteTalkRelease" min="0.5" max="10" step="0.5" value="2.5" style="width:84px"></div>
+        <div><label for="liteTalkThreshold" style="display:block;font-size:12px;font-weight:700;color:var(--muted)">Voice threshold (dB)</label><input type="number" id="liteTalkThreshold" min="-70" max="-20" step="1" value="-45" style="width:84px"></div>
+        <button class="btn ghost" type="button" id="liteTalkSave">Save</button>
+      </div>
+    </section>
+
+    <!-- 3. Live radio preview (headphone monitor) -->
+    <section class="card lite-monitor" id="liteMonitorCard">
+      <h2 style="margin-top:0">🎧 Live radio preview</h2>
+      <p><button class="btn lite-big" type="button" id="liteMonitorBtn">🎧 Headphone monitor — OFF</button></p>
+      <p class="lite-note">When this is ON and headphones are plugged in, you hear the live mix (music + mic + guest + soundboard) in your headphones. On a phone the browser plays to the default audio device — headphones when plugged in, or Bluetooth. To get this mix on the air from your phone, run an aux cable from the phone's headphone jack into the PC's line-in and set BUTT to that input.</p>
+    </section>
+
+    <!-- 4. Soundboard -->
+    <section class="card">
+      <h2 style="margin-top:0">🥁 Soundboard</h2>
+      <p class="lite-note" style="margin-top:0">Eight pads — tap to fire a drop or jingle. Tap <b>+ file</b> on a pad to load your own clip onto it instead.</p>
+      <div class="lite-pad-grid" id="litePadGrid"></div>
+      <input type="file" id="litePadFileInput" accept="audio/*" style="display:none">
+      <p style="margin:14px 0 6px"><button class="btn" type="button" id="liteMidiBtn">Connect MIDI controller</button></p>
+      <p class="lite-note" id="liteMidiStatus">Not connected. Plug in your AKAI MPK Mini II by USB (or Bluetooth), tap Connect, and its 8 pads + knobs link up automatically.</p>
+    </section>
+
+    <!-- 5. Live stream hookup -->
+    <section class="card">
+      <h2 style="margin-top:0">📡 Live stream hookup</h2>
+      <label for="liteStreamUrl">Stream link (the link the music page video box plays)</label>
+      <input type="text" id="liteStreamUrl" placeholder="https://www.youtube.com/watch?v=… or https://www.twitch.tv/…" autocomplete="off" inputmode="url">
+      <p style="margin:10px 0"><button class="btn" type="button" id="liteStreamSave">Save stream link</button> <span id="liteStreamMsg" style="font-weight:700"></span></p>
+      <p class="lite-note"><b>To go live from your phone:</b> open the YouTube app (or your streaming app) → Go Live → paste the stream link here. This box just sets the link the video box plays — the phone browser can't push video directly into the site's video box. The video goes through YouTube Live / Twitch.</p>
+      <p style="margin:10px 0 0"><a class="btn ghost" href="https://studio.youtube.com/" target="_blank" rel="noopener">▶ Open YouTube Studio — Go Live</a> <a class="btn ghost" href="https://dashboard.twitch.tv/" target="_blank" rel="noopener">▶ Open Twitch Dashboard</a></p>
+    </section>
+
+    <!-- 6. Camera -->
+    <section class="card">
+      <h2 style="margin-top:0">📷 Camera</h2>
+      <p class="lite-note" style="margin-top:0">A viewfinder so you can frame your shot before going live. This preview does <b>not</b> stream from the browser — the live video goes through the YouTube / Twitch app. The Anbernic RG476H has <b>no camera</b>, so the phone is the camera source.</p>
+      <video id="liteCamPreview" playsinline muted autoplay></video>
+      <p style="margin:10px 0"><button class="btn" type="button" id="liteCamBtn">📷 Start camera</button> <button class="btn ghost" type="button" id="liteCamFlip">Flip camera</button></p>
+      <label for="liteCamSelect">Camera</label>
+      <select id="liteCamSelect"><option value="">Default camera</option></select>
+      <p class="lite-note" id="liteCamStatus">Camera off.</p>
+      <p style="margin:10px 0 0"><a class="btn" href="https://studio.youtube.com/" target="_blank" rel="noopener">▶ Open YouTube Studio — Go Live</a></p>
+    </section>
+
+    <!-- 7. Screen -->
+    <section class="card">
+      <h2 style="margin-top:0">📺 Screen</h2>
+      <p class="lite-note" style="margin-top:0">Share your screen (your game, your DAW while producing) and record it locally. This browser can record the screen and preview it, but it cannot push a live RTMP stream to Twitch or YouTube by itself — live streaming goes through the Twitch / YouTube app, and the stream link above is what puts it in the site's video box.</p>
+      <p style="margin:10px 0"><button class="btn" type="button" id="liteShareBtn">🖥️ Share screen</button> <button class="btn ghost" type="button" id="liteRecordBtn">● Record</button></p>
+      <video id="liteScreenPreview" playsinline muted autoplay></video>
+      <p class="lite-note" id="liteScreenStatus">Screen not shared yet.</p>
+      <p class="lite-note" id="liteRecStatus" hidden>● Recording — <span id="liteRecTime">0:00</span></p>
+      <p id="liteRecDownload"></p>
+    </section>
+
+    <!-- 8. Guest / Call channel -->
+    <section class="card">
+      <h2 style="margin-top:0">📞 Guest / Call</h2>
+      <p class="lite-note" style="margin-top:0">Mix in a caller — speakerphone, Discord on another device, whoever's on the line. A phone call on the <b>same</b> device will interrupt the browser audio, so use a second device or speakerphone for calls.</p>
+      <label for="liteGuestSelect">Guest / call input</label>
+      <select id="liteGuestSelect"><option value="">No guest input</option></select>
+      <p style="margin:10px 0"><button class="btn" type="button" id="liteGuestBtn">📞 Guest off — tap to bring them in</button></p>
+      <label for="liteGuestLevel" style="font-weight:800">Guest level <span id="liteGuestLevelVal" style="color:var(--muted)">80%</span></label>
+      <input type="range" class="lite-knob" id="liteGuestLevel" min="0" max="100" value="80" aria-label="Guest level">
+      <p class="lite-note" id="liteGuestStatus">Guest channel off.</p>
+    </section>
+
+    <!-- 9. Music source -->
+    <section class="card">
+      <h2 style="margin-top:0">▶️ Music source</h2>
+      <p class="lite-note" style="margin-top:0">Auto-DJ rotation — songs shuffle, ads space out, nothing repeats inside its window (4h songs / 60min ads / 3 songs between ads). Upload a zip or load files, then press play.</p>
+      <p><button class="btn lite-big" type="button" id="litePlayBtn">▶ Play music</button></p>
+      <p style="font-weight:800;margin:6px 0" id="liteNowPlaying">Nothing playing yet.</p>
+      <p style="margin:10px 0"><label class="btn ghost" style="display:inline-block;cursor:pointer">📦 Upload a zip playlist<input type="file" id="liteZipInput" accept=".zip,application/zip" style="display:none"></label> <label class="btn ghost" style="display:inline-block;cursor:pointer">🎵 Load music files<input type="file" id="liteFileInput" accept="audio/*" multiple style="display:none"></label></p>
+      <p class="lite-note" id="liteZipStatus">No music loaded yet — upload a zip (mp3, wav, ogg, m4a, flac; max 100 tracks) or load files. Subfolders in a zip are flattened.</p>
+      <h3 style="margin:14px 0 4px">Up next</h3>
+      <ul class="lite-queue" id="liteNextUp"><li style="color:var(--muted)">Load music to see what's up next.</li></ul>
+    </section>
+
+    <p style="text-align:center"><a href="dj-console.html">Open the full DJ Console →</a> · <a href="community.html#/admin">Back to Admin</a></p>
+  </div>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="follow-label">Listen &amp; follow — a steady heart</div>
+    <div class="follow-row" id="followRow"></div>
+    <div class="foot-bottom">
+      <div class="foot-links">
+        <a class="fb-like" href="https://www.facebook.com/RareCandyReserve" target="_blank" rel="noopener">Like us on Facebook</a>
+        <a href="businesses-we-support.html">🤝 Businesses we support</a>
+      </div>
+    <p><img class="logo-mark" src="images/steady-heart.svg" alt=""> <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
+    <p>PayPal · Stripe (Card · Cash App Pay · Bank)</p>
+    <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
+    </div>
+  </div>
+</footer>
+
+<audio id="liteAudio" preload="auto"></audio>
+<script src="assets/js/site.js?v=listed1"></script>
+<script src="assets/js/dj-rotation.js?v=rot1"></script>
+<script src="assets/js/dj-talkover.js?v=talk1"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* Pocket DJ — operator + admin only (same gate as the full console). */
+(function () {
+  var gate = document.getElementById("lite-gate");
+  var app = document.getElementById("lite-app");
+  var msg = document.getElementById("lite-gate-msg");
+  var did = null;
+  try { did = localStorage.getItem("dwc-device-id"); } catch (e) {}
+  if (!did) {
+    if (msg) msg.textContent = "Sign in to the Community first — Pocket DJ needs your operator or admin account on this device.";
+    return;
+  }
+  fetch("/api/profile?device_id=" + encodeURIComponent(did)).then(function (r) { return r.json(); }).then(function (p) {
+    var prof = p && p.profile;
+    if (prof && (prof.role === "operator" || prof.role === "admin" || prof.is_operator)) {
+      if (gate) gate.remove();
+      if (app) app.hidden = false;
+      initLite();
+    } else if (msg) {
+      msg.textContent = "Operator or admin only — sign in as Chris (or an admin) to open Pocket DJ.";
+    }
+  }).catch(function () {
+    if (msg) msg.textContent = "Couldn't check who you are — try refreshing the page.";
+  });
+})();
+
+function initLite() {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var liteAudio = $("liteAudio");
+
+  /* ---- toast ---- */
+  var toastEl = null;
+  function toast(text) {
+    if (!toastEl) {
+      toastEl = document.createElement("div");
+      toastEl.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:999;background:#1d1030;border:1px solid #ff2d95;color:var(--ink);border-radius:12px;padding:12px 14px;font-weight:700";
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = text;
+    toastEl.style.display = "block";
+    clearTimeout(toastEl._t);
+    toastEl._t = setTimeout(function () { toastEl.style.display = "none"; }, 5000);
+  }
+
+  function deviceId() {
+    try { return localStorage.getItem("dwc-device-id"); } catch (e) { return null; }
+  }
+
+  /* ================= AUDIO GRAPH ================= */
+  /* Music: liteAudio -> musicVolGain (knob) -> musicDuckGain (talk-over) -> masterGain.
+     Mic / guest / pads also feed masterGain. masterGain -> destination only when
+     the headphone monitor is ON; masterGain -> recDest always (so Record works
+     whether or not the DJ is monitoring). */
+  var actx = null, masterGain = null, musicVolGain = null, musicDuckGain = null,
+      micGain = null, guestGain = null, padGain = null, recDest = null,
+      musicSrc = null, micSrc = null, micAnalyser = null, guestSrc = null,
+      monitorOn = false, monitorConnected = false;
+
+  function ensureCtx() {
+    if (actx) { if (actx.state === "suspended") actx.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { toast("Web Audio is not supported in this browser."); return; }
+    actx = new AC();
+    masterGain = actx.createGain(); masterGain.gain.value = 1;
+    musicVolGain = actx.createGain(); musicVolGain.gain.value = 0.85;
+    musicDuckGain = actx.createGain(); musicDuckGain.gain.value = 1;
+    micGain = actx.createGain(); micGain.gain.value = 0.8;
+    guestGain = actx.createGain(); guestGain.gain.value = 0.8;
+    padGain = actx.createGain(); padGain.gain.value = 0.9;
+    recDest = actx.createMediaStreamDestination();
+    musicSrc = actx.createMediaElementSource(liteAudio);
+    musicSrc.connect(musicVolGain);
+    musicVolGain.connect(musicDuckGain);
+    musicDuckGain.connect(masterGain);
+    micGain.connect(masterGain);
+    guestGain.connect(masterGain);
+    padGain.connect(masterGain);
+    masterGain.connect(recDest);
+    if (monitorOn) { masterGain.connect(actx.destination); monitorConnected = true; }
+  }
+
+  /* ---- Music knob ---- */
+  function setMusicVol(pct) {
+    pct = Math.max(0, Math.min(100, +pct || 0));
+    var knob = $("liteMusicVol");
+    if (knob) knob.value = pct;
+    var val = $("liteMusicVolVal");
+    if (val) val.textContent = Math.round(pct) + "%";
+    if (musicVolGain && actx) musicVolGain.gain.setTargetAtTime(pct / 100, actx.currentTime, 0.03);
+  }
+  $("liteMusicVol").addEventListener("input", function () { ensureCtx(); setMusicVol(this.value); });
+
+  /* ================= MIC + TALK-OVER ================= */
+  var micStream = null, micLive = false, talkOn = false, talkover = null;
+
+  function updateTalkover() {
+    if (!talkover) return;
+    if (talkOn && micLive) talkover.start(); else talkover.stop();
+  }
+
+  /* The same smart talk-over as the full console (assets/js/dj-talkover.js):
+     AnalyserNode on the mic measures voice level; when he's speaking the music
+     ducks to the bed level, and when he stops it ramps back up over the
+     release time — no abrupt cut. */
+  talkover = DJTalkover.create({
+    isActive: function () { return talkOn && micLive; },
+    getAnalyser: function () { return micAnalyser; },
+    onDuck: function (duck, speaking) {
+      if (musicDuckGain && actx) musicDuckGain.gain.setTargetAtTime(duck, actx.currentTime, 0.05);
+      var note = $("liteDuckNote");
+      if (note) note.textContent = duck < 0.9 ? "· ducked while you talk" : "";
+    },
+    onMeter: function (db, speaking, active) {
+      var fill = $("liteTalkMeterFill"), meter = $("liteTalkMeter");
+      if (fill) fill.style.width = Math.max(0, Math.min(100, (db + 60) / 60 * 100)) + "%";
+      if (meter) meter.classList.toggle("speaking", !!speaking);
+    }
+  });
+
+  function setMicLevel(pct) {
+    pct = Math.max(0, Math.min(100, +pct || 0));
+    var s = $("liteMicLevel");
+    if (s) s.value = pct;
+    var val = $("liteMicLevelVal");
+    if (val) val.textContent = Math.round(pct) + "%";
+    if (micGain && actx) micGain.gain.setTargetAtTime(pct / 100, actx.currentTime, 0.03);
+  }
+  $("liteMicLevel").addEventListener("input", function () { ensureCtx(); setMicLevel(this.value); });
+
+  async function startLiteMic() {
+    ensureCtx();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      $("liteMicStatus").textContent = "Microphone is not supported in this browser.";
+      return;
+    }
+    try {
+      var sel = $("liteMicSelect").value;
+      var constraints = sel ? { audio: { deviceId: { exact: sel } } } : { audio: true };
+      micStream = await navigator.mediaDevices.getUserMedia(constraints);
+      micSrc = actx.createMediaStreamSource(micStream);
+      micAnalyser = actx.createAnalyser();
+      micAnalyser.fftSize = 512;
+      micSrc.connect(micAnalyser);
+      micAnalyser.connect(micGain);
+      micLive = true;
+      $("liteMicBtn").textContent = "🎙️ Mic live — tap to mute";
+      $("liteMicStatus").textContent = "Mic live. The music ducks when you talk (Talk on).";
+      updateTalkover();
+      refreshDeviceLists();
+    } catch (e) {
+      $("liteMicStatus").textContent = "Mic not allowed or not available — " + (e && e.message ? e.message : "");
+    }
+  }
+  function stopLiteMic() {
+    if (micStream) { micStream.getTracks().forEach(function (t) { t.stop(); }); micStream = null; }
+    if (micSrc) { try { micSrc.disconnect(); } catch (e) {} micSrc = null; }
+    if (micAnalyser) { try { micAnalyser.disconnect(); } catch (e) {} micAnalyser = null; }
+    micLive = false;
+    $("liteMicBtn").textContent = "🎙️ Mic off — tap to go live";
+    $("liteMicStatus").textContent = "Mic off.";
+    var fill = $("liteMicMeterFill");
+    if (fill) fill.style.width = "0%";
+    updateTalkover();
+  }
+  $("liteMicBtn").addEventListener("click", function () { if (micLive) stopLiteMic(); else startLiteMic(); });
+
+  /* Talk toggle — the big button. */
+  $("liteTalkBtn").addEventListener("click", function () {
+    ensureCtx();
+    talkOn = !talkOn;
+    var meter = $("liteTalkMeter"); /* grab it BEFORE textContent wipes the button's children */
+    this.textContent = talkOn ? "🎙️ Talking — tap to stop" : "🎙️ Talk — tap to talk";
+    if (meter) this.appendChild(meter);
+    if (!micLive && talkOn) toast("Talk is on, but the mic is off — turn the mic on first so it can hear you.");
+    updateTalkover();
+  });
+
+  /* Talk-over settings (bed / release / threshold), shared with the full console. */
+  var talkSettings = DJTalkover.loadSettings();
+  $("liteTalkBed").value = talkSettings.bedDb;
+  $("liteTalkRelease").value = talkSettings.releaseSec;
+  $("liteTalkThreshold").value = talkSettings.thresholdDb;
+  $("liteTalkSave").addEventListener("click", function () {
+    var s = {
+      bedDb: parseFloat($("liteTalkBed").value),
+      releaseSec: parseFloat($("liteTalkRelease").value),
+      thresholdDb: parseFloat($("liteTalkThreshold").value)
+    };
+    if (talkover) talkover.setSettings(s);
+    toast("Talk-over settings saved.");
+  });
+
+  /* Mic level meter (120ms tick, reads the mic analyser). */
+  setInterval(function () {
+    var fill = $("liteMicMeterFill"), meter = $("liteMicMeter");
+    if (!fill || !meter) return;
+    if (!micLive || !micAnalyser) { fill.style.width = "0%"; meter.classList.remove("speaking"); return; }
+    var data = new Uint8Array(micAnalyser.fftSize);
+    micAnalyser.getByteTimeDomainData(data);
+    var sum = 0;
+    for (var i = 0; i < data.length; i++) { var v = (data[i] - 128) / 128; sum += v * v; }
+    var rms = Math.sqrt(sum / data.length);
+    fill.style.width = Math.max(0, Math.min(100, rms * 100 * 2.2)) + "%";
+    meter.classList.toggle("speaking", rms > 0.02);
+  }, 120);
+
+  /* ================= HEADPHONE MONITOR ================= */
+  $("liteMonitorBtn").addEventListener("click", function () {
+    ensureCtx();
+    monitorOn = !monitorOn;
+    if (actx && masterGain) {
+      if (monitorOn && !monitorConnected) { masterGain.connect(actx.destination); monitorConnected = true; }
+      if (!monitorOn && monitorConnected) { masterGain.disconnect(actx.destination); monitorConnected = false; }
+    }
+    this.textContent = monitorOn ? "🎧 Headphone monitor — ON" : "🎧 Headphone monitor — OFF";
+    $("liteMonitorCard").classList.toggle("on", monitorOn);
+    if (monitorOn) toast("Headphone monitor on — plug in headphones and you'll hear the live mix.");
+  });
+
+  /* ================= DEVICE LISTS ================= */
+  function fillSelect(sel, list, firstLabel) {
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = "";
+    var o0 = document.createElement("option");
+    o0.value = "";
+    o0.textContent = firstLabel;
+    sel.appendChild(o0);
+    list.forEach(function (d, i) {
+      var o = document.createElement("option");
+      o.value = d.deviceId;
+      o.textContent = d.label || (d.kind === "videoinput" ? "Camera " + (i + 1) : "Microphone " + (i + 1));
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+  async function refreshDeviceLists() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      var devs = await navigator.mediaDevices.enumerateDevices();
+      fillSelect($("liteMicSelect"), devs.filter(function (d) { return d.kind === "audioinput"; }), "Default microphone");
+      fillSelect($("liteGuestSelect"), devs.filter(function (d) { return d.kind === "audioinput"; }), "No guest input");
+      fillSelect($("liteCamSelect"), devs.filter(function (d) { return d.kind === "videoinput"; }), "Default camera");
+    } catch (e) {}
+  }
+  /* "Find microphones" — grants the permission once so real device names show,
+     then lists everything. Behind a tap, so it never prompts on load. */
+  $("liteMicFind").addEventListener("click", async function () {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        var tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+        tmp.getTracks().forEach(function (t) { t.stop(); });
+      } catch (e) {
+        toast("Mic permission was not granted — the list will show generic names until you allow it.");
+      }
+    }
+    refreshDeviceLists();
+  });
+
+  /* ================= GUEST / CALL ================= */
+  var guestStream = null, guestLive = false;
+  function setGuestLevel(pct) {
+    pct = Math.max(0, Math.min(100, +pct || 0));
+    var s = $("liteGuestLevel");
+    if (s) s.value = pct;
+    var val = $("liteGuestLevelVal");
+    if (val) val.textContent = Math.round(pct) + "%";
+    if (guestGain && actx) guestGain.gain.setTargetAtTime(pct / 100, actx.currentTime, 0.03);
+  }
+  $("liteGuestLevel").addEventListener("input", function () { ensureCtx(); setGuestLevel(this.value); });
+
+  async function startLiteGuest() {
+    ensureCtx();
+    var sel = $("liteGuestSelect").value;
+    if (!sel) {
+      $("liteGuestStatus").textContent = "Pick a guest / call input first — it's a second audio input (speakerphone, Discord on another device).";
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      $("liteGuestStatus").textContent = "Audio input is not supported in this browser.";
+      return;
+    }
+    try {
+      guestStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: sel } } });
+      guestSrc = actx.createMediaStreamSource(guestStream);
+      guestSrc.connect(guestGain);
+      guestLive = true;
+      $("liteGuestBtn").textContent = "📞 Guest live — tap to drop them";
+      $("liteGuestStatus").textContent = "Guest channel live.";
+    } catch (e) {
+      $("liteGuestStatus").textContent = "Guest input not allowed or not available — " + (e && e.message ? e.message : "");
+    }
+  }
+  function stopLiteGuest() {
+    if (guestStream) { guestStream.getTracks().forEach(function (t) { t.stop(); }); guestStream = null; }
+    if (guestSrc) { try { guestSrc.disconnect(); } catch (e) {} guestSrc = null; }
+    guestLive = false;
+    $("liteGuestBtn").textContent = "📞 Guest off — tap to bring them in";
+    $("liteGuestStatus").textContent = "Guest channel off.";
+  }
+  $("liteGuestBtn").addEventListener("click", function () { if (guestLive) stopLiteGuest(); else startLiteGuest(); });
+
+  /* ================= SOUNDBOARD ================= */
+  var PAD_DEFS = [
+    { name: "Sting", sub: "brass hit", kind: "sting" },
+    { name: "Riser", sub: "build up", kind: "riser" },
+    { name: "Drop", sub: "bass drop", kind: "drop" },
+    { name: "Applause", sub: "crowd clap", kind: "applause" },
+    { name: "Vinyl", sub: "scratch", kind: "vinyl" },
+    { name: "Siren", sub: "air horn", kind: "siren" },
+    { name: "Boom", sub: "deep boom", kind: "boom" },
+    { name: "Shimmer", sub: "sparkle", kind: "shimmer" }
+  ];
+  var pads = PAD_DEFS.map(function (d) { return { name: d.name, sub: d.sub, kind: d.kind, buf: null }; });
+
+  function padOsc(type, f0, f1, t, dur, vol) {
+    if (!actx || !padGain) return;
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(Math.max(20, f0), actx.currentTime + t);
+    if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), actx.currentTime + t + dur);
+    g.gain.setValueAtTime(0, actx.currentTime + t);
+    g.gain.linearRampToValueAtTime(vol, actx.currentTime + t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + t + dur);
+    o.connect(g); g.connect(padGain);
+    o.start(actx.currentTime + t);
+    o.stop(actx.currentTime + t + dur + 0.05);
+  }
+  function padNoise(t, dur, vol, freq) {
+    if (!actx || !padGain) return;
+    var len = Math.max(1, Math.floor(actx.sampleRate * dur));
+    var buf = actx.createBuffer(1, len, actx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+    var src = actx.createBufferSource();
+    src.buffer = buf;
+    var f = actx.createBiquadFilter();
+    f.type = "bandpass"; f.frequency.value = freq || 1200; f.Q.value = 0.8;
+    var g = actx.createGain(); g.gain.value = vol;
+    src.connect(f); f.connect(g); g.connect(padGain);
+    src.start(actx.currentTime + t);
+  }
+  function firePad(i) {
+    ensureCtx();
+    if (!actx || !padGain) return;
+    var pad = pads[i];
+    if (!pad) return;
+    if (pad.buf) {
+      var src = actx.createBufferSource();
+      src.buffer = pad.buf;
+      src.connect(padGain);
+      src.start();
+    } else {
+      switch (pad.kind) {
+        case "sting": padOsc("sawtooth", 220, 220, 0, 0.35, 0.5); padOsc("sawtooth", 277, 277, 0.12, 0.3, 0.4); padOsc("sawtooth", 330, 330, 0.24, 0.5, 0.5); break;
+        case "riser": padOsc("sawtooth", 200, 1200, 0, 1.0, 0.4); break;
+        case "drop": padOsc("sine", 150, 40, 0, 0.6, 0.9); padNoise(0, 0.15, 0.5, 800); break;
+        case "applause": for (var k = 0; k < 5; k++) padNoise(k * 0.08, 0.12, 0.5, 2000); break;
+        case "vinyl": padNoise(0, 0.35, 0.5, 2500); padOsc("sawtooth", 800, 200, 0, 0.35, 0.15); break;
+        case "siren": padOsc("square", 880, 880, 0, 0.25, 0.3); padOsc("square", 660, 660, 0.25, 0.25, 0.3); padOsc("square", 880, 880, 0.5, 0.25, 0.3); padOsc("square", 660, 660, 0.75, 0.25, 0.3); break;
+        case "boom": padOsc("sine", 60, 30, 0, 0.8, 0.9); padNoise(0, 0.1, 0.4, 200); break;
+        case "shimmer": padOsc("sine", 880, 880, 0, 0.4, 0.3); padOsc("sine", 1108, 1108, 0.12, 0.4, 0.3); padOsc("sine", 1318, 1318, 0.24, 0.6, 0.3); break;
+      }
+    }
+    var btn = document.querySelector('[data-pad="' + i + '"]');
+    if (btn) { btn.classList.add("hit"); setTimeout(function () { btn.classList.remove("hit"); }, 220); }
+  }
+
+  /* Build the 8 pad buttons. */
+  var padGrid = $("litePadGrid");
+  pads.forEach(function (pad, i) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "lite-pad";
+    b.setAttribute("data-pad", String(i));
+    var name = document.createElement("span");
+    name.textContent = "🥁 " + pad.name;
+    var sub = document.createElement("small");
+    sub.textContent = pad.sub;
+    var load = document.createElement("span");
+    load.className = "pad-load";
+    load.textContent = "+ file";
+    load.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var input = $("litePadFileInput");
+      input.dataset.pad = String(i);
+      input.click();
+    });
+    b.appendChild(name);
+    b.appendChild(sub);
+    b.appendChild(load);
+    b.addEventListener("click", function () { firePad(i); });
+    padGrid.appendChild(b);
+  });
+  $("litePadFileInput").addEventListener("change", async function () {
+    var i = parseInt(this.dataset.pad || "0", 10);
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (!f) return;
+    ensureCtx();
+    try {
+      var ab = await f.arrayBuffer();
+      var buf = await actx.decodeAudioData(ab);
+      pads[i].buf = buf;
+      pads[i].name = f.name.replace(/\.[^.]+$/, "");
+      var btn = document.querySelector('[data-pad="' + i + '"]');
+      if (btn) {
+        btn.querySelector("span").textContent = "🥁 " + pads[i].name;
+        btn.querySelector("small").textContent = "your clip";
+      }
+      toast("Pad " + (i + 1) + " loaded: " + f.name);
+    } catch (e) {
+      toast("Couldn't load that audio file — " + (e && e.message ? e.message : ""));
+    }
+  });
+
+  /* MIDI — AKAI MPK Mini II auto-link. Pads are notes 36–43; knobs are CC 1–3. */
+  var midiInput = null;
+  function onMidiMessage(ev) {
+    var d = ev.data;
+    if (!d || d.length < 3) return;
+    var cmd = d[0] & 0xf0, n = d[1], v = d[2];
+    if (cmd === 0x90 && v > 0 && n >= 36 && n <= 43) firePad(n - 36);
+    else if (cmd === 0xb0) {
+      if (n === 1) setMusicVol(v / 127 * 100);
+      else if (n === 2) setMicLevel(v / 127 * 100);
+      else if (n === 3) setGuestLevel(v / 127 * 100);
+    }
+  }
+  $("liteMidiBtn").addEventListener("click", async function () {
+    var status = $("liteMidiStatus");
+    if (!navigator.requestMIDIAccess) {
+      status.textContent = "Web MIDI is not supported in this browser — the on-screen pads still work by tap.";
+      return;
+    }
+    try {
+      var access = await navigator.requestMIDIAccess();
+      var inputs = Array.from(access.inputs.values());
+      var mpk = inputs.find(function (inp) { return /mpk/i.test(inp.name || ""); });
+      var chosen = mpk || inputs[0] || null;
+      if (!chosen) {
+        status.textContent = "No MIDI device found — plug in your MPK Mini II by USB (or Bluetooth) and tap Connect again.";
+        return;
+      }
+      if (midiInput) midiInput.onmidimessage = null;
+      midiInput = chosen;
+      midiInput.onmidimessage = onMidiMessage;
+      status.textContent = (mpk ? "MPK Mini II connected ✓" : chosen.name + " connected ✓") + " — 8 pads → soundboard, knob 1 → Music, knob 2 → Mic, knob 3 → Guest.";
+    } catch (e) {
+      status.textContent = "MIDI access was denied — " + (e && e.message ? e.message : "") + ". The on-screen pads still work by tap.";
+    }
+  });
+
+  /* ================= MUSIC SOURCE (auto-DJ, same rotation lib) ================= */
+  var liteZipTracks = [];   /* {name, dur, zip:true, zipKey} — from uploaded zips */
+  var liteExtraTracks = []; /* strings — unmatched files loaded by name */
+  var liteSongFiles = {};   /* song title -> {url, name, dur, file} */
+  var liteZipFiles = {};    /* zipKey -> {url, name, dur, file} */
+  var liteAdFiles = {};     /* "Ad — <title>" -> {url, name, dur, file} */
+  var liteQueue = [], liteQIndex = 0, litePlaying = false, liteCurrent = null;
+
+  function litePool() {
+    return {
+      tracks: DJRotation.POOL.tracks.concat(liteZipTracks, liteExtraTracks),
+      ads: DJRotation.POOL.ads,
+      songSlot: DJRotation.POOL.songSlot,
+      smokeTime: DJRotation.POOL.smokeTime
+    };
+  }
+  function liteRebuildQueue() {
+    var now = new Date();
+    var startMin = now.getHours() * 60 + now.getMinutes();
+    liteQueue = DJRotation.buildAutoQueue(litePool(), DJRotation.loadSettings(), DJRotation.loadHistory(), startMin);
+    liteQIndex = 0;
+  }
+  function fileForBlock(b) {
+    if (!b) return null;
+    if (b.type === "song") {
+      if (b.zipKey && liteZipFiles[b.zipKey]) return liteZipFiles[b.zipKey];
+      if (b.title && liteSongFiles[b.title]) return liteSongFiles[b.title];
+      return null;
+    }
+    if (b.type === "ad") {
+      if (b.title && liteAdFiles[b.title]) return liteAdFiles[b.title];
+      return null;
+    }
+    return null; /* intros / breaks / talk have no audio file — skipped, never dead air */
+  }
+  function renderNextUp() {
+    var list = $("liteNextUp");
+    if (!list) return;
+    list.innerHTML = "";
+    var shown = 0;
+    for (var j = liteQIndex + 1; j < liteQueue.length && shown < 5; j++) {
+      if (!fileForBlock(liteQueue[j])) continue;
+      var li = document.createElement("li");
+      li.textContent = liteQueue[j].title + (liteQueue[j].type === "ad" ? " (ad)" : "");
+      list.appendChild(li);
+      shown++;
+    }
+    if (!shown) {
+      var li0 = document.createElement("li");
+      li0.style.color = "var(--muted)";
+      li0.textContent = "Load music to see what's up next.";
+      list.appendChild(li0);
+    }
+  }
+  function playBlockAt(i) {
+    for (var j = i; j < liteQueue.length; j++) {
+      var f = fileForBlock(liteQueue[j]);
+      if (!f) continue;
+      liteQIndex = j;
+      liteCurrent = liteQueue[j];
+      liteAudio.src = f.url;
+      liteAudio.play().catch(function (e) { toast("Couldn't play that file — " + (e && e.message ? e.message : "unknown error")); });
+      DJRotation.recordPlay(liteQueue[j].title, liteQueue[j].type === "ad" ? "ad" : "song");
+      $("liteNowPlaying").textContent = "Now playing: " + liteQueue[j].title;
+      renderNextUp();
+      return true;
+    }
+    return false;
+  }
+  function litePlay() {
+    ensureCtx();
+    if (litePlaying) {
+      liteAudio.pause();
+      litePlaying = false;
+      $("litePlayBtn").textContent = "▶ Play music";
+      $("liteNowPlaying").textContent = "Paused — " + (liteCurrent ? liteCurrent.title : "nothing");
+      return;
+    }
+    /* Resume a paused track in place (don't restart it). */
+    if (liteCurrent && liteAudio.src && liteAudio.currentTime > 0 && !liteAudio.ended) {
+      liteAudio.play().catch(function () {});
+      litePlaying = true;
+      $("litePlayBtn").textContent = "⏸ Pause music";
+      return;
+    }
+    if (!liteQueue.length) liteRebuildQueue();
+    if (!playBlockAt(liteQIndex)) {
+      liteRebuildQueue();
+      if (!playBlockAt(0)) {
+        toast("No music files loaded yet — upload a zip or load files first.");
+        $("liteNowPlaying").textContent = "Nothing playing yet — load your music first.";
+        return;
+      }
+    }
+    litePlaying = true;
+    $("litePlayBtn").textContent = "⏸ Pause music";
+  }
+  $("litePlayBtn").addEventListener("click", litePlay);
+  liteAudio.addEventListener("ended", function () {
+    if (!litePlaying) return;
+    if (!playBlockAt(liteQIndex + 1)) {
+      liteRebuildQueue();
+      if (!playBlockAt(0)) {
+        litePlaying = false;
+        $("litePlayBtn").textContent = "▶ Play music";
+        $("liteNowPlaying").textContent = "Nothing playing yet.";
+      }
+    }
+  });
+
+  function audioDuration(url) {
+    return new Promise(function (resolve) {
+      var a = new Audio();
+      a.preload = "metadata";
+      a.onloadedmetadata = function () { resolve(isFinite(a.duration) && a.duration > 0 ? Math.round(a.duration) : 0); };
+      a.onerror = function () { resolve(0); };
+      a.src = url;
+    });
+  }
+
+  /* Zip playlist upload — same JSZip flow as the full console. Cap 100 tracks. */
+  $("liteZipInput").addEventListener("change", async function () {
+    var file = this.files && this.files[0];
+    this.value = "";
+    if (!file) return;
+    var status = $("liteZipStatus");
+    if (!window.JSZip) { status.textContent = "JSZip didn't load — check your connection and try again."; return; }
+    status.textContent = "Unzipping…";
+    try {
+      var zip = await JSZip.loadAsync(file);
+      var entries = [];
+      zip.forEach(function (rel, entry) { if (!entry.dir) entries.push(entry); });
+      var audioEntries = entries.filter(function (e) { return /\.(mp3|wav|ogg|m4a|flac)$/i.test(e.name); });
+      var skipped = entries.length - audioEntries.length;
+      if (audioEntries.length > 100) { skipped += audioEntries.length - 100; audioEntries = audioEntries.slice(0, 100); }
+      if (!audioEntries.length) { status.textContent = "No audio files found in that zip."; return; }
+      var added = 0;
+      for (var i = 0; i < audioEntries.length; i++) {
+        var e = audioEntries[i];
+        var blob = await e.async("blob");
+        var url = URL.createObjectURL(blob);
+        var base = e.name.split("/").pop().replace(/\.[^.]+$/, "");
+        var dur = await audioDuration(url);
+        var key = "zip-" + Date.now() + "-" + i;
+        liteZipTracks.push({ name: base, dur: dur, zip: true, zipKey: key });
+        liteZipFiles[key] = { url: url, name: base, dur: dur, file: blob };
+        added++;
+      }
+      liteRebuildQueue();
+      renderNextUp();
+      status.textContent = "Added " + added + " track" + (added === 1 ? "" : "s") + " from the zip" +
+        (skipped ? " — " + skipped + " file" + (skipped === 1 ? "" : "s") + " skipped (not audio, or over the 100-track cap)" : "") + ".";
+    } catch (err) {
+      status.textContent = "Couldn't open that zip — " + (err && err.message ? err.message : "unknown error");
+    }
+  });
+
+  /* Load music files — matches album tracks / ads by name; unmatched files join
+     the rotation as their own song. */
+  $("liteFileInput").addEventListener("change", async function () {
+    var files = Array.prototype.slice.call(this.files || []);
+    this.value = "";
+    if (!files.length) return;
+    var added = 0, matched = 0;
+    for (var i = 0; i < files.length; i++) {
+      var f = files[i];
+      if (!/\.(mp3|wav|ogg|m4a|flac)$/i.test(f.name)) continue;
+      var url = URL.createObjectURL(f);
+      var base = f.name.replace(/\.[^.]+$/, "");
+      var title = base.replace(/^\d+\s*[-–]\s*/, "").trim();
+      var dur = await audioDuration(url);
+      var rec = { url: url, name: f.name, dur: dur, file: f };
+      var albumIdx = DJRotation.POOL.tracks.findIndex(function (t) { return t.toLowerCase() === title.toLowerCase(); });
+      if (albumIdx >= 0) {
+        liteSongFiles[DJRotation.POOL.tracks[albumIdx]] = rec;
+        matched++;
+      } else {
+        var ad = DJRotation.POOL.ads.find(function (a) { return a.title.toLowerCase() === title.toLowerCase(); });
+        if (ad) {
+          liteAdFiles["Ad — " + ad.title] = rec;
+          matched++;
+        } else {
+          if (liteExtraTracks.indexOf(title) < 0) liteExtraTracks.push(title);
+          liteSongFiles[title] = rec;
+        }
+      }
+      added++;
+    }
+    liteRebuildQueue();
+    renderNextUp();
+    $("liteZipStatus").textContent = "Loaded " + added + " file" + (added === 1 ? "" : "s") +
+      (matched ? " (" + matched + " matched a show track or ad)" : "") + " — ready to play.";
+  });
+
+  /* ================= LIVE STREAM HOOKUP ================= */
+  async function loadLiteStream() {
+    var url = "";
+    try {
+      var r = await fetch("/api/radio-settings");
+      if (r.ok) {
+        var d = await r.json();
+        if (d.settings && d.settings.stream_url) url = d.settings.stream_url;
+      }
+    } catch (e) {}
+    if (!url) {
+      try {
+        var r2 = await fetch("live-video.json?t=" + Date.now());
+        if (r2.ok) {
+          var cfg = await r2.json();
+          if (cfg.src) url = cfg.src;
+        }
+      } catch (e2) {}
+    }
+    $("liteStreamUrl").value = url;
+  }
+  $("liteStreamSave").addEventListener("click", async function () {
+    var url = $("liteStreamUrl").value.trim();
+    var msg = $("liteStreamMsg");
+    var dev = deviceId();
+    if (!dev) { msg.textContent = "Sign in to the Community first."; return; }
+    try {
+      var r = await fetch("/api/radio-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: dev, settings: { stream_url: url } })
+      });
+      if (!r.ok) { msg.textContent = "Couldn't save — " + r.status; return; }
+      msg.textContent = "Saved ✓ — the music page video box will pick it up within 30 seconds.";
+    } catch (e) {
+      msg.textContent = "Couldn't save — " + (e && e.message ? e.message : "network error");
+    }
+  });
+
+  /* ================= CAMERA (viewfinder only) ================= */
+  var liteCamStream = null, liteCamFacing = "environment";
+  async function startLiteCam() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      $("liteCamStatus").textContent = "Camera is not supported in this browser.";
+      return;
+    }
+    try {
+      if (liteCamStream) liteCamStream.getTracks().forEach(function (t) { t.stop(); });
+      var sel = $("liteCamSelect").value;
+      var constraints = sel ? { video: { deviceId: { exact: sel } } } : { video: { facingMode: liteCamFacing } };
+      liteCamStream = await navigator.mediaDevices.getUserMedia(constraints);
+      var v = $("liteCamPreview");
+      v.srcObject = liteCamStream;
+      v.style.display = "block";
+      $("liteCamBtn").textContent = "📷 Stop camera";
+      $("liteCamStatus").textContent = "Camera on — this is a viewfinder only. It does not stream from the browser. The Anbernic RG476H has no camera, so the phone is the camera source.";
+      refreshDeviceLists();
+    } catch (e) {
+      $("liteCamStatus").textContent = "Camera not allowed or not available — " + (e && e.message ? e.message : "");
+    }
+  }
+  function stopLiteCam() {
+    if (liteCamStream) { liteCamStream.getTracks().forEach(function (t) { t.stop(); }); liteCamStream = null; }
+    var v = $("liteCamPreview");
+    v.srcObject = null;
+    v.style.display = "none";
+    $("liteCamBtn").textContent = "📷 Start camera";
+    $("liteCamStatus").textContent = "Camera off.";
+  }
+  $("liteCamBtn").addEventListener("click", function () { if (liteCamStream) stopLiteCam(); else startLiteCam(); });
+  $("liteCamFlip").addEventListener("click", function () {
+    liteCamFacing = liteCamFacing === "environment" ? "user" : "environment";
+    if (liteCamStream) startLiteCam();
+    else toast("Camera set to " + (liteCamFacing === "environment" ? "back" : "front") + " — start the camera to see it.");
+  });
+
+  /* ================= SCREEN (share + record) ================= */
+  var liteScreenStream = null, liteRecorder = null, liteRecChunks = [], liteRecTimer = null, liteRecStart = 0;
+  async function shareLiteScreen() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+      $("liteScreenStatus").textContent = "Screen share is not supported on this device — on a phone, use the YouTube / Twitch app to go live instead.";
+      return;
+    }
+    try {
+      liteScreenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      var v = $("liteScreenPreview");
+      v.srcObject = liteScreenStream;
+      v.style.display = "block";
+      $("liteScreenStatus").textContent = "Screen previewing — this is a preview only. It does not stream to Twitch or YouTube by itself.";
+      var track = liteScreenStream.getVideoTracks()[0];
+      if (track) track.addEventListener("ended", function () { stopLiteScreen(); });
+    } catch (e) {
+      $("liteScreenStatus").textContent = "Screen share not allowed or not supported on this device — " + (e && e.message ? e.message : "");
+    }
+  }
+  function stopLiteScreen() {
+    if (liteScreenStream) { liteScreenStream.getTracks().forEach(function (t) { t.stop(); }); liteScreenStream = null; }
+    var v = $("liteScreenPreview");
+    v.srcObject = null;
+    v.style.display = "none";
+    $("liteScreenStatus").textContent = "Screen not shared yet.";
+  }
+  function startLiteRecord() {
+    ensureCtx();
+    var stream = null;
+    if (liteScreenStream && recDest) {
+      stream = new MediaStream(liteScreenStream.getVideoTracks().concat(recDest.stream.getAudioTracks()));
+    } else if (recDest && (micLive || litePlaying)) {
+      stream = recDest.stream; /* audio only */
+    } else {
+      $("liteScreenStatus").textContent = "Nothing to record yet — share your screen, or start the music / mic first.";
+      return;
+    }
+    try {
+      liteRecorder = new MediaRecorder(stream);
+    } catch (e) {
+      $("liteScreenStatus").textContent = "Recording is not supported in this browser.";
+      return;
+    }
+    liteRecChunks = [];
+    liteRecorder.ondataavailable = function (ev) { if (ev.data && ev.data.size) liteRecChunks.push(ev.data); };
+    liteRecorder.onstop = function () {
+      var blob = new Blob(liteRecChunks, { type: (liteRecorder && liteRecorder.mimeType) || "video/webm" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "pocket-dj-recording-" + new Date().toISOString().replace(/[:.]/g, "-") + ".webm";
+      a.textContent = "⬇ Download recording (.webm)";
+      var holder = $("liteRecDownload");
+      holder.innerHTML = "";
+      holder.appendChild(a);
+      $("liteRecStatus").hidden = true;
+    };
+    liteRecorder.start(250);
+    liteRecStart = Date.now();
+    $("liteRecStatus").hidden = false;
+    $("liteRecordBtn").textContent = "■ Stop recording";
+    liteRecTimer = setInterval(function () {
+      var s = Math.floor((Date.now() - liteRecStart) / 1000);
+      $("liteRecTime").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+    }, 500);
+  }
+  function stopLiteRecord() {
+    if (liteRecorder && liteRecorder.state !== "inactive") liteRecorder.stop();
+    if (liteRecTimer) { clearInterval(liteRecTimer); liteRecTimer = null; }
+    $("liteRecordBtn").textContent = "● Record";
+  }
+  $("liteShareBtn").addEventListener("click", function () { if (liteScreenStream) stopLiteScreen(); else shareLiteScreen(); });
+  $("liteRecordBtn").addEventListener("click", function () {
+    if (liteRecorder && liteRecorder.state === "recording") stopLiteRecord();
+    else startLiteRecord();
+  });
+
+  /* ================= INIT ================= */
+  refreshDeviceLists();
+  loadLiteStream();
+  renderNextUp();
+}
+</script>
+</body>
+</html>

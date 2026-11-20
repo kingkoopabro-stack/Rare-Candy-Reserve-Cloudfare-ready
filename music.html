@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="Music — a steady heart · Rare Candy Reserve">
 <meta name="twitter:description" content="Check out my music — for those who never stop growing as people. A steady heart, from Rare Candy Reserve.">
 <meta name="twitter:image" content="https://rarecandyreserve.org/images/support-my-dream-merch.jpg">>
-<link rel="stylesheet" href="assets/css/style.css?v=notifcss1">
+<link rel="stylesheet" href="assets/css/style.css?v=badges1">
 <style>
 /* Live video — the stage for concerts, shows & interviews (music page) */
 .live-video-frame{max-width:860px;margin:0 auto;border-radius:20px;padding:4px;background:linear-gradient(90deg,#ff2d95,#ff9a00,#00e5ff,#7c4dff,#ff2d95);background-size:300% 100%;animation:liveVideoBorder 6s linear infinite;box-shadow:0 0 28px rgba(255,45,149,.55),0 0 48px rgba(0,229,255,.35)}
@@ -241,8 +241,6 @@
 
 <footer class="site">
   <div class="wrap">
-    <div class="follow-label">Listen &amp; follow — a steady heart</div>
-    <div class="follow-row" id="followRow"></div>
     <div class="foot-bottom">
       <div class="foot-links">
         <a class="fb-like" href="https://www.facebook.com/RareCandyReserve" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg> Like us on Facebook</a>
@@ -261,6 +259,10 @@
    fetched on load and every 30s (same pattern as radio-now.txt).
    Config: {"type":"youtube"|"twitch"|"mp4"|"embed"|"off","src":"...","title":"...","mode":"live"|"loop",
             "schedule":[{"date":"2026-12-18","start":"8:00 PM","end":"11:00 PM","title":"..."}]}
+   Stream URL override: the DJ consoles (full + pocket) save the live stream
+   link to /api/radio-settings (key stream_url). When it is set it wins over
+   live-video.json's src; the schedule still comes from live-video.json.
+   Empty / failed settings fetch = fall back to live-video.json.
    Live Chat below uses the SAME Community chatroom API as community.html #/chat
    (GET /api/chat + POST /api/chat) — one shared room, everyone sees it.
    Guests post with an optional guest name (auto-censored server-side, per the
@@ -382,9 +384,24 @@
     fetch("live-video.json?t="+Date.now())
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(cfg){
-        current=normalize(cfg||{type:"off"});
-        render(current);
-        renderSchedule((cfg&&cfg.schedule)||[]);
+        cfg = cfg || {type:"off"};
+        /* Stream URL override — the DJ consoles (full + pocket) save the live
+           stream link to /api/radio-settings (stream_url). When it is set it
+           wins over live-video.json's src; the schedule still comes from
+           live-video.json. Empty / failed settings fetch = fall back. */
+        fetch("/api/radio-settings")
+          .then(function(r){ return r.ok ? r.json() : null; })
+          .then(function(d){
+            var url = d && d.settings && d.settings.stream_url ? String(d.settings.stream_url).trim() : "";
+            current = url ? normalize({type:"auto", src:url, title:cfg.title, mode:cfg.mode}) : normalize(cfg);
+            render(current);
+            renderSchedule((cfg&&cfg.schedule)||[]);
+          })
+          .catch(function(){
+            current = normalize(cfg);
+            render(current);
+            renderSchedule((cfg&&cfg.schedule)||[]);
+          });
       })
       .catch(function(){ /* keep whatever is showing */ });
   }

@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="Rare Candy Reserve — Level Up Your Collection">
 <meta name="twitter:description" content="Graded cards, mint comics, and one-of-one 3D prints — plus a forge for your next tabletop character.">
 <meta name="twitter:image" content="https://rarecandyreserve.org/images/support-my-dream-merch.jpg">>
-<link rel="stylesheet" href="assets/css/style.css?v=notifcss1">
+<link rel="stylesheet" href="assets/css/style.css?v=badges1">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"Organization","name":"Rare Candy Reserve","url":"https://rarecandyreserve.org/","logo":"https://rarecandyreserve.org/images/steady-heart.svg","sameAs":["https://www.facebook.com/RareCandyReserve","https://allmylinks.com/ashmusic","https://open.spotify.com/artist/5Yu8YngzEdVTot78vdFgnB"]}
 </script>
@@ -88,9 +88,31 @@
       .v37-features li::before{content:"★";position:absolute;left:0;color:#ffe600;text-shadow:0 0 10px rgba(255,230,0,.8)}
       .v37-features li.v37-more{background:linear-gradient(90deg,#ff9a00,#ffe600,#22ff88,#00cfff);-webkit-background-clip:text;background-clip:text;color:transparent}
       .v37-features li.v37-more::before{content:"★";-webkit-text-fill-color:#ffe600}
+      .v37-compact{padding:18px 16px 16px}
+      .v37-compact .v37-neon{font-size:clamp(1.35rem,3.8vw,1.9rem);margin-bottom:6px}
+      .v37-compact .v37-sub{font-size:.92rem;margin:4px 0}
+      .v37-compact .v37-sub2{font-size:.88rem;margin:4px 0 12px}
+      .v37-compact .v37-player{padding:12px 14px;max-width:560px}
+      .v37-compact .v37-player h3{font-size:1rem}
+      .v37-compact .v37-player .v37-next{font-size:.85rem;margin-top:8px}
+      .v37-compact .v37-features{display:flex;flex-wrap:wrap;gap:4px 18px;justify-content:center;max-width:760px;margin:14px auto 0}
+      .v37-compact .v37-features li{font-size:.92rem;font-weight:600;padding:2px 0 2px 22px}
     </style>
     <div class="v37-frame">
-      <section class="v37-updates" aria-label="New version 3.9 feature updates">
+      <section class="v37-updates" aria-label="Website tour video">
+        <h2 class="v37-neon">📼 Watch the tour!</h2>
+        <p class="v37-sub">New here? Slab walks you through the whole site — 80s training-video style.</p>
+        <p class="v37-sub2">YourSpace, the Wall Market, the Shop, Music, the Nerd Hub, Create, the rules, and the human help team — plus one very important lesson about burgers. 4:11, narrated by Slab.</p>
+        <div class="v37-player" style="max-width:720px">
+          <span class="v37-tag">🎬 Website Tour · 80s Training Video · 4:11</span>
+          <video controls preload="none" poster="images/website-tour-poster.jpg" src="videos/website-tour-80s-training.mp4" style="width:100%;border-radius:10px;margin-top:10px;background:#000"></video>
+          <p style="font-size:.82rem;color:#c9c2d6;margin:8px 0 0;text-align:center">The last part is the most important!<br>So remember kiddos, NOTHING MATTERS!</p>
+          <p class="v37-next">A training-video parody — the site walkthrough uses real screenshots so you can find everything. Suzy is a fictional trainee. Chris's burger line is his own words, verbatim.</p>
+        </div>
+      </section>
+    </div>
+    <div class="v37-frame">
+      <section class="v37-updates v37-compact" aria-label="New version 3.9 feature updates">
         <h2 class="v37-neon">NEW V.3.9 Feature Updates!</h2>
         <p class="v37-sub">(Let Slab Explain The Newest Features &amp; Where To Find Them!)</p>
         <p class="v37-sub2">New updates rolled out weekly via Slab's Podcast!</p>
@@ -103,7 +125,7 @@
         <ul class="v37-features">
           <li>Group Up — find your squad in the Nerd Hub</li>
           <li>Shop listing editor — new admin tools for inventory &amp; orders</li>
-          <li>Headlines — top news, posted daily in the Wall Market</li>
+          <li>Headlines — top news, posted daily in YourSpace</li>
           <li>Notifications — bell in the header &amp; Alerts on Taffy Phone</li>
           <li class="v37-more">📱 Android app — coming next!</li>
         </ul>

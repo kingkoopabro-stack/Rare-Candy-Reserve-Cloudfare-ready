@@ -129,6 +129,7 @@ var state = {
   notice: null,
   category: null,
   sort: "new",
+  friendsOnly: false,
   editingProfile: false,
   signupOpen: false,
   challenge: null, // { token, question }
@@ -157,7 +158,7 @@ var state = {
   // changes never rebuild it (that keeps the radio playing and the notes
   // textarea focused). All phone data is in-memory / this session only.
   phone: { open: false, app: "home", wallpaper: "vaporwave" },
-  phoneGallery: [], // [{ url, name, timer }] — session only, auto-deleted after 10 min
+  phoneGallery: [], // [{ url, name, timer, publicId }] — session only, auto-deleted after 10 min
   phoneNotes: "", // session notes — this tab only, gone when you leave
   phoneMsgList: null, // cached member list for the MSG contacts view
   phoneAlertsList: null, // cached notifications for the Alerts app view
@@ -165,6 +166,11 @@ var state = {
   phoneChat: [], // [{ who: "me"|"taffy", text, emoji }] — session only, gone when you leave
   phoneChatOpen: false, // chat bar expanded (tap-to-reveal); conversation stays in phoneChat when closed
   phoneRenderedKey: "", // app|open|wallpaper|galleryCount — avoids rebuilding the radio
+  // v3.9 picture viewer — the lightbox opened from a profile picture.
+  // photos: [{ url, subject, label }]; subject is the comment thread key
+  // ("avatar" or "gallery:<id>"). No likes anywhere on pictures.
+  picViewer: null,
+  picViewerKeyHandler: null, // Escape-to-close listener for the viewer
 };
 
 function deviceId() {
@@ -424,7 +430,7 @@ function fileDownloadUrl(url) {
 
 // ---------- routing ----------
 var NAV = [
-  ["street", "The Street"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
+  ["street", "🏠 YourSpace"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
   ["trade", "⇄ Up for Trade"], ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
   ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
@@ -475,9 +481,9 @@ function render() {
   if (state.showUnlock && state.profile) html += unlockCardHTML();
   html += '<div id="dwc-account"></div>';
   html += '<nav class="dwc-pills" aria-label="Community sections">' + NAV.filter(function (item) {
-    // Admin + Team are role-gated: Admin is operator-only, Team is
+    // Admin + Team are role-gated: Admin is operator + admin, Team is
     // operator/admin/mod. Everyone else never sees the pills.
-    if (item[0] === "admin") return !!(state.profile && (state.profile.role === "operator" || state.profile.is_operator));
+    if (item[0] === "admin") return !!(state.profile && (state.profile.role === "operator" || state.profile.role === "admin" || state.profile.is_operator));
     if (item[0] === "team") return !!(state.profile && (state.profile.role === "operator" || state.profile.role === "admin" || state.profile.role === "mod" || state.profile.is_operator));
     return true;
   }).map(function (item) {
@@ -763,6 +769,7 @@ function phoneHomeHTML() {
     phoneAppTile("code", "Code", '<span class="tp-icon tp-icon-code"><span class="tp-glyph">&lt;/&gt;</span></span>') +
     phoneAppTile("tutorial", "Available soon — check back later!", '<span class="tp-icon tp-icon-tutorial">' + TP_ICON_TUTORIAL + '</span>') +
     phoneAppTile("alerts", "Alerts", '<span class="tp-icon tp-icon-alerts">' + TP_ICON_ALERTS + '</span>') +
+    phoneAppTile("badges", "Badges", '<span class="tp-icon tp-icon-badges"><span class="tp-glyph">🏅</span></span>') +
     '</div>' +
     '<div class="tp-wall"><span>Wallpaper</span><div class="tp-wall-swatches">' +
     PHONE_WALLPAPERS.map(function (w) {
@@ -1002,7 +1009,7 @@ function taffyReply(raw) {
     return { text: taffyPick(["On someone's page, hit “Add me” to add them as a friend — it flips to “Unfriend” once you're friends. The star next to “Add to Favorites” lights up gold when they're favorited. Your own page URL lives in Edit Profile under “My page URL” — 3 changes per 5 years, 1-year cooldown, or appeal to Chris.", "Friends and favorites live on the member page: “Add me” adds them (it turns into “Unfriend” when you're already friends), and the ☆ star fills gold when you favorite someone. Your custom page URL is in Edit Profile — “My page URL” — 3 changes in 5 years, 1-year cooldown after each one."]), emoji: taffyPickEmoji(["👥", "⭐"]), working: false };
   // Phone
   if (has(/\b(phone|my phone|the phone|apps|gallery|notes app)\b/))
-    return { text: taffyPick(["The green button opens my phone — 9 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, Tutorial, and Alerts. Tap the \u2014 to minimize me back to the button.", "My phone has 9 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, Tutorial, and Alerts. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
+    return { text: taffyPick(["The green button opens my phone — 10 apps: me, MSG for friends, Gallery, SOS, Notes, radio, Code, Tutorial, Alerts, and Badges. Tap the \u2014 to minimize me back to the button.", "My phone has 10 apps — Vita Nova (me!), MSG, Gallery, SOS, Notes, radio, Code, Tutorial, Alerts, and Badges. The green call button opens it, the \u2014 button closes it."]), emoji: taffyPickEmoji(["📱", "✨"]), working: false };
   // Shop (where is it)
   if (has(/\bwhere\b.{0,15}\b(shop|store)\b|\b(go to|take me to|visit|open)\b.{0,15}\b(shop|store)\b|\b(shop|store) page\b/))
     return { text: taffyPick(["Hit Shop in the top nav — that's the Rare Candy Reserve store, cards, handhelds, and all.", "The shop is one tap away — Shop in the top nav takes you to the store. Cards, pins, handhelds, the lot."]), emoji: taffyPickEmoji(["🛍️", "🍬"]), working: false };
@@ -1141,11 +1148,16 @@ function phoneGalleryHTML() {
   var items = state.phoneGallery;
   var thumbs = items.length
     ? '<div class="tp-gallery">' + items.map(function (it, i) {
-        return '<figure><img src="' + esc(it.url) + '" alt="" onclick="DWC.phoneGalleryOpen(' + i + ')"><button type="button" onclick="DWC.phoneGalleryDel(' + i + ')" title="Delete">✕</button><figcaption>' + esc(it.name) + '</figcaption></figure>';
-      }).join("") + '</div>'
+        return '<figure><img src="' + esc(it.url) + '" alt="" onclick="DWC.phoneGalleryOpen(' + i + ')"><button type="button" onclick="DWC.phoneGalleryDel(' + i + ')" title="Delete">✕</button><figcaption>' + esc(it.name) + "</figcaption>" +
+          (state.profile
+            ? (it.publicId
+              ? '<button type="button" class="btn ghost small" onclick="DWC.phoneGalleryUnpublish(' + i + ')">🌍 Public ✓ — take down</button>'
+              : '<button type="button" class="btn ghost small" onclick="DWC.phoneGalleryPublish(' + i + ')">📣 Make public</button>')
+            : "") + "</figure>";
+      }).join("") + "</div>"
     : '<p class="tp-note">No photos here yet — add one below.</p>';
   return phoneTopbarHTML("Gallery") + '<div class="tp-appview">' +
-    '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site.</p>' +
+    '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site. Tap “Make public” on a photo to keep it public on your page (up to 20) so visitors can scroll through it in your picture viewer.</p>' +
     thumbs +
     '<label class="btn small tp-filebtn">+ Add a photo<input type="file" accept="image/*" hidden onchange="DWC.phoneGalleryAdd(this)"></label>' +
     '<p class="tp-note">' + items.length + ' / 6 photos</p></div>';
@@ -1241,6 +1253,18 @@ function phoneAlertsHTML() {
   return phoneTopbarHTML("Alerts") + '<div class="tp-appview">' +
     '<p><button type="button" class="btn ghost small" onclick="DWC.phoneAlertsMarkAll()">Mark all read</button></p>' + rows + '</div>';
 }
+// Badges app (v3.9) — your unlocked badges + the locked ones with what
+// earns them. Same list as Edit Profile "Badge display".
+function phoneBadgesHTML() {
+  var body = "";
+  if (!state.profile) {
+    body = '<p class="tp-note">Create your account to earn badges — Taffy is here either way.</p><p><button type="button" class="btn small" onclick="DWC.phoneMinimize();DWC.openSignup()">Create account — it’s free</button></p>';
+  } else {
+    body = badgeDisplayListHTML(state.profile.badges || []) +
+      '<p class="tp-note">Pick which badge shows next to your name in Edit Profile → Badge display.</p>';
+  }
+  return phoneTopbarHTML("Badges") + '<div class="tp-appview">' + body + '</div>';
+}
 function phoneScreenHTML() {
   var app = state.phone.app;
   var inner = "";
@@ -1253,6 +1277,7 @@ function phoneScreenHTML() {
   else if (app === "code") inner = phoneCodeHTML();
   else if (app === "tutorial") inner = phoneTutorialHTML();
   else if (app === "alerts") inner = phoneAlertsHTML();
+  else if (app === "badges") inner = phoneBadgesHTML();
   else inner = phoneHomeHTML();
   return '<div class="tp-screen" style="background:' + phoneWallpaperBg(state.phone.wallpaper) + '">' +
     '<div class="tp-island"></div>' +
@@ -1360,6 +1385,50 @@ function pageSlugSectionHTML(p) {
   return html;
 }
 
+// v3.9 — picture frame picker: 11 frames, locked ones greyed out with
+// their requirement. p.unlocked_frames comes from the profile GET.
+function picFramePickerHTML(p, th) {
+  var unlocked = (p && p.unlocked_frames) || [];
+  var current = th.pic_frame || "none";
+  return PIC_FRAMES.map(function (f) {
+    var isLocked = f.locked && unlocked.indexOf(f.unlockKey) < 0;
+    var label = esc(f.name) + (f.desc ? " — " + esc(f.desc) : "");
+    if (isLocked) label = "🔒 " + esc(f.name) + " — unlock: " + esc(f.requirement);
+    return '<button type="button" class="dwc-pill' + (current === f.id ? " active" : "") + '"' + (isLocked ? " disabled" : "") + ' data-picframebtn="' + f.id + '" onclick="DWC.applyPicFrame(\'' + f.id + '\')">' + label + "</button>";
+  }).join("");
+}
+// v3.9 — preset backgrounds picker (swatch + name).
+function presetBackgroundsHTML(th) {
+  var current = th.bg_preset || "";
+  return PRESET_BACKGROUNDS.map(function (pr) {
+    return '<button type="button" class="dwc-pill' + (current === pr.id ? " active" : "") + '" data-bgpresetbtn="' + pr.id + '" onclick="DWC.applyBgPreset(\'' + pr.id + '\')">' +
+      '<span class="dwc-bg-swatch" style="background:' + pr.swatch + '"></span> ' + esc(pr.name) + (pr.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(pr.desc) + "</span>" : "") + "</button>";
+  }).join("");
+}
+// v3.9 — website-look fields: each of the five has its own show checkbox.
+function websiteFieldsHTML(p) {
+  var show = (p && p.website_show) || {};
+  var val = function (k) { return p ? esc(p[k] || "") : ""; };
+  var chk = function (k) { return show[k] ? " checked" : ""; };
+  var signs = Object.keys(ZODIAC_SIGNS).map(function (id) {
+    return '<option value="' + id + '"' + (p && p.birthsign === id ? " selected" : "") + ">" + ZODIAC_SIGNS[id].symbol + " " + esc(ZODIAC_SIGNS[id].name) + "</option>";
+  }).join("");
+  return '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌐 Website look — make my profile look like a real website</h4>' +
+    "<p style=\"margin:0 0 8px\">Turn this on and your page stops looking like a MySpace card stack — it gets a Home + Community nav bar, clean website sections, and just a “Message me” button under your picture. Top Friends hide in this mode. Tick the boxes for the bits you want to show.</p>" +
+    '<label><input type="checkbox" name="website_mode" style="width:auto"' + (p && p.website_mode ? " checked" : "") + '> 🌐 Website look — my profile looks like a real website</label>' +
+    '<label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies</label>' +
+    '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
+    '<label><input type="checkbox" name="website_show_workplace" style="width:auto"' + chk("workplace") + '> Show where I work</label>' +
+    '<label>Where I work</label><input name="workplace" maxlength="120" value="' + val("workplace") + '" placeholder="e.g. Rare Candy Reserve">' +
+    '<label><input type="checkbox" name="website_show_relationship" style="width:auto"' + chk("relationship") + '> Show Single or in a relationship</label>' +
+    '<label>Single or in a relationship</label><select name="relationship_status"><option value="">— pick one —</option>' +
+    ["Single", "In a relationship", "It's complicated", "Prefer not to say"].map(function (r) { return '<option' + (p && p.relationship_status === r ? " selected" : "") + ">" + esc(r) + "</option>"; }).join("") + "</select>" +
+    '<label><input type="checkbox" name="website_show_sign" style="width:auto"' + chk("sign") + '> Show my Sign</label>' +
+    '<label>Sign</label><select name="birthsign"><option value="">— pick your sign —</option>' + signs + "</select>" +
+    '<label><input type="checkbox" name="website_show_accomplishments" style="width:auto"' + chk("accomplishments") + '> Show my Recent accomplishments</label>' +
+    '<label>Recent accomplishments</label><textarea name="accomplishments" rows="3" maxlength="500" placeholder="What have you pulled off lately?">' + val("accomplishments") + "</textarea></div>";
+}
+
 function profileFormHTML(p) {
   var isNew = !p;
   var v = function (k) { return p ? esc(p[k] || "") : ""; };
@@ -1368,7 +1437,7 @@ function profileFormHTML(p) {
   var th = parseThemeClient(p && p.profile_theme);
   return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
     "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
-    (isNew ? '<p style="color:var(--muted);margin-top:0">Just 4 things and you’re in — username, birthday, your name, and a quick human check. Picture, bio, links, layout, and payout can all wait until after — hit Edit profile any time.</p>' : "") +
+    (isNew ? '<p style="color:var(--muted);margin-top:0">Just 4 things and you’re in — username, birthday, your name, and a quick human check. Picture, bio, links, layout, and payout can all wait until after — hit Edit profile any time.</p><p style="color:var(--green);font-weight:700;margin-top:0">Free to join — no ID needed. Selling regular stuff never needs an ID. ID is only ever asked for adult content and digital assets.</p>' : "") +
     '<form onsubmit="DWC.saveProfile(this); return false;">' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
@@ -1393,7 +1462,31 @@ function profileFormHTML(p) {
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically (a GIF becomes a still image). iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
     '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.avatarPicked(this)">' +
     '<p id="dwc-avatar-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
-    (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "")) +
+    (p && p.avatar_url ? '<label><input type="checkbox" name="remove_avatar" style="width:auto"> Remove my current picture</label>' : "") +
+    '<label>Picture size — how big your picture shows on your page</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (th.pic_size !== "smaller" ? " active" : "") + '" data-picsizebtn="bigger" onclick="DWC.applyPicSize(\'bigger\')">Bigger</button>' +
+    '<button type="button" class="dwc-pill' + (th.pic_size === "smaller" ? " active" : "") + '" data-picsizebtn="smaller" onclick="DWC.applyPicSize(\'smaller\')">Smaller</button>' +
+    '</div>' +
+    '<input type="hidden" name="theme_pic_size" value="' + esc(th.pic_size || "bigger") + '">' +
+    '<label>Picture position — where your picture sits</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (th.pic_position !== "top" ? " active" : "") + '" data-picposbtn="normal" onclick="DWC.applyPicPosition(\'normal\')">Normal — banner on top, picture below</button>' +
+    '<button type="button" class="dwc-pill' + (th.pic_position === "top" ? " active" : "") + '" data-picposbtn="top" onclick="DWC.applyPicPosition(\'top\')">On top — picture first, banner below it</button>' +
+    '</div>' +
+    '<input type="hidden" name="theme_pic_position" value="' + esc(th.pic_position || "normal") + '">' +
+    '<label>🖼️ Picture frame — the ring around your picture (tap your picture on your page to enlarge it and comment)</label>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Some frames unlock as you use the site — post, comment, and show up daily to earn them. Locked frames are greyed out with what they need.</p>' +
+    '<div class="dwc-presets">' + picFramePickerHTML(p, th) + "</div>" +
+    '<input type="hidden" name="theme_pic_frame" value="' + esc(th.pic_frame || "none") + '">' +
+    '<div id="dwc-blood-row"' + (th.pic_frame === "blood" ? "" : " hidden") + '><label>Drip color — pick any color for the blood / ooze</label>' +
+    '<input name="theme_blood_color" type="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(th.blood_color || "") ? th.blood_color : "#c41e1e") + '" style="width:64px;height:36px;padding:2px"></div>' +
+    '<div id="dwc-gb-row"' + ((th.pic_frame === "gb" || th.pic_frame === "gba") ? "" : " hidden") + '><label>Handheld colors</label>' +
+    '<select name="theme_gb_mode" onchange="DWC.gbModeChanged(this)">' + GB_FRAME_MODES.map(function (gm) { return '<option value="' + gm.id + '"' + (th.gb_mode === gm.id ? " selected" : "") + ">" + esc(gm.name) + "</option>"; }).join("") + "</select>" +
+    '<div id="dwc-gb-custom"' + (th.gb_mode === "custom" ? "" : " hidden") + '><label>Your 3 colors — they blend into the handheld body</label>' +
+    '<div class="dwc-rowform">' +
+    [0, 1, 2].map(function (i) { return '<input name="theme_gb_color_' + i + '" type="color" value="' + esc((th.gb_colors && th.gb_colors[i]) || ["#5a5fcf", "#7c4dff", "#1a1a2e"][i]) + '" style="width:64px;height:36px;padding:2px">'; }).join("") +
+    "</div></div></div>") +
     // v3.7 — banner / cover photo (centered at the top of the page) +
     // optional custom-text ticker (above the main page; the name stays put).
     (isNew ? "" :
@@ -1460,6 +1553,10 @@ function profileFormHTML(p) {
     '<textarea name="layout_css" rows="8" maxlength="8000" placeholder="e.g. .dwc-myprofile{background:#003399;} .dwc-myprofile .card{border:2px solid #fff;}" oninput="DWC.layoutCssEdited(this)">' + v("layout_css") + "</textarea>" +
     '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
     "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
+    '<h4 style="margin:14px 0 6px">🎨 Preset backgrounds</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick a ready-made background for your page — one tap, done. These sit on top of the plain color / image pickers below.</p>" +
+    '<div class="dwc-presets">' + presetBackgroundsHTML(th) + "</div>" +
+    '<input type="hidden" name="theme_bg_preset" value="' + esc(th.bg_preset || "") + '">' +
     '<h4 style="margin:14px 0 6px">🎨 My page theme — colors, background &amp; font</h4>' +
     "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. These sit on top of your preset; your custom CSS can still override them with !important.</p>" +
     '<div class="dwc-themebox">' +
@@ -1484,13 +1581,21 @@ function profileFormHTML(p) {
     '<label>Custom button CSS — your own button code (glow, GIFs, whatever you want)</label>' +
     '<textarea name="theme_button_css" rows="4" maxlength="4000" placeholder="e.g. .dwc-myprofile .btn{background:url(https://example.com/my.gif);background-size:cover;box-shadow:0 0 16px #ff2d95;}">' + esc(th.button_css || "") + "</textarea>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Targets the buttons on your page only. Images in url() must be https:// — a GIF URL works as a button background. CSS only, same limits as the layout box.</p>' +
-    '<h4 style="margin:14px 0 6px">✨ MySpace effects — the fun stuff</h4>' +
+    '<h4 style="margin:14px 0 6px">✨ MySpace effects — Give it those oldschool effects</h4>' +
     "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF background goes in the background-image URL box above — any https:// GIF works.</p>" +
     '<div class="dwc-checkgrid">' +
     Object.keys(MYSPACE_EFFECTS).map(function (k) {
       var fx = MYSPACE_EFFECTS[k];
       return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
     }).join("") + "</div>" +
+    '<label><input type="checkbox" name="theme_comment_border_use" style="width:auto"' + (th.comment_border_color ? " checked" : "") + ' onchange="DWC.commentBorderUseChanged(this)"> Use a custom color for comment-picture borders — any color (this turns off the RGB border effect above)</label>' +
+    '<input name="theme_comment_border_color" type="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(th.comment_border_color || "") ? th.comment_border_color : "#000000") + '" style="width:64px;height:36px;padding:2px">' +
+    (isNew ? "" :
+    '<h4 style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
+    "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
+    badgeDisplayListHTML(p ? p.badges : []) +
+    badgeSlotPickerHTML(p)) +
+    (isNew ? "" : websiteFieldsHTML(p)) +
     '<h4 style="margin:12px 0 6px">Live preview</h4><div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div></div>" +
     '<div class="dwc-layoutbox dwc-bot"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h4 style="margin:0 0 6px">🎨 Taffy Layout Builder — build your page theme</h4>' +
     "<p style=\"margin:0\">Hi, I'm Taffy! I build layouts and help with code. Pick a vibe, pick a color, then describe what you want in plain words and I'll write the whole theme for you.</p></div></div>" +
@@ -1539,7 +1644,7 @@ function unlockCardHTML() {
     '<button type="button" class="btn" onclick="DWC.editProfile()">💰 Start selling<br><span style="font-weight:400;font-size:13px">add how you get paid</span></button>' +
     '<button type="button" class="btn" onclick="DWC.go(\'adult\')">🔞 18+ areas<br><span style="font-weight:400;font-size:13px">ID check — only if you want in</span></button>' +
     '</div>' +
-    '<p style="margin:10px 0 0;color:var(--muted);font-size:13px">No ID needed unless you want the 18+ areas. No rush on any of it.</p>' +
+    '<p style="margin:10px 0 0;color:var(--muted);font-size:13px">No ID needed to join or sell regular stuff — only for the 18+ areas. No rush on any of it.</p>' +
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.dismissUnlock()">I\'ll do this later →</button></p>' +
     '</section>';
 }
@@ -1975,14 +2080,30 @@ function parseThemeClient(stored) {
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
   if (!obj || typeof obj !== "object") return empty;
   var hex = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
-  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", button_style: "", button_css: "", effects: [] };
+  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [] };
   var img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = themeFontCSS(obj.font) ? obj.font : "";
   out.button_style = (typeof BUTTON_STYLES !== "undefined" && BUTTON_STYLES[obj.button_style]) ? obj.button_style : "";
   out.button_css = String(obj.button_css || "").slice(0, 4000);
   var eff = Array.isArray(obj.effects) ? obj.effects : [];
-  out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 4);
+  out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8);
+  var presetIds = PRESET_BACKGROUNDS.map(function (p) { return p.id; });
+  out.bg_preset = presetIds.indexOf(String(obj.bg_preset || "")) >= 0 ? String(obj.bg_preset) : "";
+  out.comment_border_color = hex(obj.comment_border_color);
+  if (out.effects.indexOf("rgb-comment-border") >= 0) out.comment_border_color = "";
+  out.pic_size = (obj.pic_size === "bigger" || obj.pic_size === "smaller") ? obj.pic_size : "";
+  out.pic_position = (obj.pic_position === "normal" || obj.pic_position === "top") ? obj.pic_position : "";
+  var frameIds = PIC_FRAMES.map(function (f) { return f.id; });
+  out.pic_frame = frameIds.indexOf(String(obj.pic_frame || "")) >= 0 ? String(obj.pic_frame) : "";
+  out.blood_color = hex(obj.blood_color);
+  var gbModes = GB_FRAME_MODES.map(function (m) { return m.id; });
+  out.gb_mode = gbModes.indexOf(String(obj.gb_mode || "")) >= 0 ? String(obj.gb_mode) : "";
+  var gbCols = Array.isArray(obj.gb_colors) ? obj.gb_colors : [];
+  out.gb_colors = gbCols.map(function (c) { return hex(c); }).filter(Boolean).slice(0, 3);
+  // Chosen display badges (v3.9) — up to 2 known badge keys.
+  var db = Array.isArray(obj.display_badges) ? obj.display_badges : [];
+  out.display_badges = db.map(function (k) { return String(k || ""); }).filter(function (k) { return badgeByKeyClient(k); }).slice(0, 2);
   return out;
 }
 function themeCSS(theme) {
@@ -1990,12 +2111,21 @@ function themeCSS(theme) {
   var css = "";
   if (t.bg_color) css += ".dwc-myprofile{background-color:" + t.bg_color + ";}";
   if (t.bg_image_url) css += '.dwc-myprofile{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:cover;background-position:center;background-repeat:no-repeat;}';
+  // Preset background (v3.9) — wins over the plain color/image pickers.
+  if (t.bg_preset) {
+    var preset = null;
+    PRESET_BACKGROUNDS.forEach(function (p) { if (p.id === t.bg_preset) preset = p; });
+    if (preset && preset.css) css += preset.css;
+  }
   if (t.text_color) css += ".dwc-myprofile{color:" + t.text_color + ";}.dwc-myprofile p,.dwc-myprofile li{color:" + t.text_color + ";}";
   if (t.accent_color) css += ".dwc-myprofile a{color:" + t.accent_color + ";}.dwc-myprofile h2,.dwc-myprofile h3{color:" + t.accent_color + ";}.dwc-myprofile .dwc-topfriend{border-color:" + t.accent_color + ";}";
   if (t.font) css += ".dwc-myprofile{font-family:" + themeFontCSS(t.font) + ";}";
   // Buttons: preset first, then the member's own button CSS on top.
   if (t.button_style && BUTTON_STYLES[t.button_style]) css += BUTTON_STYLES[t.button_style].css;
   if (t.button_css) css += sanitizeLayoutCss(t.button_css);
+  // Comment-picture border color (v3.9) — any color the member picked
+  // (the RGB effect clears it on save, so the two never fight).
+  if (t.comment_border_color) css += ".dwc-myprofile .dwc-page-comment .dwc-avatar{border:3px solid " + t.comment_border_color + ";}";
   // MySpace effects (opt-in toggles).
   (t.effects || []).forEach(function (e) { if (MYSPACE_EFFECTS[e]) css += MYSPACE_EFFECTS[e].css; });
   return css;
@@ -2040,7 +2170,71 @@ var BUTTON_STYLES = {
 var MYSPACE_EFFECTS = {
   "animated-bg": { label: "Animated rainbow background", desc: "Your page background slowly shifts through pink, purple, blue and green.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}" },
   "sparkle": { label: "Sparkle", desc: "A twinkling star field over your page.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#00e5ff,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
-  "glow-text": { label: "Glowing headings", desc: "Your headings glow.", css: ".dwc-myprofile h2,.dwc-myprofile h3{text-shadow:0 0 8px currentColor,0 0 22px currentColor;}" }
+  "glow-text": { label: "Glowing headings", desc: "Your headings glow.", css: ".dwc-myprofile h2,.dwc-myprofile h3{text-shadow:0 0 8px currentColor,0 0 22px currentColor;}" },
+  // v3.9 — scoped sparkles + ticker + comment-picture borders.
+  "sparkle-name": { label: "Sparkle over name", desc: "Twinkling stars over your display name only.", css: ".dwc-myprofile .dwc-mypage-head h2{position:relative;}.dwc-myprofile .dwc-mypage-head h2::after{content:'';position:absolute;inset:-4px -10px;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 40%,#fff,transparent),radial-gradient(1.5px 1.5px at 60% 20%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 60%,#00e5ff,transparent),radial-gradient(1.5px 1.5px at 40% 80%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
+  "sparkle-banner": { label: "Sparkle over banner", desc: "Twinkling stars over your cover photo only.", css: ".dwc-myprofile .dwc-banner{position:relative;}.dwc-myprofile .dwc-banner::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 15% 30%,#fff,transparent),radial-gradient(2px 2px at 55% 70%,#ffe27a,transparent),radial-gradient(1.5px 1.5px at 80% 25%,#00e5ff,transparent),radial-gradient(2px 2px at 35% 60%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}" },
+  "ticker-effect": { label: "Scrolling ticker or headline", desc: "A scrolling headline above your page (your ticker text, or your bio line when you haven't set one).", css: "" },
+  "rgb-comment-border": { label: "RGB border for comment pictures", desc: "Comment avatars on your page get an animated RGB gradient border. Picking a custom border color below turns this off.", css: ".dwc-myprofile .dwc-page-comment .dwc-avatar{border:3px solid #ff2d95;animation:dwcRgbBorderGlow 3s linear infinite;}" }
+};
+// Preset backgrounds (v3.9) — CSS-only picks in Chris's aesthetic. The
+// chosen preset becomes the profile page background (applied in themeCSS,
+// after the plain color/image pickers so it wins). "vaporwave" uses the
+// site's signature vapor-bg.jpg, already on the site.
+var PRESET_BACKGROUNDS = [
+  { id: "", name: "None / default", css: "", swatch: "linear-gradient(135deg,#0b0b14,#141424)" },
+  { id: "vaporwave", name: "Vaporwave Grid", desc: "The signature — pink smoke left, cyan smoke right, neon grid floor.", css: ".dwc-myprofile{background-image:url('images/vapor-bg.jpg');background-size:cover;background-position:center;background-repeat:no-repeat;}", swatch: "linear-gradient(135deg,#ff2d95 0%,#7c4dff 45%,#00e5ff 100%)" },
+  { id: "rgb-gradient", name: "Neon RGB Gradient", desc: "Animated pink → purple → cyan → green.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", swatch: "linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88)" },
+  { id: "midnight-neon", name: "Midnight Neon", desc: "Near-black with a neon glow edge.", css: ".dwc-myprofile{background:#05050a;box-shadow:inset 0 0 60px rgba(0,229,255,.25),inset 0 0 120px rgba(255,45,149,.15);}", swatch: "linear-gradient(135deg,#05050a,#0d0d1f 60%,#00e5ff)" },
+  { id: "sunset-drive", name: "Sunset Drive", desc: "Pink, purple and orange — driving into the sunset.", css: ".dwc-myprofile{background:linear-gradient(160deg,#ff2d95 0%,#7c4dff 45%,#ff9a00 100%);}", swatch: "linear-gradient(160deg,#ff2d95,#7c4dff,#ff9a00)" },
+  { id: "cotton-candy", name: "Cotton Candy", desc: "Soft pink and cyan pastels.", css: ".dwc-myprofile{background:linear-gradient(160deg,#ffd7ef 0%,#ffb3e6 40%,#a8e6ff 100%);}", swatch: "linear-gradient(160deg,#ffd7ef,#ffb3e6,#a8e6ff)" },
+  { id: "blackout", name: "Blackout", desc: "Pure dark — the site background, nothing else.", css: ".dwc-myprofile{background:#0b0b14;}", swatch: "linear-gradient(135deg,#0b0b14,#0b0b14)" }
+];
+// Zodiac signs for the website-look "Sign" field — symbol + a short
+// blurb in Chris's voice (fun, not horoscope-woo).
+var ZODIAC_SIGNS = {
+  aries: { name: "Aries", symbol: "♈", blurb: "First one in, last one out. Runs on impulse and pure momentum — if there's a wall, an Aries is already through it." },
+  taurus: { name: "Taurus", symbol: "♉", blurb: "Stubborn in the best way. Loyal, grounded, and not moving for anyone — but if you're in their circle, you're fed and protected." },
+  gemini: { name: "Gemini", symbol: "♊", blurb: "Two minds, twice the chaos, twice the fun. Can talk to anybody about anything and somehow mean all of it." },
+  cancer: { name: "Cancer", symbol: "♋", blurb: "Soft shell, steel core. Remembers everything, feels everything, and will absolutely feed you while doing it." },
+  leo: { name: "Leo", symbol: "♌", blurb: "Born for the spotlight and not even sorry about it. Big heart, bigger presence — when a Leo walks in, the room knows." },
+  virgo: { name: "Virgo", symbol: "♍", blurb: "Notices what everyone else misses. The one who actually reads the fine print and fixes it before it breaks." },
+  libra: { name: "Libra", symbol: "♎", blurb: "Peacekeeper with a steel spine underneath. Wants everything fair and everybody vibing — and will argue politely until it is." },
+  scorpio: { name: "Scorpio", symbol: "♏", blurb: "Quiet, intense, and ten steps ahead. Doesn't say much — doesn't have to. Loyalty like this doesn't come around twice." },
+  sagittarius: { name: "Sagittarius", symbol: "♐", blurb: "Always aiming at the next horizon. Restless, honest to a fault, and allergic to being fenced in." },
+  capricorn: { name: "Capricorn", symbol: "♑", blurb: "Slow climb, big summit. Patient, practical, and quietly outworking everybody while nobody's watching." },
+  aquarius: { name: "Aquarius", symbol: "♒", blurb: "Weird on purpose and proud of it. Sees the future before it shows up and builds it anyway." },
+  pisces: { name: "Pisces", symbol: "♓", blurb: "Dreamer with a deep current. Feels the room before a word is said and turns it into art, music, or a whole world." }
+};
+// Picture frames (v3.9) — the ring around the profile picture. Free
+// frames are open to everyone; the rest unlock with engagement (see
+// UNLOCKS in the server _lib.js — same thresholds, kept in sync here so
+// the picker can show what's locked and why).
+var PIC_FRAMES = [
+  { id: "none", name: "None", desc: "No frame.", locked: false },
+  { id: "neon", name: "Neon", desc: "Cyan glow.", locked: false },
+  { id: "rgb", name: "RGB Gradient", desc: "Animated gradient border.", locked: false },
+  { id: "rgb-rotating", name: "RGB Rotating", desc: "A circling RGB gradient ring.", locked: true, unlockKey: "frame-rgb-rotating", requirement: "Use the site 7 different days" },
+  { id: "gold", name: "Gold", desc: "Golden frame.", locked: false },
+  { id: "black", name: "Black", desc: "Simple black frame.", locked: false },
+  { id: "wooden", name: "Wooden", desc: "Warm wood tones.", locked: true, unlockKey: "frame-wooden", requirement: "Post 10 times" },
+  { id: "gothic", name: "Gothic", desc: "Black and white stripes — Tim Burton style.", locked: true, unlockKey: "frame-gothic", requirement: "Leave 25 comments" },
+  { id: "blood", name: "Blood dripping", desc: "Dripping ooze — pick your drip color.", locked: true, unlockKey: "frame-blood", requirement: "Give or get 25 hearts" },
+  { id: "gb", name: "GB frame", desc: "Your picture inside a Game Boy.", locked: true, unlockKey: "frame-gb", requirement: "Post 25 times" },
+  { id: "gba", name: "GBA frame", desc: "Your picture inside a Game Boy Advance.", locked: true, unlockKey: "frame-gba", requirement: "Post 50 times and use the site 14 different days" }
+];
+// GB/GBA handheld body colors — preset mixes, or the member's own 3.
+var GB_FRAME_MODES = [
+  { id: "", name: "Default (GameCube mix)" },
+  { id: "gamecube", name: "GameCube mix" },
+  { id: "gb", name: "Game Boy (classic grey)" },
+  { id: "gba", name: "GBA (indigo)" },
+  { id: "custom", name: "My own 3 colors" }
+];
+var GB_FRAME_COLORS = {
+  gamecube: ["#5a5fcf", "#7c4dff", "#1a1a2e"],
+  gb: ["#d8d8d0", "#9a9a92", "#555550"],
+  gba: ["#6b5ce7", "#8a7cff", "#3d2b8f"]
 };
 var NAMED_BG = {
   "dark blue": ["#0a2a5e", "#061a3d", false], "light blue": ["#a8d8ff", "#7ab8f0", true],
@@ -2316,22 +2510,39 @@ function postVideoHTML(p) {
   return '<video class="dwc-post-video" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>';
 }
 
+// Event posts — "📅 Dec 13 · 12–6 PM · [place]" (only the parts given).
+function eventLineHTML(p) {
+  if (!p || p.kind !== "event") return "";
+  var parts = [];
+  if (p.event_date) {
+    var d = new Date(p.event_date + "T12:00:00");
+    if (!isNaN(d.getTime())) parts.push(d.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
+    else parts.push(p.event_date);
+  }
+  if (p.event_time) parts.push(p.event_time);
+  if (p.event_place) parts.push(p.event_place);
+  if (!parts.length) return "";
+  return '<p class="dwc-event-line">📅 ' + esc(parts.join(" · ")) + "</p>";
+}
+
 function postCardHTML(p) {
   var heartOn = myHeart("post-" + p.id);
   var isCreator = !!p.is_creator;
   var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
-  return '<article class="card dwc-post">' +
+  return '<article class="card dwc-post' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '">' +
     postPhotoHTML(p) +
     postVideoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
-    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (isCreator ? " · 🎨 Creator" : "") + "</div>" +
+    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : p.kind === "event" ? " · 📅 Event" : p.kind === "announcement" ? " · 📢 Announcement" : "") + (isCreator ? " · 🎨 Creator" : "") + "</div>" +
     '<h3 style="margin:8px 0 4px"><a href="#/post/' + p.id + '" class="dwc-titlelink">' + esc(p.title) + "</a></h3>" +
+    (p.kind === "announcement" ? '<p class="dwc-announce-line"><span class="dwc-announce-badge">📢 Official announcement from the owner</span></p>' : "") +
+    eventLineHTML(p) +
     (isCreator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
       '<strong style="color:var(--green);font-size:17px">' + priceLabel + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file</span>' : "") + "</p>" : "") +
     '<p>' + esc(p.body.length > 280 ? p.body.slice(0, 280) + "…" : p.body) + "</p>" +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
-    '<p class="dwc-meta">by @' + esc(p.author_username) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
+    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions">' +
     '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
@@ -2400,12 +2611,12 @@ function renderView() {
   viewStreet(el);
 }
 
-// ---------- The Street ----------
+// ---------- YourSpace (The Street) ----------
 async function viewStreet(el) {
   el.innerHTML =
-    '<section class="card"><h2 style="margin-top:0">How the street works</h2><ul class="dwc-rules-list">' +
+    '<section class="card"><h2 style="margin-top:0">How YourSpace works</h2><ul class="dwc-rules-list">' +
     "<li><strong>List it free, sell it fair</strong> — listing costs nothing; a fair 5% cut on a sale keeps the street running.</li>" +
-    "<li><strong>Sell anything legal</strong> — not just cards. Adult content too, <em>if</em> you’ve proved your age (only ever asked for that — see Rules &amp; After Dark).</li>" +
+    "<li><strong>Sell anything legal</strong> — not just cards. Adult content lives in its own separate 18+ area (🌙 After Dark), never mixed into YourSpace — and only if you’ve proved your age (see Rules &amp; After Dark).</li>" +
     "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
     "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></section>' +
@@ -2422,18 +2633,20 @@ async function viewStreet(el) {
     '</div><div role="group" aria-label="Sort posts">' +
     [["new", "Newest"], ["top", "Top hearts"], ["discussed", "Most discussed"]].map(function (s) {
       return '<button type="button" class="dwc-pill' + (state.sort === s[0] ? " active" : "") + '" onclick="DWC.setSort(\'' + s[0] + '\')">' + s[1] + "</button>";
-    }).join("") + "</div></div>" +
+    }).join("") +
+    (state.profile ? '<button type="button" class="dwc-pill' + (state.friendsOnly ? " active" : "") + '" onclick="DWC.setFriendsOnly(' + (!state.friendsOnly) + ')">👥 Friends</button>' : "") +
+    "</div></div>" +
     '<div id="dwc-feed"><p style="color:var(--muted)">Loading posts…</p></div>' +
     '<div id="dwc-tags"><p style="color:var(--muted)">Loading tags…</p></div>';
   renderComposer("street");
   loadHeadlinesStrip();
-  var data = await apiGet("/posts?device_id=" + encodeURIComponent(deviceId()) + "&sort=" + state.sort + "&limit=50" + (state.category ? "&category=" + encodeURIComponent(state.category) : ""));
+  var data = await apiGet("/posts?device_id=" + encodeURIComponent(deviceId()) + "&sort=" + state.sort + "&limit=50" + (state.category ? "&category=" + encodeURIComponent(state.category) : "") + (state.friendsOnly ? "&friends=1" : ""));
   var feed = $("dwc-feed");
   if (!feed) return;
   var posts = (data && data.posts) || [];
   feed.innerHTML = posts.length
     ? '<div class="grid">' + posts.map(postCardHTML).join("") + "</div>"
-    : '<div class="note">No posts yet — be the first to post on the street.</div>';
+    : '<div class="note">' + (state.friendsOnly ? "No posts from your friends yet — add some friends and their posts will show up here." : "No posts yet — be the first to post on the street.") + "</div>";
   var tags = await apiGet("/tags?scope=general&device_id=" + encodeURIComponent(deviceId()));
   var tagEl = $("dwc-tags");
   if (tagEl) {
@@ -2447,12 +2660,14 @@ async function viewStreet(el) {
 // ---------- Headlines (v3.1) ----------
 // The Community's own most eye-catching posts, ranked by engagement
 // (hearts × 2 + comments). Community posts only — no outside news.
-// Adult posts only reach age-verified callers (the endpoint enforces it).
+// Adult posts are NEVER in Headlines — the 18+ area is separate from
+// YourSpace (the endpoint excludes kind=adult entirely).
 function headlineCardHTML(h) {
   return '<article class="card dwc-headline" onclick="DWC.go(\'post/' + h.id + '\')" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\')DWC.go(\'post/' + h.id + '\')">' +
     '<div class="dwc-headline-eng">🔥 ' + (h.engagement || 0) + ' · ❤️ ' + (h.score || 0) + ' · 💬 ' + (h.comment_count || 0) + "</div>" +
     '<h3 class="dwc-headline-title" style="margin:8px 0 4px"><a href="#/post/' + h.id + '" class="dwc-titlelink">' + esc(h.title) + "</a></h3>" +
-    '<p style="margin:4px 0">by <strong>@' + esc(h.author_username) + "</strong>" + (h.kind === "adult" ? " · 18+" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
+    eventLineHTML(h) +
+    '<p style="margin:4px 0">by <strong>@' + esc(h.author_username) + "</strong>" + achBadgeIconsHTML(h.author_badges) + (h.kind === "adult" ? " · 18+" : h.kind === "event" ? " · 📅 Event" : h.kind === "announcement" ? " · 📢 Announcement" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
     (h.body ? "<p>" + esc(h.body.length > 140 ? h.body.slice(0, 140) + "…" : h.body) + "</p>" : "") +
     '<p style="margin:8px 0 0"><a href="#/post/' + h.id + '" class="dwc-titlelink">Open post →</a></p>' +
     "</article>";
@@ -2471,7 +2686,7 @@ async function loadHeadlinesStrip() {
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'headlines\')">See all headlines →</button></p></section>';
 }
 async function viewHeadlines(el) {
-  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2><p style="color:var(--muted)">The Community’s own most eye-catching posts — ranked by hearts and comments. No outside news, just what the street is shouting about.</p></section><div id="dwc-headlines-list"><p style="color:var(--muted)">Loading headlines…</p></div>';
+  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2><p style="color:var(--muted)">YourSpace’s own most eye-catching posts — ranked by hearts and comments. No outside news, just what the street is shouting about.</p></section><div id="dwc-headlines-list"><p style="color:var(--muted)">Loading headlines…</p></div>';
   var data = await apiGet("/headlines?device_id=" + encodeURIComponent(deviceId()) + "&limit=10");
   var list = (data && data.headlines) || [];
   state.headlines = list;
@@ -2513,6 +2728,7 @@ function renderComposer(context) {
   var host = $("dwc-composer");
   if (!host) return;
   var isAuth = context === "cardcheck";
+  var isOp = state.profile && (state.profile.role === "operator" || state.profile.is_operator);
   host.innerHTML =
     '<section class="card" aria-label="New post"><h3 style="margin-top:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
     (state.profile ? "" : "<p>Posting needs an account — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create one, it’s free</button>.</p>") +
@@ -2520,6 +2736,8 @@ function renderComposer(context) {
     '<div class="dwc-kindrow">' +
     '<button type="button" class="dwc-pill' + (!isAuth ? " active" : "") + '" data-kind="forum" onclick="DWC.composerKind(this, \'forum\')">💬 Forum</button>' +
     '<button type="button" class="dwc-pill' + (isAuth ? " active" : "") + '" data-kind="card_auth" onclick="DWC.composerKind(this, \'card_auth\')">🔍 Card Check</button>' +
+    '<button type="button" class="dwc-pill" data-kind="event" onclick="DWC.composerKind(this, \'event\')">📅 Event</button>' +
+    (isOp ? '<button type="button" class="dwc-pill" data-kind="announcement" onclick="DWC.composerKind(this, \'announcement\')">📢 Announcement</button>' : "") +
     "</div>" +
     '<input type="hidden" name="kind" value="' + (isAuth ? "card_auth" : "forum") + '">' +
     '<label>Category — this decides where your post shows up</label><select name="category">' + CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
@@ -2530,6 +2748,11 @@ function renderComposer(context) {
     '<textarea name="body" required maxlength="4000" placeholder="Write it out…"></textarea>' +
     '<label>Tags (up to 6, comma separated)</label>' +
     '<input name="tags" maxlength="240" placeholder="e.g. charizard, grading, psa">' +
+    '<div data-eventfields hidden>' +
+    '<label>Event date</label><input name="event_date" type="date">' +
+    '<label>Event time (e.g. 12–6 PM)</label><input name="event_time" maxlength="120" placeholder="12–6 PM">' +
+    '<label>Event place (venue / city)</label><input name="event_place" maxlength="120" placeholder="Where is it happening?">' +
+    "</div>" +
     '<label>Photo (JPG, PNG, WebP, or GIF, under 2.5 MB — required for Card Check)</label>' +
     '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-' + context + '\')">' +
     cropPreviewHTML("composer-" + context) +
@@ -2676,7 +2899,7 @@ async function viewThread(el, postId) {
   var data = await apiGet("/posts/" + postId + "?device_id=" + encodeURIComponent(deviceId()));
   var p = data && data.post;
   if (!p) {
-    el.innerHTML = '<div class="note">That post is gone, or it’s in the 18+ area and this account isn’t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to The Street</button></p>';
+    el.innerHTML = '<div class="note">That post is gone, or it’s in the 18+ area and this account isn’t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to YourSpace</button></p>';
     return;
   }
   window.__dwcThreadKind = p.kind;
@@ -2688,12 +2911,14 @@ async function viewThread(el, postId) {
   var heartOn = myHeart("post-" + p.id);
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
-    '<article class="card">' +
+    '<article class="card' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '">' +
     postPhotoHTML(p) +
     postVideoHTML(p) +
     gifEmbedHTML(p.gif_url, p.gif_label) +
-    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : "") + (p.is_creator ? " · 🎨 Creator" : "") + "</div>" +
+    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : p.kind === "event" ? " · 📅 Event" : p.kind === "announcement" ? " · 📢 Announcement" : "") + (p.is_creator ? " · 🎨 Creator" : "") + "</div>" +
     "<h2>" + esc(p.title) + "</h2>" +
+    (p.kind === "announcement" ? '<p class="dwc-announce-line"><span class="dwc-announce-badge">📢 Official announcement from the owner</span></p>' : "") +
+    eventLineHTML(p) +
     (p.is_creator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
       '<strong style="color:var(--green);font-size:20px">' + (p.price_cents > 0 ? money(p.price_cents) : "Free") + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file — ' + esc(p.file_name || "download") + "</span>" : "") + "</p>" +
@@ -2701,7 +2926,7 @@ async function viewThread(el, postId) {
     '<p style="white-space:pre-wrap">' + esc(p.body) + "</p>" +
     youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
-    '<p class="dwc-meta">by @' + esc(p.author_username) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
+    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions">' +
     '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
@@ -2729,7 +2954,7 @@ async function viewThread(el, postId) {
       var mine = state.profile && state.profile.id === c.author_id;
       return '<div class="dwc-comment">' +
         (c.author_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt="">' : "") +
-        '<div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + '</strong> <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
+        '<div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
         (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
         gifEmbedHTML(c.gif_url, c.gif_label) +
         '<div class="dwc-actions">' +
@@ -2799,7 +3024,7 @@ async function viewListing(el, listingId) {
         '<button type="button" class="btn ghost small" onclick="DWC.tradeVote(' + l.id + ", 'bad')\">👎 Bad deal (" + l.trade_bad + ")</button></div></section>" : "") +
     '<section class="card"><h3 style="margin-top:0">Comments (' + list.length + ')' + (l.allow_comments ? "" : ' <span style="color:var(--amber)">— comments are off on this listing</span>') + "</h3>" +
     (list.length ? list.map(function (c) {
-      return '<div class="dwc-comment"><div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + '</strong> <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
+      return '<div class="dwc-comment"><div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
         (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
         gifEmbedHTML(c.gif_url, c.gif_label) + "</div></div>";
     }).join("") : "<p>Nothing yet.</p>") +
@@ -2935,6 +3160,91 @@ function badgeHTML(m) {
   }
   return "";
 }
+// --- Achievement badges (v3.9) -------------------------------------------
+// BADGES mirrors the server registry in functions/api/_lib.js (icon,
+// label, requirement). Keep the two in sync — the server is the source
+// of truth for earning; this list only renders the picker + display.
+// Display rule: ONE badge by default; adult sellers ALWAYS show the 18+
+// badge plus ONE chosen badge; regular sellers showing Regular Seller
+// may add ONE optional secondary badge. Nobody shows more than two.
+var BADGES = [
+  { key: "badge:first-post", icon: "📝", label: "First Post", requirement: "Post your first post" },
+  { key: "badge:first-comment", icon: "💬", label: "First Comment", requirement: "Leave your first comment" },
+  { key: "badge:comments-25", icon: "🗨️", label: "Chatty", requirement: "Leave 25 comments" },
+  { key: "badge:hearts-25", icon: "❤️", label: "Well Loved", requirement: "Give or get 25 hearts" },
+  { key: "badge:streak-7", icon: "🔥", label: "7-Day Streak", requirement: "Use the site 7 different days" },
+  { key: "badge:first-sale", icon: "💰", label: "First Sale", requirement: "Make your first sale" },
+  { key: "badge:sales-5", icon: "🛍️", label: "Regular Seller", requirement: "Make 5 sales" },
+  { key: "badge:sales-10", icon: "🏆", label: "10 Sales", requirement: "Make 10 sales" },
+  { key: "badge:member-7d", icon: "🌱", label: "First Week", requirement: "Be a member for 7 days" },
+  { key: "badge:member-1mo", icon: "📅", label: "1 Month", requirement: "Be a member for 1 month" },
+  { key: "badge:member-3mo", icon: "📆", label: "3 Months", requirement: "Be a member for 3 months" },
+  { key: "badge:member-6mo", icon: "🗓️", label: "6 Months", requirement: "Be a member for 6 months" },
+  { key: "badge:member-1yr", icon: "🎂", label: "1 Year", requirement: "Be a member for 1 year" },
+  { key: "badge:adult-approved", icon: "🔞", label: "Adult Approved", requirement: "Get approved for adult content" },
+];
+function badgeByKeyClient(key) {
+  for (var i = 0; i < BADGES.length; i++) if (BADGES[i].key === key) return BADGES[i];
+  return null;
+}
+// Inline badge icons next to a name (posts, comments, chat, profile
+// head). badges is the author's DISPLAY badges from the API (1–2 max).
+function achBadgeIconsHTML(badges) {
+  if (!badges || !badges.length) return "";
+  return " " + badges.slice(0, 2).map(function (b) {
+    var full = badgeByKeyClient(b.key) || b;
+    return '<span class="dwc-ach-badge" title="' + esc(full.label || b.key) + '">' + esc(full.icon || "🏅") + "</span>";
+  }).join("");
+}
+// Full badge display list (Edit Profile + phone): every badge with its
+// earned state, locked ones greyed out with their requirement.
+function badgeDisplayListHTML(badges) {
+  var list = badges || [];
+  if (!list.length) return '<p style="color:var(--muted)">No badges yet — post, comment, sell, and show up to earn your first one.</p>';
+  return '<div class="dwc-badge-grid">' + list.map(function (b) {
+    return '<div class="dwc-badge-item' + (b.earned ? "" : " dwc-badge-locked") + '">' +
+      '<span class="dwc-badge-ico">' + esc(b.icon) + "</span>" +
+      '<span class="dwc-badge-lab">' + esc(b.label) + "</span>" +
+      (b.earned ? '<span class="dwc-badge-got">✓ Unlocked</span>'
+        : '<span class="dwc-badge-req">🔒 ' + esc(b.requirement) + "</span>") +
+      "</div>";
+  }).join("") + "</div>";
+}
+// The display-slot picker (Edit Profile): which badge(s) show next to
+// the member's name. Slots depend on who they are — adult sellers get
+// the 18+ badge locked in slot 1 plus one choice; regular sellers who
+// show Regular Seller get a second slot; everyone else gets one slot.
+function badgeSlotPickerHTML(p) {
+  var badges = (p && p.badges) || [];
+  var earned = badges.filter(function (b) { return b.earned; });
+  var th = parseThemeClient(p ? p.profile_theme : "");
+  var picked = (th.display_badges || []).filter(function (k) { return earned.some(function (b) { return b.key === k; }); });
+  var isAdult = !!(p && p.is_adult_seller);
+  var isRegular = !!(p && p.is_regular_seller);
+  var slots = isAdult || (isRegular && picked[0] === "badge:sales-5") ? 2 : 1;
+  var opt = function (sel) {
+    return '<option value="">— Pick a badge —</option>' + earned.map(function (b) {
+      return '<option value="' + esc(b.key) + '"' + (sel === b.key ? " selected" : "") + ">" + esc(b.icon + " " + b.label) + "</option>";
+    }).join("");
+  };
+  var html = '<p style="margin:0 0 8px">You show <strong>' + slots + " badge" + (slots > 1 ? "s" : "") + "</strong> next to your name" +
+    (isAdult ? " — as an adult seller, the 🔞 18+ badge always shows, plus one badge you pick."
+      : isRegular ? " — as a regular seller, showing Regular Seller unlocks a second slot for one more badge you pick."
+      : " — pick one of your unlocked badges.") + "</p>";
+  html += '<label>Badge slot 1' + (isAdult ? " — locked to 🔞 Adult Approved" : "") + "</label>";
+  if (isAdult) {
+    html += '<p style="margin:0 0 8px"><span class="dwc-ach-badge" style="font-size:20px">🔞</span> <strong>Adult Approved</strong> — always shows for adult sellers.</p>' +
+      '<input type="hidden" name="theme_display_badge_1" value="badge:adult-approved">';
+  } else {
+    html += '<select name="theme_display_badge_1" onchange="DWC.badgeSlotChanged()">' + opt(picked[0] || "") + "</select>";
+  }
+  // Slot 2 lives in one div that badgeSlotChanged() shows/hides (and
+  // enables/disables, so a hidden slot never submits a stale value).
+  html += '<div id="dwc-badge-slot2"' + (slots === 2 ? "" : " hidden") + '><label>Badge slot 2 — your pick</label>' +
+    '<select name="theme_display_badge_2" onchange="DWC.badgeSlotChanged()"' + (slots === 2 ? "" : " disabled") + ">" + opt(picked[1] || "") + "</select></div>";
+  html += '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Badges you haven\'t unlocked yet show greyed out above — post, comment, sell, and show up to earn them.</p>';
+  return html;
+}
 // v3.7 ticker — optional custom text, up to 200 chars, scrolling above
 // the main page. The name never scrolls; it stays put.
 function tickerHTML(m) {
@@ -3062,10 +3372,121 @@ function vanityURLHTML(m) {
     '<button type="button" class="btn ghost small" onclick="DWC.copyVanityUrl(\'' + esc(m.page_slug.replace(/'/g, "")) + '\')">📋 Copy</button></div>';
 }
 
+// ---------- v3.9 profile customization helpers ----------
+// GB/GBA handheld body colors — the member's mode, or their own 3.
+function gbFrameColors(th) {
+  if (th && th.gb_mode === "custom" && th.gb_colors && th.gb_colors.length === 3) return th.gb_colors;
+  var mode = (th && th.gb_mode) || "gamecube";
+  return GB_FRAME_COLORS[mode] || GB_FRAME_COLORS.gamecube;
+}
+// The profile picture, wrapped in the member's frame, sized by their
+// picture-size pick, and clickable to open the picture viewer (large +
+// comments, never likes). GB/GBA frames render a handheld around the
+// picture instead of a round ring.
+function picAvatarHTML(m, th) {
+  var frame = (th && th.pic_frame) || "none";
+  var big = !th || th.pic_size !== "smaller";
+  var sizeCls = big ? " dwc-avatar-big" : "";
+  var img = m.avatar_url
+    ? '<img class="dwc-avatar' + sizeCls + '" src="' + esc(m.avatar_url) + '" alt="">'
+    : '<span class="dwc-avatar dwc-avatar-none' + sizeCls + '">🍬</span>';
+  var style = "";
+  if (frame === "blood" && th && th.blood_color) style = ' style="--blood:' + esc(th.blood_color) + '"';
+  if (frame === "gb" || frame === "gba") {
+    var cols = gbFrameColors(th);
+    style = ' style="--gb-c1:' + cols[0] + ';--gb-c2:' + cols[1] + ';--gb-c3:' + cols[2] + '"';
+    return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')">' +
+      '<span class="dwc-gb-screen">' + img + '</span>' +
+      '<span class="dwc-gb-label">' + (frame === "gba" ? "GAME BOY ADVANCE" : "GAME BOY") + '</span>' +
+      '<span class="dwc-gb-dpad"></span>' +
+      '<span class="dwc-gb-startselect"><i></i><i></i></span>' +
+      '<span class="dwc-gb-ab"><i></i><i></i></span>' +
+      '<span class="dwc-gb-speaker"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
+      "</span>";
+  }
+  return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')">' + img + "</span>";
+}
+// The picture + name + bio block (no card wrapper — the caller wraps it).
+function profileHeadInnerHTML(m, th) {
+  return '<div class="dwc-profile-row">' + picAvatarHTML(m, th) +
+    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + achBadgeIconsHTML(m.badges) + "</h2>" +
+    (m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
+    (m.bio ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(m.bio) + "</p>" : "") +
+    '<p class="dwc-meta" style="margin:4px 0">' +
+    (m.birthday ? "🎂 " + esc(m.birthday) + " · " : "") + "Joined " + fmtDate(m.created_at) +
+    (m.age_verified ? ' · <span style="color:var(--green)">Age verified ✓</span>' : "") +
+    (m.payout_ready ? ' · <span style="color:var(--green)">✓ Payout ready</span>' : "") + "</p>" +
+    (m.presence === "away" && m.away_message ? '<p style="margin:4px 0">🌙 Away: “' + esc(m.away_message) + "”</p>" : "") +
+    "</div></div>";
+}
+// Action buttons for a member page. Website mode shows ONLY "Message me"
+// under the picture (no Add me / Follow / Block / Favorite / Group /
+// Report). On your own page the button is a disabled preview.
+function profileActionsHTML(m, websiteMode) {
+  var uname = esc(m.username.replace(/'/g, ""));
+  var pb = m.profile_buttons || null;
+  if (websiteMode) {
+    var dis = m.is_mine ? " disabled" : "";
+    return '<div class="dwc-actions" style="margin-top:14px">' +
+      (m.is_mine ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
+      '<button type="button" class="btn"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')" + actionButtonStyle(pb, "message") + ">💬 " + esc(actionButtonLabel(pb, "message", "Message me")) + "</button>" +
+      "</div>";
+  }
+  return '<div class="dwc-actions" style="margin-top:14px">' +
+    (m.is_mine
+      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
+      : "") +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
+    "</div>" +
+    (m.is_mine ? actionButtonsHTML(m, true) + vanityURLHTML(m) : actionButtonsHTML(m) + '<div id="dwc-group-picker"></div>' + vanityURLHTML(m));
+}
+// Website-look nav bar — Home + Community, plus Edit for the owner.
+function websiteNavHTML(m) {
+  return '<nav class="dwc-website-nav">' +
+    '<a class="btn small" href="https://rarecandyreserve.org">🏠 Home</a>' +
+    '<a class="btn small" href="community.html">💬 Community</a>' +
+    (m.is_mine ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>' : "") +
+    "</nav>";
+}
+// Website-look sections — only the checked fields, in order.
+function websiteSectionsHTML(m) {
+  var show = m.website_show || {};
+  var out = "";
+  if (show.hobbies && m.hobbies) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">🎯 Hobbies</h3><p style="white-space:pre-wrap">' + esc(m.hobbies) + "</p></section>";
+  if (show.workplace && m.workplace) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">💼 Where I work</h3><p>' + esc(m.workplace) + "</p></section>";
+  if (show.relationship && m.relationship_status) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">💞 Single or in a relationship</h3><p>' + esc(m.relationship_status) + "</p></section>";
+  if (show.sign && m.birthsign && ZODIAC_SIGNS[m.birthsign]) {
+    var z = ZODIAC_SIGNS[m.birthsign];
+    out += '<section class="card dwc-website-section"><h3 style="margin-top:0">✨ Sign</h3><p><span class="dwc-sign">' + z.symbol + " " + esc(z.name) + '</span></p><p style="color:var(--muted)">' + esc(z.blurb) + "</p></section>";
+  }
+  if (show.accomplishments && m.accomplishments) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">🏆 Recent accomplishments</h3><p style="white-space:pre-wrap">' + esc(m.accomplishments) + "</p></section>";
+  return out;
+}
+// v3.9 — the "Scrolling ticker or headline" effect: when the member
+// hasn't set their own ticker text, the effect shows their bio line (or
+// a welcome line) scrolling above the page instead.
+function vibeTickerHTML(m, th) {
+  if (!th || (th.effects || []).indexOf("ticker-effect") < 0) return "";
+  if (m.ticker_enabled && m.ticker_text) return ""; // their own ticker already renders
+  var text = (m.bio || "").split("\n")[0].trim() || "Welcome to my page!";
+  var color = /^#[0-9a-fA-F]{6}$/.test(m.ticker_color || "") ? m.ticker_color : "#00e5ff";
+  return '<div class="dwc-ticker" style="color:' + esc(color) + '"><div class="dwc-ticker-inner">' + esc(text) + "</div></div>";
+}
+
 async function viewMember(el, memberId) {
   el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
   var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
   var m = data && data.member;
+  // Age gate (v3.9): an adult creator's page is 18+ only. Unverified
+  // viewers get the gate, not the profile — no details leak through.
+  if (data && data.gated) {
+    el.innerHTML = '<div class="card"><h2 style="margin-top:0">🔞 This page is 18+</h2>' +
+      '<p>@' + esc(data.username || "This member") + ' posts adult content, so this page is only for members who have verified their age with a photo ID.</p>' +
+      '<p>🔒 <strong>Your ID is safe here.</strong> It goes into a private vault for Chris to check, and it is permanently deleted the moment he approves or rejects it. Nothing is stored — no photo, no ID number, no birthdate.</p>' +
+      '<p><button type="button" class="btn" onclick="DWC.go(\'rules\')">Verify my age →</button> ' +
+      '<button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p></div>';
+    return;
+  }
   if (!m) {
     el.innerHTML = '<div class="note">That member doesn’t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
     return;
@@ -3088,41 +3509,29 @@ async function viewMember(el, memberId) {
     tst.textContent = memberThemeCss;
     document.head.appendChild(tst);
   }
+  // v3.9 — website look + picture position drive the layout.
+  var mth = parseThemeClient(m.profile_theme);
+  var isWebsite = !!m.website_mode;
+  var picOnTop = mth.pic_position === "top";
+  var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + profileActionsHTML(m, isWebsite) + "</section>";
+  var headTop = '<section class="dwc-mypage-top">' + profileHeadInnerHTML(m, mth) + "</section>";
+  var actionsBelowBanner = '<div class="dwc-mypage-actionsbelow">' + profileActionsHTML(m, isWebsite) + "</div>";
   el.innerHTML =
-    '<div class="dwc-myprofile">' +
-    // v3.7 — banner / cover photo first, centered at the top; then the
-    // optional custom-text ticker above the main page. The name stays
-    // put (it never scrolls).
-    bannerHTML(m) + tickerHTML(m) +
-    '<section class="card dwc-mypage-head"><div class="dwc-profile-row">' +
-    (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:84px;height:84px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:84px;height:84px;font-size:38px">🍬</span>') +
-    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + "</h2>" +
-    (m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
-    (m.bio ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(m.bio) + "</p>" : "") +
-    '<p class="dwc-meta" style="margin:4px 0">' +
-    (m.birthday ? "🎂 " + esc(m.birthday) + " · " : "") + "Joined " + fmtDate(m.created_at) +
-    (m.age_verified ? ' · <span style="color:var(--green)">Age verified ✓</span>' : "") +
-    (m.payout_ready ? ' · <span style="color:var(--green)">✓ Payout ready</span>' : "") + "</p>" +
-    (m.presence === "away" && m.away_message ? '<p style="margin:4px 0">🌙 Away: “' + esc(m.away_message) + "”</p>" : "") +
-    "</div></div>" +
-    '<div class="dwc-actions" style="margin-top:14px">' +
-    (m.is_mine
-      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
-      : "") +
-    '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
-    "</div>" +
-    // v3.6 — the 5 action buttons (someone else's page) + their vanity
-    // URL. On my own page the buttons show as a disabled preview so I
-    // can see how visitors see them while customizing, then the vanity URL.
-    (m.is_mine ? actionButtonsHTML(m, true) + vanityURLHTML(m) : actionButtonsHTML(m) + '<div id="dwc-group-picker"></div>' + vanityURLHTML(m)) +
-    "</section>" +
+    '<div class="dwc-myprofile' + (isWebsite ? " dwc-website" : "") + '">' +
+    (isWebsite ? websiteNavHTML(m) : "") +
+    // Picture position "top": the big picture first, banner below it,
+    // then the buttons below the banner. Normal: banner, ticker, then
+    // the head card with the picture + buttons inside it.
+    (picOnTop ? headTop + bannerHTML(m) + tickerHTML(m) + vibeTickerHTML(m, mth) + actionsBelowBanner
+      : bannerHTML(m) + tickerHTML(m) + vibeTickerHTML(m, mth) + headCard) +
+    // Website look: the five checked fields as website sections.
+    (isWebsite ? websiteSectionsHTML(m) : "") +
     // My links (v3.4) — only when the member actually has links.
     // No links, no section, no placeholder.
     (m.my_links && m.my_links.length ? '<section class="card"><h3 style="margin-top:0">🔗 My links</h3>' + myLinksButtonsHTML(m.my_links) + "</section>" : "") +
-    // Top 8 — only when the member actually has Top Friends. No
-    // friends, no section at all (no placeholder cards, no "pick yours"
-    // nudge on someone else's page).
-    ((m.top_friends && m.top_friends.length)
+    // Top 8 — hidden in website mode. Otherwise only when the member
+    // actually has Top Friends. No friends, no section at all.
+    ((!isWebsite && m.top_friends && m.top_friends.length)
       ? '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>"
       : "") +
     ((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to
@@ -3166,7 +3575,7 @@ async function loadPageComments(profileId, isMine, isFriend) {
     ? comments.map(function (c) {
         return '<div class="dwc-page-comment">' +
           (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
-          '<div><strong>@' + esc(c.author_username) + '</strong> <span class="dwc-meta">' + fmtDate(c.created_at) + '</span>' +
+          '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + '</span>' +
           (c.visibility !== "public" ? ' <span class="dwc-meta">· ' + (c.visibility === "friends" ? "friends-only" : "private") + '</span>' : "") +
           (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
           (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
@@ -3192,6 +3601,86 @@ async function loadPageComments(profileId, isMine, isFriend) {
     '<input type="url" name="gif_url" placeholder="GIF link (https://…)" style="min-width:180px">' +
     '<button class="btn" type="submit">Post comment</button></form>' +
     '<p class="dwc-form-err" data-err hidden></p>';
+}
+
+// ---------- v3.9 picture viewer (lightbox + comments, never likes) ----------
+// Opened by tapping a profile picture. Shows the picture large in the
+// owner's frame, with Prev/Next through their public phone pictures
+// (avatar first, then up to 20 public gallery photos), and a comment
+// thread under it (the profile-comments API, subject = the picture).
+// There is NO like button on pictures — likes live on posts only.
+function picViewerPhotoHTML(pv) {
+  var photo = pv.photos[pv.index];
+  if (!photo) return '<p style="color:var(--muted)">No picture here.</p>';
+  var th = pv.theme || {};
+  var frame = th.pic_frame || "none";
+  var style = "";
+  if (frame === "blood" && th.blood_color) style = ' style="--blood:' + esc(th.blood_color) + '"';
+  var img = '<img class="dwc-avatar dwc-picviewer-img" src="' + esc(photo.url) + '" alt="' + esc(photo.label || "Profile picture") + '">';
+  if (frame === "gb" || frame === "gba") {
+    var cols = gbFrameColors(th);
+    style = ' style="--gb-c1:' + cols[0] + ';--gb-c2:' + cols[1] + ';--gb-c3:' + cols[2] + '"';
+    return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + '>' +
+      '<span class="dwc-gb-screen">' + img + '</span>' +
+      '<span class="dwc-gb-label">' + (frame === "gba" ? "GAME BOY ADVANCE" : "GAME BOY") + '</span>' +
+      '<span class="dwc-gb-dpad"></span>' +
+      '<span class="dwc-gb-startselect"><i></i><i></i></span>' +
+      '<span class="dwc-gb-ab"><i></i><i></i></span>' +
+      '<span class="dwc-gb-speaker"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
+      "</span>";
+  }
+  return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + '>' + img + "</span>";
+}
+function renderPicViewer() {
+  var pv = state.picViewer;
+  var host = $("dwc-picviewer");
+  if (!pv || !host) return;
+  var photo = pv.photos[pv.index];
+  host.innerHTML =
+    '<div class="dwc-picviewer-backdrop" onclick="DWC.closePicViewer()"></div>' +
+    '<div class="dwc-picviewer-card" role="dialog" aria-label="Picture viewer">' +
+    '<button type="button" class="dwc-picviewer-close" onclick="DWC.closePicViewer()" title="Close">✕</button>' +
+    '<div class="dwc-picviewer-photo">' + picViewerPhotoHTML(pv) + "</div>" +
+    '<p class="dwc-picviewer-label">' + esc(photo ? (photo.label || "Profile picture") : "") + "</p>" +
+    '<div class="dwc-picviewer-nav">' +
+    '<button type="button" class="btn ghost small" onclick="DWC.picViewerPrev()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>← Prev</button>' +
+    '<span>' + (pv.index + 1) + " / " + pv.photos.length + "</span>" +
+    '<button type="button" class="btn ghost small" onclick="DWC.picViewerNext()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>Next →</button>' +
+    "</div>" +
+    '<div id="dwc-picviewer-comments"><p style="color:var(--muted)">Loading comments…</p></div>' +
+    "</div>";
+  loadPicViewerComments();
+}
+async function loadPicViewerComments() {
+  var pv = state.picViewer;
+  var host = $("dwc-picviewer-comments");
+  if (!pv || !host) return;
+  var photo = pv.photos[pv.index];
+  if (!photo) { host.innerHTML = ""; return; }
+  var data = await apiGet("/profile-comments?profile_id=" + pv.memberId + "&subject=" + encodeURIComponent(photo.subject) + (state.profile ? "&device_id=" + encodeURIComponent(deviceId()) : ""));
+  var comments = (data && data.comments) || [];
+  var canComment = !!(data && data.can_comment);
+  host.innerHTML =
+    '<h4 style="margin:12px 0 6px">💬 Comments on this picture</h4>' +
+    (comments.length
+      ? comments.map(function (c) {
+          return '<div class="dwc-page-comment">' +
+            (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
+            '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span>" +
+            (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+            (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
+            ((c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "") +
+            "</div></div>";
+        }).join("")
+      : '<p style="color:var(--muted)">No comments on this picture yet — be the first.</p>') +
+    (state.profile
+      ? (canComment
+        ? '<form class="dwc-rowform" onsubmit="DWC.sendPicComment(this); return false;" style="flex-wrap:wrap;margin-top:8px">' +
+          '<textarea name="body" rows="2" maxlength="500" placeholder="Comment on this picture…" style="flex:1;min-width:200px"></textarea>' +
+          '<select name="visibility" title="Who can see this comment"><option value="public">🌍 Public</option><option value="friends">👥 Friends-only</option><option value="private">🔒 Private (just them)</option></select>' +
+          '<button class="btn" type="submit">Post comment</button></form><p class="dwc-form-err" data-err hidden></p>'
+        : '<p style="color:var(--muted)">Add them as a friend first — only friends can comment on pictures.</p>')
+      : '<p style="color:var(--muted)">Sign in to comment on this picture.</p>');
 }
 
 // ---------- Live Chat — AIM throwback ----------
@@ -3239,7 +3728,7 @@ async function loadChatAim() {
     var msgs = (data && data.messages) || [];
     log.innerHTML = msgs.length
       ? msgs.map(function (m) {
-          return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + '</strong>' + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+          return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
         }).join("")
       : "<p>No messages yet — say hi.</p>";
     log.scrollTop = log.scrollHeight;
@@ -3584,19 +4073,50 @@ function renderAdminMembers() {
 }
 
 async function viewAdmin(el) {
-  if (!state.profile || !(state.profile.role === "operator" || state.profile.is_operator)) {
-    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin</h2><p>Only the operator (Chris) can open the admin panel — this is where he bans, grants mod/admin, and approves or denies requests.</p></section>';
+  var isOp = !!(state.profile && (state.profile.role === "operator" || state.profile.is_operator));
+  var isAdmin = !!(state.profile && state.profile.role === "admin");
+  if (!state.profile || !(isOp || isAdmin)) {
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin</h2><p>Only the operator (Chris) and admins he grants can open the admin panel — this is where he bans, grants mod/admin, and approves or denies requests.</p></section>';
     return;
   }
-  el.innerHTML = '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">Members, bans, roles, and requests — all in one place. Only you can see this.</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>' +
-    '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
-    '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>';
+  /* Members, bans, roles, requests, and shop listings stay operator-only.
+     The radio text + DJ console below are open to admins too. */
+  el.innerHTML =
+    (isOp
+      ? '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">Members, bans, roles, and requests — all in one place. Only you can see this.</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>' +
+        '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
+        '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>'
+      : "") +
+    '<section class="card"><h2 style="margin-top:0">📻 Radio player text</h2><p style="color:var(--muted)">Change the words on the live radio page — they update within 30 seconds. Leave a field blank to leave it as-is.</p>' +
+    '<form onsubmit="DWC.saveRadioSettings(this); return false;">' +
+    '<label style="display:block;margin-bottom:8px">Station tagline<input name="station_tagline" type="text" maxlength="500" placeholder="DJ Slabb · A Steady Heart · Vita Nova Records" style="width:100%;min-height:48px"></label>' +
+    '<label style="display:block;margin-bottom:8px">DJ greeting<input name="dj_greeting" type="text" maxlength="500" placeholder="Slabb here — welcome to Steady Wave." style="width:100%;min-height:48px"></label>' +
+    '<label style="display:block;margin-bottom:8px">DJ message<input name="dj_message" type="text" maxlength="500" placeholder="Tune in — the station is live, 24/7." style="width:100%;min-height:48px"></label>' +
+    '<label style="display:block;margin-bottom:8px">On-air label<input name="onair_label" type="text" maxlength="500" placeholder="LIVE" style="width:100%;min-height:48px"></label>' +
+    '<label style="display:block;margin-bottom:8px">Stream URL — the link the music page video box plays<input name="stream_url" type="text" maxlength="500" placeholder="https://www.youtube.com/watch?v=… or https://www.twitch.tv/…" style="width:100%;min-height:48px"></label>' +
+    '<label style="display:block;margin-bottom:8px">Ticker<textarea name="ticker" rows="3" maxlength="500" placeholder="thank you for listening to Steady Wave! …" style="width:100%;min-height:90px"></textarea></label>' +
+    '<p><button class="btn" type="submit">Save radio text</button> <span id="dwc-radio-settings-msg" style="font-weight:700"></span></p>' +
+    "</form></section>" +
+    '<section class="card"><h2 style="margin-top:0">🎧 DJ Console</h2><p style="color:var(--muted)">Run the show from the browser — deck, mic, talk-over, soundboard, and the auto-DJ rotation. Operator + admin only. Keep the tab open while you DJ.</p><p><a class="btn" href="dj-console.html">Open the full DJ Console →</a> <a class="btn ghost" href="dj-lite.html">🎧 Pocket DJ (phone) →</a></p></section>';
+  loadRadioSettingsForm();
+  if (!isOp) return;
   var data = await apiGet("/admin/members?device_id=" + encodeURIComponent(deviceId()));
   var host = $("dwc-admin-members");
   if (!host) return;
   if (!data || !data.ok) { host.innerHTML = '<p style="color:var(--muted)">' + esc((data && data.error) || "Couldn't load members.") + "</p>"; return; }
   adminMembersAll = data.members || [];
   renderAdminMembers();
+}
+
+/* Radio player text — load the current settings into the admin form. */
+async function loadRadioSettingsForm() {
+  var data = await apiGet("/radio-settings");
+  if (!data || !data.settings) return;
+  var keys = ["station_tagline", "dj_greeting", "dj_message", "ticker", "onair_label", "stream_url"];
+  keys.forEach(function (k) {
+    var input = document.querySelector('form [name="' + k + '"]');
+    if (input && data.settings[k]) input.value = data.settings[k];
+  });
 }
 
 // ---------- v3.7 Team (operator + admin + mod) ----------
@@ -3638,7 +4158,7 @@ async function loadTeamChat() {
   var msgs = (data && data.messages) || [];
   log.innerHTML = msgs.length
     ? msgs.map(function (m) {
-        return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + '</strong>: <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
       }).join("")
     : "<p>No team notes yet — say what you handled.</p>";
   log.scrollTop = log.scrollHeight;
@@ -3668,7 +4188,7 @@ function viewRules(el) {
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML + "</section>" +
     '<section class="card"><h2 style="margin-top:0">🌙 Adult content &amp; the 18+ area — how age verification works</h2>' +
     "<p>The deal is simple: <strong>you can sell any content, adult or otherwise, if you prove your age.</strong> Adult discussion lives in the <strong>🌙 After Dark 18+</strong> forum inside this app, and adult selling lives in the After Dark market — entering any 18+ area asks for age verification first. Everything else on the street never asks.</p>" +
-    "<p><strong>How the check works:</strong> you upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport). Chris — the operator — reviews it himself: that it’s a genuine-looking government ID, that the date of birth on it shows 18 or older, and that it matches the name and date of birth on your account. <strong>A typed birthday or an “I’m 18” checkbox alone never verifies anyone.</strong> Until the check passes, there is no adult access — no entering the 18+ forum, no adult selling.</p>" +
+    "<p><strong>How the check works:</strong> you upload a clear photo of your government-issued photo ID (driver’s license, state ID, or passport). Chris — the operator — reviews it himself: that it’s a genuine-looking government ID, that the date of birth on it shows 18 or older, and that it matches the name and date of birth on your account. <strong>A typed birthday or an “I’m 18” checkbox alone never verifies anyone.</strong> Until the check passes, there is no adult access — no entering the 18+ forum, no adult selling. Your ID photo is permanently deleted the moment Chris approves or rejects it — nothing is stored.</p>" +
     AGE_NOTICE_HTML + AGE_REVIEW_NOTE +
     '<div id="dwc-age-block"></div></section>';
   renderAgeBlock();
@@ -3747,6 +4267,7 @@ async function viewAdult(el) {
         ? '<img src="' + esc(wimg) + '" alt="Welcome to the 18+ area" class="dwc-welcome-img">'
         : '<div class="dwc-welcome-slot"><p>🌙</p><p><strong>Welcome picture slot</strong></p><p style="font-size:13px;color:var(--muted)">Chris uploads his own welcome picture here. The slot is empty until he does — no stock photo.</p></div>') +
       '<p>This area is for age-verified members only. A typed birthday alone is never enough — a real photo ID check is what opens the door.</p>' +
+      '<p class="dwc-review-note">🔒 <strong>Your ID is safe here.</strong> Joining YourSpace is free, and selling regular stuff never needs an ID — ID is only for adult content and digital assets. When you do verify, your ID photo goes into a private vault for Chris to check, and it is permanently deleted the moment he approves or rejects it. Nothing is stored — no photo, no ID number, no birthdate. The only thing kept is a simple ‘age verified’ mark on your account.</p>' +
       (st && st.pending ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself.</p>' : "") +
       "</section>" +
       DFM_HTML +
@@ -3992,6 +4513,7 @@ window.DWC = {
   dismissNotice: function () { setNotice(null); },
   setCategory: function (c) { state.category = c; renderView(); },
   setSort: function (s) { state.sort = s; renderView(); },
+  setFriendsOnly: function (on) { state.friendsOnly = !!on; renderView(); },
   openSignup: function () { state.signupOpen = true; state.editingProfile = false; state.challenge = null; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   // Human check didn't load (slow mobile) — reload it without losing the form.
@@ -4010,6 +4532,89 @@ window.DWC = {
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },
+  // v3.9 — picture viewer: avatar first, then the owner's public
+  // gallery photos (max 20). The host div is created once on the body.
+  openPicViewer: async function (memberId) {
+    var host = $("dwc-picviewer");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "dwc-picviewer";
+      host.className = "dwc-picviewer";
+      host.hidden = true;
+      document.body.appendChild(host);
+    }
+    var m = state.viewingMember && state.viewingMember.id === memberId ? state.viewingMember : null;
+    if (!m) {
+      var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
+      m = data && data.member;
+    }
+    if (!m) { setNotice("That member doesn't exist."); return; }
+    var photos = [];
+    if (m.avatar_url) photos.push({ url: m.avatar_url, subject: "avatar", label: "Profile picture" });
+    try {
+      var g = await apiGet("/gallery?profile_id=" + memberId);
+      ((g && g.photos) || []).slice(0, 20).forEach(function (p, i) {
+        photos.push({ url: p.url, subject: "gallery:" + p.id, label: p.caption || ("Photo " + (i + 1)) });
+      });
+    } catch (e) { /* gallery not there yet — avatar only */ }
+    if (!photos.length) { setNotice("No picture to show yet."); return; }
+    state.picViewer = { memberId: memberId, photos: photos, index: 0, theme: parseThemeClient(m.profile_theme) };
+    host.hidden = false;
+    renderPicViewer();
+    // Escape closes the viewer (backdrop click does too).
+    if (state.picViewerKeyHandler) document.removeEventListener("keydown", state.picViewerKeyHandler);
+    state.picViewerKeyHandler = function (e) { if (e && e.key === "Escape") DWC.closePicViewer(); };
+    document.addEventListener("keydown", state.picViewerKeyHandler);
+  },
+  picViewerPrev: function () {
+    var pv = state.picViewer;
+    if (!pv) return;
+    pv.index = (pv.index + pv.photos.length - 1) % pv.photos.length;
+    renderPicViewer();
+  },
+  picViewerNext: function () {
+    var pv = state.picViewer;
+    if (!pv) return;
+    pv.index = (pv.index + 1) % pv.photos.length;
+    renderPicViewer();
+  },
+  closePicViewer: function () {
+    var host = $("dwc-picviewer");
+    if (host) host.hidden = true;
+    if (state.picViewerKeyHandler) { document.removeEventListener("keydown", state.picViewerKeyHandler); state.picViewerKeyHandler = null; }
+    state.picViewer = null;
+  },
+  // v3.9 — comment on the picture currently open in the viewer.
+  sendPicComment: async function (form) {
+    var pv = state.picViewer;
+    if (!pv) return false;
+    var photo = pv.photos[pv.index];
+    if (!photo) return false;
+    var fd = new FormData(form);
+    var err = form.parentElement.querySelector("[data-err]");
+    var body = {
+      device_id: deviceId(),
+      profile_id: pv.memberId,
+      subject: photo.subject,
+      body: String(fd.get("body") || "").trim(),
+      visibility: String(fd.get("visibility") || "public"),
+    };
+    if (!body.body) { if (err) { err.hidden = false; err.textContent = "Write something first."; } return false; }
+    var data = await apiPost("/profile-comments", body);
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't post that comment."; } return false; }
+    if (data.subject_skipped) setNotice("Comment posted — it landed as a page comment (the shop is still running a quick database update).");
+    form.reset();
+    await loadPicViewerComments();
+    return false;
+  },
+  deletePicComment: async function (commentId) {
+    var pv = state.picViewer;
+    if (!pv) return;
+    if (!confirm("Delete this comment?")) return;
+    var data = await apiDelete("/profile-comments?id=" + commentId + "&device_id=" + encodeURIComponent(deviceId()));
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't delete that comment."); return; }
+    await loadPicViewerComments();
+  },
 
   toggleGifPicker: function (key) {
     var box = document.querySelector('[data-gifbox="' + key + '"] .dwc-gifgrid');
@@ -4040,6 +4645,8 @@ window.DWC = {
     form.querySelectorAll("[data-kind]").forEach(function (b) { b.classList.toggle("active", b.getAttribute("data-kind") === kind); });
     var flair = form.querySelector('select[name="flair"]');
     if (flair) flair.value = kind === "card_auth" ? "Card Check" : "Discussion";
+    var ev = form.querySelector("[data-eventfields]");
+    if (ev) ev.hidden = kind !== "event";
   },
 
   saveProfile: async function (form) {
@@ -4128,8 +4735,53 @@ window.DWC = {
       var btnCss = String(fd.get("theme_button_css") || "").slice(0, 4000);
       if (btnCss.trim()) theme.button_css = btnCss;
       var effs = fd.getAll ? fd.getAll("theme_effects") : [];
-      theme.effects = effs.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 4);
+      theme.effects = effs.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8);
+      // v3.9 — preset background + comment-border color + picture
+      // size / position / frame + blood + handheld colors. The RGB
+      // comment-border effect and a custom border color are mutually
+      // exclusive: ticking the RGB effect drops the custom color.
+      var bgPreset = String(fd.get("theme_bg_preset") || "");
+      if (PRESET_BACKGROUNDS.some(function (pr) { return pr.id === bgPreset; })) theme.bg_preset = bgPreset;
+      if (theme.effects.indexOf("rgb-comment-border") >= 0) {
+        theme.comment_border_color = "";
+      } else if (fd.get("theme_comment_border_use")) {
+        theme.comment_border_color = hexOk(fd.get("theme_comment_border_color")) || "#000000";
+      }
+      var picSize = String(fd.get("theme_pic_size") || "");
+      if (picSize === "bigger" || picSize === "smaller") theme.pic_size = picSize;
+      var picPos = String(fd.get("theme_pic_position") || "");
+      if (picPos === "normal" || picPos === "top") theme.pic_position = picPos;
+      var picFrame = String(fd.get("theme_pic_frame") || "");
+      if (PIC_FRAMES.some(function (f) { return f.id === picFrame; })) theme.pic_frame = picFrame;
+      var bloodCol = hexOk(fd.get("theme_blood_color"));
+      if (bloodCol) theme.blood_color = bloodCol;
+      var gbMode = String(fd.get("theme_gb_mode") || "");
+      if (GB_FRAME_MODES.some(function (gm) { return gm.id === gbMode; })) theme.gb_mode = gbMode;
+      var gbCols = [0, 1, 2].map(function (i) { return hexOk(fd.get("theme_gb_color_" + i)); }).filter(Boolean);
+      if (gbCols.length) theme.gb_colors = gbCols;
+      // v3.9 — chosen display badges (1–2 slots; the server enforces
+      // the slot rules on save, so the client just passes the picks).
+      var dbPicked = [String(fd.get("theme_display_badge_1") || ""), String(fd.get("theme_display_badge_2") || "")]
+        .filter(function (k) { return BADGES.some(function (b) { return b.key === k; }); });
+      if (dbPicked.length) theme.display_badges = dbPicked;
       body.profile_theme = JSON.stringify(theme);
+    }
+    // v3.9 — website look: the toggle + the five fields + their show
+    // checkboxes. Only sent when the form has them (edit view).
+    if (form.querySelector('input[name="website_mode"]')) {
+      body.website_mode = !!fd.get("website_mode");
+      body.hobbies = String(fd.get("hobbies") || "").trim().slice(0, 200);
+      body.workplace = String(fd.get("workplace") || "").trim().slice(0, 120);
+      body.relationship_status = String(fd.get("relationship_status") || "").trim();
+      body.birthsign = String(fd.get("birthsign") || "").trim();
+      body.accomplishments = String(fd.get("accomplishments") || "").trim().slice(0, 500);
+      body.website_show = {
+        hobbies: !!fd.get("website_show_hobbies"),
+        workplace: !!fd.get("website_show_workplace"),
+        relationship: !!fd.get("website_show_relationship"),
+        sign: !!fd.get("website_show_sign"),
+        accomplishments: !!fd.get("website_show_accomplishments"),
+      };
     }
     // Steady Wave player (v3.1) — opt-in radio on the profile.
     // Edit-only fields (the toggles only render on edit), so only send
@@ -4204,16 +4856,17 @@ window.DWC = {
     if (bannerError) bannerNote = " Your banner didn't save — " + bannerError;
     else if (data.banner_error) bannerNote = " Your banner didn't save — " + data.banner_error;
     else if (bannerUploaded) bannerNote = " Banner saved ✓";
-    if (data.v2_pending || data.v3_pending || data.v36_pending || data.v37_pending) {
+    if (data.v2_pending || data.v3_pending || data.v36_pending || data.v37_pending || data.v39_pending) {
       var pendingParts = [];
       if (data.v2_pending) pendingParts.push("your Top Friends / layout");
       if (data.v3_pending) pendingParts.push("your What I sell / Find prefs / music picks");
       if (data.v36_pending) pendingParts.push("your page URL / action buttons");
       if (data.v37_pending) pendingParts.push("your banner / ticker");
+      if (data.v39_pending) pendingParts.push("your website look");
       setNotice("Profile saved — but " + pendingParts.join(" and ") + " didn't stick yet. " +
         "The shop is still running a quick database update; try saving again later." + avatarNote + bannerNote);
     } else {
-      setNotice((isNew ? "Welcome to the street, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote + bannerNote);
+      setNotice((isNew ? "Welcome to YourSpace, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote + bannerNote);
     }
     render();
     await refreshStats();
@@ -4257,6 +4910,11 @@ window.DWC = {
       verification_status: check ? check.status : "not_checked",
       verification_summary: check ? (check.summary || "") : "",
     };
+    if (kind === "event") {
+      body.event_date = String(fd.get("event_date") || "").trim().slice(0, 120);
+      body.event_time = String(fd.get("event_time") || "").trim().slice(0, 120);
+      body.event_place = String(fd.get("event_place") || "").trim().slice(0, 120);
+    }
     if (photo) body.image = { dataBase64: photo.dataBase64, mimeType: photo.mimeType };
     if (video) body.video = { dataBase64: video.dataBase64, mimeType: video.mimeType, fileName: video.fileName };
     var data = await apiPost("/posts", body);
@@ -4265,8 +4923,9 @@ window.DWC = {
     clearCropPick(gk);
     clearVideoPick(gk);
     state.checkResult = null;
-    var postMsg = kind === "adult" ? "Posted to the 18+ forum." : "Posted.";
+    var postMsg = kind === "adult" ? "Posted to the 18+ forum." : kind === "announcement" ? "Announcement is live." : kind === "event" ? "Event posted." : "Posted.";
     if (data.video_skipped) postMsg += " The video didn't attach yet — the shop is still running a database update, so the post is live without it.";
+    if (data.event_skipped) postMsg += " The event date/time/place didn't save yet — the shop is still running a database update, so the post is live without them.";
     setNotice(postMsg);
     if (context === "adult") renderAdultForum();
     else if (context === "cardcheck") renderView();
@@ -4854,6 +5513,24 @@ window.DWC = {
     else if (which === "clear") { adminSellsFilter = ""; adminWantsFilter = ""; }
     renderAdminMembers();
   },
+  // v3.9 radio player text — save the radio.html words + stream URL.
+  // Blank fields are left as-is (only non-empty values are sent).
+  saveRadioSettings: async function (form) {
+    var msg = $("dwc-radio-settings-msg");
+    var keys = ["station_tagline", "dj_greeting", "dj_message", "ticker", "onair_label", "stream_url"];
+    var settings = {};
+    keys.forEach(function (k) {
+      var input = form.querySelector('[name="' + k + '"]');
+      var v = input ? String(input.value || "").trim() : "";
+      if (v) settings[k] = v.slice(0, 500);
+    });
+    if (!Object.keys(settings).length) { if (msg) msg.textContent = "Nothing to save — fill in a field first."; return false; }
+    if (msg) msg.textContent = "Saving…";
+    var data = await apiPost("/radio-settings", { device_id: deviceId(), settings: settings });
+    if (!data || !data.ok) { if (msg) msg.textContent = (data && data.error) || "Couldn't save — try again."; return false; }
+    if (msg) msg.textContent = "Saved ✓ — the radio page picks it up within 30 seconds.";
+    return false;
+  },
 
   // v3.7 team chat.
   sendTeamChat: async function (form) {
@@ -4936,6 +5613,76 @@ window.DWC = {
     document.querySelectorAll("[data-presetbtn]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-presetbtn") === id);
     });
+  },
+  // v3.9 — preset background picker.
+  applyBgPreset: function (id) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_bg_preset"]');
+    if (hidden) hidden.value = id;
+    document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === id);
+    });
+  },
+  // v3.9 — picture size / position pickers.
+  applyPicSize: function (size) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_pic_size"]');
+    if (hidden) hidden.value = size;
+    document.querySelectorAll("[data-picsizebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-picsizebtn") === size);
+    });
+  },
+  applyPicPosition: function (pos) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_pic_position"]');
+    if (hidden) hidden.value = pos;
+    document.querySelectorAll("[data-picposbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-picposbtn") === pos);
+    });
+  },
+  // v3.9 — picture frame picker. Shows/hides the blood-color row and
+  // the handheld-color row for the frames that need them.
+  applyPicFrame: function (id) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_pic_frame"]');
+    if (hidden) hidden.value = id;
+    document.querySelectorAll("[data-picframebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-picframebtn") === id);
+    });
+    var blood = $("dwc-blood-row");
+    if (blood) blood.hidden = id !== "blood";
+    var gb = $("dwc-gb-row");
+    if (gb) gb.hidden = !(id === "gb" || id === "gba");
+  },
+  // Badge slot picker (v3.9): a regular seller only gets a second slot
+  // while slot 1 is Regular Seller. Hiding the slot also disables it
+  // (and clears it) so a stale second badge never submits.
+  badgeSlotChanged: function () {
+    var form = document.querySelector("#dwc-account form");
+    if (!form) return;
+    var s1 = form.querySelector('select[name="theme_display_badge_1"]');
+    var slot2 = $("dwc-badge-slot2");
+    if (!slot2) return;
+    var show = !!(state.profile && state.profile.is_regular_seller) && s1 && s1.value === "badge:sales-5";
+    slot2.hidden = !show;
+    var s2 = slot2.querySelector("select");
+    if (s2) {
+      s2.disabled = !show;
+      if (!show) s2.value = "";
+    }
+  },
+  // v3.9 — handheld color mode: show the 3 custom colors only for "custom".
+  gbModeChanged: function (sel) {
+    var custom = $("dwc-gb-custom");
+    if (custom) custom.hidden = sel.value !== "custom";
+  },
+  // v3.9 — custom comment-border color vs the RGB effect: ticking the
+  // color un-ticks the RGB effect (they're mutually exclusive).
+  commentBorderUseChanged: function (cb) {
+    if (!cb.checked) return;
+    var form = cb.closest("form");
+    var rgb = form && form.querySelector('input[name="theme_effects"][value="rgb-comment-border"]');
+    if (rgb) rgb.checked = false;
   },
   layoutCssEdited: function (ta) {
     var form = ta.closest("form");
@@ -5357,6 +6104,30 @@ window.DWC = {
     if (!it) return;
     if (it.timer) clearTimeout(it.timer);
     state.phoneGallery.splice(i, 1);
+    renderPhone();
+  },
+  // v3.9 — "Make public": upload a session phone photo to the public
+  // gallery (R2) so it shows in the picture viewer on your page (up to
+  // 20). The session copy still vanishes after 10 minutes — the public
+  // copy stays until you take it down.
+  phoneGalleryPublish: async function (i) {
+    var it = state.phoneGallery[i];
+    if (!it || !state.profile) return;
+    var m = /^data:([^;]+);base64,(.+)$/.exec(it.url || "");
+    if (!m) { setNotice("That photo couldn't be read — add it again."); return; }
+    var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: m[2], mimeType: m[1] }, caption: it.name || "" });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't make that photo public."); return; }
+    it.publicId = data.photo && data.photo.id;
+    setNotice("Public ✓ — visitors can scroll to it from your picture.");
+    renderPhone();
+  },
+  phoneGalleryUnpublish: async function (i) {
+    var it = state.phoneGallery[i];
+    if (!it || !it.publicId) return;
+    var data = await apiDelete("/gallery?id=" + it.publicId + "&device_id=" + encodeURIComponent(deviceId()));
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't take that photo down."); return; }
+    it.publicId = null;
+    setNotice("Taken down from your public gallery.");
     renderPhone();
   },
   phoneGalleryOpen: function (i) {

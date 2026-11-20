@@ -8,10 +8,10 @@
 // file). They live in the adult forum feed and its tag pages, and only
 // age-verified members can create or see them.
 import {
-  json, noDb, getDb, readJson, profileByDevice, shapePost,
+  json, noDb, getDb, readJson, profileByDevice, isOperator, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
-  createNotification,
+  createNotification, badgesForProfiles,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -26,6 +26,7 @@ export async function onRequestGet({ env, request }) {
   const deviceId = q.get("device_id") || "";
   const onlyCreator = q.get("creator") === "1";
   const genre = q.get("genre") || null;
+  const friendsOnly = q.get("friends") === "1";
 
   const wantsAdult = kind === "adult";
   let callerVerified = false;
@@ -57,9 +58,26 @@ export async function onRequestGet({ env, request }) {
   // age-verified adult scope above — a non-verified caller already got [].
   if (onlyCreator) rows = rows.filter((r) => r.is_creator === 1);
   if (genre) rows = rows.filter((r) => (r.content_genre ?? "") === genre);
+  // Friends feed — only posts by people the viewer added as friends,
+  // plus the viewer's own posts. Guests (no profile) get nothing here;
+  // the Friends pill is hidden for them. A missing friends table (the
+  // v3.6 migration hasn't run yet) also yields nothing, never a crash.
+  if (friendsOnly) {
+    const me = deviceId ? await profileByDevice(db, deviceId) : null;
+    if (!me) return json({ posts: [] });
+    let friendIds = [];
+    try {
+      const { results } = await db.prepare("SELECT friend_id FROM friends WHERE profile_id = ?").bind(me.id).all();
+      friendIds = (results || []).map((r) => r.friend_id);
+    } catch { friendIds = []; }
+    const allowed = new Set(friendIds);
+    allowed.add(me.id);
+    rows = rows.filter((r) => allowed.has(r.profile_id));
+  }
   const shaped = [];
+  const badgeMap = await badgesForProfiles(db, rows.map((r) => r.author_id));
   for (const r of rows) {
-    shaped.push(await shapePost(db, r, { id: r.author_id, username: r.author_username, occupation: r.author_occupation, avatar_blob_key: r.author_avatar }));
+    shaped.push(await shapePost(db, r, { id: r.author_id, username: r.author_username, occupation: r.author_occupation, avatar_blob_key: r.author_avatar, badges: badgeMap.get(r.author_id) || [] }));
   }
   shaped.sort((a, b) => {
     if (sort === "top") return b.score - a.score || b.id - a.id;
@@ -76,7 +94,10 @@ export async function onRequestPost({ env, request }) {
   const fail = (error) => json({ ok: false, error, post_id: null });
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return fail("Create your profile first — posting needs a username.");
-  const kind = ["forum", "card_auth", "adult"].includes(a.kind) ? a.kind : "forum";
+  const kind = ["forum", "card_auth", "adult", "event", "announcement"].includes(a.kind) ? a.kind : "forum";
+  // Announcements are operator-only (Chris). The pill only renders for
+  // the operator, but the gate lives here — a forged request gets a 403.
+  if (kind === "announcement" && !isOperator(env, me)) return fail("Announcements are for the operator only.");
   const title = String(a.title || "").trim();
   const body = String(a.body || "").trim();
   if (title.length < 3 || title.length > 120) return fail("Title needs 3–120 characters.");
@@ -118,7 +139,7 @@ export async function onRequestPost({ env, request }) {
       const v2 = vals.filter((_, i) => combo.drop.indexOf(cols[i]) === -1);
       try {
         const r = await db.prepare(`INSERT INTO posts (${c2.join(", ")}) VALUES (${c2.map(() => "?").join(", ")})`).bind(...v2).run();
-        return { post_id: r.meta.last_row_id, videoSkipped: combo.drop.indexOf("video_blob_key") !== -1 };
+        return { post_id: r.meta.last_row_id, videoSkipped: combo.drop.indexOf("video_blob_key") !== -1, dropped: combo.drop };
       } catch (e) {
         if (!missingCol(e)) throw e;
         lastErr = e;
@@ -128,10 +149,13 @@ export async function onRequestPost({ env, request }) {
   };
   // Success JSON for a post insert — video_skipped is only set when a
   // video was actually picked AND the insert had to drop the video
-  // column (the v3.5 migration hasn't run yet). Never silently dropped.
-  const insertDone = (res) => {
+  // column (the v3.5 migration hasn't run yet). event_skipped is the
+  // same deal for event date/time/place (the post-types migration
+  // hasn't run yet). Never silently dropped.
+  const insertDone = (res, hadEvent) => {
     const out = { ok: true, error: null, post_id: res.post_id };
     if (res.videoSkipped && videoKey) out.video_skipped = true;
+    if (hadEvent && res.dropped && res.dropped.indexOf("event_date") !== -1) out.event_skipped = true;
     return json(out);
   };
   const now = nowMs();
@@ -206,17 +230,27 @@ export async function onRequestPost({ env, request }) {
   // Blur (v3.2) — OPT-IN ONLY, off by default. Stored on any post with a
   // photo; a post with no photo just carries 0 and nothing changes.
   const blurPhoto = a.blur_photo === true ? 1 : 0;
-  const regCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "video_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "blur_photo", "created_at", "updated_at"];
+  // Event fields — only on kind="event"; empty strings become NULL.
+  const evDate = kind === "event" ? String(a.event_date || "").trim().slice(0, 120) : "";
+  const evTime = kind === "event" ? String(a.event_time || "").trim().slice(0, 120) : "";
+  const evPlace = kind === "event" ? String(a.event_place || "").trim().slice(0, 120) : "";
+  const regCols = ["profile_id", "category", "kind", "flair", "tags", "image_blob_key", "video_blob_key", "gif_url", "gif_label", "verification_status", "verification_summary", "title", "body", "blur_photo", "event_date", "event_time", "event_place", "created_at", "updated_at"];
   const regVals = [me.id, a.category, kind, flair, tags, imageKey, videoKey,
     a.gif_url ? String(a.gif_url).slice(0, 500) : null,
-    String(a.gif_label || "").slice(0, 80), vs, vsum, title, body, blurPhoto, now, now];
-  // v3.2 blur column / v3.5 video column not there yet — retry without
-  // them so posting never breaks (video_skipped tells the client).
+    String(a.gif_label || "").slice(0, 80), vs, vsum, title, body, blurPhoto,
+    evDate || null, evTime || null, evPlace || null, now, now];
+  // v3.2 blur column / v3.5 video column / post-types event columns not
+  // there yet — retry without them so posting never breaks (video_skipped
+  // / event_skipped tells the client).
   const regRes = await tryInsert(regCols, regVals, [
     { drop: [] },
     { drop: ["video_blob_key"] },
     { drop: ["blur_photo"] },
     { drop: ["video_blob_key", "blur_photo"] },
+    { drop: ["event_date", "event_time", "event_place"] },
+    { drop: ["video_blob_key", "event_date", "event_time", "event_place"] },
+    { drop: ["blur_photo", "event_date", "event_time", "event_place"] },
+    { drop: ["video_blob_key", "blur_photo", "event_date", "event_time", "event_place"] },
   ]);
   // @mentions in the post body (v3.8) — skips quietly if the table isn't there yet.
   await notifyMentions(db, me, body, { ref_type: "post", ref_id: regRes.post_id, label: "in a post", link: `#/thread/${regRes.post_id}` });
@@ -229,5 +263,5 @@ export async function onRequestPost({ env, request }) {
     text: `@${me.username} posted — ${title}`,
     link: `#/thread/${regRes.post_id}`,
   });
-  return insertDone(regRes);
+  return insertDone(regRes, !!(evDate || evTime || evPlace));
 }

@@ -1,7 +1,7 @@
 // DELETE /api/shop-listings/:id — operator only: delete one override.
 // The listing falls back to its hardcoded site.js data (or disappears
 // entirely if it was a brand-new shop-* listing with no hardcoded row).
-import { json, noDb, getDb, readJson, profileByDevice, isOperator } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator } from "../_lib.js";
 
 export async function onRequestDelete({ env, request, params }) {
   const db = getDb(env);

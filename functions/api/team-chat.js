@@ -3,7 +3,7 @@
 // POST /api/team-chat — post a team message (up to 500 characters).
 // This is where the team mentions what they handled. Members and guests
 // cannot read or post here.
-import { json, noDb, getDb, readJson, profileByDevice, roleOf, isTeamRole, iso, nowMs } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, roleOf, isTeamRole, iso, nowMs, badgesForProfiles } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -15,10 +15,12 @@ export async function onRequestGet({ env, request }) {
   const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") || "60", 10) || 60, 1), 100);
   const { results } = await db.prepare("SELECT * FROM team_chat_messages ORDER BY id DESC LIMIT ?").bind(limit).all();
   const rows = (results || []).reverse();
+  const badgeMap = await badgesForProfiles(db, rows.map((r) => r.profile_id));
   return json({
     ok: true,
     messages: rows.map((r) => ({
       id: r.id, profile_id: r.profile_id, author_name: r.author_name,
+      author_badges: r.profile_id ? (badgeMap.get(r.profile_id) || []) : [],
       body: r.body, created_at: iso(r.created_at),
     })),
   });

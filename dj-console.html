@@ -1,0 +1,2011 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="data:," />
+    <title>Vita Nova DJ Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+      :root {
+        --bg: #101216; --bg-soft: #16191f; --panel: #1b1f26; --panel-2: #22262f;
+        --line: #2e333f; --ink: #eef0f4; --ink-soft: #aab1bf; --ink-faint: #767e8d;
+        --amber: #f2b13c; --amber-ink: #1a1405; --teal: #2ec4a6; --red: #e5484d;
+        --ok: #3fb96f; --radius: 10px;
+        --mono: "IBM Plex Mono", ui-monospace, monospace;
+        --sans: "Archivo", system-ui, -apple-system, sans-serif;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          --bg: #eceef1; --bg-soft: #e2e5ea; --panel: #ffffff; --panel-2: #f3f4f7;
+          --line: #cfd4dd; --ink: #171a20; --ink-soft: #4c5462; --ink-faint: #7c8494;
+          --amber: #b87a10; --amber-ink: #ffffff;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+      button, [role="button"], select, summary, input:not([type="checkbox"], [type="radio"]) { min-height: 2.25rem; }
+      button { font-family: inherit; cursor: pointer; }
+      :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+      .wrap { max-width: 1180px; margin: 0 auto; padding: 14px 14px 48px; }
+
+      .onair { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; }
+      .onair .brand { font-weight: 800; font-size: 19px; }
+      .onair .brand span { color: var(--amber); }
+      .onair .sub { color: var(--ink-soft); font-size: 13px; }
+      .onair .spacer { flex: 1; }
+      .live-dot { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; font-weight: 600; letter-spacing: .12em; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--panel-2); }
+      .live-dot .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-faint); }
+      .live-dot.on { color: #fff; background: var(--red); border-color: var(--red); }
+      .live-dot.on .dot { background: #fff; animation: pulse 1.2s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+      @media (prefers-reduced-motion: reduce) { .live-dot.on .dot { animation: none; } }
+      .clock { font-family: var(--mono); font-size: 20px; font-weight: 600; text-align: right; }
+      .clock small { display: block; font-size: 10px; letter-spacing: .14em; color: var(--ink-faint); font-weight: 500; }
+
+      .grid { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 14px; }
+      @media (min-width: 900px) { .grid { grid-template-columns: minmax(0,7fr) minmax(0,5fr); } .span-all { grid-column: 1 / -1; } }
+      .panel { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+      .panel h2 { margin: 0 0 4px; font-size: 13px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+      .panel h2 .tag { margin-left: auto; font-family: var(--mono); font-size: 11px; letter-spacing: 0; text-transform: none; color: var(--ink-faint); font-weight: 500; }
+      .panel .hint { color: var(--ink-soft); font-size: 13px; margin: 2px 0 12px; }
+
+      .np-badge { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: .1em; padding: 3px 9px; border-radius: 4px; text-transform: uppercase; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-soft); }
+      .np-badge.song { color: var(--amber); border-color: var(--amber); }
+      .np-badge.ad { color: var(--teal); border-color: var(--teal); }
+      .np-badge.talk { color: #fff; background: var(--red); border-color: var(--red); }
+      .np-title { font-size: 26px; font-weight: 800; line-height: 1.15; margin: 10px 0 2px; }
+      .np-meta { color: var(--ink-soft); font-size: 14px; }
+      .np-next { color: var(--ink-faint); font-size: 13px; margin-top: 6px; }
+      .np-next strong { color: var(--ink-soft); font-weight: 600; }
+
+      .progress-row { display: flex; align-items: center; gap: 10px; margin-top: 16px; font-family: var(--mono); font-size: 12px; color: var(--ink-soft); }
+      input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; padding: 0; }
+      input[type="range"]::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: var(--line); }
+      input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--amber); margin-top: -6px; border: 2px solid var(--bg); }
+      input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--line); }
+      input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--amber); border: 2px solid var(--bg); }
+      .seek { flex: 1; }
+
+      .transport { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; align-items: center; }
+      .tbtn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 8px; padding: 8px 14px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; }
+      .tbtn:hover { border-color: var(--ink-faint); }
+      .tbtn.play { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); font-size: 16px; padding: 8px 22px; }
+      .tbtn.on { background: var(--red); border-color: var(--red); color: #fff; }
+      .tbtn svg { width: 16px; height: 16px; flex: none; }
+
+      .deck-row { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+      @media (min-width: 560px) { .deck-row { grid-template-columns: 1fr 1fr; } }
+      .ctl label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 6px; }
+      .ctl .val { font-family: var(--mono); color: var(--ink-soft); font-size: 12px; }
+      .ctl input[type="range"] { width: 100%; }
+
+      .switch-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
+      .switch-row .txt { flex: 1; }
+      .switch-row .txt b { display: block; font-size: 14px; }
+      .switch-row .txt span { color: var(--ink-soft); font-size: 12.5px; }
+      .switch { position: relative; width: 50px; height: 30px; flex: none; background: none; border: none; padding: 0; }
+      .switch .track { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background .15s; pointer-events: none; }
+      .switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); transition: transform .15s; }
+      .switch[aria-checked="true"] .track { background: var(--teal); }
+      .switch[aria-checked="true"] .track::after { transform: translateX(20px); background: #fff; }
+
+      canvas.meter { width: 100%; height: 44px; display: block; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px; margin-top: 10px; }
+      .meter-label { font-family: var(--mono); font-size: 11px; color: var(--ink-faint); margin-top: 4px; display: flex; justify-content: space-between; }
+
+      .rundown-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-bottom: 10px; }
+      .field { margin-bottom: 12px; }
+      .field label, .rundown-tools label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 5px; }
+      input[type="time"] { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-family: var(--mono); font-size: 15px; }
+      .btn { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 8px; padding: 8px 14px; font-size: 14px; font-weight: 600; min-height: 40px; }
+      .btn:hover { border-color: var(--ink-faint); }
+      .btn.primary { background: var(--amber); border-color: var(--amber); color: var(--amber-ink); }
+      .btn.teal { background: var(--teal); border-color: var(--teal); color: #06231d; }
+      .btn:disabled { opacity: .45; cursor: not-allowed; }
+      .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+      .schedule-note { font-size: 13px; color: var(--ink-soft); background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; margin-bottom: 10px; }
+      .schedule-note b { color: var(--ink); }
+
+      .rundown { list-style: none; margin: 0; padding: 0; max-height: 560px; overflow-y: auto; }
+      .rundown li { display: flex; align-items: center; gap: 10px; padding: 8px; border-top: 1px solid var(--line); border-radius: 6px; }
+      .rundown li:first-child { border-top: none; }
+      .rundown li.playing { background: var(--bg-soft); box-shadow: inset 3px 0 0 var(--amber); }
+      .rundown li.done { opacity: .45; }
+      .rundown .time { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); width: 64px; flex: none; }
+      .rundown .r-badge { font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--line); color: var(--ink-soft); flex: none; width: 54px; text-align: center; }
+      .rundown .r-badge.song { color: var(--amber); border-color: var(--amber); }
+      .rundown .r-badge.ad { color: var(--teal); border-color: var(--teal); }
+      .rundown .r-badge.talk { color: #fff; background: var(--red); border-color: var(--red); }
+      .rundown .r-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .rundown .r-title small { display: block; font-weight: 400; color: var(--ink-faint); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .rundown .r-dur { font-family: var(--mono); font-size: 12px; color: var(--ink-faint); flex: none; }
+      .rundown .r-play { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+      .rundown .r-play:hover { border-color: var(--amber); color: var(--amber); }
+      .rundown .r-play svg { width: 14px; height: 14px; }
+      .file-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+      .file-dot.missing { background: var(--line); }
+
+      .route-flow { display: flex; flex-wrap: wrap; align-items: stretch; margin: 12px 0; }
+      .route-node { flex: 1 1 104px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; text-align: center; }
+      .route-node b { display: block; font-size: 13px; }
+      .route-node span { font-size: 11.5px; color: var(--ink-soft); font-family: var(--mono); }
+      .route-node.hot { border-color: var(--teal); }
+      .route-arrow { align-self: center; padding: 0 5px; color: var(--ink-faint); font-family: var(--mono); }
+      select { width: 100%; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+      .steps { margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 13.5px; }
+      .steps li { margin-bottom: 7px; }
+      .steps b { color: var(--ink); }
+      .steps code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-soft); border: 1px solid var(--line); padding: 1px 5px; border-radius: 4px; }
+      .status-line { font-size: 13px; color: var(--ink-soft); margin-top: 8px; }
+      .status-line .ok { color: var(--ok); font-weight: 700; }
+      .status-line .warn { color: var(--amber); font-weight: 700; }
+
+      .mic-big { width: 100%; min-height: 52px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+      .mic-big.live { background: var(--red); border-color: var(--red); color: #fff; }
+      .mic-big .dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+      .mic-note { font-size: 12.5px; color: var(--ink-faint); margin-top: 8px; }
+
+      .pack-list { margin: 0 0 12px; padding-left: 20px; color: var(--ink-soft); font-size: 13.5px; }
+      .pack-list li { margin-bottom: 5px; }
+      .pack-list b { color: var(--ink); }
+      .toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); font-weight: 600; font-size: 14px; padding: 11px 18px; border-radius: 999px; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px); text-align: center; z-index: 50; }
+      .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+      .foot { color: var(--ink-faint); font-size: 12.5px; margin-top: 16px; text-align: center; }
+      /* Listener display */
+      .display-screen { background: var(--bg-soft); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; position: relative; }
+      .display-screen:fullscreen { border-radius: 0; }
+      .disp-top { display: flex; align-items: center; gap: 10px; padding: 12px 16px 0; flex-wrap: wrap; }
+      .disp-brand { font-weight: 800; letter-spacing: .06em; font-size: 14px; }
+      .disp-brand span { color: var(--amber); }
+      .disp-title { font-size: clamp(30px, 5.4vw, 52px); font-weight: 800; line-height: 1.08; padding: 8px 16px 0; }
+      .disp-meta { color: var(--ink-soft); font-size: clamp(14px, 2vw, 18px); padding: 2px 16px 0; }
+      .disp-next { color: var(--ink-faint); font-size: 14px; padding: 2px 16px 10px; }
+      .disp-next strong { color: var(--ink-soft); }
+      canvas.viz { width: 100%; height: 130px; display: block; }
+      .disp-msg { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 24px; background: rgba(10, 11, 14, .88); color: #fff; font-size: clamp(26px, 4.6vw, 46px); font-weight: 800; line-height: 1.15; }
+      .disp-msg.show { display: flex; }
+      .ticker { border-top: 1px solid var(--line); overflow: hidden; white-space: nowrap; padding: 8px 0; background: var(--panel); }
+      .ticker span { display: inline-block; font-family: var(--mono); font-size: 14px; color: var(--ink-soft); padding-left: 100%; animation: tickmove 30s linear infinite; }
+      @keyframes tickmove { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+      @media (prefers-reduced-motion: reduce) { .ticker span { animation: none; padding-left: 16px; } }
+      .disp-reqline { padding: 8px 16px 12px; font-size: 14px; color: var(--ink-soft); }
+      .disp-reqline b { color: var(--amber); }
+      .disp-tools { margin-top: 12px; }
+      .disp-tools textarea, .disp-tools input[type="text"], .req-form input[type="text"] { width: 100%; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; font-size: 14px; font-family: inherit; }
+      .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+      .chip { border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-soft); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 600; min-height: 34px; }
+      .chip:hover { color: var(--ink); border-color: var(--ink-faint); }
+      .eq-row { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 14px; }
+      @media (min-width: 560px) { .eq-row { grid-template-columns: 1fr 1fr 1fr; } }
+      .eq-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; align-items: center; }
+      .eq-presets .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-faint); margin-right: 2px; }
+
+      /* Requests */
+      .req-list { list-style: none; margin: 0; padding: 0; }
+      .req-list li { border-top: 1px solid var(--line); padding: 10px 2px; }
+      .req-list li:first-child { border-top: none; }
+      .req-song { font-weight: 700; font-size: 15px; }
+      .req-meta { color: var(--ink-faint); font-size: 12.5px; font-family: var(--mono); }
+      .req-match { font-size: 13px; margin-top: 2px; }
+      .req-match .ok { color: var(--ok); font-weight: 600; }
+      .req-match .miss { color: var(--amber); font-weight: 600; }
+      .req-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+      .req-actions .btn { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+      .req-empty { color: var(--ink-faint); font-size: 13.5px; padding: 8px 0 2px; }
+      .req-form { display: grid; gap: 8px; margin-bottom: 6px; }
+
+      /* Pads */
+      .pad-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      @media (min-width: 560px) { .pad-grid { grid-template-columns: repeat(4, 1fr); } }
+      .pad { position: relative; border: 1px solid var(--line); background: var(--panel-2); color: var(--ink); border-radius: 10px; min-height: 74px; padding: 10px 10px 8px; text-align: left; display: flex; flex-direction: column; gap: 2px; }
+      .pad b { font-size: 14px; }
+      .pad small { color: var(--ink-faint); font-size: 11.5px; font-family: var(--mono); }
+      .pad.hit { border-color: var(--amber); background: var(--bg-soft); }
+      .pad .pad-load { position: absolute; top: 6px; right: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft); border-radius: 6px; font-size: 11px; font-weight: 700; padding: 3px 7px; min-height: 26px; }
+      .pad .pad-load:hover { color: var(--amber); border-color: var(--amber); }
+      .midi-map { font-family: var(--mono); font-size: 12px; color: var(--ink-soft); background: var(--bg-soft); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; margin-top: 12px; line-height: 1.7; }
+      .hidden-file { display: none; }
+      .panel input[type="text"], .panel input[type="number"] { background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+      .talk-meter { display: inline-block; width: 64px; height: 10px; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; vertical-align: middle; margin-left: 8px; }
+      .talk-meter span { display: block; height: 100%; width: 0%; background: var(--teal); }
+      .talk-meter.speaking span { background: var(--ok); }
+      .r-play:disabled { opacity: .35; cursor: default; }
+      .rot-list { margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 13.5px; max-height: 220px; overflow-y: auto; }
+      .rot-list li { margin-bottom: 4px; }
+    </style>
+  </head>
+  <body>
+    <div id="djGate" class="panel" style="max-width:640px;margin:48px auto">
+      <h2>🎧 DJ Console</h2>
+      <p id="djGateMsg">Checking who you are…</p>
+      <p><a class="btn" href="community.html">Go to the Community to sign in →</a></p>
+    </div>
+    <div class="wrap" id="djConsole" hidden>
+      <p style="margin:0 0 12px;font-size:14px"><a href="community.html#/admin" style="color:var(--ink-soft)">← Back to Admin</a> &nbsp;·&nbsp; <a href="dj-lite.html" style="color:var(--ink-soft)">Open the simple phone version (Pocket DJ) →</a></p>
+      <!-- On-air strip -->
+      <header class="onair">
+        <div>
+          <div class="brand">VITA NOVA <span>RADIO</span></div>
+          <div class="sub">DJ Console · “End of the year” show block · A Steady Heart</div>
+        </div>
+        <div class="spacer"></div>
+        <div class="live-dot" id="liveDot"><span class="dot"></span><span id="liveText">OFF AIR</span></div>
+        <div class="clock"><span id="clockTime">--:--:--</span><small>STATION CLOCK · LOCAL</small></div>
+      </header>
+
+      <div class="grid">
+        <!-- Deck -->
+        <section class="panel" aria-label="Now playing deck">
+          <h2>On the deck <span class="tag" id="deckPos">— of —</span></h2>
+          <span class="np-badge" id="npBadge">Ready</span>
+          <div class="np-title" id="npTitle">Press play to start the show</div>
+          <div class="np-meta" id="npMeta">The prearranged rundown is loaded below — intros, songs, ads, and the 4:20 talk break in order.</div>
+          <div class="np-next" id="npNext"></div>
+
+          <div class="progress-row">
+            <span id="tElapsed">0:00</span>
+            <input class="seek" type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek within current segment" />
+            <span id="tTotal">0:00</span>
+          </div>
+
+          <div class="transport">
+            <button class="tbtn" id="btnPrev" aria-label="Previous segment">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9.5 12z"/></svg>
+              Prev
+            </button>
+            <button class="tbtn play" id="btnPlay" aria-label="Play or pause">
+              <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
+              <span id="playLabel">Play</span>
+            </button>
+            <button class="tbtn" id="btnNext" aria-label="Next segment">
+              Next
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM4 5v14l10.5-7z"/></svg>
+            </button>
+            <button class="tbtn" id="btnDuck" aria-label="Talk over: duck the music under your voice">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3zm7-3a7 7 0 0 1-14 0H3a9 9 0 0 0 8 8.94V23h2v-2.06A9 9 0 0 0 21 12h-2z"/></svg>
+              Talk over
+            </button>
+            <span class="talk-meter" id="talkMeter" title="Mic level while talking"><span id="talkMeterFill"></span></span>
+          </div>
+
+          <div class="deck-row">
+            <div class="ctl">
+              <label for="volSlider">Deck volume <span class="val" id="volVal">85%</span></label>
+              <input type="range" id="volSlider" min="0" max="100" value="85" />
+            </div>
+            <div class="ctl">
+              <label for="fadeSlider">Crossfade <span class="val" id="fadeVal">2s</span></label>
+              <input type="range" id="fadeSlider" min="0" max="8" value="2" />
+            </div>
+          </div>
+
+          <div class="eq-row" aria-label="Equalizer">
+            <div class="ctl">
+              <label for="eqLow">EQ · Bass <span class="val" id="eqLowVal">0 dB</span></label>
+              <input type="range" id="eqLow" min="-12" max="12" step="1" value="0" />
+            </div>
+            <div class="ctl">
+              <label for="eqMid">EQ · Mid <span class="val" id="eqMidVal">0 dB</span></label>
+              <input type="range" id="eqMid" min="-12" max="12" step="1" value="0" />
+            </div>
+            <div class="ctl">
+              <label for="eqHigh">EQ · Treble <span class="val" id="eqHighVal">0 dB</span></label>
+              <input type="range" id="eqHigh" min="-12" max="12" step="1" value="0" />
+            </div>
+          </div>
+          <div class="eq-presets">
+            <span class="lbl">Presets</span>
+            <button class="chip eq-preset" data-low="0" data-mid="0" data-high="0">Flat</button>
+            <button class="chip eq-preset" data-low="6" data-mid="0" data-high="2">Bass up</button>
+            <button class="chip eq-preset" data-low="0" data-mid="2" data-high="6">Bright</button>
+            <button class="chip eq-preset" data-low="-4" data-mid="5" data-high="3">Voice / talk break</button>
+          </div>
+
+          <canvas class="meter" id="deckMeter" width="640" height="44" aria-hidden="true"></canvas>
+          <div class="meter-label"><span>DECK LEVEL</span><span id="meterDb">— dB</span></div>
+
+          <div style="margin-top:12px">
+            <div class="switch-row">
+              <div class="txt"><b>Auto-level (auto volume)</b><span>Dynamics compressor keeps quiet songs and loud songs at one steady broadcast level.</span></div>
+              <button type="button" class="switch" role="switch" aria-checked="true" id="swAutoLevel" aria-label="Auto-level (auto volume)"><span class="track"></span></button>
+            </div>
+            <div class="switch-row">
+              <div class="txt"><b>Auto DJ — Slabb runs the show</b><span>Advances on its own, plays the intro before every song, plays every ad exactly once, and holds the talk break for its time slot. Turn it off to run every segment by hand.</span></div>
+              <button type="button" class="switch" role="switch" aria-checked="true" id="swAutoDj" aria-label="Auto DJ"><span class="track"></span></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Mic / live -->
+        <section class="panel" aria-label="Microphone and live interviews">
+          <h2>Mic &amp; live interviews <span class="tag" id="micTag">Not checked yet</span></h2>
+          <p class="hint">Plug in your USB mic or headset, pick it here, and go live for interviews or calls. Your browser will ask permission the first time — that mic stays on this device, it is never recorded or sent anywhere by this page.</p>
+          <div class="field">
+            <label for="micSelect">Microphone input</label>
+            <select id="micSelect"><option value="">Tap “Find my devices” in Routing below</option></select>
+          </div>
+          <button class="mic-big" id="btnMic"><span class="dot"></span><span id="micLabel">Mic off — tap to go live</span></button>
+          <canvas class="meter" id="micMeter" width="640" height="44" aria-hidden="true"></canvas>
+          <div class="meter-label"><span>MIC LEVEL</span><span id="micDb">— dB</span></div>
+          <div class="ctl" style="margin-top:10px">
+            <label for="micMix">Mic level in the stream mix <span class="val" id="micMixVal">80%</span></label>
+            <input type="range" id="micMix" min="0" max="100" value="80" />
+          </div>
+          <div class="switch-row">
+            <div class="txt"><b>Auto-duck while I talk</b><span>When your voice comes in, the music drops under you automatically — no fader riding.</span></div>
+            <button type="button" class="switch" role="switch" aria-checked="true" id="swAutoDuck" aria-label="Auto-duck while I talk"><span class="track"></span></button>
+          </div>
+          <div class="switch-row">
+            <div class="txt"><b>Send my voice to the stream mix</b><span>Puts your mic into the same output the deck feeds, so BUTT and the stream hear you on breaks and interviews — at the mix level above. Off by default so you don’t get feedback through the TV speakers; use headphones when it’s on.</span></div>
+            <button type="button" class="switch" role="switch" aria-checked="false" id="swMonitor" aria-label="Hear yourself (monitor)"><span class="track"></span></button>
+          </div>
+          <p class="mic-note">Taking a call? Put the call on your USB headset, keep this mic live, and the deck keeps playing underneath at duck level until you tap Talk over off.</p>
+          <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px">
+            <div style="margin-bottom:8px"><b>Talk-over settings</b><br><span style="color:var(--ink-soft);font-size:12.5px">While Talk is on, your voice ducks the music to the bed level; when you stop, it fades back up over the release time. Same settings as the Pocket DJ.</span></div>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:end">
+              <div><label for="talkBed" style="display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px">Bed level (dB)</label><input type="number" id="talkBed" min="-40" max="0" step="1" value="-16" style="width:84px"></div>
+              <div><label for="talkRelease" style="display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px">Release (s)</label><input type="number" id="talkRelease" min="0.5" max="10" step="0.5" value="2.5" style="width:84px"></div>
+              <div><label for="talkThreshold" style="display:block;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:5px">Voice threshold (dB)</label><input type="number" id="talkThreshold" min="-70" max="-20" step="1" value="-45" style="width:84px"></div>
+              <button class="btn" id="btnTalkSave">Save</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Listener display -->
+        <section class="panel span-all" aria-label="Listener display">
+          <h2>Listener display — what they see <span class="tag">visualizer · song names · your text</span></h2>
+          <p class="hint">This is the screen for your listeners: the visualizer moves with the music, the song name stays big, and any text you push takes over the whole screen. Put it fullscreen on a second screen or TV, or show it on the stream — whatever’s playing here is what they see.</p>
+          <div class="display-screen" id="listenerDisplay">
+            <div class="disp-top">
+              <span class="disp-brand">VITA NOVA <span>RADIO</span></span>
+              <span class="np-badge" id="dispBadge">Ready</span>
+              <span style="flex:1"></span>
+              <span class="live-dot" id="dispLive"><span class="dot"></span><span id="dispLiveText">OFF AIR</span></span>
+            </div>
+            <div class="disp-title" id="dispTitle">Vita Nova Radio</div>
+            <div class="disp-meta" id="dispMeta">A Steady Heart — “End of the year”</div>
+            <div class="disp-next" id="dispNext"></div>
+            <canvas class="viz" id="dispViz" width="960" height="130" aria-hidden="true"></canvas>
+            <div class="disp-reqline" id="dispReqLine"></div>
+            <div class="ticker" aria-hidden="true"><span id="dispTicker">Vita Nova Radio · A Steady Heart — End of the year · Requests are open · Thank you for listening · Vita Nova Records · Rare Candy Reserve</span></div>
+            <div class="disp-msg" id="dispMsg"></div>
+          </div>
+          <div class="disp-tools">
+            <div class="field">
+              <label for="pushText">Push text to the listener screen</label>
+              <textarea id="pushText" rows="2" placeholder="Type a message — a shout-out, a break announcement, the request line — then push it."></textarea>
+            </div>
+            <div class="chip-row" aria-label="Quick messages">
+              <button class="chip push-preset">Taking requests now — send a song name</button>
+              <button class="chip push-preset">Smoke Sesh Discussions at 4:20</button>
+              <button class="chip push-preset">Back in five — stay with us</button>
+              <button class="chip push-preset">Live interview coming up next</button>
+            </div>
+            <div class="btn-row">
+              <button class="btn primary" id="btnPush">Push to screen</button>
+              <button class="btn" id="btnClearPush">Clear message</button>
+              <button class="btn" id="btnDispFull">Fullscreen display</button>
+            </div>
+            <div class="field" style="margin-top:12px">
+              <label for="tickerText">Bottom ticker text</label>
+              <input type="text" id="tickerText" value="Vita Nova Radio · A Steady Heart — End of the year · Requests are open · Thank you for listening · Vita Nova Records · Rare Candy Reserve" />
+            </div>
+            <button class="btn" id="btnTicker">Update ticker</button>
+          </div>
+        </section>
+
+        <!-- Rundown -->
+        <section class="panel span-all" aria-label="Show rundown">
+          <h2>Prearranged rundown <span class="tag" id="rundownTag"></span></h2>
+          <p class="hint" id="rundownHint">Intro → song, every time. One ad break between song groups — and every spot in the rotation is different, so each ad plays exactly once in the whole show. The talk break drops into the slot that lands on its time. Tap any row’s play button to jump to that part by hand — the schedule never locks you out.</p>
+          <div class="rundown-tools">
+            <div>
+              <label for="startTime">Show starts at</label>
+              <input type="time" id="startTime" value="16:00" />
+            </div>
+            <button class="btn primary" id="btnStartShow">Start show from the top</button>
+            <button class="btn teal" id="btnJumpNow">Jump to what’s on now</button>
+            <button class="btn" id="btnLoadFiles">Load my audio files</button>
+            <input type="file" id="fileInput" class="hidden-file" accept="audio/*" multiple />
+          </div>
+          <div class="panel" style="margin-bottom:12px">
+            <h2>Rotation — Auto DJ no-repeat</h2>
+            <p class="hint">When Auto DJ finishes the rundown it rebuilds the queue instead of replaying it: songs shuffle, ads space out, and nothing repeats inside its window. If everything is blocked, it plays the least-recently-played one — never dead air. The 4:20 Smoke Sesh stays on its slot.</p>
+            <div class="rundown-tools">
+              <div><label for="rotSongHours">Song repeat window (hours)</label><input type="number" id="rotSongHours" min="1" max="12" step="1" value="4" style="width:90px"></div>
+              <div><label for="rotAdMinutes">Ad repeat window (minutes)</label><input type="number" id="rotAdMinutes" min="15" max="180" step="5" value="60" style="width:90px"></div>
+              <div><label for="rotAdSpacing">Songs between ads</label><input type="number" id="rotAdSpacing" min="1" max="10" step="1" value="3" style="width:90px"></div>
+              <button class="btn" id="btnRotSave">Save rotation</button>
+            </div>
+            <h2 style="margin-top:14px">Recently played</h2>
+            <ol class="rot-list" id="recentPlays"><li>Nothing played yet — start the show and the rotation fills in here.</li></ol>
+          </div>
+          <div class="panel" style="margin-bottom:12px">
+            <h2>Zip playlist — upload a whole show</h2>
+            <p class="hint">Drop a .zip of audio files (mp3, wav, ogg, m4a, flac) and they join the Auto DJ pool — they shuffle in with the album and obey the same no-repeat rules. Subfolders are flattened. Max 100 tracks per zip (browser memory). Start the show (or let Auto DJ finish the rundown) and the new queue includes them.</p>
+            <div class="btn-row">
+              <label class="btn primary" style="display:inline-block;cursor:pointer">📦 Upload a zip playlist<input type="file" id="zipInput" class="hidden-file" accept=".zip,application/zip"></label>
+              <button class="btn" id="btnZipClear">Clear uploaded tracks</button>
+            </div>
+            <p class="status-line" id="zipStatus">No zip uploaded yet.</p>
+            <ol class="rot-list" id="zipList"><li>No zip tracks loaded yet.</li></ol>
+          </div>
+          <div class="schedule-note" id="scheduleNote"></div>
+          <ol class="rundown" id="rundown"></ol>
+          <p class="hint" style="margin-top:10px">Slot lengths are the show-clock targets (songs averaged from the album’s 1:15:01 total, ads 0:30, talk breaks 10:00). Load your real files above and each segment plays at its true length — files are matched to the rundown by name.</p>
+        </section>
+
+        <!-- Requests -->
+        <section class="panel" aria-label="Song requests">
+          <h2>Requests <span class="tag" id="reqTag">0 waiting</span></h2>
+          <p class="hint">Set the request line you use — a text-in number, a short code, whatever you announce on air — and it shows on the listener screen. When a text comes in, drop it here: requests that match the album get <b>Play now</b> and <b>Play next</b> buttons that drive the real deck. This inbox lives on this page only; the texts themselves land on your phone as usual.</p>
+          <div class="field">
+            <label for="reqLineInput">Request line (shown on the listener screen)</label>
+            <input type="text" id="reqLineInput" placeholder="e.g. Text VITA + a song name to 44321" />
+          </div>
+          <button class="btn" id="btnReqLine">Show it on the listener screen</button>
+          <div class="switch-row">
+            <div class="txt"><b>Requests open</b><span>Off tells the listener screen requests are closed — the inbox still works.</span></div>
+            <button type="button" class="switch" role="switch" aria-checked="true" id="swRequests" aria-label="Requests open"><span class="track"></span></button>
+          </div>
+          <div class="req-form" style="margin-top:12px">
+            <input type="text" id="reqSong" placeholder="Song they asked for" aria-label="Requested song" />
+            <input type="text" id="reqName" placeholder="Who asked (optional)" aria-label="Who requested it" />
+            <button class="btn primary" id="btnAddReq">Add request</button>
+          </div>
+          <ul class="req-list" id="reqList"></ul>
+          <p class="req-empty" id="reqEmpty">No requests yet. When someone texts one in, add it here and play it straight from the list.</p>
+        </section>
+
+        <!-- Sample pads & MIDI -->
+        <section class="panel" aria-label="Sample pads, MIDI and effects">
+          <h2>Sample pads &amp; MIDI <span class="tag" id="midiTag">MIDI not connected</span></h2>
+          <p class="hint">Eight pads for stings and effects, fired by tap, by the number keys 1–8, or by your MIDI controller. The built-in sounds play right away; tap <b>+ file</b> on any pad to load your own sample onto it instead. Pads play into the same mix as the deck, so they reach the stream.</p>
+          <div class="pad-grid" id="padGrid"></div>
+          <input type="file" id="padFileInput" class="hidden-file" accept="audio/*" />
+          <div class="btn-row" style="margin-top:12px">
+            <button class="btn primary" id="btnMidi">Connect MIDI controller</button>
+          </div>
+          <p class="status-line" id="midiStatus">Not connected. Plug the controller in by USB, tap Connect, and pick it if the browser asks. Works in Chrome/Edge on the PC.</p>
+          <div class="midi-map">
+            PADS&nbsp;· MIDI notes 36–43 fire pads 1–8<br />
+            TRANSPORT&nbsp;· note 44 = previous · note 45 = next · note 46 = play / pause<br />
+            KNOBS&nbsp;· CC 1 = deck volume · CC 2 = bass · CC 3 = mid · CC 4 = treble<br />
+            <span id="midiLast">Last MIDI message: —</span>
+          </div>
+        </section>
+
+        <!-- Routing -->
+        <section class="panel" aria-label="Audio routing and virtual cable">
+          <h2>Routing &amp; virtual cable <span class="tag">VB-Cable</span></h2>
+          <p class="hint">This is the setup that keeps your PC sounds off the stream: the deck plays into the virtual cable, BUTT listens to the other end of the cable, and everything else on the PC stays on your TV speakers. Keep this tab open while you DJ — closing it stops the music.</p>
+          <div class="route-flow" aria-hidden="true">
+            <div class="route-node"><b>This deck</b><span>music + ads</span></div>
+            <div class="route-arrow">→</div>
+            <div class="route-node hot"><b>CABLE Input</b><span>VB-Audio</span></div>
+            <div class="route-arrow">→</div>
+            <div class="route-node hot"><b>BUTT</b><span>CABLE Output</span></div>
+            <div class="route-arrow">→</div>
+            <div class="route-node"><b>Icecast</b><span>/vitanova</span></div>
+          </div>
+          <div class="field">
+            <label for="outSelect">Play the deck out of</label>
+            <select id="outSelect"><option value="">Default device</option></select>
+          </div>
+          <button class="btn" id="btnDevices">Find my devices</button>
+          <p class="status-line" id="deviceStatus">Not checked yet. On your PC, pick <b>CABLE Input (VB-Audio Virtual Cable)</b> here so the deck feeds the stream instead of the room speakers.</p>
+          <h2 style="margin-top:16px">One-time setup, in order</h2>
+          <ol class="steps">
+            <li><b>Install VB-Cable first</b> — run its setup as administrator, restart if it asks. Until it’s installed, <code>CABLE Input</code> won’t appear in any list, and pointing a player at a missing device can crash it.</li>
+            <li><b>In VLC:</b> Tools → Preferences → Audio → Device → <code>CABLE Input (VB-Audio Virtual Cable)</code> → Save.</li>
+            <li><b>In BUTT:</b> set the audio device to <code>CABLE Output</code> — that’s the end of the cable BUTT records from.</li>
+            <li><b>For Icecast:</b> server <code>127.0.0.1</code>, port <code>8000</code>, user <code>source</code>, mountpoint <code>/vitanova</code>, MP3 128k. Start Icecast as admin and leave its console open while streaming.</li>
+            <li><b>Result:</b> notifications, browser audio, and game sounds stay on the TV speakers. Only what you route into the cable reaches listeners.</li>
+          </ol>
+        </section>
+
+        <!-- Screen share, record, go live -->
+        <section class="panel" aria-label="Screen share, record, and go live">
+          <h2>📺 Screen — share, record, go live <span class="tag">screen + record</span></h2>
+          <p class="hint">Share your screen (your game, your DAW while producing, the DJ view) and record it locally. Going live still goes through the Twitch / YouTube app on your phone or PC — this console can record the screen and preview it, but it cannot push a live RTMP stream to Twitch or YouTube by itself. The stream link below is what puts that live stream into the site's video box.</p>
+          <div class="btn-row">
+            <button class="btn primary" id="btnShareScreen">🖥️ Share screen</button>
+            <button class="btn" id="btnStopScreen">Stop sharing</button>
+            <button class="btn" id="btnRecord">● Record</button>
+          </div>
+          <video id="screenPreview" playsinline muted autoplay style="width:100%;border-radius:10px;background:#000;margin-top:12px;display:none"></video>
+          <p class="status-line" id="screenStatus">Screen not shared yet.</p>
+          <p id="recStatus" class="status-line" hidden>● Recording — <span id="recTime">0:00</span></p>
+          <p id="recDownload"></p>
+          <div class="field" style="margin-top:12px">
+            <label for="screenStreamUrl">Live stream URL (the link the music page video box plays)</label>
+            <input type="text" id="screenStreamUrl" placeholder="https://www.youtube.com/watch?v=… or https://www.twitch.tv/…" style="width:100%">
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btnStreamSave">Save stream link</button>
+            <a class="btn" href="https://studio.youtube.com/" target="_blank" rel="noopener">▶ Open YouTube Studio — Go Live</a>
+            <a class="btn" href="https://dashboard.twitch.tv/" target="_blank" rel="noopener">▶ Open Twitch Dashboard</a>
+          </div>
+          <p class="status-line" id="streamStatus"></p>
+        </section>
+
+        <!-- Show pack -->
+        <section class="panel" aria-label="Downloadable show pack">
+          <h2>Show pack <span class="tag">take it to the PC</span></h2>
+          <p class="hint">One compressed file with the show arranged in running order. Load your audio files into the rundown first and they go into the pack renamed 01, 02, 03… in show order — intros, songs, ads, talk break. With no files loaded yet, the pack holds the paperwork below.</p>
+          <ul class="pack-list">
+            <li><b>audio-in-order/</b> — every audio file you loaded, renamed in running order; the rundown lists any segment still missing its file</li>
+            <li><b>rundown.txt</b> — the full running order with start times</li>
+            <li><b>vita-nova-show.m3u</b> — playlist in the same order, ready for VLC (drop it in the folder with your audio files)</li>
+            <li><b>cue-sheet.txt</b> — where every ad, thank-you, and the talk break land</li>
+            <li><b>routing-cheatsheet.txt</b> — the VB-Cable, VLC, and BUTT settings above</li>
+          </ul>
+          <div class="btn-row">
+            <button class="btn primary" id="btnZip">Download show pack (.zip)</button>
+            <button class="btn" id="btnM3u">Playlist only (.m3u)</button>
+            <button class="btn" id="btnTxt">Rundown only (.txt)</button>
+          </div>
+          <p class="mic-note">Rebuild the pack after changing the start time — the times inside are written from the schedule you see here.</p>
+        </section>
+      </div>
+
+      <p class="foot">Vita Nova Radio · Rare Candy Reserve · Thank you to everyone listening — new artists, send your (human-made) music in for review.</p>
+    </div>
+    <div class="toast" id="toast" role="status"></div>
+    <audio id="deckAudio" preload="auto"></audio>
+
+    <script src="assets/js/dj-rotation.js?v=rot1"></script>
+    <script src="assets/js/dj-talkover.js?v=talk1"></script>
+    <script>
+    /* DJ console gate — operator + admin only (Chris + admins he grants).
+       The console itself stays inert behind this until the check passes. */
+    (function () {
+      var gate = document.getElementById("djGate");
+      var app = document.getElementById("djConsole");
+      var msg = document.getElementById("djGateMsg");
+      var did = null;
+      try { did = localStorage.getItem("dwc-device-id"); } catch (e) {}
+      if (!did) {
+        if (msg) msg.textContent = "Sign in to the Community first — the DJ console needs your operator or admin account on this device.";
+        return;
+      }
+      fetch("/api/profile?device_id=" + encodeURIComponent(did)).then(function (r) { return r.json(); }).then(function (p) {
+        var prof = p && p.profile;
+        if (prof && (prof.role === "operator" || prof.role === "admin" || prof.is_operator)) {
+          if (gate) gate.remove();
+          if (app) app.hidden = false;
+        } else if (msg) {
+          msg.textContent = "Operator or admin only — sign in as Chris (or an admin) to open the DJ console.";
+        }
+      }).catch(function () {
+        if (msg) msg.textContent = "Couldn't check who you are — try refreshing the page.";
+      });
+    })();
+    </script>
+    <script>
+    (function () {
+      "use strict";
+
+      /* ---------------- Data ---------------- */
+      var TRACKS = [
+        "Break habits, not hearts", "Untold weapons", "Voice inside my head original",
+        "Sunk for you", "I'll prove everything", "Mr.Selfish", "Sweet BBgirl",
+        "Let's Travel", "Straight to pieces", "The day she came to be",
+        "Djentlemen Thief", "Guess how it ends", "On top of it (feat. Chest Club)",
+        "Monster in disguise", "Stay until sunrise", "Read between the lines",
+        "Introduction to heartache", "We will meet again I swear", "Dance till they drop",
+        "Aiming to tease part 2", "Give them the world"
+      ];
+      var ADS = [
+        { title: "Rare Candy Reserve", sub: "Graded cards, collectibles & custom 3D prints — “Collect from the best of the best.”" },
+        { title: "7 Acre Wood Nursery", sub: "Plants & nursery goods from the 7 Acre Wood crew." },
+        { title: "ASH Supply Co.", sub: "Fox Mask Tee and the End of the Year drop — print-on-demand, no upfront cost." },
+        { title: "Vita Nova Records", sub: "Independent artists: submit your music for review and a shot at airplay." },
+        { title: "A Steady Heart — blooming season", sub: "Ash's earlier album, streaming now on Spotify." },
+        { title: "Spoof ad — Left-Handed Screwdriver Co.", sub: "For all your right-handed problems. (Spoof spot — the show bible mixes these in with the real ones.)" }
+      ];
+      var SONG_SLOT = Math.round(4501 / 21); /* album total 1:15:01 across 21 tracks */
+      var SMOKE_TIME = 16 * 60 + 20; /* 4:20 PM */
+
+      /* ---------------- State ---------------- */
+      var blocks = [];
+      var state = {
+        index: -1, pos: 0, playing: false, lastTick: 0,
+        volume: 0.85, duckManual: false, duckMult: 1,
+        files: {}, /* blockIndex -> {url, name, dur, file} */
+        loadedFiles: [], /* audio files loaded by hand, matched by name */
+        zipTracks: [], /* {name, dur, zipKey} from an uploaded zip */
+        zipFiles: {} /* zipKey -> {url, name, dur, file} */
+      };
+
+      /* ---------------- Helpers ---------------- */
+      function $(id) { return document.getElementById(id); }
+      function pad(n) { return (n < 10 ? "0" : "") + n; }
+      function fmt(sec) {
+        sec = Math.max(0, Math.floor(sec));
+        var m = Math.floor(sec / 60), s = sec % 60;
+        if (m >= 60) { return Math.floor(m / 60) + ":" + pad(m % 60) + ":" + pad(s); }
+        return m + ":" + pad(s);
+      }
+      function fmtClock(mins) {
+        mins = ((Math.floor(mins) % 1440) + 1440) % 1440;
+        var h = Math.floor(mins / 60), m = mins % 60;
+        var ap = h >= 12 ? "PM" : "AM"; var h12 = h % 12; if (h12 === 0) h12 = 12;
+        return h12 + ":" + pad(m) + " " + ap;
+      }
+      var toastTimer = null;
+      function toast(msg) {
+        var t = $("toast"); t.textContent = msg; t.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3400);
+      }
+      function isOn(id) { return $(id).getAttribute("aria-checked") === "true"; }
+      function bindSwitch(id, cb) {
+        $(id).addEventListener("click", function () {
+          var on = !isOn(id);
+          this.setAttribute("aria-checked", on ? "true" : "false");
+          if (cb) cb(on);
+        });
+      }
+      function startMinutes() {
+        var v = $("startTime").value || "16:00";
+        var p = v.split(":"); return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+      }
+
+      /* ---------------- Build the rundown ---------------- */
+      function buildBlocks() {
+        var list = [];
+        list.push({ type: "intro", title: "Show open — Vita Nova Radio", sub: "Slabb welcomes everyone in · station ID", dur: 30 });
+        var adIdx = 0, sinceAd = 0;
+        for (var i = 0; i < TRACKS.length; i++) {
+          list.push({ type: "intro", title: "Intro — " + TRACKS[i], sub: "Slabb introduces the song", dur: 15, trackNo: i + 1 });
+          list.push({ type: "song", title: TRACKS[i], sub: "A Steady Heart · End of the year · Track " + (i + 1) + " of 21", dur: SONG_SLOT, trackNo: i + 1 });
+          sinceAd++;
+          if ((i + 1) % 7 === 0 && i !== TRACKS.length - 1) {
+            list.push({ type: "break", title: "Thank-you segment", sub: "Vita Nova Records · Rare Candy Reserve · Chris J · Ash", dur: 20 });
+          }
+          if (i + 1 === 11) {
+            list.push({ type: "talk", title: "Podcast break — Slabb & Jordan", sub: "Ten minutes of banter between the songs", dur: 600 });
+          }
+          if (sinceAd >= 3 && i !== TRACKS.length - 1 && adIdx < ADS.length) {
+            var ad = ADS[adIdx]; adIdx++;
+            list.push({ type: "ad", title: "Ad — " + ad.title, sub: ad.sub, dur: 30 });
+            sinceAd = 0;
+          }
+        }
+        list.push({ type: "break", title: "Show close — thank you for listening", sub: "Vita Nova Records · Rare Candy Reserve", dur: 20 });
+
+        /* Drop Smoke Sesh into the slot that lands on 4:20 PM for this start time. */
+        var start = startMinutes(), cum = 0, insertAt = -1;
+        for (var j = 0; j < list.length; j++) {
+          var blockStart = start + cum / 60;
+          var blockEnd = blockStart + list[j].dur / 60;
+          if (blockStart < SMOKE_TIME && blockEnd >= SMOKE_TIME) { insertAt = j + 1; break; }
+          if (blockStart >= SMOKE_TIME) { insertAt = j; break; }
+          cum += list[j].dur;
+        }
+        var smoke = { type: "talk", title: "Smoke Sesh Discussions", sub: "The 4:20 talk segment — Slabb & Jordan", dur: 600 };
+        if (insertAt === -1) { list.splice(Math.max(1, list.length - 1), 0, smoke); }
+        else { list.splice(insertAt, 0, smoke); }
+
+        /* Assign clock times. */
+        cum = 0;
+        for (var k = 0; k < list.length; k++) {
+          list[k].startMin = start + cum / 60;
+          cum += list[k].dur;
+          list[k].endMin = start + cum / 60;
+        }
+        blocks = list;
+      }
+
+      /* Recompute clock times after a rebuild or a manual reorder. */
+      function assignTimes() {
+        var start = startMinutes(), cum = 0;
+        for (var k = 0; k < blocks.length; k++) {
+          blocks[k].startMin = start + cum / 60;
+          cum += blocks[k].dur;
+          blocks[k].endMin = start + cum / 60;
+        }
+      }
+      /* Move one rundown row earlier/later (the full schedule list reorder). */
+      function moveBlock(i, dir) {
+        var j = i + dir;
+        if (j < 0 || j >= blocks.length) return;
+        var t = blocks[i]; blocks[i] = blocks[j]; blocks[j] = t;
+        if (state.index === i) state.index = j;
+        else if (state.index === j) state.index = i;
+        assignTimes(); rematchFiles(); renderRundown(); updateDeck();
+      }
+      /* Rebuild the queue for the next Auto DJ cycle: shuffled songs, ads
+         spaced out, nothing repeating inside its window. Zip tracks join
+         the pool here too. Falls back to the fixed order if the rotation
+         library didn't load. */
+      function currentPoolTracks() {
+        var tracks = TRACKS.slice();
+        state.zipTracks.forEach(function (z) { tracks.push({ name: z.name, dur: z.dur, zip: true, zipKey: z.key }); });
+        return tracks;
+      }
+      function buildAutoCycle() {
+        if (typeof DJRotation === "undefined") { toast("Rotation library didn’t load — the rundown stays in its fixed order."); return false; }
+        blocks = DJRotation.buildAutoQueue(
+          { tracks: currentPoolTracks(), ads: ADS, songSlot: SONG_SLOT, smokeTime: SMOKE_TIME },
+          DJRotation.loadSettings(), DJRotation.loadHistory(), startMinutes());
+        rematchFiles();
+        renderRundown(); updateDeck(); renderRecentPlays();
+        return true;
+      }
+
+      function badgeLabel(t) {
+        return { intro: "Intro", song: "Song", ad: "Ad", talk: "Talk", "break": "Break" }[t] || t;
+      }
+
+      function renderRundown() {
+        var ol = $("rundown"); ol.innerHTML = "";
+        blocks.forEach(function (b, i) {
+          var li = document.createElement("li");
+          if (i === state.index) li.className = "playing";
+          else if (i < state.index) li.className = "done";
+          var hasFile = !!state.files[i];
+          li.innerHTML =
+            '<span class="time">' + fmtClock(b.startMin) + '</span>' +
+            '<span class="r-badge ' + b.type + '">' + badgeLabel(b.type) + '</span>' +
+            '<span class="r-title">' + b.title + '<small>' + b.sub + '</small></span>' +
+            '<span class="file-dot ' + (hasFile ? "" : "missing") + '" title="' + (hasFile ? "Your file is loaded for this segment" : "No file loaded — plays on the show clock") + '"></span>' +
+            '<span class="r-dur">' + fmt(b.dur) + '</span>';
+          var upBtn = document.createElement("button");
+          upBtn.className = "r-play"; upBtn.textContent = "↑";
+          upBtn.setAttribute("aria-label", "Move “" + b.title + "” earlier");
+          upBtn.disabled = (i === 0);
+          upBtn.addEventListener("click", function () { moveBlock(i, -1); });
+          var dnBtn = document.createElement("button");
+          dnBtn.className = "r-play"; dnBtn.textContent = "↓";
+          dnBtn.setAttribute("aria-label", "Move “" + b.title + "” later");
+          dnBtn.disabled = (i === blocks.length - 1);
+          dnBtn.addEventListener("click", function () { moveBlock(i, 1); });
+          li.appendChild(upBtn); li.appendChild(dnBtn);
+          var btn = document.createElement("button");
+          btn.className = "r-play";
+          btn.setAttribute("aria-label", "Play “" + b.title + "” now");
+          btn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>';
+          btn.addEventListener("click", function () { state.pendingNext = null; state.resumeAfter = null; playBlock(i, true); });
+          li.appendChild(btn);
+          ol.appendChild(li);
+        });
+        $("rundownTag").textContent = blocks.length + " segments · ends " + fmtClock(blocks[blocks.length - 1].endMin);
+        var smoke = null;
+        for (var i = 0; i < blocks.length; i++) { if (blocks[i].title.indexOf("Smoke Sesh") === 0) { smoke = blocks[i]; break; } }
+        var note = "<b>Smoke Sesh lands at " + fmtClock(smoke.startMin) + "</b> with a " + fmtClock(startMinutes()) + " start.";
+        if (Math.abs(smoke.startMin - SMOKE_TIME) > 6) {
+          note += " Want it right on 4:20? Start the show a little " + (smoke.startMin > SMOKE_TIME ? "earlier" : "later") + ", or just tap its play button when the clock hits 4:20 — manual play always works.";
+        } else {
+          note += " Right on its 4:20 slot.";
+        }
+        note += " Every segment can also be played by hand at any time.";
+        $("scheduleNote").innerHTML = note;
+      }
+
+      /* ---------------- Audio engine ---------------- */
+      var audio = $("deckAudio");
+      var actx = null, deckSrc = null, deckGain = null, comp = null, analyser = null;
+      var eqLowF = null, eqMidF = null, eqHighF = null, padGain = null;
+      var micStream = null, micAnalyser = null, micGain = null, micLive = false;
+
+      function ensureCtx() {
+        if (actx) { if (actx.state === "suspended") actx.resume(); return; }
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+        actx = new AC();
+        deckSrc = actx.createMediaElementSource(audio);
+        eqLowF = actx.createBiquadFilter(); eqLowF.type = "lowshelf"; eqLowF.frequency.value = 200;
+        eqMidF = actx.createBiquadFilter(); eqMidF.type = "peaking"; eqMidF.frequency.value = 1000; eqMidF.Q.value = 0.9;
+        eqHighF = actx.createBiquadFilter(); eqHighF.type = "highshelf"; eqHighF.frequency.value = 3200;
+        comp = actx.createDynamicsCompressor();
+        deckGain = actx.createGain();
+        analyser = actx.createAnalyser(); analyser.fftSize = 512;
+        padGain = actx.createGain(); padGain.gain.value = 0.9;
+        deckSrc.connect(eqLowF); eqLowF.connect(eqMidF); eqMidF.connect(eqHighF);
+        eqHighF.connect(comp); comp.connect(deckGain); deckGain.connect(analyser); analyser.connect(actx.destination);
+        padGain.connect(analyser);
+        applyEQ();
+        applyAutoLevel();
+        applyVolume();
+      }
+      function applyAutoLevel() {
+        if (!comp) return;
+        if (isOn("swAutoLevel")) {
+          comp.threshold.value = -18; comp.knee.value = 18; comp.ratio.value = 8;
+          comp.attack.value = 0.004; comp.release.value = 0.18;
+        } else {
+          comp.threshold.value = 0; comp.knee.value = 0; comp.ratio.value = 1;
+        }
+      }
+      function duckFactor() {
+        if (talkover) return state.duckMult;
+        return state.duckManual ? 0.22 : 1;
+      }
+      function applyVolume() {
+        audio.volume = state.volume;
+        /* The talk-over controller owns deckGain when it loaded; without
+           it, fall back to the old manual/auto duck factor. */
+        if (!talkover && deckGain && actx) {
+          deckGain.gain.setTargetAtTime(duckFactor(), actx.currentTime, 0.08);
+        }
+      }
+
+      /* ---- Smart talk-over (shared with the Pocket DJ) ----
+         One duck system: the mic analyser drives the music gain. Voice
+         above the threshold ducks the music to the bed; when the voice
+         stops it fades back up over the release time. Talk over (the
+         button) or auto-duck + a live mic both activate it. */
+      var talkover = null;
+      function escHtml(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+      function ensureTalkover() {
+        if (talkover) return talkover;
+        if (typeof DJTalkover === "undefined") return null;
+        talkover = DJTalkover.create({
+          getAnalyser: function () { return micAnalyser; },
+          isActive: function () { return state.duckManual || (isOn("swAutoDuck") && micLive); },
+          onDuck: function (duck, speaking) {
+            state.duckMult = duck;
+            if (deckGain && actx) deckGain.gain.setTargetAtTime(duck, actx.currentTime, 0.05);
+          },
+          onMeter: function (db, speaking, active) {
+            var fill = $("talkMeterFill");
+            if (fill) {
+              var pct = Math.max(0, Math.min(100, (db + 70) / 70 * 100));
+              fill.style.width = pct + "%";
+              var m = $("talkMeter");
+              if (m) m.classList.toggle("speaking", !!speaking);
+            }
+          }
+        });
+        talkover.start();
+        return talkover;
+      }
+      function loadTalkForm() {
+        if (typeof DJTalkover === "undefined") return;
+        var s = DJTalkover.loadSettings();
+        $("talkBed").value = s.bedDb;
+        $("talkRelease").value = s.releaseSec;
+        $("talkThreshold").value = s.thresholdDb;
+      }
+
+      function blockDur(i) {
+        var f = state.files[i];
+        if (f && f.dur) return f.dur;
+        return blocks[i].dur;
+      }
+
+      function playBlock(i, autoplay) {
+        if (i < 0 || i >= blocks.length) return;
+        state.index = i; state.pos = 0;
+        var _b = blocks[i];
+        if (_b && (_b.type === "song" || _b.type === "ad") && typeof DJRotation !== "undefined") {
+          DJRotation.recordPlay(_b.title, _b.type);
+          renderRecentPlays();
+        }
+        var f = state.files[i];
+        if (f) {
+          ensureCtx();
+          if (audio.getAttribute("src") !== f.url) audio.src = f.url;
+          audio.currentTime = 0;
+          if (autoplay) { audio.play().catch(function () {}); state.playing = true; }
+          else { state.playing = false; }
+        } else {
+          audio.pause(); audio.removeAttribute("src"); audio.load();
+          state.playing = !!autoplay;
+        }
+        state.lastTick = performance.now();
+        updateDeck(); renderRundown();
+        var li = $("rundown").children[i];
+        if (li) li.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+
+      function setPlaying(p) {
+        if (state.index < 0) { if (p) playBlock(0, true); return; }
+        var f = state.files[state.index];
+        if (f) {
+          ensureCtx();
+          if (p) { audio.play().catch(function () {}); } else { audio.pause(); }
+        }
+        state.playing = p;
+        state.lastTick = performance.now();
+        updateDeck();
+      }
+
+      /* Advance honoring a queued request: play it next, then resume the rundown. */
+      function advance(auto) {
+        if (state.pendingNext != null && state.pendingNext !== state.index) {
+          var target = state.pendingNext;
+          state.pendingNext = null;
+          state.resumeAfter = (state.index + 1 < blocks.length) ? state.index + 1 : null;
+          playBlock(target, true);
+          return;
+        }
+        state.pendingNext = null;
+        if (state.resumeAfter != null && state.resumeAfter < blocks.length) {
+          var resume = state.resumeAfter;
+          state.resumeAfter = null;
+          playBlock(resume, state.playing || auto);
+          return;
+        }
+        next(auto);
+      }
+
+      function next(auto) {
+        if (state.index < 0) { playBlock(0, true); return; }
+        if (state.index >= blocks.length - 1) {
+          if (auto && isOn("swAutoDj")) {
+            if (buildAutoCycle()) { playBlock(0, true); return; }
+          }
+          setPlaying(false); state.pos = 0; updateDeck();
+          toast("That’s the end of the rundown. Start the show again any time.");
+          return;
+        }
+        playBlock(state.index + 1, state.playing || auto);
+      }
+      function prev() {
+        if (state.index > 0) playBlock(state.index - 1, state.playing);
+      }
+
+      audio.addEventListener("ended", function () {
+        if (isOn("swAutoDj")) { advance(true); }
+        else { state.playing = false; updateDeck(); }
+      });
+      audio.addEventListener("loadedmetadata", function () {
+        var f = state.files[state.index];
+        if (f && isFinite(audio.duration)) { f.dur = audio.duration; }
+        updateDeck();
+      });
+
+      /* ---------------- Deck UI ---------------- */
+      function updateDeck() {
+        var b = blocks[state.index];
+        var badge = $("npBadge"), playIcon = $("playIcon"), live = $("liveDot");
+        if (!b) {
+          badge.textContent = "Ready"; badge.className = "np-badge";
+          $("npTitle").textContent = "Press play to start the show";
+          $("npMeta").textContent = isOn("swAutoDj")
+            ? "Auto DJ is on — the rundown below is the pool the rotation draws from. Songs shuffle, ads space out, nothing repeats."
+            : "The prearranged rundown is loaded below — intros, songs, ads, and the 4:20 talk break in order.";
+          $("npNext").textContent = ""; $("deckPos").textContent = "— of —";
+        } else {
+          badge.textContent = badgeLabel(b.type) + (state.files[state.index] ? " · your file" : " · show clock");
+          badge.className = "np-badge " + b.type;
+          $("npTitle").textContent = b.title;
+          $("npMeta").textContent = b.sub + " · scheduled " + fmtClock(b.startMin);
+          var nx = blocks[state.index + 1];
+          $("npNext").innerHTML = nx ? "Up next: <strong>" + nx.title + "</strong> at " + fmtClock(nx.startMin) : "This is the last segment of the show.";
+          $("deckPos").textContent = (state.index + 1) + " of " + blocks.length;
+        }
+        playIcon.innerHTML = state.playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4l13 8-13 8z"/>';
+        $("playLabel").textContent = state.playing ? "Pause" : "Play";
+        live.classList.toggle("on", state.playing);
+        $("liveText").textContent = state.playing ? "ON AIR" : "OFF AIR";
+        renderDisplay();
+      }
+
+      $("btnPlay").addEventListener("click", function () {
+        if (state.index < 0) { playBlock(0, true); return; }
+        setPlaying(!state.playing);
+      });
+      $("btnNext").addEventListener("click", function () { advance(false); });
+      $("btnPrev").addEventListener("click", prev);
+      $("btnDuck").addEventListener("click", function () {
+        state.duckManual = !state.duckManual;
+        this.classList.toggle("on", state.duckManual);
+        if (!talkover) applyVolume();
+        toast(state.duckManual ? "Talk over on — speak and the music ducks under your voice." : "Talk over off — music fades back up.");
+      });
+      $("seek").addEventListener("input", function () {
+        if (state.index < 0) return;
+        var dur = blockDur(state.index);
+        var target = (this.value / 1000) * dur;
+        var f = state.files[state.index];
+        if (f) { audio.currentTime = target; }
+        state.pos = target;
+      });
+      $("volSlider").addEventListener("input", function () {
+        state.volume = this.value / 100;
+        $("volVal").textContent = this.value + "%";
+        applyVolume();
+      });
+      $("fadeSlider").addEventListener("input", function () { $("fadeVal").textContent = this.value + "s"; });
+      bindSwitch("swAutoLevel", function (on) {
+        ensureCtx(); applyAutoLevel();
+        toast(on ? "Auto-level on — the compressor evens out loud and quiet songs." : "Auto-level off.");
+      });
+      bindSwitch("swAutoDj", function (on) {
+        updateRotationHint();
+        updateDeck();
+        toast(on ? "Auto DJ on — Slabb runs the rundown." : "Auto DJ off — you cue every segment by hand.");
+      });
+
+      /* ---------------- Tick loop: clock, progress, meters ---------------- */
+      function levelFromAnalyser(an) {
+        if (!an) return 0;
+        var buf = new Uint8Array(an.fftSize);
+        an.getByteTimeDomainData(buf);
+        var sum = 0;
+        for (var i = 0; i < buf.length; i++) { var v = (buf[i] - 128) / 128; sum += v * v; }
+        return Math.sqrt(sum / buf.length);
+      }
+      function drawMeter(canvas, level, color) {
+        var ctx = canvas.getContext("2d");
+        var w = canvas.width, h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        var bars = 48, bw = w / bars;
+        for (var i = 0; i < bars; i++) {
+          var on = (i / bars) < level;
+          ctx.fillStyle = on ? (i > bars * 0.85 ? "#e5484d" : i > bars * 0.65 ? "#f2b13c" : color) : "rgba(127,134,148,.25)";
+          ctx.fillRect(i * bw + 1, 6, bw - 2, h - 12);
+        }
+      }
+      function dbText(level) {
+        if (level <= 0.001) return "— dB";
+        var db = Math.round(20 * Math.log10(level));
+        return (db > 0 ? 0 : db) + " dB";
+      }
+
+      setInterval(function () {
+        var now = new Date();
+        $("clockTime").textContent = pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+
+        if (state.index >= 0) {
+          var f = state.files[state.index];
+          var dur = blockDur(state.index);
+          if (f) {
+            state.pos = audio.currentTime || 0;
+            if (state.playing && audio.paused && !audio.ended) { /* buffering */ }
+          } else if (state.playing) {
+            var t = performance.now();
+            state.pos += (t - state.lastTick) / 1000;
+            state.lastTick = t;
+            if (state.pos >= dur) {
+              if (isOn("swAutoDj")) { advance(true); }
+              else { state.pos = dur; state.playing = false; updateDeck(); }
+            }
+          } else {
+            state.lastTick = performance.now();
+          }
+          dur = blockDur(state.index);
+          $("seek").value = dur ? Math.round((state.pos / dur) * 1000) : 0;
+          $("tElapsed").textContent = fmt(state.pos);
+          $("tTotal").textContent = fmt(dur);
+        }
+
+        /* Deck meter: real analyser for files, animated level for show-clock segments. */
+        var deckLevel = 0;
+        if (state.playing) {
+          if (state.files[state.index] && analyser) { deckLevel = Math.min(1, levelFromAnalyser(analyser) * 2.4); }
+          else { deckLevel = 0.45 + 0.3 * Math.abs(Math.sin(Date.now() / 300)) * duckFactor(); }
+          deckLevel *= duckFactor();
+        }
+        drawMeter($("deckMeter"), deckLevel, "#2ec4a6");
+        $("meterDb").textContent = dbText(deckLevel);
+
+        /* Mic meter (the talk-over controller reads the same analyser
+           and drives the duck — no separate duck flag here anymore). */
+        var micLevel = micLive ? levelFromAnalyser(micAnalyser) : 0;
+        drawMeter($("micMeter"), Math.min(1, micLevel * 2.6), "#f2b13c");
+        $("micDb").textContent = micLive ? dbText(micLevel) : "— dB";
+      }, 120);
+
+      /* ---------------- Show controls ---------------- */
+      $("btnStartShow").addEventListener("click", function () {
+        if (isOn("swAutoDj")) buildAutoCycle();
+        playBlock(0, true);
+        toast("Show started from the top — " + fmtClock(startMinutes()) + " on the rundown clock.");
+      });
+      $("btnJumpNow").addEventListener("click", function () {
+        var now = new Date(); var nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+        for (var i = 0; i < blocks.length; i++) {
+          if (nowMin >= blocks[i].startMin && nowMin < blocks[i].endMin) {
+            playBlock(i, true);
+            var f = state.files[i];
+            if (!f) { state.pos = (nowMin - blocks[i].startMin) * 60; }
+            toast("Jumped to what’s on now: " + blocks[i].title);
+            return;
+          }
+        }
+        if (nowMin < blocks[0].startMin) { toast("The show hasn’t started yet — it begins at " + fmtClock(blocks[0].startMin) + ". You can still play any segment by hand."); }
+        else { toast("Today’s rundown has ended. Start it again from the top, or play any segment by hand."); }
+      });
+      $("startTime").addEventListener("change", function () {
+        var keepIndex = state.index, wasPlaying = state.playing;
+        buildBlocks(); state.files = {}; state.loadedFiles = []; state.zipTracks = []; state.zipFiles = {};
+        state.index = -1; state.pos = 0; state.playing = false;
+        renderRundown(); updateDeck(); renderZipList();
+        $("zipStatus").textContent = "No zip uploaded yet.";
+        toast("Rundown rebuilt for a " + fmtClock(startMinutes()) + " start. Loaded files were cleared — load them again to re-match.");
+        if (keepIndex >= 0 && wasPlaying) { /* stay stopped; user restarts */ }
+      });
+
+      /* ---------------- Rotation settings ---------------- */
+      var RUNDOWN_HINT_FIXED = "Intro → song, every time. One ad break between song groups — and every spot in the rotation is different, so each ad plays exactly once in the whole show. The talk break drops into the slot that lands on its time. Tap any row’s play button to jump to that part by hand — the schedule never locks you out.";
+      var RUNDOWN_HINT_AUTO = "Auto DJ is on — this list is the pool the rotation draws from, not a fixed order. Songs shuffle, ads space out, and nothing repeats inside its window. The 4:20 Smoke Sesh stays on its slot. Tap any row’s play button to jump to that part by hand.";
+      function updateRotationHint() {
+        var el = $("rundownHint");
+        if (el) el.textContent = isOn("swAutoDj") ? RUNDOWN_HINT_AUTO : RUNDOWN_HINT_FIXED;
+      }
+      function loadRotationForm() {
+        if (typeof DJRotation === "undefined") return;
+        var s = DJRotation.loadSettings();
+        $("rotSongHours").value = s.songRepeatHours;
+        $("rotAdMinutes").value = s.adRepeatMinutes;
+        $("rotAdSpacing").value = s.minSongsBetweenAds;
+      }
+      function renderRecentPlays() {
+        var host = $("recentPlays");
+        if (!host || typeof DJRotation === "undefined") return;
+        var h = DJRotation.loadHistory().slice(-10).reverse();
+        host.innerHTML = h.length
+          ? h.map(function (e) { return "<li><b>" + escHtml(e.title) + "</b> <span style=\"color:var(--ink-faint)\">· " + escHtml(e.type || "song") + " · " + DJRotation.timeAgo(e.playedAt) + "</span></li>"; }).join("")
+          : "<li>Nothing played yet — start the show and the rotation fills in here.</li>";
+      }
+      $("btnRotSave").addEventListener("click", function () {
+        if (typeof DJRotation === "undefined") { toast("Rotation library didn’t load — the settings can’t save yet."); return; }
+        DJRotation.saveSettings({
+          songRepeatHours: parseFloat($("rotSongHours").value),
+          adRepeatMinutes: parseFloat($("rotAdMinutes").value),
+          minSongsBetweenAds: parseFloat($("rotAdSpacing").value)
+        });
+        loadRotationForm();
+        toast("Rotation saved — songs won't repeat for that long, ads stay spaced out.");
+      });
+      $("btnTalkSave").addEventListener("click", function () {
+        if (!talkover || typeof DJTalkover === "undefined") { toast("Talk-over library didn’t load — the settings can’t save yet."); return; }
+        talkover.setSettings({
+          bedDb: parseFloat($("talkBed").value),
+          releaseSec: parseFloat($("talkRelease").value),
+          thresholdDb: parseFloat($("talkThreshold").value)
+        });
+        loadTalkForm();
+        toast("Talk-over saved — bed, release, and voice threshold updated.");
+      });
+
+      /* ---------------- Load user files ---------------- */
+      /* Match one file name to a rundown block (by song title or by the
+         leading track number, e.g. "07 - Sweet BBgirl"). Zip blocks match
+         by key, not by name — see rematchFiles. */
+      function matchFileToBlock(fileName) {
+        var name = fileName.replace(/\.[^.]+$/, "").toLowerCase();
+        var best = -1;
+        blocks.forEach(function (b, i) {
+          if (b.zipKey) return;
+          var t = b.title.toLowerCase().replace(/^intro — /, "").replace(/^ad — /, "");
+          if (name.indexOf(t) !== -1 || t.indexOf(name.replace(/^\d+\s*[-–]\s*/, "")) !== -1) { best = i; }
+        });
+        if (best === -1) {
+          /* Numbered files: "07 - Sweet BBgirl" -> track 7 -> its intro/song pair */
+          var m = name.match(/^(\d{1,2})/);
+          if (m) {
+            var n = parseInt(m[1], 10);
+            blocks.forEach(function (b, i) { if (b.trackNo === n && b.type === "song") best = i; });
+          }
+        }
+        return best;
+      }
+      /* Rebuild the block-index -> file map from the loaded files and the
+         zip files. Called after every queue rebuild or reorder, so files
+         follow their segment instead of their old row number. */
+      function rematchFiles() {
+        state.files = {};
+        state.loadedFiles.forEach(function (f) {
+          var bi = matchFileToBlock(f.name);
+          if (bi !== -1 && !state.files[bi]) state.files[bi] = f;
+        });
+        blocks.forEach(function (b, i) {
+          if (b.zipKey && state.zipFiles[b.zipKey] && !state.files[i]) state.files[i] = state.zipFiles[b.zipKey];
+        });
+      }
+      $("btnLoadFiles").addEventListener("click", function () { $("fileInput").click(); });
+      $("fileInput").addEventListener("change", function () {
+        var files = Array.prototype.slice.call(this.files || []);
+        if (!files.length) return;
+        files.forEach(function (file) {
+          var already = state.loadedFiles.some(function (f) { return f.name === file.name; });
+          if (already) return;
+          state.loadedFiles.push({ url: URL.createObjectURL(file), name: file.name, dur: 0, file: file });
+        });
+        var before = Object.keys(state.files).length;
+        rematchFiles();
+        var matched = Object.keys(state.files).length - before;
+        renderRundown();
+        toast(matched ? "Loaded " + matched + " file" + (matched === 1 ? "" : "s") + " into the rundown." : "Those files didn’t match any segment names — names containing the song title or its track number match best.");
+        this.value = "";
+      });
+
+      /* ---------------- Zip playlist ---------------- */
+      var ZIP_AUDIO_EXTS = ["mp3", "wav", "ogg", "m4a", "flac"];
+      var ZIP_CAP = 100; /* tracks per zip — browser memory */
+      function zipTrackKey(title) { return "zip:" + String(title).toLowerCase(); }
+      function readAudioDuration(url) {
+        return new Promise(function (resolve) {
+          var a = new Audio();
+          var done = false;
+          var to = setTimeout(function () { if (!done) { done = true; resolve(0); } }, 5000);
+          a.addEventListener("loadedmetadata", function () { if (!done) { done = true; clearTimeout(to); resolve(isFinite(a.duration) && a.duration > 0 ? a.duration : 0); } });
+          a.addEventListener("error", function () { if (!done) { done = true; clearTimeout(to); resolve(0); } });
+          a.preload = "metadata";
+          a.src = url;
+        });
+      }
+      function renderZipList() {
+        var host = $("zipList");
+        if (!host) return;
+        host.innerHTML = state.zipTracks.length
+          ? state.zipTracks.map(function (z) { return "<li>" + escHtml(z.name) + " <span style=\"color:var(--ink-faint)\">· " + fmt(z.dur) + "</span></li>"; }).join("")
+          : "<li>No zip tracks loaded yet.</li>";
+      }
+      $("zipInput").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file) return;
+        if (typeof JSZip === "undefined") { $("zipStatus").textContent = "Zip library didn’t load — check the connection and try again."; return; }
+        $("zipStatus").textContent = "Unzipping…";
+        JSZip.loadAsync(file).then(function (zip) {
+          var entries = [], skipped = 0;
+          zip.forEach(function (relPath, entry) {
+            if (entry.dir) return;
+            var base = relPath.split("/").pop();
+            var ext = (base.split(".").pop() || "").toLowerCase();
+            if (ZIP_AUDIO_EXTS.indexOf(ext) !== -1) entries.push({ path: relPath, name: base });
+            else skipped++;
+          });
+          if (!entries.length) { $("zipStatus").textContent = "No audio files in that zip — it needs mp3, wav, ogg, m4a, or flac files."; return; }
+          var capped = false;
+          if (entries.length > ZIP_CAP) { entries = entries.slice(0, ZIP_CAP); capped = true; }
+          var chain = Promise.resolve();
+          var added = 0;
+          entries.forEach(function (e) {
+            chain = chain.then(function () {
+              return zip.file(e.path).async("blob").then(function (blob) {
+                var url = URL.createObjectURL(blob);
+                return readAudioDuration(url).then(function (dur) {
+                  var title = e.name.replace(/\.[^.]+$/, "");
+                  var key = zipTrackKey(title);
+                  if (state.zipFiles[key]) { URL.revokeObjectURL(url); return; }
+                  var f = null;
+                  try { f = new File([blob], e.name, { type: blob.type }); } catch (err) { f = blob; }
+                  state.zipFiles[key] = { url: url, name: e.name, dur: dur || 180, file: f };
+                  state.zipTracks.push({ name: title, dur: dur || 180, zip: true, zipKey: key });
+                  added++;
+                });
+              });
+            });
+          });
+          return chain.then(function () {
+            renderZipList();
+            $("zipStatus").textContent = "Loaded " + added + " track" + (added === 1 ? "" : "s") + " from the zip" +
+              (skipped ? " — " + skipped + " non-audio file" + (skipped === 1 ? "" : "s") + " skipped." : ".") +
+              (capped ? " Only the first " + ZIP_CAP + " tracks were loaded (browser memory cap)." : "") +
+              " They join the Auto DJ pool — start the show (or let Auto DJ finish the rundown) and the new queue includes them.";
+            toast("Zip loaded — " + added + " track(s) joined the pool.");
+          });
+        }).catch(function () {
+          $("zipStatus").textContent = "That zip couldn’t be read — try another file.";
+        });
+      });
+      $("btnZipClear").addEventListener("click", function () {
+        state.zipTracks = []; state.zipFiles = {};
+        renderZipList();
+        $("zipStatus").textContent = "Uploaded tracks cleared.";
+        rematchFiles(); renderRundown();
+      });
+
+      /* ---------------- Devices & routing ---------------- */
+      function fillDevices() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          $("deviceStatus").innerHTML = '<span class="warn">This browser can’t list audio devices.</span> On the PC, set the devices in VLC and BUTT using the steps below.';
+          return;
+        }
+        navigator.mediaDevices.enumerateDevices().then(function (devs) {
+          var outs = devs.filter(function (d) { return d.kind === "audiooutput"; });
+          var ins = devs.filter(function (d) { return d.kind === "audioinput"; });
+          var outSel = $("outSelect"), micSel = $("micSelect");
+          var outVal = outSel.value, micVal = micSel.value;
+          outSel.innerHTML = '<option value="">Default device</option>';
+          outs.forEach(function (d, i) {
+            var o = document.createElement("option");
+            o.value = d.deviceId; o.textContent = d.label || ("Output " + (i + 1));
+            outSel.appendChild(o);
+          });
+          micSel.innerHTML = ins.length ? "" : '<option value="">No mic found yet</option>';
+          ins.forEach(function (d, i) {
+            var o = document.createElement("option");
+            o.value = d.deviceId; o.textContent = d.label || ("Microphone " + (i + 1));
+            micSel.appendChild(o);
+          });
+          if (outVal) outSel.value = outVal;
+          if (micVal) micSel.value = micVal;
+          $("micTag").textContent = ins.length ? ins.length + " mic(s) found" : "No mic found";
+          var hasCable = devs.some(function (d) { return /cable/i.test(d.label || ""); });
+          $("deviceStatus").innerHTML = hasCable
+            ? '<span class="ok">VB-Cable found.</span> Pick CABLE Input as the deck output here (and in VLC) and CABLE Output in BUTT, and you’re routed.'
+            : '<span class="warn">No VB-Cable device seen in this list.</span> That’s expected on a phone or before install — on the PC, install VB-Cable (step 1 below) and it will appear as CABLE Input / CABLE Output. Found ' + outs.length + " output(s), " + ins.length + " input(s) here.";
+        }).catch(function () {
+          $("deviceStatus").innerHTML = '<span class="warn">Device list was blocked.</span> Allow microphone permission, then try again — browsers only reveal device names after permission.';
+        });
+      }
+      $("btnDevices").addEventListener("click", fillDevices);
+      $("outSelect").addEventListener("change", function () {
+        var id = this.value;
+        var done = function () { toast(id ? "Deck output changed." : "Deck output back to the default device."); };
+        var failed = function () { toast("This browser wouldn’t switch outputs here — the same pick in VLC’s Device menu does it on the PC."); };
+        if (actx && actx.setSinkId) { actx.setSinkId(id || "default").then(done).catch(failed); }
+        else if (audio.setSinkId) { audio.setSinkId(id || "default").then(done).catch(failed); }
+        else { failed(); }
+      });
+
+      /* ---------------- Mic ---------------- */
+      $("btnMic").addEventListener("click", function () {
+        if (micLive) {
+          micLive = false;
+          if (micStream) { micStream.getTracks().forEach(function (t) { t.stop(); }); micStream = null; }
+          $("btnMic").classList.remove("live");
+          $("micLabel").textContent = "Mic off — tap to go live";
+          $("micTag").textContent = "Mic off";
+          state.duckAuto = false; applyVolume();
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          toast("This browser can’t open a mic here. On the PC it will — or run the mic through BUTT instead.");
+          return;
+        }
+        ensureCtx();
+        var devId = $("micSelect").value;
+        var constraints = { audio: devId ? { deviceId: { exact: devId } } : true };
+        navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+          micStream = stream;
+          var src = actx.createMediaStreamSource(stream);
+          micAnalyser = actx.createAnalyser(); micAnalyser.fftSize = 512;
+          micGain = actx.createGain(); micGain.gain.value = 0;
+          src.connect(micAnalyser); src.connect(micGain); micGain.connect(analyser);
+          micLive = true;
+          $("btnMic").classList.add("live");
+          $("micLabel").textContent = "Mic LIVE — tap to mute";
+          $("micTag").textContent = "Mic live";
+          fillDevices();
+          toast("You’re live. The deck ducks under your voice automatically.");
+        }).catch(function () {
+          toast("Mic permission was denied or no mic was found. Check the USB mic is plugged in, allow permission, and try again.");
+        });
+      });
+      bindSwitch("swMonitor", function (on) {
+        if (micGain && actx) micGain.gain.setTargetAtTime(on ? $("micMix").value / 100 : 0, actx.currentTime, 0.05);
+        if (on) toast("Your voice is in the stream mix — use headphones, or this will feed back through the speakers.");
+      });
+      $("micMix").addEventListener("input", function () {
+        $("micMixVal").textContent = this.value + "%";
+        if (micGain && actx && isOn("swMonitor")) micGain.gain.setTargetAtTime(this.value / 100, actx.currentTime, 0.05);
+      });
+
+      /* ---------------- Screen share, record, go live ---------------- */
+      var screenStream = null, mediaRecorder = null, recChunks = [], recStartAt = 0, recTimer = null, recDest = null;
+      function screenSupported() { return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia); }
+      function setScreenStream(stream) {
+        stopScreenStream();
+        screenStream = stream;
+        var v = $("screenPreview");
+        v.srcObject = stream;
+        v.style.display = "block";
+        v.play().catch(function () {});
+        $("screenStatus").textContent = "Sharing your screen — the preview above is what you’re showing.";
+        var vt = stream.getVideoTracks()[0];
+        if (vt) vt.addEventListener("ended", function () { stopScreenStream(); });
+      }
+      function stopScreenStream() {
+        if (screenStream) { screenStream.getTracks().forEach(function (t) { t.stop(); }); screenStream = null; }
+        var v = $("screenPreview");
+        if (v) { v.srcObject = null; v.style.display = "none"; }
+        var st = $("screenStatus");
+        if (st) st.textContent = "Screen not shared yet.";
+      }
+      $("btnShareScreen").addEventListener("click", function () {
+        if (!screenSupported()) { $("screenStatus").textContent = "Screen share isn’t supported in this browser — use Chrome or Edge on the PC."; return; }
+        navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }).then(function (stream) {
+          setScreenStream(stream);
+        }).catch(function () {
+          $("screenStatus").textContent = "Screen share not allowed or not supported on this device.";
+        });
+      });
+      $("btnStopScreen").addEventListener("click", function () { stopScreenStream(); });
+      /* The recording captures the screen video + the live mix (music +
+         mic + pads, the same mix the stream hears) as one .webm file. */
+      function combinedRecordStream() {
+        var tracks = [];
+        if (screenStream) { var vt = screenStream.getVideoTracks()[0]; if (vt) tracks.push(vt); }
+        ensureCtx();
+        if (actx && analyser) {
+          if (!recDest) { recDest = actx.createMediaStreamDestination(); analyser.connect(recDest); }
+          var at = recDest.stream.getAudioTracks()[0];
+          if (at) tracks.push(at);
+        }
+        return tracks.length ? new MediaStream(tracks) : null;
+      }
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.stop();
+        if (recTimer) { clearInterval(recTimer); recTimer = null; }
+        $("btnRecord").textContent = "● Record";
+        $("recStatus").hidden = true;
+      }
+      function finishRecording() {
+        var blob = new Blob(recChunks, { type: "video/webm" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "steady-wave-recording-" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".webm";
+        a.textContent = "⬇ Download the recording (.webm, " + (blob.size / 1048576).toFixed(1) + " MB)";
+        var host = $("recDownload");
+        host.innerHTML = "";
+        host.appendChild(a);
+        $("screenStatus").textContent = "Recording saved — download it above.";
+      }
+      $("btnRecord").addEventListener("click", function () {
+        if (mediaRecorder && mediaRecorder.state === "recording") { stopRecording(); return; }
+        if (typeof MediaRecorder === "undefined") { $("screenStatus").textContent = "Recording isn’t supported in this browser."; return; }
+        var startRec = function () {
+          var stream = combinedRecordStream();
+          if (!stream) { $("screenStatus").textContent = "Couldn’t build a recording stream — try sharing the screen first."; return; }
+          var mime = "";
+          if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported("video/webm")) mime = "video/webm";
+          try {
+            recChunks = [];
+            mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+            mediaRecorder.ondataavailable = function (e) { if (e.data && e.data.size) recChunks.push(e.data); };
+            mediaRecorder.onstop = finishRecording;
+            mediaRecorder.start(1000);
+            recStartAt = Date.now();
+            $("btnRecord").textContent = "■ Stop recording";
+            $("recStatus").hidden = false;
+            recTimer = setInterval(function () {
+              var s = Math.floor((Date.now() - recStartAt) / 1000);
+              $("recTime").textContent = Math.floor(s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+            }, 500);
+            $("screenStatus").textContent = "Recording — screen video + the live mix (music + mic).";
+          } catch (e) {
+            $("screenStatus").textContent = "Recording couldn’t start here — try again.";
+          }
+        };
+        if (!screenStream) {
+          if (!screenSupported()) { $("screenStatus").textContent = "Screen share isn’t supported in this browser — use Chrome or Edge on the PC."; return; }
+          navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }).then(function (stream) {
+            setScreenStream(stream);
+            startRec();
+          }).catch(function () {
+            $("screenStatus").textContent = "Screen share not allowed or not supported on this device.";
+          });
+          return;
+        }
+        startRec();
+      });
+      function loadStreamUrlField() {
+        fetch("/api/radio-settings").then(function (r) { return r.json(); }).then(function (d) {
+          var u = (d && d.settings && d.settings.stream_url) || "";
+          var el = $("screenStreamUrl");
+          if (el && !el.value) el.value = u;
+          if (!u) {
+            fetch("live-video.json?t=" + Date.now()).then(function (r) { return r.ok ? r.json() : null; }).then(function (cfg) {
+              if (cfg && cfg.src && el && !el.value) el.value = cfg.src;
+            }).catch(function () {});
+          }
+        }).catch(function () {});
+      }
+      $("btnStreamSave").addEventListener("click", function () {
+        var url = $("screenStreamUrl").value.trim();
+        var did = radioDeviceId();
+        if (!did) { $("streamStatus").textContent = "Sign in to the Community first — the stream link needs your operator or admin account."; return; }
+        fetch("/api/radio-settings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ device_id: did, settings: { stream_url: url } }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            $("streamStatus").textContent = d && d.ok ? "✓ Stream link saved — the music page video box plays it within 30 seconds." : "Couldn't save — " + ((d && d.error) || "try again.");
+          })
+          .catch(function () { $("streamStatus").textContent = "Couldn't save — check the connection and try again."; });
+      });
+
+      /* ---------------- Downloads ---------------- */
+      function rundownText() {
+        var lines = [];
+        lines.push("VITA NOVA RADIO — SHOW RUNDOWN");
+        lines.push("Show: A Steady Heart — End of the year block");
+        lines.push("Starts: " + fmtClock(startMinutes()) + " · " + blocks.length + " segments · Ends: " + fmtClock(blocks[blocks.length - 1].endMin));
+        lines.push("");
+        blocks.forEach(function (b, i) {
+          lines.push(fmtClock(b.startMin) + "  [" + badgeLabel(b.type).toUpperCase() + "]  " + b.title + "  (" + fmt(b.dur) + ")");
+          lines.push("          " + b.sub);
+        });
+        lines.push("");
+        lines.push("Every ad plays exactly once in the show — no repeats. Intro plays before every song. Smoke Sesh Discussions sits in the 4:20 PM slot for this start time; any segment can be played manually at any time.");
+        return lines.join("\r\n");
+      }
+      function cueText() {
+        var lines = ["VITA NOVA RADIO — CUE SHEET", ""];
+        blocks.forEach(function (b) {
+          if (b.type !== "song" && b.type !== "intro") {
+            lines.push(fmtClock(b.startMin) + "  " + badgeLabel(b.type).toUpperCase() + "  " + b.title + " — " + b.sub);
+          }
+        });
+        return lines.join("\r\n");
+      }
+      function routingText() {
+        return [
+          "VITA NOVA RADIO — ROUTING CHEAT SHEET", "",
+          "Goal: only the deck reaches the stream. Every other PC sound stays on the TV speakers.", "",
+          "1. Install VB-Cable first (setup as administrator, restart if asked).",
+          "2. VLC: Tools > Preferences > Audio > Device = CABLE Input (VB-Audio Virtual Cable) > Save.",
+          "3. BUTT: audio device = CABLE Output.",
+          "4. Icecast: 127.0.0.1 port 8000, user 'source', mountpoint /vitanova, MP3 128k. Start Icecast as admin, leave the console open.",
+          "5. USB mic for interviews: pick it as the mic in the console (or in BUTT), keep deck volume ducked while talking.", "",
+          "Stream: https://radio.rarecandyreserve.org/vitanova"
+        ].join("\r\n");
+      }
+      function m3uText() {
+        var lines = ["#EXTM3U", "#PLAYLIST:Vita Nova Radio — Show"];
+        blocks.forEach(function (b) {
+          var fname;
+          if (b.type === "song") fname = (b.trackNo ? pad(b.trackNo) + " - " : "") + b.title.replace(/\s*\(feat\. Chest Club\)/, " Feat. Chest Club") + ".mp3";
+          else if (b.type === "intro" && b.trackNo) fname = "intro-" + pad(b.trackNo) + ".mp3";
+          else if (b.type === "ad") fname = "ad - " + b.title.replace(/^Ad — /, "").toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".mp3";
+          else if (b.type === "talk") fname = "talk - " + b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".mp3";
+          else fname = b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".mp3";
+          lines.push("#EXTINF:" + b.dur + "," + b.title);
+          lines.push(fname);
+        });
+        return lines.join("\r\n");
+      }
+      function download(name, text, mime) {
+        var blob = new Blob([text], { type: mime || "text/plain" });
+        var a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+      }
+      $("btnTxt").addEventListener("click", function () { download("vita-nova-rundown.txt", rundownText()); });
+      $("btnM3u").addEventListener("click", function () { download("vita-nova-show.m3u", m3uText(), "audio/x-mpegurl"); });
+      $("btnZip").addEventListener("click", function () {
+        if (typeof JSZip === "undefined") {
+          download("vita-nova-rundown.txt", rundownText());
+          toast("Zip library didn’t load — sent the rundown on its own instead.");
+          return;
+        }
+        var zip = new JSZip();
+        var audioCount = 0;
+        blocks.forEach(function (b, i) {
+          var f = state.files[i];
+          if (f && f.file) {
+            audioCount++;
+            var ext = (f.name.match(/\.[^.]+$/) || [".mp3"])[0];
+            zip.file("audio-in-order/" + pad(audioCount) + " - " + b.title.replace(/[\\/:*?"<>|]/g, "") + ext, f.file);
+          }
+        });
+        zip.file("rundown.txt", rundownText());
+        zip.file("vita-nova-show.m3u", m3uText());
+        zip.file("cue-sheet.txt", cueText());
+        zip.file("routing-cheatsheet.txt", routingText());
+        zip.generateAsync({ type: "blob", compression: "DEFLATE" }).then(function (blob) {
+          var a = document.createElement("a");
+          a.href = URL.createObjectURL(blob); a.download = "vita-nova-show-pack.zip";
+          document.body.appendChild(a); a.click();
+          setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 800);
+          toast(audioCount ? "Show pack downloaded — " + audioCount + " audio file(s) in running order, plus the rundown paperwork." : "Show pack downloaded — paperwork only this time. Load your audio files into the rundown first and they will be arranged inside the pack too.");
+        });
+      });
+
+      /* ---------------- EQ ---------------- */
+      function applyEQ() {
+        var lo = parseFloat($("eqLow").value), mi = parseFloat($("eqMid").value), hi = parseFloat($("eqHigh").value);
+        $("eqLowVal").textContent = (lo > 0 ? "+" : "") + lo + " dB";
+        $("eqMidVal").textContent = (mi > 0 ? "+" : "") + mi + " dB";
+        $("eqHighVal").textContent = (hi > 0 ? "+" : "") + hi + " dB";
+        if (!eqLowF) return;
+        var t = actx.currentTime;
+        eqLowF.gain.setTargetAtTime(lo, t, 0.03);
+        eqMidF.gain.setTargetAtTime(mi, t, 0.03);
+        eqHighF.gain.setTargetAtTime(hi, t, 0.03);
+      }
+      ["eqLow", "eqMid", "eqHigh"].forEach(function (id) {
+        $(id).addEventListener("input", function () { ensureCtx(); applyEQ(); });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(".eq-preset"), function (btn) {
+        btn.addEventListener("click", function () {
+          ensureCtx();
+          $("eqLow").value = btn.getAttribute("data-low");
+          $("eqMid").value = btn.getAttribute("data-mid");
+          $("eqHigh").value = btn.getAttribute("data-high");
+          applyEQ();
+        });
+      });
+      function setEqBand(id, db) {
+        var el = $(id);
+        el.value = Math.max(-12, Math.min(12, Math.round(db)));
+        applyEQ();
+      }
+
+      /* ---------------- Radio page sync ---------------- */
+      /* Push the ticker / DJ message to the public radio page via
+         /api/radio-settings. Local preview always works; the POST just
+         makes it live for listeners too. Fails silently offline. */
+      function radioDeviceId() { try { return localStorage.getItem("dwc-device-id"); } catch (e) { return null; } }
+      function postRadioSettings(patch) {
+        var did = radioDeviceId();
+        if (!did) return Promise.resolve(false);
+        return fetch("/api/radio-settings", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ device_id: did, settings: patch }) })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { return !!(d && d.ok); })
+          .catch(function () { return false; });
+      }
+
+      /* ---------------- Listener display ---------------- */
+      state.djMessage = "";
+      state.reqLine = "";
+      function renderDisplay() {
+        var b = blocks[state.index];
+        var badge = $("dispBadge");
+        if (!b) {
+          badge.textContent = "Ready"; badge.className = "np-badge";
+          $("dispTitle").textContent = "Vita Nova Radio";
+          $("dispMeta").textContent = "A Steady Heart — “End of the year”";
+          $("dispNext").textContent = "";
+        } else {
+          badge.textContent = badgeLabel(b.type);
+          badge.className = "np-badge " + b.type;
+          $("dispTitle").textContent = b.title;
+          $("dispMeta").textContent = b.sub;
+          var nx = blocks[state.index + 1];
+          $("dispNext").innerHTML = nx ? "Up next: <strong>" + nx.title + "</strong>" : "Last segment of the show — thank you for listening";
+        }
+        $("dispLive").classList.toggle("on", state.playing);
+        $("dispLiveText").textContent = state.playing ? "ON AIR" : "OFF AIR";
+        var msg = $("dispMsg");
+        msg.textContent = state.djMessage;
+        msg.classList.toggle("show", !!state.djMessage);
+        if (isOn("swRequests")) {
+          $("dispReqLine").innerHTML = state.reqLine
+            ? "Requests open — <b>" + state.reqLine + "</b>"
+            : "Requests open — set your request line in the Requests panel and it shows here.";
+        } else {
+          $("dispReqLine").textContent = "Requests are closed right now — enjoy the show.";
+        }
+      }
+      $("btnPush").addEventListener("click", function () {
+        state.djMessage = $("pushText").value.trim();
+        renderDisplay();
+        if (!state.djMessage) { toast("Type a message first — or use Clear to take text down."); return; }
+        postRadioSettings({ dj_message: state.djMessage }).then(function (ok) {
+          toast(ok ? "Your text is on the listener screen — and on the radio page too." : "Your text is on the listener screen. (Sign in to the Community to push it to the radio page too.)");
+        });
+      });
+      $("btnClearPush").addEventListener("click", function () {
+        state.djMessage = ""; $("pushText").value = ""; renderDisplay();
+        postRadioSettings({ dj_message: "" }).then(function () {});
+        toast("Listener screen cleared.");
+      });
+      Array.prototype.forEach.call(document.querySelectorAll(".push-preset"), function (btn) {
+        btn.addEventListener("click", function () {
+          state.djMessage = btn.textContent.trim();
+          $("pushText").value = state.djMessage;
+          renderDisplay();
+        });
+      });
+      $("btnTicker").addEventListener("click", function () {
+        var txt = $("tickerText").value.trim() || "Vita Nova Radio";
+        $("dispTicker").textContent = txt;
+        postRadioSettings({ ticker: txt }).then(function (ok) {
+          toast(ok ? "Ticker updated — also live on the radio page." : "Ticker updated on this screen. (Sign in to the Community to push it to the radio page too.)");
+        });
+      });
+      $("btnDispFull").addEventListener("click", function () {
+        var el = $("listenerDisplay");
+        if (el.requestFullscreen) { el.requestFullscreen().catch(function () { toast("Fullscreen was blocked here — the display still works in the page."); }); }
+        else { toast("Fullscreen isn’t available in this browser."); }
+      });
+
+      /* Visualizer: real spectrum from the deck when a file plays, animated bars on the show clock. */
+      (function vizLoop() {
+        var canvas = $("dispViz");
+        if (canvas) {
+          var ctx = canvas.getContext("2d");
+          var w = canvas.width, h = canvas.height;
+          ctx.clearRect(0, 0, w, h);
+          var bars = 56, bw = w / bars;
+          var freq = null;
+          if (analyser && state.playing && state.files[state.index]) {
+            freq = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(freq);
+          }
+          var micBoost = micLive ? levelFromAnalyser(micAnalyser) : 0;
+          var t = Date.now() / 1000;
+          for (var i = 0; i < bars; i++) {
+            var v;
+            if (freq) { v = freq[Math.floor(2 + (i / bars) * 120)] / 255; }
+            else if (state.playing) { v = 0.28 + 0.22 * Math.abs(Math.sin(t * 2.1 + i * 0.55)) + 0.18 * Math.abs(Math.sin(t * 5.3 + i * 1.7)); }
+            else { v = 0.05 + 0.03 * Math.abs(Math.sin(t + i)); }
+            v = Math.min(1, v * duckFactor() + micBoost * 0.7);
+            var bh = Math.max(3, v * (h - 14));
+            ctx.fillStyle = i % 7 === 3 ? "#2ec4a6" : "#f2b13c";
+            ctx.fillRect(i * bw + 1.5, h - bh, bw - 3, bh);
+          }
+        }
+        requestAnimationFrame(vizLoop);
+      })();
+
+      /* ---------------- Requests ---------------- */
+      var requests = [];
+      function matchTrack(text) {
+        var q = text.toLowerCase().trim();
+        if (!q) return -1;
+        for (var i = 0; i < TRACKS.length; i++) {
+          var t = TRACKS[i].toLowerCase();
+          if (t.indexOf(q) !== -1 || q.indexOf(t) !== -1) return i;
+        }
+        return -1;
+      }
+      function songBlockForTrack(trackIdx) {
+        for (var i = 0; i < blocks.length; i++) {
+          if (blocks[i].type === "song" && blocks[i].trackNo === trackIdx + 1) return i;
+        }
+        return -1;
+      }
+      function renderRequests() {
+        var ul = $("reqList"); ul.innerHTML = "";
+        $("reqEmpty").style.display = requests.length ? "none" : "block";
+        $("reqTag").textContent = requests.length + " waiting";
+        requests.forEach(function (r) {
+          var li = document.createElement("li");
+          var matched = r.track >= 0;
+          var html = '<div class="req-song">' + r.song + '</div>' +
+            '<div class="req-meta">' + r.time + (r.name ? " · from " + r.name : "") + '</div>' +
+            '<div class="req-match">' + (matched
+              ? '<span class="ok">In the album</span> — “' + TRACKS[r.track] + ',” track ' + (r.track + 1) + " of 21"
+              : '<span class="miss">Not in this album</span> — check your library, or let them pick another') + '</div>';
+          li.innerHTML = html;
+          var actions = document.createElement("div");
+          actions.className = "req-actions";
+          if (matched) {
+            var bNow = document.createElement("button");
+            bNow.className = "btn primary"; bNow.textContent = "Play now";
+            bNow.addEventListener("click", function () {
+              var bi = songBlockForTrack(r.track);
+              if (bi >= 0) { state.pendingNext = null; state.resumeAfter = null; playBlock(bi, true); removeRequest(r); toast("Playing the request: " + TRACKS[r.track]); }
+            });
+            var bNext = document.createElement("button");
+            bNext.className = "btn teal"; bNext.textContent = state.pendingNext === songBlockForTrack(r.track) ? "Queued next ✓" : "Play next";
+            bNext.addEventListener("click", function () {
+              state.pendingNext = songBlockForTrack(r.track);
+              renderRequests();
+              toast("Queued next: " + TRACKS[r.track] + " — it plays right after this segment, then the rundown picks back up.");
+            });
+            actions.appendChild(bNow); actions.appendChild(bNext);
+          }
+          var bDone = document.createElement("button");
+          bDone.className = "btn"; bDone.textContent = "Done";
+          bDone.addEventListener("click", function () { removeRequest(r); });
+          actions.appendChild(bDone);
+          li.appendChild(actions);
+          ul.appendChild(li);
+        });
+      }
+      function removeRequest(r) {
+        var i = requests.indexOf(r);
+        if (i >= 0) requests.splice(i, 1);
+        if (state.pendingNext != null) {
+          var still = requests.some(function (x) { return songBlockForTrack(x.track) === state.pendingNext; });
+          if (!still && state.pendingNext != null && !requests.length) state.pendingNext = null;
+        }
+        renderRequests();
+      }
+      $("btnAddReq").addEventListener("click", function () {
+        var song = $("reqSong").value.trim();
+        if (!song) { toast("Type the song they asked for first."); return; }
+        var now = new Date();
+        requests.push({ song: song, name: $("reqName").value.trim(), track: matchTrack(song), time: pad(now.getHours()) + ":" + pad(now.getMinutes()) });
+        $("reqSong").value = ""; $("reqName").value = "";
+        renderRequests();
+        toast("Request added.");
+      });
+      $("reqSong").addEventListener("keydown", function (e) { if (e.key === "Enter") $("btnAddReq").click(); });
+      $("btnReqLine").addEventListener("click", function () {
+        state.reqLine = $("reqLineInput").value.trim();
+        renderDisplay();
+        toast(state.reqLine ? "Request line is on the listener screen." : "Request line cleared from the listener screen.");
+      });
+      bindSwitch("swRequests", function () { renderDisplay(); });
+
+      /* ---------------- Sample pads ---------------- */
+      var PADS = [
+        { name: "Sting", kind: "sting", hint: "chord stab" },
+        { name: "Riser", kind: "riser", hint: "build-up sweep" },
+        { name: "Drop", kind: "drop", hint: "bass drop" },
+        { name: "Applause", kind: "applause", hint: "crowd claps" },
+        { name: "Vinyl stop", kind: "vinyl", hint: "record brake" },
+        { name: "Siren", kind: "siren", hint: "two-tone" },
+        { name: "Boom", kind: "boom", hint: "low thump" },
+        { name: "Shimmer", kind: "shimmer", hint: "sparkle arp" }
+      ];
+      var padBuffers = {}; /* padIndex -> AudioBuffer */
+      var padNames = {};   /* padIndex -> loaded file name */
+      var padTarget = -1;
+      var noiseBuf = null;
+      function getNoise() {
+        if (noiseBuf) return noiseBuf;
+        var len = actx.sampleRate * 1.2;
+        noiseBuf = actx.createBuffer(1, len, actx.sampleRate);
+        var d = noiseBuf.getChannelData(0);
+        for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+        return noiseBuf;
+      }
+      function env(g, t0, peak, dur) {
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(peak, t0 + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      }
+      function firePad(i) {
+        ensureCtx();
+        if (!actx || !padGain) { toast("Audio isn’t available in this browser here."); return; }
+        var el = $("pad" + i);
+        if (el) { el.classList.add("hit"); setTimeout(function () { el.classList.remove("hit"); }, 220); }
+        var t = actx.currentTime;
+        if (padBuffers[i]) {
+          var bs = actx.createBufferSource(); bs.buffer = padBuffers[i];
+          bs.connect(padGain); bs.start(t);
+          return;
+        }
+        var kind = PADS[i].kind;
+        if (kind === "sting" || kind === "shimmer") {
+          var freqs = kind === "sting" ? [220, 261.63, 329.63] : [523.25, 659.25, 783.99, 1046.5];
+          freqs.forEach(function (f, k) {
+            var o = actx.createOscillator(); o.type = kind === "sting" ? "sawtooth" : "triangle"; o.frequency.value = f;
+            var fl = actx.createBiquadFilter(); fl.type = "lowpass"; fl.frequency.value = kind === "sting" ? 2400 : 5200;
+            var g = actx.createGain();
+            o.connect(fl); fl.connect(g); g.connect(padGain);
+            var st = t + (kind === "shimmer" ? k * 0.07 : 0);
+            env(g, st, kind === "sting" ? 0.16 : 0.14, kind === "sting" ? 0.45 : 0.7);
+            o.start(st); o.stop(st + 0.8);
+          });
+        } else if (kind === "riser") {
+          var n = actx.createBufferSource(); n.buffer = getNoise();
+          var bp = actx.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 1.4;
+          bp.frequency.setValueAtTime(300, t); bp.frequency.exponentialRampToValueAtTime(4200, t + 0.9);
+          var g2 = actx.createGain(); g2.gain.setValueAtTime(0.0001, t);
+          g2.gain.exponentialRampToValueAtTime(0.3, t + 0.75); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.95);
+          n.connect(bp); bp.connect(g2); g2.connect(padGain); n.start(t); n.stop(t + 1);
+        } else if (kind === "drop" || kind === "boom") {
+          var o2 = actx.createOscillator(); o2.type = "sine";
+          o2.frequency.setValueAtTime(kind === "drop" ? 320 : 130, t);
+          o2.frequency.exponentialRampToValueAtTime(38, t + (kind === "drop" ? 0.5 : 0.7));
+          var g3 = actx.createGain(); env(g3, t, 0.65, kind === "drop" ? 0.55 : 0.75);
+          o2.connect(g3); g3.connect(padGain); o2.start(t); o2.stop(t + 0.8);
+        } else if (kind === "applause") {
+          for (var c = 0; c < 14; c++) {
+            var cn = actx.createBufferSource(); cn.buffer = getNoise();
+            var cf = actx.createBiquadFilter(); cf.type = "bandpass"; cf.frequency.value = 1400 + Math.random() * 900; cf.Q.value = 2.2;
+            var cg = actx.createGain(); var ct = t + Math.random() * 0.55;
+            env(cg, ct, 0.13, 0.09);
+            cn.connect(cf); cf.connect(cg); cg.connect(padGain); cn.start(ct); cn.stop(ct + 0.12);
+          }
+        } else if (kind === "vinyl") {
+          var o3 = actx.createOscillator(); o3.type = "sawtooth";
+          o3.frequency.setValueAtTime(180, t); o3.frequency.exponentialRampToValueAtTime(28, t + 0.6);
+          var vf = actx.createBiquadFilter(); vf.type = "lowpass";
+          vf.frequency.setValueAtTime(3000, t); vf.frequency.exponentialRampToValueAtTime(220, t + 0.6);
+          var g4 = actx.createGain(); env(g4, t, 0.22, 0.65);
+          o3.connect(vf); vf.connect(g4); g4.connect(padGain); o3.start(t); o3.stop(t + 0.7);
+        } else if (kind === "siren") {
+          var o4 = actx.createOscillator(); o4.type = "square"; o4.frequency.value = 700;
+          var lfo = actx.createOscillator(); lfo.frequency.value = 2.4;
+          var lg = actx.createGain(); lg.gain.value = 160;
+          lfo.connect(lg); lg.connect(o4.frequency);
+          var g5 = actx.createGain(); env(g5, t, 0.12, 0.85);
+          o4.connect(g5); g5.connect(padGain); o4.start(t); o4.stop(t + 0.9); lfo.start(t); lfo.stop(t + 0.9);
+        }
+      }
+      (function buildPads() {
+        var grid = $("padGrid");
+        PADS.forEach(function (p, i) {
+          var b = document.createElement("button");
+          b.className = "pad"; b.id = "pad" + i;
+          b.setAttribute("aria-label", "Play sample pad " + (i + 1) + ": " + p.name);
+          b.innerHTML = "<b>" + p.name + '</b><small id="padSub' + i + '">key ' + (i + 1) + " · MIDI " + (36 + i) + " · " + p.hint + "</small>";
+          var load = document.createElement("span");
+          load.className = "pad-load"; load.textContent = "+ file";
+          load.setAttribute("role", "button");
+          load.setAttribute("aria-label", "Load your own sample onto pad " + (i + 1));
+          load.addEventListener("click", function (e) { e.stopPropagation(); padTarget = i; $("padFileInput").click(); });
+          b.appendChild(load);
+          b.addEventListener("click", function () { firePad(i); });
+          grid.appendChild(b);
+        });
+      })();
+      $("padFileInput").addEventListener("change", function () {
+        var file = this.files && this.files[0];
+        this.value = "";
+        if (!file || padTarget < 0) return;
+        ensureCtx();
+        if (!actx) { toast("Audio isn’t available here, so the sample can’t be loaded."); return; }
+        var idx = padTarget;
+        file.arrayBuffer().then(function (buf) { return actx.decodeAudioData(buf); }).then(function (decoded) {
+          padBuffers[idx] = decoded; padNames[idx] = file.name;
+          var sub = $("padSub" + idx);
+          if (sub) sub.textContent = "key " + (idx + 1) + " · MIDI " + (36 + idx) + " · your file: " + file.name;
+          toast("Pad " + (idx + 1) + " now plays your sample.");
+        }).catch(function () { toast("That file couldn’t be read as audio."); });
+      });
+      document.addEventListener("keydown", function (e) {
+        var tag = (e.target && e.target.tagName) || "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.metaKey || e.ctrlKey || e.altKey) return;
+        var n = parseInt(e.key, 10);
+        if (n >= 1 && n <= 8) firePad(n - 1);
+      });
+
+      /* ---------------- MIDI ---------------- */
+      $("btnMidi").addEventListener("click", function () {
+        if (!navigator.requestMIDIAccess) {
+          $("midiStatus").innerHTML = '<span class="warn">This browser has no Web MIDI.</span> Use Chrome or Edge on the PC — Safari and most phone browsers can’t see MIDI controllers.';
+          $("midiTag").textContent = "No Web MIDI here";
+          return;
+        }
+        navigator.requestMIDIAccess().then(function (access) {
+          var names = [];
+          function hook() {
+            names = [];
+            access.inputs.forEach(function (input) {
+              names.push(input.name || "MIDI device");
+              input.onmidimessage = onMidiMessage;
+            });
+            $("midiTag").textContent = names.length ? "Connected" : "No controller found";
+            $("midiStatus").innerHTML = names.length
+              ? '<span class="ok">Listening to:</span> ' + names.join(", ") + ". Pads, transport, and knobs follow the map below."
+              : '<span class="warn">No MIDI input found.</span> Plug the controller in by USB, then tap Connect again.';
+          }
+          hook();
+          access.onstatechange = hook;
+        }).catch(function () {
+          $("midiStatus").innerHTML = '<span class="warn">MIDI access was denied.</span> Allow it in the browser prompt and try again.';
+        });
+      });
+      function onMidiMessage(e) {
+        var data = e.data; if (!data || data.length < 2) return;
+        var status = data[0] & 0xf0, d1 = data[1], d2 = data.length > 2 ? data[2] : 0;
+        if (status === 0x90 && d2 > 0) {
+          $("midiLast").textContent = "Last MIDI message: note " + d1 + " on, velocity " + d2;
+          if (d1 >= 36 && d1 <= 43) firePad(d1 - 36);
+          else if (d1 === 44) prev();
+          else if (d1 === 45) advance(false);
+          else if (d1 === 46) { if (state.index < 0) { playBlock(0, true); } else { setPlaying(!state.playing); } }
+        } else if (status === 0xb0) {
+          $("midiLast").textContent = "Last MIDI message: CC " + d1 + " = " + d2;
+          ensureCtx();
+          if (d1 === 1) {
+            state.volume = d2 / 127;
+            $("volSlider").value = Math.round(state.volume * 100);
+            $("volVal").textContent = Math.round(state.volume * 100) + "%";
+            applyVolume();
+          } else if (d1 === 2) { setEqBand("eqLow", (d2 / 127) * 24 - 12); }
+          else if (d1 === 3) { setEqBand("eqMid", (d2 / 127) * 24 - 12); }
+          else if (d1 === 4) { setEqBand("eqHigh", (d2 / 127) * 24 - 12); }
+        }
+      }
+
+      /* ---------------- Init ---------------- */
+      buildBlocks();
+      renderRundown();
+      renderRequests();
+      updateDeck();
+      loadRotationForm();
+      renderRecentPlays();
+      updateRotationHint();
+      loadTalkForm();
+      ensureTalkover();
+      renderZipList();
+      loadStreamUrlField();
+    })();
+    </script>
+  </body>
+</html>

@@ -8,7 +8,9 @@ import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
   checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
-  createNotification,
+  createNotification, cleanWebsiteShow, RELATIONSHIP_IDS, ZODIAC_IDS,
+  recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
+  badgeListFor, cleanDisplayBadges, adultCreatorIds,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -16,7 +18,21 @@ export async function onRequestGet({ env, request }) {
   if (!db) return noDb();
   const deviceId = new URL(request.url).searchParams.get("device_id") || "";
   const row = await profileByDevice(db, deviceId);
-  return json({ profile: shapeProfile(row) });
+  if (!row) return json({ profile: null });
+  // v3.9 — daily usage: loading the community counts as a day, and any
+  // newly-earned frame unlocks are granted here. Both are best-effort
+  // (missing tables before the migration just no-op).
+  await recordActivityDay(db, row.id);
+  const grants = await grantUnlocks(db, row.id);
+  const profile = shapeProfile(row);
+  profile.unlocked_frames = grants.unlocked;
+  profile.unlock_counts = grants.counts;
+  // Badges (v3.9) — full list with earned flags for the Badge display,
+  // plus the display-slot facts the picker needs.
+  profile.badges = badgeListFor(grants.unlocked);
+  profile.is_regular_seller = grants.unlocked.includes("badge:sales-5");
+  profile.is_adult_seller = (await adultCreatorIds(db, [row.id])).has(row.id);
+  return json({ profile });
 }
 
 const USERNAME_RE = /^[A-Za-z0-9_.-]+$/;
@@ -188,8 +204,38 @@ export async function onRequestPost({ env, request }) {
     v3Vals.push(str(a.subscribe_label, 40) || "Subscribe to my page");
   }
   if (typeof a.profile_theme === "string" || (a.profile_theme && typeof a.profile_theme === "object")) {
+    // v3.9 — locked frames can't be picked: if the submitted frame is
+    // locked for this member, keep whatever frame they already had (or
+    // none). Free frames and earned unlocks pass through.
+    let themeIn = a.profile_theme;
+    if (existing) {
+      const incoming = parseTheme(a.profile_theme);
+      if (incoming.pic_frame && !isFreeFrame(incoming.pic_frame)) {
+        const grants = await grantUnlocks(db, existing.id);
+        const need = unlockForFrame(incoming.pic_frame);
+        if (need && !grants.unlocked.includes(need)) {
+          const current = parseTheme(existing.profile_theme);
+          incoming.pic_frame = current.pic_frame || "";
+          themeIn = incoming;
+        }
+      }
+      // v3.9 — display badges: enforce the slot rules (adult sellers
+      // always show 18+ plus one chosen; regular sellers showing Regular
+      // Seller may add one secondary; everyone else shows one). Repairs
+      // instead of rejecting, so a bad pick never kills the save.
+      if (incoming.display_badges && incoming.display_badges.length) {
+        const grants = await grantUnlocks(db, existing.id);
+        const isAdult = (await adultCreatorIds(db, [existing.id])).has(existing.id);
+        const isRegular = grants.unlocked.includes("badge:sales-5");
+        const repaired = cleanDisplayBadges(incoming.display_badges, grants.unlocked, isAdult, isRegular);
+        if (JSON.stringify(repaired) !== JSON.stringify(incoming.display_badges)) {
+          incoming.display_badges = repaired;
+          themeIn = incoming;
+        }
+      }
+    }
     v3Sets.push("profile_theme = ?");
-    v3Vals.push(cleanTheme(a.profile_theme));
+    v3Vals.push(cleanTheme(themeIn));
   }
   // v3.4 — My links (label + URL buttons on the member page). Stored as
   // JSON; cleanMyLinks drops bad rows (no label, non-http(s) URL, dupes)
@@ -267,12 +313,47 @@ export async function onRequestPost({ env, request }) {
     v37Sets.push("banner_blob_key = ?");
     v37Vals.push(bannerKey);
   }
+  // v3.9 — website look: the five website fields + which ones show.
+  // Same graceful pattern: they ride in their own v39 columns, so if
+  // the v3.9 migration hasn't run yet the edit retries without them
+  // and the client is told via v39_pending.
+  const v39Sets = [];
+  const v39Vals = [];
+  let v39Pending = false;
+  if (typeof a.website_mode === "boolean" || a.website_mode === 0 || a.website_mode === 1) {
+    v39Sets.push("website_mode = ?");
+    v39Vals.push(a.website_mode === true || a.website_mode === 1 ? 1 : 0);
+  }
+  if (typeof a.hobbies === "string") {
+    v39Sets.push("hobbies = ?");
+    v39Vals.push(str(a.hobbies, 200));
+  }
+  if (typeof a.workplace === "string") {
+    v39Sets.push("workplace = ?");
+    v39Vals.push(str(a.workplace, 120));
+  }
+  if (typeof a.relationship_status === "string") {
+    v39Sets.push("relationship_status = ?");
+    v39Vals.push(RELATIONSHIP_IDS.includes(a.relationship_status) ? a.relationship_status : "");
+  }
+  if (typeof a.birthsign === "string") {
+    v39Sets.push("birthsign = ?");
+    v39Vals.push(ZODIAC_IDS.includes(a.birthsign) ? a.birthsign : "");
+  }
+  if (typeof a.accomplishments === "string") {
+    v39Sets.push("accomplishments = ?");
+    v39Vals.push(str(a.accomplishments, 500));
+  }
+  if (typeof a.website_show === "string" || (a.website_show && typeof a.website_show === "object")) {
+    v39Sets.push("website_show = ?");
+    v39Vals.push(cleanWebsiteShow(a.website_show));
+  }
   let row;
   let v2Pending = false;
   let v3Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals];
+    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
@@ -302,25 +383,30 @@ export async function onRequestPost({ env, request }) {
           await db.prepare(`UPDATE profiles SET ${r.keep.join(", ")} WHERE id = ?`).bind(...r.keepVals).run();
         };
         let done = false;
-        if (v37Sets.length) {
-          try { await tryDrop(v37Sets); v37Pending = true; done = true; }
+        if (v39Sets.length) {
+          try { await tryDrop(v39Sets); v39Pending = true; done = true; }
+          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
+        }
+        if (!done && v37Sets.length) {
+          try { await tryDrop([...v37Sets, ...v39Sets]); v37Pending = true; v39Pending = true; done = true; }
           catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v36Sets.length) {
-          try { await tryDrop([...v36Sets, ...v37Sets]); v36Pending = true; v37Pending = true; done = true; }
+          try { await tryDrop([...v36Sets, ...v37Sets, ...v39Sets]); v36Pending = true; v37Pending = true; v39Pending = true; done = true; }
           catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v3Sets.length) {
-          try { await tryDrop([...v3Sets, ...v36Sets, ...v37Sets]); v3Pending = true; v36Pending = true; v37Pending = true; done = true; }
+          try { await tryDrop([...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets]); v3Pending = true; v36Pending = true; v37Pending = true; v39Pending = true; done = true; }
           catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
         }
         if (!done && v2Sets.length) {
-          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets]);
+          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets]);
           await db.prepare(`UPDATE profiles SET ${r2.keep.join(", ")} WHERE id = ?`).bind(...r2.keepVals).run();
           v2Pending = true;
           if (v3Sets.length) v3Pending = true;
           if (v36Sets.length) v36Pending = true;
           if (v37Sets.length) v37Pending = true;
+          if (v39Sets.length) v39Pending = true;
           done = true;
         }
         if (!done) throw e;
@@ -352,5 +438,11 @@ export async function onRequestPost({ env, request }) {
       link: `#/member/${row.id}`,
     });
   }
-  return json({ ok: true, error: null, profile: shapeProfile(row), v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, avatar_error: avatarError, banner_error: bannerError });
+  const profileOut = shapeProfile(row);
+  if (row) {
+    const grants = await grantUnlocks(db, row.id);
+    profileOut.unlocked_frames = grants.unlocked;
+    profileOut.unlock_counts = grants.counts;
+  }
+  return json({ ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, avatar_error: avatarError, banner_error: bannerError });
 }

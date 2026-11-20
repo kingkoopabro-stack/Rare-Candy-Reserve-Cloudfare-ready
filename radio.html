@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="Steady Wave — 24/7 · Rare Candy Reserve">
 <meta name="twitter:description" content="Steady Wave — the 24/7 station from Vita Nova Records. A steady heart on rotation, podcasts to listen to and make, a chill area to submit music, and a place to host and be heard, learn and teach.">
 <meta name="twitter:image" content="https://rarecandyreserve.org/images/support-my-dream-merch.jpg">>
-<link rel="stylesheet" href="assets/css/style.css?v=notifcss1">
+<link rel="stylesheet" href="assets/css/style.css?v=badges1">
 <style>
 /* Live visualizer — listeners see visuals, not just a play bar */
 .live-viz{max-width:760px;margin:0 auto;border-radius:16px;padding:4px;background:var(--grad);box-shadow:0 0 24px rgba(255,45,149,.5),0 0 44px rgba(0,229,255,.3)}
@@ -332,10 +332,11 @@
      checking never interrupts the listener's own player. */
   var badge = document.getElementById("liveBadge");
   var badgeText = document.getElementById("liveBadgeText");
+  var onairLabel = "LIVE"; /* set by /api/radio-settings (onair_label) when Chris edits it */
   function setLive(on){
     if(!badge) return;
     badge.classList.toggle("on", !!on);
-    if(badgeText) badgeText.textContent = on ? "LIVE" : "OFF AIR";
+    if(badgeText) badgeText.textContent = on ? onairLabel : "OFF AIR";
   }
   setLive(false);
   var probe = null;
@@ -364,19 +365,48 @@
   audio.addEventListener("playing", function(){ setLive(true); });
   audio.addEventListener("error", function(){ setLive(false); });
 
-  /* DJ message — whatever Chris puts in radio-now.txt shows up here, checked every 30s */
-  var msg = document.getElementById("liveDjMsg");
-  function fetchMsg(){
-    if(!msg) return;
-    fetch("radio-now.txt?t=" + Date.now())
-      .then(function(r){ return r.ok ? r.text() : null; })
-      .then(function(t){
-        if(t && t.trim()) msg.textContent = t.trim();
-      })
-      .catch(function(){ /* keep the default message */ });
+  /* Radio player text — Chris edits these from the admin panel (#/admin).
+     GET /api/radio-settings returns {settings:{...}}; an empty or missing
+     table leaves every hardcoded default in place. Polled every 30s.
+     This REPLACES the old radio-now.txt fetch (the DJ console / admin panel
+     now writes dj_message to the same D1-backed store instead). */
+  var radioSettings = {};
+  function applyRadioSettings(){
+    var s = radioSettings;
+    var g = document.getElementById("djGreeting");
+    if(g && s.dj_greeting) g.textContent = s.dj_greeting;
+    var msg = document.getElementById("liveDjMsg");
+    if(msg && s.dj_message) msg.textContent = s.dj_message;
+    var sub = document.getElementById("liveNowSub");
+    if(sub && s.station_tagline) sub.textContent = s.station_tagline;
+    var tick = document.querySelector(".live-ticker span");
+    if(tick && s.ticker) tick.textContent = s.ticker;
+    /* The demo loop (vnr-radio.js) owns #vnrNow/#vnrSub while it plays —
+       only apply the settings when it is idle, or the poll fights the loop. */
+    var vnrShell = document.getElementById("vnrRadio");
+    var vnrPlaying = !!(vnrShell && vnrShell.classList.contains("playing"));
+    if(!vnrPlaying){
+      var vnrNow = document.getElementById("vnrNow");
+      if(vnrNow && s.dj_message) vnrNow.textContent = s.dj_message;
+      var vnrSub = document.getElementById("vnrSub");
+      if(vnrSub && s.station_tagline) vnrSub.textContent = s.station_tagline;
+    }
   }
-  fetchMsg();
-  setInterval(fetchMsg, 30000);
+  function fetchRadioSettings(){
+    fetch("/api/radio-settings")
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if(!d || !d.settings) return;
+        radioSettings = d.settings;
+        if(radioSettings.onair_label) onairLabel = radioSettings.onair_label;
+        applyRadioSettings();
+        /* Re-apply the badge label now that we know it (setLive already ran). */
+        if(badge && badgeText && badge.classList.contains("on")) badgeText.textContent = onairLabel;
+      })
+      .catch(function(){ /* keep the hardcoded defaults */ });
+  }
+  fetchRadioSettings();
+  setInterval(fetchRadioSettings, 30000);
 })();
 </script>
 </body>

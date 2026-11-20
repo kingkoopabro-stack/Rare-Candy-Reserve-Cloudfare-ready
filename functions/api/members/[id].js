@@ -6,7 +6,7 @@
 // v3.6: also returns is_friend / is_favorite (for the viewer) and
 // my_groups (the viewer's own groups, with member ids) so the member
 // page can render the action buttons and the Add-to-group picker.
-import { json, noDb, getDb, profileByDevice, shapeMember, parseTopFriendIds, topFriendCards } from "../_lib.js";
+import { json, noDb, getDb, profileByDevice, shapeMember, parseTopFriendIds, topFriendCards, adultCreatorIds, badgesForProfiles, isOperator } from "../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -17,8 +17,20 @@ export async function onRequestGet({ env, request, params }) {
   if (!row) return json({ member: null });
   const deviceId = new URL(request.url).searchParams.get("device_id") || "";
   const me = deviceId ? await profileByDevice(db, deviceId) : null;
+  // Age gate (v3.9): an adult creator's profile page is 18+ only. If the
+  // owner posts adult content and the viewer hasn't verified their own ID
+  // (and isn't the owner or the operator), show the gate instead of the
+  // profile — no profile details leak through. The #/adult area gate and
+  // the posts API adult filtering are untouched; this is the profile page
+  // only.
+  const isAdultCreator = (await adultCreatorIds(db, [row.id])).has(row.id);
+  const canViewAdult = !!me && (me.id === row.id || isOperator(env, me) || me.age_verified === 1);
+  if (isAdultCreator && !canViewAdult) {
+    return json({ member: null, gated: true, gate_reason: "adult_creator", username: row.username });
+  }
   const friends = await topFriendCards(db, parseTopFriendIds(row.top_friends));
   const m = shapeMember(row);
+  const badgeMap = await badgesForProfiles(db, [row.id]);
   // v3.6 viewer state — wrapped so a DB that hasn't run the v3.6
   // migration yet just returns the defaults instead of erroring.
   let isFriend = false;
@@ -46,6 +58,8 @@ export async function onRequestGet({ env, request, params }) {
       ...m,
       age_verified: row.age_verified === 1,
       is_operator: row.is_operator === 1,
+      is_adult_creator: isAdultCreator,
+      badges: badgeMap.get(row.id) || [],
       layout_css: row.layout_css ?? "",
       layout_preset: row.layout_preset ?? "",
       top_friends: friends,

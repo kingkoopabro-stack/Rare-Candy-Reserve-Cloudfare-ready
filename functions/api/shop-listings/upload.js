@@ -7,7 +7,7 @@
 // Returns { ok, url } — the URL to store in the override's photos[]
 // or video field. Served back through /api/images like every other
 // community image.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, putVideo, imageUrl, videoUrl } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, putVideo, imageUrl, videoUrl } from "../_lib.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);

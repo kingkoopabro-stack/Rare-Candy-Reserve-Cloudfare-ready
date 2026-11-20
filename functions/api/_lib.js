@@ -607,6 +607,15 @@ export function shapeProfile(row) {
     ticker_enabled: row.ticker_enabled === 1,
     ticker_color: row.ticker_color ?? "",
     banned: row.banned === 1,
+    // v3.9 — website look: the five website fields + which ones show.
+    // Columns may not exist yet (migration pending) — read defensively.
+    website_mode: row.website_mode === 1,
+    hobbies: row.hobbies ?? "",
+    workplace: row.workplace ?? "",
+    relationship_status: row.relationship_status ?? "",
+    birthsign: row.birthsign ?? "",
+    accomplishments: row.accomplishments ?? "",
+    website_show: parseWebsiteShow(row.website_show),
     created_at: iso(row.created_at),
   };
 }
@@ -649,6 +658,14 @@ export function shapeMember(row) {
     ticker_enabled: row.ticker_enabled === 1,
     ticker_color: row.ticker_color ?? "",
     banned: row.banned === 1,
+    // v3.9 — website look (public): the five website fields + show flags.
+    website_mode: row.website_mode === 1,
+    hobbies: row.hobbies ?? "",
+    workplace: row.workplace ?? "",
+    relationship_status: row.relationship_status ?? "",
+    birthsign: row.birthsign ?? "",
+    accomplishments: row.accomplishments ?? "",
+    website_show: parseWebsiteShow(row.website_show),
     created_at: iso(row.created_at),
   };
 }
@@ -704,6 +721,7 @@ export async function shapePost(db, row, author) {
     auth_real: t.real, auth_fake: t.fake, auth_unsure: t.unsure,
     author_id: author.id, author_username: author.username, author_occupation: author.occupation ?? "",
     author_avatar_url: imageUrl(author.avatar_blob_key),
+    author_badges: author.badges || [],
     score: hearts?.n ?? 0, comment_count: cc?.n ?? 0,
     // Creator/Seller area (v3) — only set on creator posts; plain posts
     // carry the defaults (is_creator 0, free, no genre, no file).
@@ -715,6 +733,8 @@ export async function shapePost(db, row, author) {
     // explicitly ticked the box when posting.
     blur_photo: row.blur_photo === 1,
     pay_unlock: row.pay_unlock === 1,
+    // Event posts — date/time/place (empty until the migration runs).
+    event_date: row.event_date ?? "", event_time: row.event_time ?? "", event_place: row.event_place ?? "",
     file_url: fileUrl(row.file_blob_key ?? null),
     file_name: row.file_name ?? "", file_mime: row.file_mime ?? "",
     file_size: row.file_size ?? 0,
@@ -799,9 +819,273 @@ export function parseAshTracks(stored) {
 // https://, and the font must be one of the fixed allowlisted stacks.
 export const THEME_FONTS = ["", "comic", "typewriter", "serif", "rounded"];
 export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost"];
-export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text"];
+export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text", "sparkle-name", "sparkle-banner", "ticker-effect", "rgb-comment-border"];
+// Profile customization (v3.9) — preset backgrounds, picture size /
+// position / frame, comment-picture border color. All live in the theme
+// JSON (validated by parseTheme, same as the other theme fields).
+export const PRESET_BG_IDS = ["", "vaporwave", "rgb-gradient", "midnight-neon", "sunset-drive", "cotton-candy", "blackout"];
+export const PIC_SIZE_IDS = ["bigger", "smaller"];
+export const PIC_POSITION_IDS = ["normal", "top"];
+export const PIC_FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba"];
+export const GB_FRAME_MODES = ["", "gamecube", "gb", "gba", "custom"];
+// Zodiac signs for the website-look "Sign" field (id, symbol, name).
+export const ZODIAC_IDS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
+export const RELATIONSHIP_IDS = ["", "Single", "In a relationship", "It's complicated", "Prefer not to say"];
+// --- Frame unlocks (v3.9) -----------------------------------------------
+// Picture frames unlock with engagement + daily usage. The registry is
+// the single source of truth — add a row here (and a frame id below) to
+// unlock more things later; nothing else is hard-coded to frames.
+// kind: which count the threshold reads. "posts_days" needs both
+// threshold (posts) and threshold2 (days).
+export const FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba"];
+export const FREE_FRAMES = ["none", "neon", "rgb", "gold", "black"];
+export const FRAME_UNLOCK_KEY = {
+  "rgb-rotating": "frame-rgb-rotating", "wooden": "frame-wooden",
+  "gothic": "frame-gothic", "blood": "frame-blood",
+  "gb": "frame-gb", "gba": "frame-gba",
+};
+export const UNLOCKS = [
+  { key: "frame-rgb-rotating", label: "RGB Rotating frame", requirement: "Use the site 7 different days", kind: "days", threshold: 7 },
+  { key: "frame-wooden", label: "Wooden frame", requirement: "Post 10 times", kind: "posts", threshold: 10 },
+  { key: "frame-gothic", label: "Gothic frame", requirement: "Leave 25 comments", kind: "comments", threshold: 25 },
+  { key: "frame-blood", label: "Blood dripping frame", requirement: "Give or get 25 hearts", kind: "hearts", threshold: 25 },
+  { key: "frame-gb", label: "GB frame", requirement: "Post 25 times", kind: "posts", threshold: 25 },
+  { key: "frame-gba", label: "GBA frame", requirement: "Post 50 times and use the site 14 different days", kind: "posts_days", threshold: 50, threshold2: 14 },
+];
+// --- Badges (v3.9) ---------------------------------------------------------
+// Achievement badges live in the SAME profile_unlocks table as frames
+// (badge keys are prefixed "badge:" so they never collide with frame
+// keys). They are granted by the same grantUnlocks() pass — add a row
+// here and the badge is earned, stored, and shown everywhere names
+// appear. kind: which count the threshold reads. "sales" counts completed
+// orders (status paid/shipped/delivered) where the member is the seller.
+// "member_days" counts days since the profile was created. "verified"
+// is earned by being age-verified (age_verified = 1).
+export const BADGES = [
+  { key: "badge:first-post", icon: "📝", label: "First Post", requirement: "Post your first post", kind: "posts", threshold: 1 },
+  { key: "badge:first-comment", icon: "💬", label: "First Comment", requirement: "Leave your first comment", kind: "comments", threshold: 1 },
+  { key: "badge:comments-25", icon: "🗨️", label: "Chatty", requirement: "Leave 25 comments", kind: "comments", threshold: 25 },
+  { key: "badge:hearts-25", icon: "❤️", label: "Well Loved", requirement: "Give or get 25 hearts", kind: "hearts", threshold: 25 },
+  { key: "badge:streak-7", icon: "🔥", label: "7-Day Streak", requirement: "Use the site 7 different days", kind: "days", threshold: 7 },
+  { key: "badge:first-sale", icon: "💰", label: "First Sale", requirement: "Make your first sale", kind: "sales", threshold: 1 },
+  { key: "badge:sales-5", icon: "🛍️", label: "Regular Seller", requirement: "Make 5 sales", kind: "sales", threshold: 5 },
+  { key: "badge:sales-10", icon: "🏆", label: "10 Sales", requirement: "Make 10 sales", kind: "sales", threshold: 10 },
+  { key: "badge:member-7d", icon: "🌱", label: "First Week", requirement: "Be a member for 7 days", kind: "member_days", threshold: 7 },
+  { key: "badge:member-1mo", icon: "📅", label: "1 Month", requirement: "Be a member for 1 month", kind: "member_days", threshold: 30 },
+  { key: "badge:member-3mo", icon: "📆", label: "3 Months", requirement: "Be a member for 3 months", kind: "member_days", threshold: 90 },
+  { key: "badge:member-6mo", icon: "🗓️", label: "6 Months", requirement: "Be a member for 6 months", kind: "member_days", threshold: 180 },
+  { key: "badge:member-1yr", icon: "🎂", label: "1 Year", requirement: "Be a member for 1 year", kind: "member_days", threshold: 365 },
+  { key: "badge:adult-approved", icon: "🔞", label: "Adult Approved", requirement: "Get approved for adult content", kind: "verified", threshold: 1 },
+];
+export const BADGE_KEYS = BADGES.map((b) => b.key);
+export function badgeByKey(key) {
+  return BADGES.find((b) => b.key === key) || null;
+}
+// Full badge list with an earned flag for a member's unlocked keys.
+// Used by Edit Profile ("Badge display") and the phone Badges view.
+export function badgeListFor(unlockedKeys) {
+  const have = new Set(unlockedKeys || []);
+  return BADGES.map((b) => ({ key: b.key, icon: b.icon, label: b.label, requirement: b.requirement, earned: have.has(b.key) }));
+}
+// An "adult content seller" is a member who sells adult content: they
+// ticked the "Adult Content" seller type, or they have an adult creator
+// post (kind=adult, is_creator=1). Used for the mandatory 18+ display
+// badge and for the profile-page age gate.
+export async function adultCreatorIds(db, profileIds) {
+  const out = new Set();
+  if (!profileIds || !profileIds.length) return out;
+  try {
+    const ph = profileIds.map(() => "?").join(",");
+    const { results } = await db.prepare(
+      `SELECT id, seller_types FROM profiles WHERE id IN (${ph})`,
+    ).bind(...profileIds).all();
+    for (const r of (results || [])) {
+      if (parsePrefs(r.seller_types).includes("Adult Content")) out.add(r.id);
+    }
+    const { results: posts } = await db.prepare(
+      `SELECT DISTINCT profile_id FROM posts WHERE profile_id IN (${ph}) AND kind = 'adult' AND is_creator = 1`,
+    ).bind(...profileIds).all();
+    for (const r of (posts || [])) out.add(r.profile_id);
+  } catch { /* tables not there yet — nobody counts as an adult seller */ }
+  return out;
+}
+// Which badges show next to a member's name (the display rule):
+// default ONE chosen badge; adult sellers ALWAYS show the 18+ badge
+// plus ONE chosen badge; regular sellers who display Regular Seller may
+// add ONE optional secondary badge. An adult seller who is also a
+// regular seller follows the adult rule (never three). storedDisplay is
+// the member's chosen display_badges from their theme (may be empty);
+// unlockedKeys are their earned badge keys. Returns 1–2 badge objects.
+export function displayBadgesFor(unlockedKeys, storedDisplay, isAdultSeller, isRegularSeller) {
+  const have = new Set(unlockedKeys || []);
+  const earned = BADGES.filter((b) => have.has(b.key));
+  const chosen = (Array.isArray(storedDisplay) ? storedDisplay : [])
+    .map((k) => badgeByKey(k)).filter((b) => b && have.has(b.key));
+  const first = earned[0] || null;
+  if (isAdultSeller) {
+    const adult = badgeByKey("badge:adult-approved");
+    if (!have.has("badge:adult-approved")) return first ? [first] : [];
+    const other = chosen.find((b) => b.key !== "badge:adult-approved") || earned.find((b) => b.key !== "badge:adult-approved") || null;
+    return other ? [adult, other] : [adult];
+  }
+  if (isRegularSeller && chosen[0] && chosen[0].key === "badge:sales-5") {
+    const second = chosen[1] || earned.find((b) => b.key !== "badge:sales-5") || null;
+    return second ? [chosen[0], second] : [chosen[0]];
+  }
+  if (chosen[0]) return [chosen[0]];
+  return first ? [first] : [];
+}
+// Validate a submitted display_badges array against the slot rules and
+// the member's earned badges. Repairs instead of rejecting: an adult
+// seller always keeps the 18+ badge in slot 1; a non-seller keeps at
+// most one badge; a regular seller keeps Regular Seller + at most one
+// more. Returns the repaired array (0–2 keys).
+export function cleanDisplayBadges(input, unlockedKeys, isAdultSeller, isRegularSeller) {
+  const have = new Set(unlockedKeys || []);
+  const picked = (Array.isArray(input) ? input : [])
+    .map((k) => String(k || "")).filter((k) => BADGE_KEYS.includes(k) && have.has(k));
+  const dedup = [...new Set(picked)];
+  if (isAdultSeller) {
+    if (!have.has("badge:adult-approved")) return dedup.slice(0, 1);
+    const other = dedup.find((k) => k !== "badge:adult-approved") || null;
+    return other ? ["badge:adult-approved", other] : ["badge:adult-approved"];
+  }
+  if (isRegularSeller && dedup[0] === "badge:sales-5") {
+    return dedup.slice(0, 2);
+  }
+  return dedup.slice(0, 1);
+}
+// Batch badge lookup for author lists (posts, comments, chat): returns a
+// Map(profileId → [badge objects]) of DISPLAY badges only, per the
+// display rule above. Defensive: a missing table just yields empty lists.
+export async function badgesForProfiles(db, profileIds) {
+  const out = new Map();
+  const ids = [...new Set((profileIds || []).filter((n) => Number(n) > 0))];
+  if (!ids.length) return out;
+  for (const id of ids) out.set(id, []);
+  try {
+    const ph = ids.map(() => "?").join(",");
+    const { results: rows } = await db.prepare(
+      `SELECT id, profile_theme, seller_types FROM profiles WHERE id IN (${ph})`,
+    ).bind(...ids).all();
+    const { results: unlockRows } = await db.prepare(
+      `SELECT profile_id, unlock_key FROM profile_unlocks WHERE profile_id IN (${ph})`,
+    ).bind(...ids).all();
+    const unlockedById = new Map();
+    for (const r of (unlockRows || [])) {
+      if (!unlockedById.has(r.profile_id)) unlockedById.set(r.profile_id, []);
+      unlockedById.get(r.profile_id).push(r.unlock_key);
+    }
+    const adultIds = await adultCreatorIds(db, ids);
+    for (const r of (rows || [])) {
+      const unlocked = unlockedById.get(r.id) || [];
+      const stored = parseTheme(r.profile_theme).display_badges;
+      const isRegular = unlocked.includes("badge:sales-5");
+      out.set(r.id, displayBadgesFor(unlocked, stored, adultIds.has(r.id), isRegular));
+    }
+  } catch { /* tables not there yet — empty badge lists */ }
+  return out;
+}
+export function unlockForFrame(frameId) {
+  return FRAME_UNLOCK_KEY[frameId] || null;
+}
+export function isFreeFrame(frameId) {
+  return FREE_FRAMES.includes(frameId);
+}
+// Daily usage — one row per profile per UTC calendar day. Recorded when
+// a signed-in profile loads the community (the profile GET). INSERT OR
+// IGNORE makes it a no-op when the day is already recorded.
+export async function recordActivityDay(db, profileId) {
+  if (!profileId) return;
+  const day = new Date().toISOString().slice(0, 10);
+  try {
+    await db.prepare("INSERT OR IGNORE INTO profile_activity_days (profile_id, day) VALUES (?, ?)").bind(profileId, day).run();
+  } catch { /* table not there yet — migration pending */ }
+}
+// Count the engagement a member has earned. Every count is defensive:
+// a missing table just reads as 0, so unlocks never crash a fetch.
+export async function computeUnlockCounts(db, profileId) {
+  const counts = { posts: 0, comments: 0, hearts: 0, days: 0, sales: 0, memberDays: 0, verified: 0 };
+  const count = async (sql, ...binds) => {
+    try {
+      const r = await db.prepare(sql).bind(...binds).first();
+      return Number(r?.n || 0);
+    } catch { return 0; }
+  };
+  counts.posts = await count("SELECT COUNT(*) AS n FROM posts WHERE profile_id = ?", profileId);
+  const pageComments = await count("SELECT COUNT(*) AS n FROM profile_comments WHERE author_id = ?", profileId);
+  const postComments = await count("SELECT COUNT(*) AS n FROM comments WHERE profile_id = ?", profileId);
+  counts.comments = pageComments + postComments;
+  const heartsGiven = (await count("SELECT COUNT(*) AS n FROM post_votes WHERE profile_id = ? AND value = 1", profileId))
+    + (await count("SELECT COUNT(*) AS n FROM comment_votes WHERE profile_id = ? AND value = 1", profileId));
+  const heartsOnPosts = await count("SELECT COUNT(*) AS n FROM post_votes pv JOIN posts p ON p.id = pv.post_id WHERE p.profile_id = ? AND pv.value = 1", profileId);
+  const heartsOnComments = await count("SELECT COUNT(*) AS n FROM comment_votes cv JOIN comments c ON c.id = cv.comment_id WHERE c.profile_id = ? AND cv.value = 1", profileId);
+  counts.hearts = heartsGiven + heartsOnPosts + heartsOnComments;
+  counts.days = await count("SELECT COUNT(*) AS n FROM profile_activity_days WHERE profile_id = ?", profileId);
+  // Completed sales: orders where this member is the seller and the
+  // order reached paid/shipped/delivered. "Regular Seller" is 5 sales.
+  counts.sales = await count("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status IN ('paid', 'shipped', 'delivered')", profileId);
+  // Membership age + age verification come from the profile row itself.
+  try {
+    const row = await db.prepare("SELECT age_verified, created_at FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
+    if (row) {
+      counts.verified = row.age_verified === 1 ? 1 : 0;
+      const created = Number(row.created_at || 0);
+      counts.memberDays = created > 0 ? Math.max(0, Math.floor((nowMs() - created) / 86400000)) : 0;
+    }
+  } catch { /* profile row unreadable — member badges stay unearned */ }
+  return counts;
+}
+function unlockEarned(unlock, counts) {
+  if (unlock.kind === "days") return counts.days >= unlock.threshold;
+  if (unlock.kind === "posts") return counts.posts >= unlock.threshold;
+  if (unlock.kind === "comments") return counts.comments >= unlock.threshold;
+  if (unlock.kind === "hearts") return counts.hearts >= unlock.threshold;
+  if (unlock.kind === "posts_days") return counts.posts >= unlock.threshold && counts.days >= (unlock.threshold2 || 0);
+  if (unlock.kind === "sales") return counts.sales >= unlock.threshold;
+  if (unlock.kind === "member_days") return counts.memberDays >= unlock.threshold;
+  if (unlock.kind === "verified") return counts.verified >= 1;
+  return false;
+}
+// Compute what's earned, insert any newly-earned rows, and return the
+// full unlocked key list for the profile (stored + just earned). Frames
+// and badges share this pass — UNLOCKS and BADGES are checked together.
+export async function grantUnlocks(db, profileId) {
+  if (!profileId) return [];
+  const counts = await computeUnlockCounts(db, profileId);
+  let stored = [];
+  try {
+    const r = await db.prepare("SELECT unlock_key FROM profile_unlocks WHERE profile_id = ?").bind(profileId).all();
+    stored = (r.results || []).map((x) => x.unlock_key);
+  } catch { stored = []; /* table not there yet */ }
+  const have = new Set(stored);
+  for (const u of [...UNLOCKS, ...BADGES]) {
+    if (!have.has(u.key) && unlockEarned(u, counts)) {
+      try {
+        await db.prepare("INSERT OR IGNORE INTO profile_unlocks (profile_id, unlock_key, unlocked_at) VALUES (?, ?, ?)").bind(profileId, u.key, nowMs()).run();
+        have.add(u.key);
+      } catch { /* table not there yet */ }
+    }
+  }
+  return { unlocked: [...have], counts };
+}
+// Website-look "show" flags — which of the five website fields display.
+// Stored as a JSON blob; cleanWebsiteShow keeps only known keys as 0/1.
+export function parseWebsiteShow(stored) {
+  const empty = { hobbies: 0, workplace: 0, relationship: 0, sign: 0, accomplishments: 0 };
+  if (!stored) return empty;
+  let obj;
+  try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
+  if (!obj || typeof obj !== "object") return empty;
+  const out = { ...empty };
+  for (const k of Object.keys(empty)) out[k] = obj[k] === 1 || obj[k] === true ? 1 : 0;
+  return out;
+}
+export function cleanWebsiteShow(input) {
+  return JSON.stringify(parseWebsiteShow(input));
+}
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", button_style: "", button_css: "", effects: [] };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -817,14 +1101,37 @@ export function parseTheme(stored) {
   out.button_style = BUTTON_STYLE_IDS.includes(obj.button_style) ? obj.button_style : "";
   out.button_css = sanitizeLayoutCss(String(obj.button_css || "")).slice(0, 4000);
   const eff = Array.isArray(obj.effects) ? obj.effects : [];
-  out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 4);
+  out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 8);
+  // Preset background (v3.9) — one of the fixed preset ids, or "" for none.
+  out.bg_preset = PRESET_BG_IDS.includes(String(obj.bg_preset || "")) ? String(obj.bg_preset) : "";
+  // Comment-picture border color (v3.9) — any #rrggbb the member picks.
+  // Mutually exclusive with the RGB comment-border effect: the RGB
+  // effect wins when both are set, so the saved color is dropped.
+  out.comment_border_color = hex(obj.comment_border_color);
+  if (out.effects.includes("rgb-comment-border")) out.comment_border_color = "";
+  // Picture size / position / frame (v3.9) — fixed ids, "" = default.
+  out.pic_size = PIC_SIZE_IDS.includes(String(obj.pic_size || "")) ? String(obj.pic_size) : "";
+  out.pic_position = PIC_POSITION_IDS.includes(String(obj.pic_position || "")) ? String(obj.pic_position) : "";
+  out.pic_frame = PIC_FRAME_IDS.includes(String(obj.pic_frame || "")) ? String(obj.pic_frame) : "";
+  // Blood-drip color (v3.9) — the drip color for the Blood frame.
+  out.blood_color = hex(obj.blood_color);
+  // GB/GBA frame colors (v3.9) — handheld body mode + up to 3 custom
+  // gradient colors (only used when mode is "custom").
+  out.gb_mode = GB_FRAME_MODES.includes(String(obj.gb_mode || "")) ? String(obj.gb_mode) : "";
+  const gbCols = Array.isArray(obj.gb_colors) ? obj.gb_colors : [];
+  out.gb_colors = gbCols.map((c) => hex(c)).filter(Boolean).slice(0, 3);
+  // Chosen display badges (v3.9) — up to 2 badge keys the member picked
+  // to show next to their name. Slot rules are enforced on save
+  // (cleanDisplayBadges); parsing only keeps known badge keys.
+  const db = Array.isArray(obj.display_badges) ? obj.display_badges : [];
+  out.display_badges = [...new Set(db.map((k) => String(k || "")))].filter((k) => BADGE_KEYS.includes(k)).slice(0, 2);
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.button_style && !t.button_css && !(t.effects && t.effects.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

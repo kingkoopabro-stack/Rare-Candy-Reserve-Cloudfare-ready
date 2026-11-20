@@ -4,7 +4,7 @@
 // directions so "are we friends" is one lookup; unfriend deletes both.
 // Requires the v3.6 migration (friends table); without it, writes fail
 // with a clear error instead of silently doing nothing.
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, awardLucre, LUCRE_AWARDS } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -40,6 +40,8 @@ export async function onRequestPost({ env, request }) {
       const now = nowMs();
       await db.prepare("INSERT OR IGNORE INTO friends (profile_id, friend_id, created_at) VALUES (?, ?, ?)").bind(me.id, friendId, now).run();
       await db.prepare("INSERT OR IGNORE INTO friends (profile_id, friend_id, created_at) VALUES (?, ?, ?)").bind(friendId, me.id, now).run();
+      // Lucre (v3.11) — 5 for adding a friend, once per friend.
+      await awardLucre(db, me.id, LUCRE_AWARDS.friend, "friend", String(friendId));
       // Notification (v3.8) — skips quietly if the table isn't there yet.
       await createNotification(db, {
         profile_id: friendId, actor_profile_id: me.id, kind: "friend",

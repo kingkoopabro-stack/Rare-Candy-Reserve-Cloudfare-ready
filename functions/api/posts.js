@@ -11,7 +11,7 @@ import {
   json, noDb, getDb, readJson, profileByDevice, isOperator, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
-  createNotification, badgesForProfiles,
+  createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -152,10 +152,14 @@ export async function onRequestPost({ env, request }) {
   // column (the v3.5 migration hasn't run yet). event_skipped is the
   // same deal for event date/time/place (the post-types migration
   // hasn't run yet). Never silently dropped.
-  const insertDone = (res, hadEvent) => {
+  const insertDone = async (res, hadEvent) => {
     const out = { ok: true, error: null, post_id: res.post_id };
     if (res.videoSkipped && videoKey) out.video_skipped = true;
     if (hadEvent && res.dropped && res.dropped.indexOf("event_date") !== -1) out.event_skipped = true;
+    // Lucre (v3.11) — 10 for posting, once per post. Best-effort: a
+    // missing ledger table never breaks the post.
+    const lw = await awardLucre(db, me.id, LUCRE_AWARDS.post, "post", String(res.post_id));
+    if (lw.awarded) out.lucre = { awarded: true, balance: lw.balance };
     return json(out);
   };
   const now = nowMs();

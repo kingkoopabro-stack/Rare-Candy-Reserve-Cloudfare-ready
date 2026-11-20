@@ -1,6 +1,6 @@
 // POST /api/posts/:id/comments/:commentId/vote — voteComment.
 // Hearts (or un-hearts) a comment — the only reaction comments have.
-import { json, noDb, getDb, readJson, profileByDevice, createNotification } from "../../../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, createNotification, awardLucre, LUCRE_AWARDS } from "../../../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);
@@ -35,6 +35,8 @@ export async function onRequestPost({ env, request, params }) {
       text: `@${me.username} hearted your reply`,
       link: `#/thread/${comment.post_id}`,
     });
+    // Lucre (v3.11) — 5 for hearting, once per comment per member.
+    await awardLucre(db, me.id, LUCRE_AWARDS.heart, "heart", "comment:" + String(commentId));
   }
   return json({ ok: true, error: null, hearts: row?.n ?? 0, my_heart: myHeart });
 }

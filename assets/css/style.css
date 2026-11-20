@@ -857,6 +857,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-picframe-rgb-rotating::before{content:'';position:absolute;inset:-6px;border-radius:50%;background:conic-gradient(#ff2d95,#7c4dff,#00e5ff,#39ff88,#ff2d95);animation:spin 3s linear infinite}
 .dwc-picframe-rgb-rotating .dwc-avatar{position:relative}
 .dwc-picframe-gold{border:4px solid #d4af37;box-shadow:0 0 12px rgba(212,175,55,.6),inset 0 0 8px rgba(212,175,55,.4)}
+/* VITA NOVA frame (v3.11) — gold and violet, earned by fully setting up your profile. */
+.dwc-picframe-vita-nova{border:4px solid transparent;background:linear-gradient(#150326,#150326) padding-box,linear-gradient(135deg,#d4af37,#7c4dff,#ff2ea6,#d4af37) border-box;box-shadow:0 0 14px rgba(212,175,55,.65),0 0 28px rgba(124,77,255,.45)}
 .dwc-picframe-black{border:5px solid #000;box-shadow:0 2px 8px rgba(0,0,0,.6)}
 .dwc-picframe-wooden{border:8px solid transparent;background:linear-gradient(#8b5a2b,#6b4423) padding-box,linear-gradient(135deg,#a67c52,#6b4423,#c49a6c,#8b5a2b) border-box;box-shadow:0 4px 12px rgba(0,0,0,.5)}
 .dwc-picframe-gothic{border:6px solid transparent;background:#000 padding-box,repeating-linear-gradient(45deg,#000 0 8px,#fff 8px 16px) border-box}
@@ -1031,3 +1033,28 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-unlock { border-color: var(--pink); box-shadow: 0 0 24px rgba(255,45,149,.25); }
 .dwc-unlock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .dwc-unlock-grid .btn { min-height: 64px; text-align: center; line-height: 1.35; }
+
+/* Lucre wallet + weekly check-in (v3.11) — on the member home page,
+   under the profile row. Small, centered, classy, uncluttered. */
+.dwc-lucre-wallet{margin:12px auto 4px;max-width:560px;text-align:center;border-top:1px solid var(--border);padding-top:10px;font-size:14px}
+.dwc-lucre-top{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:center;align-items:baseline}
+.dwc-lucre-balance{font-size:17px}
+.dwc-lucre-note{color:var(--muted);font-size:12.5px}
+.dwc-lucre-checkin{margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+.dwc-lucre-streak{color:var(--muted);font-size:13.5px}
+.dwc-lucre-earn{margin-top:6px;color:var(--muted);font-size:13px}
+
+/* Layout Store (v3.11) — the fake in-site browser inside Taffy's phone. */
+.dwc-store-filters{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 10px}
+.dwc-store-list{display:flex;flex-direction:column;gap:10px}
+.dwc-store-card{border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:10px 12px;background:rgba(0,0,0,.30);text-align:left}
+.dwc-store-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.dwc-store-price{font-weight:800;color:#ffd75e;white-space:nowrap}
+.dwc-store-tag{margin:2px 0 0;font-size:12px;opacity:.75}
+.dwc-store-desc{margin:6px 0 0;font-size:13.5px;line-height:1.45}
+.dwc-store-conflict{margin:6px 0 0;font-size:12.5px;color:#ffb347}
+.dwc-store-btns{margin:8px 0 0;display:flex;gap:8px;align-items:center}
+.dwc-store-wearing{font-size:13px;color:#39ff88;font-weight:700}
+.dwc-store-preview{margin:0 0 10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px;padding:10px;background:rgba(0,0,0,.25)}
+.dwc-store-preview .dwc-previewbox{margin:0}
+.tp-icon-store{background:linear-gradient(135deg,#ff9a00,#ff2ea6)}

@@ -1,7 +1,7 @@
 // GET /api/listings/:id/comments — listListingComments (oldest first).
 // POST /api/listings/:id/comments — addListingComment (when the poster left
 // comments on; optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, awardLucre, LUCRE_AWARDS } from "../../_lib.js";
 
 export async function onRequestGet({ env, params }) {
   const db = getDb(env);
@@ -36,5 +36,9 @@ export async function onRequestPost({ env, request, params }) {
   const r = await db.prepare(
     "INSERT INTO listing_comments (listing_id, profile_id, body, gif_url, gif_label, created_at) VALUES (?, ?, ?, ?, ?, ?)",
   ).bind(id, me.id, body, a.gif_url ? String(a.gif_url).slice(0, 500) : null, String(a.gif_label || "").slice(0, 80), nowMs()).run();
-  return json({ ok: true, error: null, comment_id: r.meta.last_row_id });
+  // Lucre (v3.11) — 10 for commenting, once per comment.
+  const lw = await awardLucre(db, me.id, LUCRE_AWARDS.comment, "comment", "listing:" + String(r.meta.last_row_id));
+  const out = { ok: true, error: null, comment_id: r.meta.last_row_id };
+  if (lw.awarded) out.lucre = { awarded: true, balance: lw.balance };
+  return json(out);
 }

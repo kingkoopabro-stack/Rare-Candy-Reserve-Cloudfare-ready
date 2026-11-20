@@ -828,7 +828,7 @@ export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-te
 export const PRESET_BG_IDS = ["", "vaporwave", "rgb-gradient", "midnight-neon", "sunset-drive", "cotton-candy", "blackout"];
 export const PIC_SIZE_IDS = ["bigger", "smaller"];
 export const PIC_POSITION_IDS = ["normal", "top"];
-export const PIC_FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba"];
+export const PIC_FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba", "vita-nova"];
 export const GB_FRAME_MODES = ["", "gamecube", "gb", "gba", "custom"];
 // Zodiac signs for the website-look "Sign" field (id, symbol, name).
 export const ZODIAC_IDS = ["aries", "taurus", "gemini", "cancer", "leo", "virgo", "libra", "scorpio", "sagittarius", "capricorn", "aquarius", "pisces"];
@@ -839,12 +839,13 @@ export const RELATIONSHIP_IDS = ["", "Single", "In a relationship", "It's compli
 // unlock more things later; nothing else is hard-coded to frames.
 // kind: which count the threshold reads. "posts_days" needs both
 // threshold (posts) and threshold2 (days).
-export const FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba"];
+export const FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba", "vita-nova"];
 export const FREE_FRAMES = ["none", "neon", "rgb", "gold", "black"];
 export const FRAME_UNLOCK_KEY = {
   "rgb-rotating": "frame-rgb-rotating", "wooden": "frame-wooden",
   "gothic": "frame-gothic", "blood": "frame-blood",
   "gb": "frame-gb", "gba": "frame-gba",
+  "vita-nova": "frame-vita-nova",
 };
 export const UNLOCKS = [
   { key: "frame-rgb-rotating", label: "RGB Rotating frame", requirement: "Use the site 7 different days", kind: "days", threshold: 7 },
@@ -853,6 +854,7 @@ export const UNLOCKS = [
   { key: "frame-blood", label: "Blood dripping frame", requirement: "Give or get 25 hearts", kind: "hearts", threshold: 25 },
   { key: "frame-gb", label: "GB frame", requirement: "Post 25 times", kind: "posts", threshold: 25 },
   { key: "frame-gba", label: "GBA frame", requirement: "Post 50 times and use the site 14 different days", kind: "posts_days", threshold: 50, threshold2: 14 },
+  { key: "frame-vita-nova", label: "VITA NOVA frame", requirement: "Fully set up your profile", kind: "profile_complete", threshold: 1 },
 ];
 // --- Badges (v3.9) ---------------------------------------------------------
 // Achievement badges live in the SAME profile_unlocks table as frames
@@ -878,6 +880,7 @@ export const BADGES = [
   { key: "badge:member-6mo", icon: "🗓️", label: "6 Months", requirement: "Be a member for 6 months", kind: "member_days", threshold: 180 },
   { key: "badge:member-1yr", icon: "🎂", label: "1 Year", requirement: "Be a member for 1 year", kind: "member_days", threshold: 365 },
   { key: "badge:adult-approved", icon: "🔞", label: "Adult Approved", requirement: "Get approved for adult content", kind: "verified", threshold: 1 },
+  { key: "badge:rcr-candy", icon: "🍬", label: "Rare Candy", requirement: "Fully set up your profile", kind: "profile_complete", threshold: 1 },
 ];
 export const BADGE_KEYS = BADGES.map((b) => b.key);
 export function badgeByKey(key) {
@@ -1007,7 +1010,7 @@ export async function recordActivityDay(db, profileId) {
 // Count the engagement a member has earned. Every count is defensive:
 // a missing table just reads as 0, so unlocks never crash a fetch.
 export async function computeUnlockCounts(db, profileId) {
-  const counts = { posts: 0, comments: 0, hearts: 0, days: 0, sales: 0, memberDays: 0, verified: 0 };
+  const counts = { posts: 0, comments: 0, hearts: 0, days: 0, sales: 0, memberDays: 0, verified: 0, profile_complete: 0 };
   const count = async (sql, ...binds) => {
     try {
       const r = await db.prepare(sql).bind(...binds).first();
@@ -1028,12 +1031,19 @@ export async function computeUnlockCounts(db, profileId) {
   // order reached paid/shipped/delivered. "Regular Seller" is 5 sales.
   counts.sales = await count("SELECT COUNT(*) AS n FROM orders WHERE seller_id = ? AND status IN ('paid', 'shipped', 'delivered')", profileId);
   // Membership age + age verification come from the profile row itself.
+  // "Fully set up" (v3.11) — avatar + bio + occupation + at least one
+  // link + at least one Top Friend. Unlocks the VITA NOVA frame and the
+  // RCR rare-candy badge, and pays 10 Lucre (awarded on profile save).
   try {
-    const row = await db.prepare("SELECT age_verified, created_at FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
+    const row = await db.prepare("SELECT age_verified, created_at, avatar_blob_key, bio, occupation, my_links, top_friends FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
     if (row) {
       counts.verified = row.age_verified === 1 ? 1 : 0;
       const created = Number(row.created_at || 0);
       counts.memberDays = created > 0 ? Math.max(0, Math.floor((nowMs() - created) / 86400000)) : 0;
+      let links = 0;
+      try { const parsed = JSON.parse(row.my_links || "[]"); if (Array.isArray(parsed)) links = parsed.filter((l) => l && l.url).length; } catch { links = 0; }
+      const friends = String(row.top_friends || "").split(",").map((s) => s.trim()).filter(Boolean).length;
+      counts.profile_complete = (row.avatar_blob_key && String(row.bio || "").trim() && String(row.occupation || "").trim() && links >= 1 && friends >= 1) ? 1 : 0;
     }
   } catch { /* profile row unreadable — member badges stay unearned */ }
   return counts;
@@ -1047,6 +1057,7 @@ function unlockEarned(unlock, counts) {
   if (unlock.kind === "sales") return counts.sales >= unlock.threshold;
   if (unlock.kind === "member_days") return counts.memberDays >= unlock.threshold;
   if (unlock.kind === "verified") return counts.verified >= 1;
+  if (unlock.kind === "profile_complete") return (counts.profile_complete || 0) >= 1;
   return false;
 }
 // Compute what's earned, insert any newly-earned rows, and return the
@@ -1070,6 +1081,108 @@ export async function grantUnlocks(db, profileId) {
     }
   }
   return { unlocked: [...have], counts };
+}
+// --- Lucre (v3.11) -------------------------------------------------------
+// The site-only currency. Lucre is NOT real money, NOT crypto, and NOT
+// redeemable for cash — it only buys layouts and frames in Taffy's
+// Layout Store. Every balance lives server-side in the lucre_ledger;
+// the client never sends a balance, it only triggers actions, and the
+// server computes what was earned. Every award is one row per
+// (profile, reason, ref) — the UNIQUE index makes double-crediting
+// impossible even if an action is retried or double-tapped. All helpers
+// are defensive: a missing table reads as 0 / no award, never a crash.
+export const LUCRE_SYMBOL = "◈";
+export const LUCRE_AWARDS = {
+  post: 10, listing: 10, profile: 10, comment: 10, heart: 5,
+  transaction: 40, suggestion: 40, friend: 5, favorite: 5, share: 5,
+  song: 10, radio_first: 10, profile_complete: 10, checkin: 5, checkin_bonus: 50,
+};
+// Priced Layout Store items (server-side source of truth for purchase —
+// the client catalog must match these ids and prices; the client never
+// sends a price). Free layouts (price 0) are not listed here.
+export const LUCRE_STORE_PRICES = {
+  "store:neon-rain": 20,
+  "store:golden-shrine": 20,
+};
+export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
+export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window
+export const LUCRE_CHECKIN_STREAK_MS = 14 * 86400000; // check in within 14 days to keep the streak
+
+export async function lucreBalance(db, profileId) {
+  if (!profileId) return 0;
+  try {
+    const r = await db.prepare("SELECT COALESCE(SUM(amount), 0) AS n FROM lucre_ledger WHERE profile_id = ?").bind(profileId).first();
+    return Number(r?.n || 0);
+  } catch { return 0; }
+}
+// Award Lucre once for one action. Returns { awarded, balance } —
+// awarded is false when this exact (reason, ref) was already paid or
+// the ledger table isn't there yet. Never throws.
+export async function awardLucre(db, profileId, amount, reason, refId) {
+  if (!profileId || !Number.isFinite(amount) || amount === 0) return { awarded: false, balance: await lucreBalance(db, profileId) };
+  const ref = String(refId ?? "");
+  try {
+    const r = await db.prepare(
+      "INSERT OR IGNORE INTO lucre_ledger (profile_id, amount, reason, ref_id, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).bind(profileId, Math.round(amount), String(reason).slice(0, 40), ref.slice(0, 120), nowMs()).run();
+    const awarded = Number(r?.meta?.changes || 0) > 0;
+    return { awarded, balance: await lucreBalance(db, profileId) };
+  } catch { return { awarded: false, balance: await lucreBalance(db, profileId) }; }
+}
+export async function lucreLedger(db, profileId, limit = 20) {
+  if (!profileId) return [];
+  try {
+    const { results } = await db.prepare(
+      "SELECT amount, reason, ref_id, created_at FROM lucre_ledger WHERE profile_id = ? ORDER BY id DESC LIMIT ?",
+    ).bind(profileId, Math.max(1, Math.min(limit, 50))).all();
+    return (results || []).map((e) => ({ amount: e.amount, reason: e.reason, ref_id: e.ref_id ?? "", created_at: iso(e.created_at) }));
+  } catch { return []; }
+}
+export async function lucreOwned(db, profileId) {
+  if (!profileId) return [];
+  try {
+    const { results } = await db.prepare("SELECT item_id FROM lucre_owned WHERE profile_id = ?").bind(profileId).all();
+    return (results || []).map((r) => r.item_id);
+  } catch { return []; }
+}
+// Weekly check-in state. A check-in is allowed once per rolling 7 days.
+// The streak counts consecutive weekly check-ins; a gap over 14 days
+// resets it. The 7th consecutive check-in pays the 50 Lucre bonus and
+// the streak starts over.
+export async function lucreCheckinState(db, profileId) {
+  const empty = { streak: 0, total_checkins: 0, last_checkin_at: 0, can_check_in: true, next_checkin_at: 0, bonus_at_streak: LUCRE_CHECKIN_BONUS_STREAK };
+  if (!profileId) return empty;
+  try {
+    const row = await db.prepare("SELECT streak, total_checkins, last_checkin_at FROM lucre_checkins WHERE profile_id = ? LIMIT 1").bind(profileId).first();
+    if (!row) return empty;
+    const last = Number(row.last_checkin_at || 0);
+    const can = last === 0 || (nowMs() - last) >= LUCRE_CHECKIN_MIN_MS;
+    return {
+      streak: Number(row.streak || 0), total_checkins: Number(row.total_checkins || 0), last_checkin_at: last,
+      can_check_in: can, next_checkin_at: can ? 0 : last + LUCRE_CHECKIN_MIN_MS,
+      bonus_at_streak: LUCRE_CHECKIN_BONUS_STREAK,
+    };
+  } catch { return empty; }
+}
+export async function lucreDoCheckin(db, profileId) {
+  const state = await lucreCheckinState(db, profileId);
+  if (!state.can_check_in) return { ok: false, error: "Already checked in this week — come back after 7 days.", state };
+  const now = nowMs();
+  let streak = 1;
+  if (state.last_checkin_at > 0 && (now - state.last_checkin_at) <= LUCRE_CHECKIN_STREAK_MS) streak = state.streak + 1;
+  const paysBonus = streak >= LUCRE_CHECKIN_BONUS_STREAK;
+  const newStreak = paysBonus ? 0 : streak;
+  try {
+    await db.prepare(
+      "INSERT INTO lucre_checkins (profile_id, streak, total_checkins, last_checkin_at) VALUES (?, ?, 1, ?) ON CONFLICT(profile_id) DO UPDATE SET streak = excluded.streak, total_checkins = total_checkins + 1, last_checkin_at = excluded.last_checkin_at",
+    ).bind(profileId, newStreak, now).run();
+  } catch { return { ok: false, error: "Check-ins aren't switched on yet — the shop is still running a quick database update. Try again later.", state }; }
+  const base = await awardLucre(db, profileId, LUCRE_AWARDS.checkin, "checkin", String(Math.floor(now / LUCRE_CHECKIN_MIN_MS)));
+  let bonus = { awarded: false, balance: base.balance };
+  // Bonus ref includes the week number, so the next 7-week cycle pays
+  // again — a bare "streak-7" ref would collide and block it forever.
+  if (paysBonus) bonus = await awardLucre(db, profileId, LUCRE_AWARDS.checkin_bonus, "checkin_bonus", "streak-" + streak + ":" + String(Math.floor(now / LUCRE_CHECKIN_MIN_MS)));
+  return { ok: true, error: null, streak: newStreak, bonus_paid: paysBonus, awarded: base.awarded, balance: bonus.balance, state: await lucreCheckinState(db, profileId) };
 }
 // Website-look "show" flags — which of the five website fields display.
 // Stored as a JSON blob; cleanWebsiteShow keeps only known keys as 0/1.

@@ -6,6 +6,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeListing,
   LISTING_CATEGORIES, sanitizeListingHtml, bannedCheck, putImage, nowMs,
+  awardLucre, LUCRE_AWARDS,
 } from "./_lib.js";
 
 const CARD_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs"];
@@ -84,5 +85,9 @@ export async function onRequestPost({ env, request }) {
     photoKeys[0], photoKeys[1], photoKeys[2],
     a.gif_url ? String(a.gif_url).slice(0, 500) : null,
     vs.slice(0, 40), String(a.verification_summary || "").slice(0, 800), now, now).run();
-  return json({ ok: true, error: null, listing_id: r.meta.last_row_id });
+  // Lucre (v3.11) — 10 for putting up a listing, once per listing.
+  const lw = await awardLucre(db, me.id, LUCRE_AWARDS.listing, "listing", String(r.meta.last_row_id));
+  const out = { ok: true, error: null, listing_id: r.meta.last_row_id };
+  if (lw.awarded) out.lucre = { awarded: true, balance: lw.balance };
+  return json(out);
 }

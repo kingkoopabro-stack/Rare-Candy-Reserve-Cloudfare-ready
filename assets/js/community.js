@@ -166,6 +166,12 @@ var state = {
   btcTimer: null, // live Bitcoin ticker refresh (cleared on navigation)
   builderPending: null, // Taffy builder's pending settings (applied on Apply, saved on Save)
   builderUnderstood: [], // what the builder matched, for the honesty report
+  // Lucre (v3.11) — the site-only currency. Balance lives server-side;
+  // state.lucre is the last GET /api/lucre response (or null until loaded).
+  lucre: null, // { balance, ledger, checkin, owned }
+  storeFilter: "all", // Layout Store filter: all | free | priced | owned
+  storePreview: null, // Layout Store preview item id (null = no preview open)
+  storeApplying: null, // item id being applied/bought right now
   phoneMsgList: null, // cached member list for the MSG contacts view
   phoneAlertsList: null, // cached notifications for the Alerts app view
   phoneAlertsStamp: 0, // bumps when alerts reload, so renderPhone rebuilds
@@ -509,6 +515,18 @@ function fileToPrintFile(file, maxBytes) {
   });
 }
 function copyLink(url, btn) {
+  // Lucre (v3.11) — 5 for sharing a post or listing, once per item.
+  // Best-effort: never block the copy itself.
+  if (state.profile) {
+    var m = String(url || "").match(/#\/(post|listing)\/(\d+)/);
+    if (m) apiPost("/lucre", { device_id: deviceId(), action: "share", ref_type: m[1], ref_id: m[2] }).then(function (d) {
+      if (d && d.ok && typeof d.balance === "number" && state.lucre) {
+        state.lucre.balance = d.balance;
+        var w = document.getElementById("dwc-lucre-wallet");
+        if (w) w.outerHTML = lucreWalletHTML();
+      }
+    });
+  }
   var done = function () {
     if (btn) {
       var old = btn.textContent;
@@ -634,10 +652,10 @@ function renderAccount() {
         : '<p style="margin:4px 0 0">Add a payout method + handle whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
-      (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(p.layout_preset) + "</span>" : "") + "</p>" +
+      (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(storeLayoutName(p.layout_preset)) + "</span>" : "") + "</p>" +
       "</div>" +
       '<div style="margin-left:auto"><button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button> <button type="button" class="btn ghost small" onclick="DWC.signOut()">Sign out</button></div>' +
-      "</div></section>";
+      "</div>" + lucreWalletHTML() + "</section>";
     return;
   }
   if (!state.profile && !state.signupOpen) {
@@ -795,6 +813,286 @@ function copyTextToClipboard(text) {
   document.body.removeChild(ta);
 }
 
+// ---------- Lucre (v3.11) — the site-only currency ----------
+// Lucre ◈ is play money for the site ONLY: not real money, not crypto,
+// not redeemable for cash. It buys layouts and frames in Taffy's Layout
+// Store. Balances live server-side in D1 (the ledger); the client never
+// sends a balance or a price — it only triggers actions, and the server
+// computes what was earned. Earning: post 10, listing 10, new profile
+// 10, comment 10, heart 5, completed transaction 40, suggestion 40,
+// friend/favorite 5, share 5, song 10, first radio listen 10, fully
+// set up profile 10, weekly check-in 5, 7th consecutive weekly
+// check-in +50. One award per action, enforced by the ledger's unique
+// key — a double-tap or retry can never pay twice.
+var LUCRE_SYMBOL = "◈";
+function lucreFmt(n) { return LUCRE_SYMBOL + " " + (Number(n) || 0); }
+// Layout Store catalog — the single source of truth on the client. The
+// server holds the same ids + prices for purchase (LUCRE_STORE_PRICES);
+// a priced item's price here is display-only. Every preset is a
+// COMPLETE theme: its theme object sets vibe, colors, font, button
+// style, and preset background explicitly ("" clears a previous pick),
+// so applying one never leaves a stray setting from the old look
+// behind. layout_css carries only what a theme can't express —
+// overlays, animations, borders the theme doesn't set, letter-spacing.
+// Theme CSS is injected AFTER layout CSS on the real page, so anything
+// the theme sets wins over the same property in layout_css.
+var LAYOUT_STORE = [
+  {
+    id: "store:rainy-night", name: "Rainy Night", tag: "Animated · moody", price: 0,
+    desc: "Rain falls over a deep-blue night while your words take the stage.",
+    conflict: "Hides your Top 8 and links — those sections won't show while this layout is on.",
+    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", bg_preset: "", button_style: "neon", pic_position: "top", hide_sections: ["top8", "links"] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{letter-spacing:.05em;}" +
+      "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+  },
+  {
+    id: "store:clean-professional", name: "Clean Professional", tag: "Tidy · business", price: 0,
+    desc: "Crisp white page, serif text, a thin navy rule — for selling like a pro.",
+    conflict: "",
+    theme: { vibe: "classic", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "serif", bg_preset: "", button_style: "", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile .card{box-shadow:0 1px 3px rgba(0,0,0,.14);}" +
+      ".dwc-myprofile .dwc-mypage-head{border-bottom:2px solid #003399;padding-bottom:8px;}"
+  },
+  {
+    id: "store:facebook-style", name: "Facebook Style", tag: "Familiar · blue", price: 0,
+    desc: "Light grey page, white cards, Facebook blue — the look everyone already knows.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#e9ebee", bg_image_url: "", text_color: "#1c1e21", accent_color: "#1877f2", font: "", bg_preset: "", button_style: "rounded", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile .card{background:#fff;border:1px solid #dddfe2;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.10);}" +
+      ".dwc-myprofile .btn{background:#1877f2;color:#fff;}" +
+      ".dwc-myprofile .dwc-mypage-head h3{color:#1877f2;}"
+  },
+  {
+    id: "store:instagram-style", name: "Instagram Style", tag: "Photo-first · clean", price: 0,
+    desc: "Bright white, centered, with a rainbow ring around your picture — built for photos.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#fafafa", bg_image_url: "", text_color: "#262626", accent_color: "#e1306c", font: "", bg_preset: "", button_style: "rounded", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile .card{background:#fff;border:1px solid #dbdbdb;border-radius:12px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid transparent;border-radius:50%;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5) border-box;}" +
+      ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
+      ".dwc-myprofile .dwc-mypage-head .dwc-avatar{margin:0 auto;}"
+  },
+  {
+    id: "store:80s-arcade", name: "80s Arcade", tag: "Neon · pixel", price: 0,
+    desc: "Insert coin. Hot pink, electric cyan, scanlines, typewriter type — the arcade never closed.",
+    conflict: "",
+    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "typewriter", bg_preset: "", button_style: "arcade", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 2px,transparent 2px 4px);}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{text-transform:uppercase;letter-spacing:.10em;}" +
+      ".dwc-myprofile .btn{text-transform:uppercase;letter-spacing:.10em;}"
+  },
+  {
+    id: "store:kitsune-shrine", name: "Kitsune Shrine", tag: "Fox · gold · red", price: 0,
+    desc: "Nine-tailed fox at a shrine in RGB — black classy background, golden borders, red accents here and there.",
+    conflict: "",
+    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "", bg_preset: "", button_style: "gold", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.72));}" +
+      ".dwc-myprofile .card{outline:1px solid rgba(212,175,55,.55);outline-offset:3px;}" +
+      ".dwc-myprofile h2{border-bottom:2px solid #e53935;padding-bottom:4px;}" +
+      ".dwc-myprofile .dwc-avatar{box-shadow:0 0 0 3px #8a0303,0 0 18px rgba(229,57,53,.6);}"
+  },
+  {
+    id: "store:horror-lover", name: "Horror Lover", tag: "Dark · blood", price: 0,
+    desc: "Black as the basement, blood-red headings, serif like a tombstone inscription. For the ones who love the dark.",
+    conflict: "",
+    theme: { vibe: "dark", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#c41e1e", font: "serif", bg_preset: "", button_style: "ghost", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile .card{box-shadow:0 0 24px rgba(196,30,30,.25);}" +
+      ".dwc-myprofile h2{border-bottom:1px solid #5c0000;padding-bottom:4px;letter-spacing:.04em;}" +
+      ".dwc-myprofile .dwc-avatar{box-shadow:0 0 16px rgba(196,30,30,.7);}"
+  },
+  {
+    id: "store:stardust-diner", name: "Stardust Diner", tag: "50s · chrome · teal", price: 0,
+    desc: "Cream booths, teal chrome, pink neon — a 50s diner at midnight, jukebox optional.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#fff6e5", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#0e7c7b", font: "", bg_preset: "", button_style: "gradient", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;top:0;left:0;right:0;height:18px;pointer-events:none;background-image:repeating-linear-gradient(90deg,#0e7c7b 0 18px,#fff 18px 36px);}" +
+      ".dwc-myprofile .card{background:#fff;border:2px solid #0e7c7b;border-radius:18px;}" +
+      ".dwc-myprofile .btn{background:linear-gradient(180deg,#f5f5f5,#cfcfcf);color:#222;border:2px solid #0e7c7b;}"
+  },
+  {
+    id: "store:deep-forest", name: "Deep Forest", tag: "Green · calm", price: 0,
+    desc: "Moss, pine, and soft green light — quiet, earthy, and easy on the eyes at 2 AM.",
+    conflict: "",
+    theme: { vibe: "forest", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "serif", bg_preset: "", button_style: "", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile .card{box-shadow:0 4px 14px rgba(0,0,0,.35);}" +
+      ".dwc-myprofile h2{letter-spacing:.04em;}" +
+      ".dwc-myprofile .dwc-avatar{box-shadow:0 0 14px rgba(57,255,136,.5);}"
+  },
+  {
+    id: "store:cyber-street", name: "Cyber Street", tag: "Cyberpunk · angled", price: 0,
+    desc: "Rain-slick blacktop, cyan neon, magenta slashes — the street after dark, wired up.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", bg_preset: "", button_style: "neon", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile h2,.dwc-myprofile h3{transform:skewX(-8deg);}" +
+      ".dwc-myprofile .card{box-shadow:-4px 0 0 #ff2ea6,0 0 12px rgba(0,229,255,.25);}" +
+      ".dwc-myprofile .btn{text-transform:uppercase;letter-spacing:.12em;}"
+  },
+  {
+    id: "store:neon-rain", name: "Neon Rain", tag: "Animated · premium", price: 20,
+    desc: "Rainy Night's storm, turned all the way up — rain, neon glow, and your picture up top.",
+    conflict: "Hides your links — that section won't show while this layout is on.",
+    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", bg_preset: "", button_style: "neon", pic_position: "top", hide_sections: ["links"] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(0,229,255,.28) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
+      ".dwc-myprofile h2{text-transform:uppercase;letter-spacing:.10em;}" +
+      ".dwc-myprofile .dwc-avatar{box-shadow:0 0 18px rgba(0,229,255,.8);}" +
+      "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+  },
+  {
+    id: "store:golden-shrine", name: "Golden Shrine", tag: "Fox · deluxe", price: 20,
+    desc: "Kitsune Shrine, gilded — double gold frames, red ribbon rules, serif like a temple plaque.",
+    conflict: "",
+    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "serif", bg_preset: "", button_style: "gold", pic_position: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.72));}" +
+      ".dwc-myprofile .card{outline:2px solid #d4af37;outline-offset:4px;}" +
+      ".dwc-myprofile h2{border-bottom:2px solid #e53935;padding-bottom:4px;}" +
+      ".dwc-myprofile .dwc-avatar{box-shadow:0 0 0 3px #d4af37,0 0 18px rgba(212,175,55,.7);}"
+  }
+];
+function storeItemById(id) {
+  var found = null;
+  LAYOUT_STORE.forEach(function (x) { if (x.id === id) found = x; });
+  return found;
+}
+function storeLayoutName(id) {
+  var item = storeItemById(id);
+  return item ? item.name : (id || "");
+}
+// The member's theme merged with a store preset's theme bits — the
+// exact theme the preview shows AND the apply call saves, so the two
+// can never disagree.
+function storeMergedTheme(item) {
+  var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
+  return Object.assign({}, cur, item.theme);
+}
+// Scope CSS to the store preview box so a preview can never restyle
+// the page behind the phone. themeCSS + layout_css both use
+// .dwc-myprofile selectors; keyframes stay global (harmless).
+function scopeStoreCSS(css) {
+  return String(css || "").replace(/\.dwc-myprofile/g, "#dwc-store-preview .dwc-myprofile");
+}
+async function loadLucre() {
+  if (!state.profile) { state.lucre = null; return; }
+  var data = await apiGet("/lucre?device_id=" + encodeURIComponent(deviceId()));
+  if (data && data.ok) {
+    state.lucre = { balance: data.balance, ledger: data.ledger || [], checkin: data.checkin || null, owned: data.owned || [] };
+    var w = document.getElementById("dwc-lucre-wallet");
+    if (w) w.outerHTML = lucreWalletHTML();
+    if (state.phone.open && state.phone.app === "store") renderPhone();
+  } else if (data) {
+    state.lucre = { balance: 0, ledger: [], checkin: null, owned: [] };
+  }
+}
+// A post/comment/listing response that paid Lucre carries it — keep the
+// wallet balance fresh without another fetch.
+function applyLucreResponse(data) {
+  if (data && data.lucre && typeof data.lucre.balance === "number" && state.lucre) {
+    state.lucre.balance = data.lucre.balance;
+    var w = document.getElementById("dwc-lucre-wallet");
+    if (w) w.outerHTML = lucreWalletHTML();
+  }
+}
+function lucreCheckinLabel() {
+  var c = state.lucre && state.lucre.checkin;
+  if (!c) return "";
+  if (c.can_check_in) {
+    return (c.streak > 0 ? "🔥 Streak: " + c.streak + "/7 — " : "") + "50 " + LUCRE_SYMBOL + " bonus at 7 weeks in a row";
+  }
+  var days = Math.max(1, Math.ceil(((c.next_checkin_at || 0) - Date.now()) / 86400000));
+  return "✓ Checked in — next check-in in " + days + " day" + (days === 1 ? "" : "s") + (c.streak > 0 ? " · 🔥 Streak: " + c.streak + "/7" : "");
+}
+// The wallet + weekly check-in on the member home page, right under the
+// profile row and next to the Edit Profile buttons. Small, centered,
+// classy — one look tells you your balance, your streak, and how to earn.
+function lucreWalletHTML() {
+  if (!state.profile) return "";
+  var l = state.lucre;
+  var balance = l ? l.balance : null;
+  var c = l && l.checkin;
+  var can = !!(c && c.can_check_in);
+  return '<div id="dwc-lucre-wallet" class="dwc-lucre-wallet">' +
+    '<div class="dwc-lucre-top"><span class="dwc-lucre-balance">' + LUCRE_SYMBOL + ' <strong>' + (balance === null ? "…" : balance) + '</strong> Lucre</span>' +
+    '<span class="dwc-lucre-note">site only currency — not real money, not crypto, can’t cash out</span></div>' +
+    '<div class="dwc-lucre-checkin"><span class="dwc-lucre-streak">' + esc(lucreCheckinLabel() || "Weekly check-in — 5 " + LUCRE_SYMBOL + " a week, 50 " + LUCRE_SYMBOL + " bonus every 7th week") + '</span>' +
+    (can ? ' <button type="button" class="btn small" onclick="DWC.lucreCheckin()">Check in · +5 ' + LUCRE_SYMBOL + '</button>' : "") + '</div>' +
+    '<div class="dwc-lucre-earn">Earn: post 10 · comment 10 · heart 5 · listing 10 · check in weekly · <button type="button" class="dwc-linklike" onclick="DWC.phoneGo(\'store\')">🛍️ Spend it in the Layout Store →</button></div>' +
+    '</div>';
+}
+// ---------- Layout Store (Taffy Phone app) ----------
+// A little fake browser inside the phone: browse pre-made layout codes
+// like an old MySpace layout site, preview each one on YOUR page, then
+// apply the free ones or buy the priced ones with Lucre. Taffy doesn't
+// write code — these are pre-made, one tap each.
+function storeOwnedIds() {
+  return (state.lucre && state.lucre.owned) || [];
+}
+function storeFilteredItems() {
+  var f = state.storeFilter || "all";
+  var owned = storeOwnedIds();
+  return LAYOUT_STORE.filter(function (x) {
+    if (f === "free") return x.price === 0;
+    if (f === "priced") return x.price > 0;
+    if (f === "owned") return x.price === 0 || owned.indexOf(x.id) >= 0;
+    return true;
+  });
+}
+function storePreviewHTML(item) {
+  if (!item || !state.profile) return "";
+  var merged = storeMergedTheme(item);
+  var fake = Object.assign({}, state.profile, { is_mine: true, profile_theme: JSON.stringify(merged) });
+  var css = scopeStoreCSS(themeCSS(merged)) + scopeStoreCSS(item.css);
+  return '<div id="dwc-store-preview" class="dwc-store-preview">' +
+    '<style>' + css + '</style>' +
+    '<h4 style="margin:0 0 6px">Preview — your page with “' + esc(item.name) + '”</h4>' +
+    layoutPreviewInnerHTML(fake) +
+    '</div>';
+}
+function phoneStoreHTML() {
+  var body = "";
+  if (!state.profile) {
+    body = '<p class="tp-note">Create your account to use the Layout Store — Taffy is here either way.</p><p><button type="button" class="btn small" onclick="DWC.phoneMinimize();DWC.openSignup()">Create account — it’s free</button></p>';
+  } else {
+    var l = state.lucre;
+    if (!l) { loadLucre(); }
+    var balance = l ? l.balance : null;
+    var owned = storeOwnedIds();
+    var current = state.profile.layout_preset || "";
+    var currentItem = storeItemById(current);
+    var items = storeFilteredItems();
+    var filters = [["all", "All"], ["free", "Free"], ["priced", "Priced"], ["owned", "Mine"]].map(function (f) {
+      return '<button type="button" class="dwc-pill' + (state.storeFilter === f[0] ? " active" : "") + '" onclick="DWC.storeFilter(\'' + f[0] + '\')">' + f[1] + '</button>';
+    }).join("");
+    var previewItem = state.storePreview ? storeItemById(state.storePreview) : null;
+    body =
+      '<p class="tp-note" style="text-align:center;margin:0 0 4px"><strong>' + LUCRE_SYMBOL + ' ' + (balance === null ? "…" : balance) + ' Lucre</strong> · site only currency — not real money, not crypto, can’t cash out.</p>' +
+      '<p class="tp-note" style="text-align:center;margin:0 0 8px">Pre-made layouts, like an old MySpace layout site. Preview one on your page, then apply it — one tap.</p>' +
+      '<div class="dwc-store-filters">' + filters + '</div>' +
+      (currentItem ? '<p class="tp-note" style="text-align:center">You’re wearing <strong>' + esc(currentItem.name) + '</strong> right now. <button type="button" class="dwc-linklike" onclick="DWC.storeRevert()">← Back to my own look</button></p>' : "") +
+      (previewItem ? storePreviewHTML(previewItem) + '<p style="margin:6px 0 10px;text-align:center"><button type="button" class="btn small" onclick="DWC.storeApply(\'' + previewItem.id + '\')">Apply “' + esc(previewItem.name) + '”' + (previewItem.price > 0 && owned.indexOf(previewItem.id) < 0 ? ' · ' + previewItem.price + ' ' + LUCRE_SYMBOL : "") + '</button> <button type="button" class="btn ghost small" onclick="DWC.storePreview(null)">Close preview</button></p>' : "") +
+      '<div class="dwc-store-list">' + items.map(function (x) {
+        var isOwned = x.price === 0 || owned.indexOf(x.id) >= 0;
+        var isCurrent = current === x.id;
+        return '<div class="dwc-store-card">' +
+          '<div class="dwc-store-head"><strong>' + esc(x.name) + '</strong><span class="dwc-store-price">' + (x.price === 0 ? "FREE" : x.price + " " + LUCRE_SYMBOL) + '</span></div>' +
+          '<p class="dwc-store-tag">' + esc(x.tag) + '</p>' +
+          '<p class="dwc-store-desc">' + esc(x.desc) + '</p>' +
+          (x.conflict ? '<p class="dwc-store-conflict">⚠️ ' + esc(x.conflict) + '</p>' : "") +
+          '<p class="dwc-store-btns"><button type="button" class="btn ghost small" onclick="DWC.storePreview(\'' + x.id + '\')">Preview</button> ' +
+          (isCurrent ? '<span class="dwc-store-wearing">✓ Wearing it</span>'
+            : '<button type="button" class="btn small" ' + (state.storeApplying === x.id ? "disabled" : "") + ' onclick="DWC.storeApply(\'' + x.id + '\')">' + (isOwned ? "Apply" : "Buy · " + x.price + " " + LUCRE_SYMBOL) + '</button>') +
+          '</p></div>';
+      }).join("") + '</div>' +
+      '<p class="tp-note">Taffy doesn’t write code — these layouts are pre-made by the shop. Priced ones are yours forever once bought. Future layouts and frames cost about 20 ' + LUCRE_SYMBOL + ' each.</p>';
+  }
+  return phoneTopbarHTML("Layout Store") + '<div class="tp-appview">' + body + '</div>';
+}
+
 // ---------- Taffy Phone — the iPhone-like popup phone window ----------
 // The green call/text button (bottom-right) opens a little iPhone-style
 // popup: rounded frame, dynamic island, status bar, home screen with apps.
@@ -804,7 +1102,7 @@ function copyTextToClipboard(text) {
 // Apps: Vita Nova (Taffy), MSG (contacts — Taffy first, then friends),
 // Gallery (session-only, auto-deletes after 10 min), SOS (help),
 // Notes (session-only), radio (Steady Wave stream), Code (the layout/CSS
-// editor in Edit profile), Tutorial (coming soon — Chris adds the video).
+// editor in Edit profile), Layout Store (pre-made layouts, Lucre).
 // The phone root lives on document.body, OUTSIDE #dwc-app, so route
 // changes never rebuild it — the radio keeps playing and the notes
 // textarea keeps focus. renderPhone() only rebuilds when the app, open
@@ -855,7 +1153,6 @@ var TP_STATUS_ICONS =
 var TP_ICON_MSG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 5.9 2 10.8c0 2.8 1.5 5.2 3.8 6.8L4.5 22l5-2.7c.8.2 1.6.3 2.5.3 5.5 0 10-3.9 10-8.8S17.5 2 12 2z" fill="#fff"/></svg>';
 var TP_ICON_GALLERY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="#fff"/><path d="M5 17l4.5-4.5L12 15l3-3 4 4" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.6" fill="#f59e0b"/></svg>';
 var TP_ICON_NOTES = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2" fill="#fff"/><path d="M8 8h8M8 12h8M8 16h5" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round"/></svg>';
-var TP_ICON_TUTORIAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="#fff"/></svg>';
 var TP_ICON_ALERTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" fill="#fff"/></svg>';
 
 function phoneTopbarHTML(title) {
@@ -877,7 +1174,7 @@ function phoneHomeHTML() {
     phoneAppTile("notes", "Notes", '<span class="tp-icon tp-icon-notes">' + TP_ICON_NOTES + '</span>') +
     phoneAppTile("radio", "radio", '<span class="tp-icon tp-icon-radio"><span class="tp-glyph">♪</span></span>') +
     phoneAppTile("code", "Code", '<span class="tp-icon tp-icon-code"><span class="tp-glyph">&lt;/&gt;</span></span>') +
-    phoneAppTile("tutorial", "Available soon — check back later!", '<span class="tp-icon tp-icon-tutorial">' + TP_ICON_TUTORIAL + '</span>') +
+    phoneAppTile("store", "Layout Store", '<span class="tp-icon tp-icon-store"><span class="tp-glyph">🛍️</span></span>') +
     phoneAppTile("alerts", "Alerts", '<span class="tp-icon tp-icon-alerts">' + TP_ICON_ALERTS + '</span>') +
     phoneAppTile("badges", "Badges", '<span class="tp-icon tp-icon-badges"><span class="tp-glyph">🏅</span></span>') +
     '</div>' +
@@ -930,13 +1227,23 @@ function taffyReply(raw) {
   // Who is Taffy / tattoos
   if (has(/\b(who are you|your name|what are you|what's your name)\b/) || has(/\btattoo|904|lokos|prison|jail\b/))
     return { text: taffyPick(["I'm Taffy — your little site helper. Cute up front, and yes… my astral form has the 904 Lokos tattoos. Don't judge, I earned them. Ask me how to change something on your page.", "That's me — Taffy, the little helper that lives in the phone. I help with layouts, code, and site questions. The tattoos are on my astral form, long story."]), emoji: taffyPickEmoji(["🍬", "😎"]), working: false };
+  // ---- Lucre + Layout Store (v3.11) — Taffy points at real features,
+  // never claims to understand arbitrary language or to write code. ----
+  if (has(/\blucre\b/) || has(/\b(site )?currenc(y|ies)\b/) || has(/\bhow (do|can) i (earn|get|make).*lucre\b/) || has(/\bwhat is lucre\b/))
+    return { text: "Lucre ◈ is the site's own play money — not real money, not crypto, and you can't cash it out. You earn it by being here: 10 for a post, 10 for a comment, 5 for a heart, 10 for a listing, and a weekly check-in on your home page. Spend it in my Layout Store on Taffy's phone — layouts and frames, about 20 ◈ each. Your wallet lives on your home page.", emoji: "◈", working: false };
+  if (has(/\blayout store\b/) || has(/\bbuy (a )?layout\b/) || has(/\bpre.?made layouts?\b/))
+    return { text: "The Layout Store lives on my phone — tap the 🛍️ Layout Store app. Ten pre-made layouts are free (rainy night, professional, Facebook-style, Instagram-style, 80s arcade, kitsune shrine, horror, and a few surprises), and two fancy ones cost 20 ◈ each. Tap Preview to see one on your page first, then Apply — one tap and it's live.", emoji: "🛍️", working: false };
+  if (has(/\bcheck ?in\b/) || has(/\bweekly check/) || has(/\bstreak\b/))
+    return { text: "Weekly check-in: once a week, on your home page near the Edit Profile buttons — 5 ◈ each time, and every 7th week in a row pays a 50 ◈ bonus. Miss more than two weeks and the streak starts over.", emoji: "🔥", working: false };
+  if (has(/\bachievements?\b/) || has(/\bunlockables?\b/) || has(/\bwhat.*(unlocked|earned)\b/) || has(/\bmy badges\b/))
+    return { text: "Your badges, frames, and Lucre all live in the Badges app on my phone — unlocked ones on top, locked ones with what earns them. Fully setting up your profile unlocks the VITA NOVA frame and a rare-candy badge, too.", emoji: "🏅", working: false };
   // ---- "Make me a whole profile" — Taffy can't write a layout from
   // words, and she says so plainly. The real path is Edit Profile →
   // Taffy Layout Builder: pick a vibe + an accent color and watch the
   // live preview change. This runs before the single-feature intents so
   // a whole-profile ask gets the honest answer, not one piece of it.
   if (has(/\b(make|build|create|design)\b.{0,25}\b(my )?(profile|layout|theme|page)\b/) || (has(/\bhtml\b/) && has(/\b(copy|write|give|show|paste)\b/) && has(/\b(profile|layout|theme|page|my)\b/))) {
-    return { text: "I can't write a whole layout from words — that's not something I can do. But Edit Profile → Taffy Layout Builder has real vibes + accent colors you can see live in the preview, and Taffy's Layout Store (coming soon) will have pre-made layouts to grab. For one thing at a time, just ask me how — like “how do I make my buttons glow”.", emoji: "🎨", working: false };
+    return { text: "I can't write a whole layout from words — that's not something I can do. But Edit Profile → Taffy Layout Builder has real vibes + accent colors you can see live in the preview, and Taffy's Layout Store has pre-made layouts to grab — free ones and a couple you can buy with Lucre. For one thing at a time, just ask me how — like “how do I make my buttons glow”.", emoji: "🎨", working: false };
   }
   // ---- Layout help that actually helps: real CSS + an Apply button ----
   // Each of these returns a css snippet. The chat renders an
@@ -1272,7 +1579,7 @@ function phoneRadioHTML() {
     '<div class="tp-radio-logo">♪</div>' +
     '<p class="tp-radio-name">Steady Wave</p>' +
     '<p class="tp-note" style="text-align:center">Chris’s station — live, 24/7.</p>' +
-    '<audio controls preload="none" src="' + VNR_STREAM_URL + '"></audio>' +
+    '<audio controls preload="none" onplay="DWC.phoneRadioFirst()" src="' + VNR_STREAM_URL + '"></audio>' +
     '<p class="tp-note"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p>' +
     '</div>';
 }
@@ -1282,12 +1589,6 @@ function phoneCodeHTML() {
     '<p><button type="button" class="btn" onclick="DWC.phoneOpenEditor()">Open the code editor →</button></p>' +
     '<p><button type="button" class="btn ghost small" onclick="DWC.phoneGo(\'vitanova\')">Keep Taffy open alongside →</button></p>' +
     '<p class="tp-note">Taffy can sit in the phone while you code — or minimize the phone and he’ll wait for you.</p>' +
-    '</div>';
-}
-function phoneTutorialHTML() {
-  return phoneTopbarHTML("Tutorial") + '<div class="tp-appview">' +
-    '<p class="tp-note"><strong>Available soon — check back later!</strong></p>' +
-    '<p class="tp-note">A short video tour of everything Taffy can do is coming — Chris will add it here. It won’t be long, just the gist.</p>' +
     '</div>';
 }
 // ---------- Alerts app (v3.8) — the same notifications as the header
@@ -1344,14 +1645,31 @@ function phoneAlertsHTML() {
     '<p><button type="button" class="btn ghost small" onclick="DWC.phoneAlertsMarkAll()">Mark all read</button></p>' + rows + '</div>';
 }
 // Badges app (v3.9) — your unlocked badges + the locked ones with what
-// earns them. Same list as Edit Profile "Badge display".
+// earns them. Same list as Edit Profile "Badge display". v3.11 — also
+// your achievements: Lucre balance + recent earnings + picture frames,
+// unlocked and locked, so one app shows everything you've earned.
 function phoneBadgesHTML() {
   var body = "";
   if (!state.profile) {
     body = '<p class="tp-note">Create your account to earn badges — Taffy is here either way.</p><p><button type="button" class="btn small" onclick="DWC.phoneMinimize();DWC.openSignup()">Create account — it’s free</button></p>';
   } else {
+    var unlocked = state.profile.unlocked_frames || [];
+    var isUnlocked = function (k) { return unlocked.indexOf(k) >= 0; };
+    var frameRows = PIC_FRAMES.map(function (f) {
+      var un = !f.locked || (f.unlockKey && isUnlocked(f.unlockKey));
+      return '<li>' + (un ? "✓ " : "🔒 ") + esc(f.name) + (f.locked && !un && f.requirement ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(f.requirement) + "</span>" : "") + "</li>";
+    }).join("");
+    var l = state.lucre;
+    if (!l) { loadLucre(); }
+    var recent = (l && l.ledger ? l.ledger.slice(0, 5) : []).map(function (e) {
+      return '<li>' + (e.amount > 0 ? "+" : "") + e.amount + " " + LUCRE_SYMBOL + " · " + esc(e.label || e.reason) + "</li>";
+    }).join("");
     body = badgeDisplayListHTML(state.profile.badges || []) +
-      '<p class="tp-note">Pick which badge shows next to your name in Edit Profile → Badge display.</p>';
+      '<p class="tp-note">Pick which badge shows next to your name in Edit Profile → Badge display.</p>' +
+      '<h4 style="margin:12px 0 4px">🖼️ Picture frames</h4><ul class="dwc-list">' + frameRows + "</ul>" +
+      '<h4 style="margin:12px 0 4px">' + LUCRE_SYMBOL + ' Lucre — site only currency</h4>' +
+      '<p class="tp-note" style="margin:0 0 4px">Balance: <strong>' + (l ? l.balance : "…") + " " + LUCRE_SYMBOL + '</strong> · not real money, not crypto, can’t cash out.</p>' +
+      (recent ? '<ul class="dwc-list">' + recent + "</ul>" : '<p class="tp-note">No earnings yet — post, comment, heart, or check in weekly to start earning.</p>');
   }
   return phoneTopbarHTML("Badges") + '<div class="tp-appview">' + body + '</div>';
 }
@@ -1365,7 +1683,7 @@ function phoneScreenHTML() {
   else if (app === "notes") inner = phoneNotesHTML();
   else if (app === "radio") inner = phoneRadioHTML();
   else if (app === "code") inner = phoneCodeHTML();
-  else if (app === "tutorial") inner = phoneTutorialHTML();
+  else if (app === "store") inner = phoneStoreHTML();
   else if (app === "alerts") inner = phoneAlertsHTML();
   else if (app === "badges") inner = phoneBadgesHTML();
   else inner = phoneHomeHTML();
@@ -1377,7 +1695,12 @@ function phoneScreenHTML() {
     '</div>';
 }
 function phoneRenderedKey() {
-  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x") + "|" + (state.phoneAlertsList ? state.phoneAlertsList.length : "x") + "|" + state.phoneAlertsStamp;
+  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x") + "|" + (state.phoneAlertsList ? state.phoneAlertsList.length : "x") + "|" + state.phoneAlertsStamp +
+    // Lucre + Layout Store (v3.11) — filter, preview, applying, balance,
+    // owned, and the current layout all change what the phone shows.
+    "|" + (state.storeFilter || "all") + "|" + (state.storePreview || "") + "|" + (state.storeApplying || "") +
+    "|" + (state.lucre ? state.lucre.balance : "x") + "|" + (state.lucre ? state.lucre.owned.length : "x") +
+    "|" + (state.profile ? (state.profile.layout_preset || "") : "");
 }
 function renderPhone() {
   var root = $("dwc-phone-root");
@@ -1744,7 +2067,7 @@ function profileFormHTML(p) {
       return '<button type="button" class="dwc-swatch" style="background:' + c + '" title="' + c + '" onclick="DWC.setAccent(\'' + c + '\')">&nbsp;</button>';
     }).join("") + "</div>" +
     '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Browse layouts in Taffy’s store →</button></p>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab — coming soon. For now, pick a vibe above — it works right now.</p>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab in Taffy’s Layout Store — 10 free, 2 priced in Lucre. Pick a vibe above for a quick look that works right now.</p>' +
     '<h4 style="margin:16px 0 6px">🗣️ Tell Taffy what you want — in plain words</h4>' +
     "<p style=\"margin:0 0 8px\">One box, one ask: type what you want for your page — buttons side, button style, ticker, video, what shows and what hides — and I'll set it up. I match words I know (buttons, arcade, insert coin, bitcoin, top friends, links, videos…). Anything I don't get, I'll tell you plainly and set the rest. No AI service involved — I match your words right here, nothing leaves your browser.</p>" +
     '<input id="dwc-builder-prompt" maxlength="500" placeholder="e.g. buttons on the right, arcade buttons, bitcoin ticker, hide everything but my top friends and my videos">' +
@@ -2429,7 +2752,8 @@ var PIC_FRAMES = [
   { id: "gothic", name: "Gothic", desc: "Black and white stripes — Tim Burton style.", locked: true, unlockKey: "frame-gothic", requirement: "Leave 25 comments" },
   { id: "blood", name: "Blood dripping", desc: "Dripping ooze — pick your drip color.", locked: true, unlockKey: "frame-blood", requirement: "Give or get 25 hearts" },
   { id: "gb", name: "GB frame", desc: "Your picture inside a Game Boy.", locked: true, unlockKey: "frame-gb", requirement: "Post 25 times" },
-  { id: "gba", name: "GBA frame", desc: "Your picture inside a Game Boy Advance.", locked: true, unlockKey: "frame-gba", requirement: "Post 50 times and use the site 14 different days" }
+  { id: "gba", name: "GBA frame", desc: "Your picture inside a Game Boy Advance.", locked: true, unlockKey: "frame-gba", requirement: "Post 50 times and use the site 14 different days" },
+  { id: "vita-nova", name: "VITA NOVA frame", desc: "Gold and violet — the Vita Nova Records frame.", locked: true, unlockKey: "frame-vita-nova", requirement: "Fully set up your profile" }
 ];
 // GB/GBA handheld body colors — preset mixes, or the member's own 3.
 var GB_FRAME_MODES = [
@@ -6053,11 +6377,9 @@ window.DWC = {
     DWC.refreshLayoutPreviewSoon();
     DWC.profileFormDirty();
   },
-  // Layout Store entry point — placeholder only. The store itself
-  // (fake in-site browser, pre-made layouts, Lucre purchases, free
-  // presets) is the NEXT build; this just says so honestly.
+  // Layout Store entry point — opens Taffy's phone on the store app.
   layoutStoreSoon: function () {
-    setNotice("Taffy's Layout Store is coming soon — pre-made layouts you can grab with Lucre, plus free ones to try. For now, pick a vibe above — it works right now.");
+    DWC.phoneGo("store");
   },
   // Live preview, debounced — the form's oninput/onchange fires this on
   // every keystroke, and the preview rebuilds 200ms after the member
@@ -6560,7 +6882,103 @@ window.DWC = {
     if (app === "msg") loadPhoneMsgList();
     if (app === "alerts") loadPhoneAlerts();
     if (app === "notes") loadPhoneNotes();
+    if (app === "store" && !state.lucre) loadLucre();
     renderPhone();
+  },
+  // Lucre (v3.11) — weekly check-in from the wallet on the home page.
+  lucreCheckin: async function () {
+    if (!state.profile) return;
+    var data = await apiPost("/lucre", { device_id: deviceId(), action: "checkin" });
+    if (!data) return;
+    if (!data.ok) { setNotice(data.error || "Check-in didn't go through — try again."); return; }
+    await loadLucre();
+    setNotice(data.bonus_paid ? "Checked in! +5 " + LUCRE_SYMBOL + " — and a 50 " + LUCRE_SYMBOL + " streak bonus for 7 weeks in a row! 🔥" : "Checked in! +5 " + LUCRE_SYMBOL + " — see you next week.");
+  },
+  // Layout Store (v3.11) — filter, preview, apply, buy, revert.
+  storeFilter: function (f) {
+    state.storeFilter = f;
+    renderPhone();
+  },
+  storePreview: function (id) {
+    state.storePreview = id || null;
+    renderPhone();
+  },
+  // Apply a store layout to YOUR profile page. Free layouts apply
+  // straight away; priced ones are bought first (server price, never
+  // the client's). The POST echoes the profile fields the server
+  // rewrites (chat_name, occupation, bio, payout) so nothing is lost,
+  // and sends the full merged theme so one setting never resets another.
+  storeApply: async function (id) {
+    var item = storeItemById(id);
+    if (!item || !state.profile || state.storeApplying) return;
+    state.storeApplying = id;
+    renderPhone();
+    try {
+      var owned = storeOwnedIds();
+      if (item.price > 0 && owned.indexOf(id) < 0) {
+        var buy = await apiPost("/lucre", { device_id: deviceId(), action: "purchase", item_id: id });
+        if (!buy || !buy.ok) {
+          setNotice(buy && buy.error ? buy.error : "That purchase didn't go through — try again.");
+          state.storeApplying = null; renderPhone(); return;
+        }
+        state.lucre = state.lucre || { balance: 0, ledger: [], checkin: null, owned: [] };
+        state.lucre.balance = buy.balance;
+        state.lucre.owned = buy.owned || owned.concat([id]);
+      }
+      var p = state.profile;
+      var merged = storeMergedTheme(item);
+      var data = await apiPost("/profile", {
+        device_id: deviceId(),
+        username: p.username, chat_name: p.chat_name || "", occupation: p.occupation || "",
+        bio: p.bio || "", payout_method: p.payout_method || "", payout_handle: p.payout_handle || "",
+        layout_preset: item.id, layout_css: item.css, profile_theme: JSON.stringify(merged),
+      });
+      if (!data || !data.ok) {
+        setNotice(data && data.error ? data.error : "That layout didn't apply — try again.");
+      } else {
+        await refreshProfile();
+        await loadLucre();
+        state.storePreview = null;
+        setNotice("“" + item.name + "” is live on your page! 🎨");
+        render();
+      }
+    } finally {
+      state.storeApplying = null;
+      if (state.phone.open && state.phone.app === "store") renderPhone();
+    }
+  },
+  // Back to my own look — clears the store layout (preset + CSS) and
+  // keeps the member's own theme exactly as it was.
+  storeRevert: async function () {
+    if (!state.profile) return;
+    var p = state.profile;
+    var data = await apiPost("/profile", {
+      device_id: deviceId(),
+      username: p.username, chat_name: p.chat_name || "", occupation: p.occupation || "",
+      bio: p.bio || "", payout_method: p.payout_method || "", payout_handle: p.payout_handle || "",
+      layout_preset: "", layout_css: "",
+    });
+    if (!data || !data.ok) { setNotice(data && data.error ? data.error : "Couldn't switch back — try again."); return; }
+    await refreshProfile();
+    setNotice("Back to your own look — the store layout is off.");
+    render();
+  },
+  // First radio listen (v3.11) — 10 Lucre, once ever. Fires on the
+  // phone radio's first play; the server key makes repeats a no-op.
+  phoneRadioFirst: async function () {
+    if (!state.profile) return;
+    var d = await apiPost("/lucre", { device_id: deviceId(), action: "radio-first" });
+    if (d && d.ok && d.awarded) {
+      if (state.lucre) {
+        state.lucre.balance = d.balance;
+        // The wallet shows the balance — swap it now, or the +10 only
+        // appears after the next reload (same pattern as copyLink).
+        var w = document.getElementById("dwc-lucre-wallet");
+        if (w) w.outerHTML = lucreWalletHTML();
+        if (state.phone.open && (state.phone.app === "store" || state.phone.app === "badges")) renderPhone();
+      }
+      setNotice("First radio listen! +10 " + LUCRE_SYMBOL + " — welcome to Steady Wave. 📻");
+    }
   },
   // Alerts app (v3.8) — tap an alert: mark it read, close the phone,
   // and jump to what it points at.
@@ -6924,6 +7342,7 @@ async function init() {
   await refreshProfile();
   await refreshStats();
   if (state.profile) {
+    loadLucre(); // Lucre wallet (balance, check-in, owned) — loads in the background
     // AIM presence: start Online (or Away if that's how they left it) and
     // keep the heartbeat fresh every 60s so the buddy list sees them.
     state.presence = state.profile.presence === "away" ? "away" : "online";

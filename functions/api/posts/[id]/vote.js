@@ -1,7 +1,7 @@
 // POST /api/posts/:id/vote — votePost. Hearts (or un-hearts) a post — the
 // ONLY reaction anywhere. No downvotes: a member either hearts a post or
 // doesn't. Toggling returns the new heart count.
-import { json, noDb, getDb, readJson, profileByDevice, createNotification } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, createNotification, awardLucre, LUCRE_AWARDS } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);
@@ -37,6 +37,9 @@ export async function onRequestPost({ env, request, params }) {
       text: `@${me.username} hearted your post`,
       link: `#/thread/${id}`,
     });
+    // Lucre (v3.11) — 5 for hearting, once per post per member (the
+    // ledger key makes un-heart + re-heart a no-op, never a double pay).
+    await awardLucre(db, me.id, LUCRE_AWARDS.heart, "heart", "post:" + String(id));
   }
   return json({ ok: true, error: null, hearts: row?.n ?? 0, my_heart: myHeart });
 }

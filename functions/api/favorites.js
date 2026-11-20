@@ -2,7 +2,7 @@
 // POST /api/favorites — add or remove a favorite (the star on a member
 // page). Separate from Top 8: a favorite is a one-way star, Top 8 is a
 // public tile row. Requires the v3.6 migration (favorites table).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, awardLucre, LUCRE_AWARDS } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -36,6 +36,8 @@ export async function onRequestPost({ env, request }) {
   try {
     if (action === "add") {
       await db.prepare("INSERT OR IGNORE INTO favorites (profile_id, favorite_id, created_at) VALUES (?, ?, ?)").bind(me.id, favoriteId, nowMs()).run();
+      // Lucre (v3.11) — 5 for favoriting a member, once per member.
+      await awardLucre(db, me.id, LUCRE_AWARDS.favorite, "favorite", String(favoriteId));
       // Notification (v3.8) — skips quietly if the table isn't there yet.
       await createNotification(db, {
         profile_id: favoriteId, actor_profile_id: me.id, kind: "favorite",

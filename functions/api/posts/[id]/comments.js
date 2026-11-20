@@ -1,7 +1,7 @@
 // GET /api/posts/:id/comments — listComments (oldest first; adult posts
 // only to age-verified callers).
 // POST /api/posts/:id/comments — addComment (optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles, awardLucre, LUCRE_AWARDS } from "../../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -58,5 +58,9 @@ export async function onRequestPost({ env, request, params }) {
     link: `#/thread/${id}`,
   });
   await notifyMentions(db, me, body, { ref_type: "comment", ref_id: r.meta.last_row_id, label: "in a reply", link: `#/thread/${id}` });
-  return json({ ok: true, error: null, comment_id: r.meta.last_row_id });
+  // Lucre (v3.11) — 10 for commenting, once per comment.
+  const lw = await awardLucre(db, me.id, LUCRE_AWARDS.comment, "comment", String(r.meta.last_row_id));
+  const out = { ok: true, error: null, comment_id: r.meta.last_row_id };
+  if (lw.awarded) out.lucre = { awarded: true, balance: lw.balance };
+  return json(out);
 }

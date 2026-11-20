@@ -10,7 +10,7 @@ import {
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
   createNotification, cleanWebsiteShow, RELATIONSHIP_IDS, ZODIAC_IDS,
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
-  badgeListFor, cleanDisplayBadges, adultCreatorIds,
+  badgeListFor, cleanDisplayBadges, adultCreatorIds, awardLucre, LUCRE_AWARDS,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -110,7 +110,17 @@ export async function onRequestPost({ env, request }) {
   // If the v2 migration hasn't been run yet the UPDATE fails with
   // "no such column" and we retry with just the v1 columns, so an edit
   // never breaks — the client is told via v2_pending.
-  const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "afterdark", "creatorgold", "candyshop", "arcade", "ocean", "custom"];
+  // Layout presets the client may apply through Edit Profile. Store
+  // layouts ("store:*") are in this list too — they can only be set
+  // through the Layout Store (free, or bought with Lucre), and the
+  // store applies them through this same POST, so the server must
+  // accept them here. The client picker never lists store ids, so
+  // nobody can claim a priced layout by typing its id in Edit Profile.
+  const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "afterdark", "creatorgold", "candyshop", "arcade", "ocean", "custom",
+    "store:rainy-night", "store:clean-professional", "store:facebook-style",
+    "store:instagram-style", "store:80s-arcade", "store:kitsune-shrine",
+    "store:horror-lover", "store:stardust-diner", "store:deep-forest",
+    "store:cyber-street", "store:neon-rain", "store:golden-shrine"];
   const v2Sets = [];
   const v2Vals = [];
   if (Array.isArray(a.top_friends)) {
@@ -464,6 +474,7 @@ export async function onRequestPost({ env, request }) {
     });
   }
   const profileOut = shapeProfile(row);
+  const lucreOut = {};
   if (row) {
     const grants = await grantUnlocks(db, row.id);
     profileOut.unlocked_frames = grants.unlocked;
@@ -474,6 +485,19 @@ export async function onRequestPost({ env, request }) {
     profileOut.badges = badgeListFor(grants.unlocked);
     profileOut.is_regular_seller = grants.unlocked.includes("badge:sales-5");
     profileOut.is_adult_seller = (await adultCreatorIds(db, [row.id])).has(row.id);
+    // Lucre (v3.11) — 10 for a new profile, once ever; 10 more the
+    // first time the profile is fully set up (avatar + bio + occupation
+    // + a link + a Top Friend). The ledger key makes each once-ever.
+    if (!existing) {
+      const np = await awardLucre(db, row.id, LUCRE_AWARDS.profile, "profile", "new");
+      if (np.awarded) lucreOut.profile = np.balance;
+    }
+    if (grants.counts.profile_complete) {
+      const pc = await awardLucre(db, row.id, LUCRE_AWARDS.profile_complete, "profile_complete", "complete");
+      if (pc.awarded) lucreOut.profile_complete = pc.balance;
+    }
   }
-  return json({ ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError });
+  const out = { ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError };
+  if (Object.keys(lucreOut).length) out.lucre = lucreOut;
+  return json(out);
 }

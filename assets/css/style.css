@@ -758,10 +758,13 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-btn:hover{background:#16a34a}
 .tp-phone{position:fixed;right:16px;bottom:16px;width:340px;max-width:calc(100vw - 24px);height:640px;max-height:calc(100vh - 32px);background:#0a0a12;border:1px solid #3a3a4a;border-radius:44px;padding:10px;z-index:9991;box-shadow:0 18px 60px rgba(0,0,0,.65)}
 .tp-screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;display:flex;flex-direction:column;color:#fff}
-.tp-island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:96px;height:26px;background:#000;border-radius:14px;z-index:3}
-.tp-status{display:flex;justify-content:space-between;align-items:center;padding:12px 26px 4px;font-size:13px;font-weight:600;z-index:2}
-.tp-status-right{display:flex;align-items:center;gap:8px}
-.tp-status-icons{display:flex;align-items:center;gap:5px}
+.tp-statuswrap{position:relative;height:34px;flex:0 0 auto}
+.tp-island{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:96px;height:24px;background:#000;border-radius:14px;z-index:3}
+.tp-status{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 16px 4px;font-size:11px;font-weight:600;z-index:2;white-space:nowrap}
+.tp-status #tp-clock{flex:0 0 auto}
+.tp-status-right{display:flex;align-items:center;gap:6px;flex:0 0 auto}
+.tp-status-icons{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+@media (max-width:380px){.tp-status{font-size:10px;padding-left:12px;padding-right:12px}.tp-status-right{gap:4px}.tp-status-icons{gap:3px}}
 .tp-carrier{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .tp-carrier svg{flex:0 0 auto}
 .tp-body{flex:1;overflow-y:auto;padding:6px 14px 14px;position:relative;z-index:1}
@@ -1222,3 +1225,21 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-meme-drawer-body{overflow:hidden}
 .meme-stash.open .dwc-meme-drawer-body{animation:dwcDrawerUp .38s cubic-bezier(.2,.9,.3,1.05) both}
 @keyframes dwcDrawerUp{from{transform:translateY(36px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ---- Comment reactions (v3.15): heart + sad + confused ---- */
+/* Posts and comments get all three; everything else keeps hearts only
+   (or no reactions at all, as before). The group sits inline in the
+   action row, next to the bookmark. Sad glows blue when yours is on,
+   confused glows violet. */
+.dwc-react-group{display:inline-flex;align-items:center;gap:2px}
+.dwc-react-ico{font-size:19px;line-height:1}
+.dwc-sad.on .dwc-react-ico{filter:drop-shadow(0 0 6px rgba(127,183,255,.95)) drop-shadow(0 0 12px rgba(127,183,255,.55))}
+.dwc-confused.on .dwc-react-ico{filter:drop-shadow(0 0 6px rgba(196,141,255,.95)) drop-shadow(0 0 12px rgba(196,141,255,.55))}
+
+/* ---- Picture hearts (v3.16): heart or nothing on pictures ---- */
+/* The heart button under the photo in the picture viewer. It reuses the
+   .dwc-act / .dwc-star neon star from posts and comments — no sad, no
+   confused, no thumbs-down on pictures. The wrapper just centers it
+   under the Prev/Next row. */
+.dwc-picviewer-heart{display:flex;justify-content:center;margin:2px 0 8px;min-height:30px}
+.dwc-picviewer-heart .dwc-act{font-size:15px}

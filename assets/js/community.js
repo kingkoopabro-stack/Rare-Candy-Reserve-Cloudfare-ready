@@ -207,10 +207,26 @@ function loadVotes() {
   try { return JSON.parse(localStorage.getItem(VOTES_KEY) || "{}"); } catch (e) { return {}; }
 }
 function saveVotes(v) { try { localStorage.setItem(VOTES_KEY, JSON.stringify(v)); } catch (e) {} }
-function myHeart(key) { return !!loadVotes()[key]; }
-function setHeart(key, on) {
+function myHeart(key) { return myReaction(key) === "heart"; }
+function setHeart(key, on) { setReaction(key, on ? "heart" : null); }
+// Reactions (v3.15) — one reaction per person per target, kind
+// 'heart' | 'sad' | 'confused'. The cache stores the kind string.
+// Legacy entries stored 1 for a heart, and thread-comment hearts used
+// to live under "comment-<id>" — both still read as 'heart'.
+function myReaction(key) {
+  var v = loadVotes()[key];
+  if (v === 1 || v === "heart") return "heart";
+  if (v === "sad" || v === "confused") return v;
+  if (key.indexOf("comment-thread-") === 0) {
+    var legacy = loadVotes()["comment-" + key.slice(15)];
+    if (legacy === 1 || legacy === "heart") return "heart";
+  }
+  return null;
+}
+function setReaction(key, kind) {
   var v = loadVotes();
-  if (on) v[key] = 1; else delete v[key];
+  if (kind) v[key] = kind; else delete v[key];
+  if (key.indexOf("comment-thread-") === 0) delete v["comment-" + key.slice(15)];
   saveVotes(v);
 }
 
@@ -289,6 +305,77 @@ function bookmarkHTML(saved) {
 function commentBubbleHTML(count, label) {
   return '<svg class="dwc-cmt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 5.9 2 10.8c0 2.8 1.5 5.2 3.8 6.8L4.5 22l5-2.7c.8.2 1.6.3 2.5.3 5.5 0 10-3.9 10-8.8S17.5 2 12 2z"/></svg>' +
     '<span class="dwc-act-count">' + (label != null ? label : (count || 0)) + "</span>";
+}
+// ---------- Reactions (v3.15): heart + sad + confused ----------
+// Posts AND comments get all three. Pictures (v3.16) get heart or
+// nothing — the same neon star, no sad, no confused, no thumbs-down.
+// One reaction per person per target: tapping the same kind again takes
+// it off, tapping another kind switches.
+function sadReactHTML(on, count) {
+  return '<span class="dwc-react-ico" aria-hidden="true">😢</span><span class="dwc-act-count">' + (count || 0) + "</span>";
+}
+function confusedReactHTML(on, count) {
+  return '<span class="dwc-react-ico" aria-hidden="true">😕</span><span class="dwc-act-count">' + (count || 0) + "</span>";
+}
+function postReactionInnerHTML(id, counts) {
+  var my = myReaction("post-" + id);
+  return '<button type="button" class="dwc-act dwc-star' + (my === "heart" ? " on" : "") + '" onclick="DWC.reactPost(' + id + ', \'heart\', this)" aria-label="Heart this post">' + starHeartHTML(my === "heart", counts.heart) + "</button>" +
+    '<button type="button" class="dwc-act dwc-sad' + (my === "sad" ? " on" : "") + '" onclick="DWC.reactPost(' + id + ', \'sad\', this)" aria-label="React sad to this post">' + sadReactHTML(my === "sad", counts.sad) + "</button>" +
+    '<button type="button" class="dwc-act dwc-confused' + (my === "confused" ? " on" : "") + '" onclick="DWC.reactPost(' + id + ', \'confused\', this)" aria-label="React confused to this post">' + confusedReactHTML(my === "confused", counts.confused) + "</button>";
+}
+function postReactionGroupHTML(p) {
+  return '<span class="dwc-react-group" data-react-kind="post" data-react-id="' + p.id + '">' +
+    postReactionInnerHTML(p.id, { heart: p.score || 0, sad: p.sad || 0, confused: p.confused || 0 }) + "</span>";
+}
+function commentReactionInnerHTML(commentId, ctype, ref, counts) {
+  var my = myReaction("comment-" + ctype + "-" + commentId);
+  var args = "'" + ctype + "', " + ref + ", " + commentId + ", ";
+  return '<button type="button" class="dwc-act dwc-star' + (my === "heart" ? " on" : "") + '" onclick="DWC.reactComment(' + args + '\'heart\', this)" aria-label="Heart this comment">' + starHeartHTML(my === "heart", counts.heart) + "</button>" +
+    '<button type="button" class="dwc-act dwc-sad' + (my === "sad" ? " on" : "") + '" onclick="DWC.reactComment(' + args + '\'sad\', this)" aria-label="React sad to this comment">' + sadReactHTML(my === "sad", counts.sad) + "</button>" +
+    '<button type="button" class="dwc-act dwc-confused' + (my === "confused" ? " on" : "") + '" onclick="DWC.reactComment(' + args + '\'confused\', this)" aria-label="React confused to this comment">' + confusedReactHTML(my === "confused", counts.confused) + "</button>";
+}
+function commentReactionGroupHTML(c, react) {
+  // react: { ctype: 'thread' | 'listing' | 'profile', ref: postId | listingId | profileId }
+  var counts = { heart: (c.hearts != null ? c.hearts : (c.score || 0)), sad: c.sad || 0, confused: c.confused || 0 };
+  return '<span class="dwc-react-group" data-react-kind="comment" data-react-ctype="' + react.ctype + '" data-react-ref="' + react.ref + '" data-react-id="' + c.id + '">' +
+    commentReactionInnerHTML(c.id, react.ctype, react.ref, counts) + "</span>";
+}
+// After a react lands, re-render just that reaction group in place
+// (counts + which one is yours) without reloading the whole view.
+function refreshReactGroup(kind, id, data, ctype, ref) {
+  var sel = kind === "post"
+    ? '.dwc-react-group[data-react-kind="post"][data-react-id="' + id + '"]'
+    : '.dwc-react-group[data-react-kind="comment"][data-react-ctype="' + ctype + '"][data-react-id="' + id + '"]';
+  var counts = { heart: data.hearts || 0, sad: data.sad || 0, confused: data.confused || 0 };
+  document.querySelectorAll(sel).forEach(function (el) {
+    el.innerHTML = kind === "post"
+      ? postReactionInnerHTML(id, counts)
+      : commentReactionInnerHTML(id, ctype, ref, counts);
+  });
+}
+// ---------- Picture hearts (v3.16): heart or nothing ----------
+// On actual pictures (profile picture + public gallery photos in the
+// picture viewer): the same neon star heart, or nothing. No sad, no
+// confused, no thumbs-down. The cache key is "picture-<ownerId>-<subject>"
+// where subject is "avatar" or "gallery:<id>" — the same key the
+// picture comments use, so the heart always follows the same picture.
+function pictureHeartKey(ownerId, subject) { return "picture-" + ownerId + "-" + subject; }
+function pictureHeartHTML(hearts, my) {
+  return '<button type="button" class="dwc-act dwc-star' + (my ? " on" : "") + '" onclick="DWC.heartPicture(this)" aria-label="Heart this picture">' + starHeartHTML(my, hearts) + "</button>";
+}
+async function loadPicViewerHeart() {
+  var pv = state.picViewer;
+  var host = $("dwc-picviewer-heart");
+  if (!pv || !host) return;
+  var photo = pv.photos[pv.index];
+  if (!photo) { host.innerHTML = ""; return; }
+  var q = "/picture-hearts?owner_id=" + pv.memberId + "&subject=" + encodeURIComponent(photo.subject);
+  if (state.profile) q += "&device_id=" + encodeURIComponent(deviceId());
+  var data = await apiGet(q);
+  if (!state.picViewer || state.picViewer.photos[state.picViewer.index] !== photo) return;
+  if (!data || !data.ok) return;
+  if (state.profile) setReaction(pictureHeartKey(pv.memberId, photo.subject), data.my_heart ? "heart" : null);
+  host.innerHTML = pictureHeartHTML(data.hearts || 0, !!data.my_heart);
 }
 function $(id) { return document.getElementById(id); }
 function setNotice(msg) { state.notice = msg || null; renderNotice(); }
@@ -1843,8 +1930,8 @@ function phoneScreenHTML() {
   else if (app === "badges") inner = phoneBadgesHTML();
   else inner = phoneHomeHTML();
   return '<div class="tp-screen" style="background:' + phoneWallpaperBg(state.phone.wallpaper) + '">' +
-    '<div class="tp-island"></div>' +
-    '<div class="tp-status"><span id="tp-clock">' + phoneClockText() + '</span><span class="tp-status-right"><span class="tp-carrier">VNwireless ' + TP_SIGNAL_BARS + '</span><span class="tp-status-icons">' + TP_STATUS_ICONS + '</span></span></div>' +
+    '<div class="tp-statuswrap"><div class="tp-island"></div>' +
+    '<div class="tp-status"><span id="tp-clock">' + phoneClockText() + '</span><span class="tp-status-right"><span class="tp-carrier">VNR Wireless ' + TP_SIGNAL_BARS + '</span><span class="tp-status-icons">' + TP_STATUS_ICONS + '</span></span></div></div>' +
     '<div class="tp-body">' + inner + '</div>' +
     '<div class="tp-homebar" onclick="DWC.phoneGo(\'home\')" title="Home"></div>' +
     '</div>';
@@ -3356,7 +3443,6 @@ function postMediaHTML(p) {
     '<div class="dwc-dots" role="tablist" aria-label="Pictures in this post">' + dots + "</div></div>";
 }
 function postCardHTML(p) {
-  var heartOn = myHeart("post-" + p.id);
   var isCreator = !!p.is_creator;
   var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
   var isMine = state.profile && state.profile.id === p.author_id;
@@ -3398,7 +3484,7 @@ function postCardHTML(p) {
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-feed-actions">' +
     '<button type="button" class="dwc-act dwc-bookmark' + (saved ? " on" : "") + '" onclick="DWC.toggleSave(' + p.id + ', \'post\', this)" aria-label="Save this post">' + bookmarkHTML(saved) + "</button>" +
-    '<button type="button" class="dwc-act dwc-star' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)" aria-label="Heart this post">' + starHeartHTML(heartOn, p.score) + "</button>" +
+    postReactionGroupHTML(p) +
     '<a class="dwc-act dwc-comment-link" href="#/post/' + p.id + '" aria-label="Open comments">' + commentBubbleHTML(p.comment_count) + "</a>" +
     '<button type="button" class="dwc-act dwc-share" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)" aria-label="Share this post">♻️ <span class="dwc-act-count">Share</span></button>' +
     (p.kind === "card_auth" ? '<span class="dwc-auth">Real ' + p.auth_real + " · Fake " + p.auth_fake + " · Unsure " + p.auth_unsure + "</span>" : "") +
@@ -3417,9 +3503,9 @@ function postCardHTML(p) {
 // Feed redesign (v3.14) — comments use the same layout language as
 // posts: header row (name left, date+time right), compact body with
 // Read more, same action row, same RGB/neon borders. Callers pass
-// their own heart/reply/delete pieces — the backends differ by place:
-// thread comments have a heart endpoint; listing + profile comments
-// do not (no vote backend exists there — see the build log).
+// o.react ({ ctype: 'thread' | 'listing' | 'profile', ref: the post,
+// listing, or profile id }) and the card renders the heart + sad +
+// confused reaction group for that surface (v3.15).
 function commentCardHTML(c, o) {
   o = o || {};
   var long = (c.body || "").length > 280;
@@ -3436,7 +3522,7 @@ function commentCardHTML(c, o) {
     (o.gifAsImage ? "" : gifEmbedHTML(c.gif_url, c.gif_label)) +
     '<div class="dwc-feed-actions">' +
     '<button type="button" class="dwc-act dwc-bookmark' + (saved ? " on" : "") + '" onclick="DWC.toggleSave(' + c.id + ', \'comment\', this)" aria-label="Save this comment">' + bookmarkHTML(saved) + "</button>" +
-    (o.heartHTML || "") +
+    (o.react ? commentReactionGroupHTML(c, o.react) : "") +
     (o.canReply ? '<button type="button" class="dwc-act dwc-reply" onclick="DWC.replyToComment(\'' + esc(String(c.author_username || "").replace(/'/g, "")) + '\')">' + commentBubbleHTML(0, "Reply") + "</button>" : "") +
     (o.extraActions || "") +
     "</div></div></div>";
@@ -3888,7 +3974,6 @@ async function viewThread(el, postId) {
   var isMine = state.profile && state.profile.id === p.author_id;
   var isOperator = state.profile && state.profile.is_operator;
   var canDelete = isMine || isOperator;
-  var heartOn = myHeart("post-" + p.id);
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
     '<article class="card' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '">' +
@@ -3909,7 +3994,7 @@ async function viewThread(el, postId) {
     '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDateTime(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions dwc-feed-actions">' +
-    '<button type="button" class="dwc-act dwc-star' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)" aria-label="Heart this post">' + starHeartHTML(heartOn, p.score) + "</button>" +
+    postReactionGroupHTML(p) +
     '<button type="button" class="dwc-act dwc-share" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)" aria-label="Share this post">♻️ <span class="dwc-act-count">Share</span></button>' +
     (p.is_creator && state.profile && state.profile.id !== p.author_id
       ? (p.pay_unlock && p.price_cents > 0
@@ -3930,11 +4015,10 @@ async function viewThread(el, postId) {
         "</section>" : "") +
     '<section class="card"><h3 style="margin-top:0">Comments (' + list.length + ')' + (p.allow_comments ? "" : ' <span style="color:var(--amber)">— comments are off on this post</span>') + "</h3>" +
     (list.length ? list.map(function (c) {
-      var ch = myHeart("comment-" + c.id);
       var mine = state.profile && state.profile.id === c.author_id;
       return commentCardHTML(c, {
         canReply: true,
-        heartHTML: '<button type="button" class="dwc-act dwc-star' + (ch ? " on" : "") + '" onclick="DWC.heartComment(' + p.id + ", " + c.id + ', this)" aria-label="Heart this comment">' + starHeartHTML(ch, c.score) + "</button>",
+        react: { ctype: "thread", ref: p.id },
         extraActions: '<button type="button" class="dwc-linklike" onclick="DWC.report(\'comment\', ' + c.id + ')">🚩 Report</button>' +
           (mine ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteComment(' + p.id + ", " + c.id + ')">🗑 Delete</button>' : ""),
       });
@@ -4000,7 +4084,7 @@ async function viewListing(el, listingId) {
         '<button type="button" class="btn ghost small" onclick="DWC.tradeVote(' + l.id + ", 'bad')\">👎 Bad deal (" + l.trade_bad + ")</button></div></section>" : "") +
     '<section class="card"><h3 style="margin-top:0">Comments (' + list.length + ')' + (l.allow_comments ? "" : ' <span style="color:var(--amber)">— comments are off on this listing</span>') + "</h3>" +
     (list.length ? list.map(function (c) {
-      return commentCardHTML(c, { canReply: true });
+      return commentCardHTML(c, { canReply: true, react: { ctype: "listing", ref: l.id } });
     }).join("") : "<p>Nothing yet.</p>") +
     "</section>" +
     (state.profile && l.allow_comments
@@ -4442,7 +4526,7 @@ function gbFrameColors(th) {
 }
 // The profile picture, wrapped in the member's frame, sized by their
 // picture-size pick, and clickable to open the picture viewer (large +
-// comments, never likes). GB/GBA frames render a handheld around the
+// comments + heart). GB/GBA frames render a handheld around the
 // picture instead of a round ring.
 function picAvatarHTML(m, th) {
   var frame = (th && th.pic_frame) || "none";
@@ -4665,6 +4749,7 @@ async function loadPageComments(profileId, isMine, isFriend) {
     ? comments.map(function (c) {
         return commentCardHTML(c, {
           canReply: true,
+          react: { ctype: "profile", ref: profileId },
           gifAsImage: true, // page comments show a raw GIF link as an image, as before
           visibilityNote: c.visibility !== "public" ? "· " + (c.visibility === "friends" ? "friends-only" : "private") : "",
           mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
@@ -4692,12 +4777,12 @@ async function loadPageComments(profileId, isMine, isFriend) {
     '<p class="dwc-form-err" data-err hidden></p>';
 }
 
-// ---------- v3.9 picture viewer (lightbox + comments, never likes) ----------
+// ---------- v3.9 picture viewer (lightbox + comments + heart) ----------
 // Opened by tapping a profile picture. Shows the picture large in the
 // owner's frame, with Prev/Next through their public phone pictures
-// (avatar first, then up to 20 public gallery photos), and a comment
-// thread under it (the profile-comments API, subject = the picture).
-// There is NO like button on pictures — likes live on posts only.
+// (avatar first, then up to 20 public gallery photos), a heart button
+// under it (v3.16 — heart or nothing, no sad/confused), and a comment
+// thread under that (the profile-comments API, subject = the picture).
 function picViewerPhotoHTML(pv) {
   var photo = pv.photos[pv.index];
   if (!photo) return '<p style="color:var(--muted)">No picture here.</p>';
@@ -4736,9 +4821,11 @@ function renderPicViewer() {
     '<span>' + (pv.index + 1) + " / " + pv.photos.length + "</span>" +
     '<button type="button" class="btn ghost small" onclick="DWC.picViewerNext()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>Next →</button>' +
     "</div>" +
+    '<div id="dwc-picviewer-heart" class="dwc-picviewer-heart"></div>' +
     '<div id="dwc-picviewer-comments"><p style="color:var(--muted)">Loading comments…</p></div>' +
     "</div>";
   loadPicViewerComments();
+  loadPicViewerHeart();
 }
 async function loadPicViewerComments() {
   var pv = state.picViewer;
@@ -4754,6 +4841,8 @@ async function loadPicViewerComments() {
     (comments.length
       ? comments.map(function (c) {
           return commentCardHTML(c, {
+            canReply: true,
+            react: { ctype: "profile", ref: pv.memberId },
             mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
             extraActions: (c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "",
           });
@@ -5727,10 +5816,12 @@ window.DWC = {
     return false;
   },
   // Feed redesign (v3.14) — the bubble on a comment is a Reply button:
-  // focus the comment form and prefill "@username ".
+  // focus the comment form and prefill "@username ". Reactions (v3.15)
+  // added the picture viewer form too, so Reply works there as well.
   replyToComment: function (username) {
     var box = $("dwc-comment-box");
     if (!box) { var pf = $("dwc-page-comments-form"); if (pf) box = pf.querySelector('textarea[name="body"]'); }
+    if (!box) { var pv = $("dwc-picviewer-comments"); if (pv) box = pv.querySelector('textarea[name="body"]'); }
     if (!box) return;
     var prefix = "@" + username + " ";
     if (box.value.indexOf(prefix) !== 0) box.value = prefix + box.value;
@@ -6733,21 +6824,55 @@ window.DWC = {
     return false;
   },
 
-  heartPost: async function (id, btn) {
-    if (!state.profile) { setNotice("Create your account first to heart posts."); DWC.openSignup(); return; }
-    var data = await apiPost("/posts/" + id + "/vote", { device_id: deviceId() });
+  // Reactions (v3.15) — heart + sad + confused on a post. One reaction
+  // per person; tapping the same kind again takes it off, tapping
+  // another kind switches. The group re-renders in place from the
+  // server's counts, so no full reload is needed.
+  reactPost: async function (id, kind, btn) {
+    if (!state.profile) { setNotice("Create your account first to react to posts."); DWC.openSignup(); return; }
+    var data = await apiPost("/posts/" + id + "/vote", { device_id: deviceId(), kind: kind });
     if (data && data.ok) {
-      setHeart("post-" + id, data.my_heart);
-      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = starHeartHTML(data.my_heart, data.hearts); }
+      setReaction("post-" + id, data.my_reaction || null);
+      refreshReactGroup("post", id, data);
+    } else if (data && data.error) setNotice(data.error);
+  },
+  heartPost: async function (id, btn) { return DWC.reactPost(id, "heart", btn); },
+  // Reactions (v3.15) — heart + sad + confused on a comment, on every
+  // surface: thread (postId), listing (listingId), profile page and
+  // picture viewer (profileId). Same one-reaction rule as posts.
+  reactComment: async function (ctype, ref, commentId, kind, btn) {
+    if (!state.profile) { setNotice("Create your account first to react to comments."); DWC.openSignup(); return; }
+    var url, body = { device_id: deviceId(), kind: kind };
+    if (ctype === "thread") url = "/posts/" + ref + "/comments/" + commentId + "/vote";
+    else if (ctype === "listing") url = "/listings/" + ref + "/comments/" + commentId + "/react";
+    else { url = "/profile-comments/react"; body.comment_id = commentId; }
+    var data = await apiPost(url, body);
+    if (data && data.ok) {
+      setReaction("comment-" + ctype + "-" + commentId, data.my_reaction || null);
+      refreshReactGroup("comment", commentId, data, ctype, ref);
     } else if (data && data.error) setNotice(data.error);
   },
   // Feed redesign (v3.14) — the thread post heart is the same neon star.
-  heartComment: async function (postId, commentId, btn) {
-    if (!state.profile) { setNotice("Create your account first to heart comments."); return; }
-    var data = await apiPost("/posts/" + postId + "/comments/" + commentId + "/vote", { device_id: deviceId() });
+  heartComment: async function (postId, commentId, btn) { return DWC.reactComment("thread", postId, commentId, "heart", btn); },
+  // Picture hearts (v3.16) — heart or nothing on the picture open in
+  // the viewer. Same neon star as posts/comments; no sad/confused.
+  // The button re-renders in place from the server's count, and the
+  // host is only touched if the viewer is still on the same photo
+  // (Prev/Next rebuilds it, so a late reply never writes to the
+  // wrong picture).
+  heartPicture: async function (btn) {
+    if (!state.profile) { setNotice("Create your account first to heart pictures."); DWC.openSignup(); return; }
+    var pv = state.picViewer;
+    if (!pv) return;
+    var photo = pv.photos[pv.index];
+    if (!photo) return;
+    var data = await apiPost("/picture-hearts", { device_id: deviceId(), owner_id: pv.memberId, subject: photo.subject });
     if (data && data.ok) {
-      setHeart("comment-" + commentId, data.my_heart);
-      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = starHeartHTML(data.my_heart, data.hearts); }
+      setReaction(pictureHeartKey(pv.memberId, photo.subject), data.my_heart ? "heart" : null);
+      var host = $("dwc-picviewer-heart");
+      if (host && state.picViewer && state.picViewer.photos[state.picViewer.index] === photo) {
+        host.innerHTML = pictureHeartHTML(data.hearts || 0, !!data.my_heart);
+      }
     } else if (data && data.error) setNotice(data.error);
   },
   // Feed redesign (v3.14) — comment hearts are the same neon star.

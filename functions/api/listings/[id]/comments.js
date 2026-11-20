@@ -1,7 +1,7 @@
 // GET /api/listings/:id/comments — listListingComments (oldest first).
 // POST /api/listings/:id/comments — addListingComment (when the poster left
 // comments on; optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, awardLucre, LUCRE_AWARDS } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, awardLucre, LUCRE_AWARDS, commentReactionCounts } from "../../_lib.js";
 
 export async function onRequestGet({ env, params }) {
   const db = getDb(env);
@@ -11,13 +11,18 @@ export async function onRequestGet({ env, params }) {
     `SELECT c.*, a.id AS author_id, a.username AS author_username, a.avatar_blob_key AS author_avatar
      FROM listing_comments c JOIN profiles a ON a.id = c.profile_id WHERE c.listing_id = ? ORDER BY c.id ASC`,
   ).bind(id).all();
-  return json({
-    comments: (results || []).map((r) => ({
+  const comments = [];
+  for (const r of (results || [])) {
+    // Reactions (v3.15) — heart + sad + confused per comment.
+    const rc = await commentReactionCounts(db, "listing", r.id);
+    comments.push({
       id: r.id, listing_id: r.listing_id, body: r.body, gif_url: r.gif_url ?? null, gif_label: r.gif_label ?? "",
       author_id: r.author_id, author_username: r.author_username, author_avatar_url: imageUrl(r.author_avatar),
+      score: rc.heart, hearts: rc.heart, sad: rc.sad, confused: rc.confused,
       created_at: new Date(r.created_at).toISOString(),
-    })),
-  });
+    });
+  }
+  return json({ comments });
 }
 
 export async function onRequestPost({ env, request, params }) {

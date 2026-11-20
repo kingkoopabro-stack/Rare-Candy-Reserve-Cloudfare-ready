@@ -1,7 +1,7 @@
 // GET /api/posts/:id/comments — listComments (oldest first; adult posts
 // only to age-verified callers).
 // POST /api/posts/:id/comments — addComment (optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles, awardLucre, LUCRE_AWARDS } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles, awardLucre, LUCRE_AWARDS, commentReactionCounts } from "../../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -20,11 +20,13 @@ export async function onRequestGet({ env, request, params }) {
   const comments = [];
   const badgeMap = await badgesForProfiles(db, (results || []).map((r) => r.author_id));
   for (const r of (results || [])) {
-    const hearts = await db.prepare("SELECT COUNT(*) AS n FROM comment_votes WHERE comment_id = ? AND value = 1").bind(r.id).first();
+    // Reactions (v3.15) — heart + sad + confused per comment.
+    const rc = await commentReactionCounts(db, "post", r.id);
     comments.push({
       id: r.id, post_id: r.post_id, body: r.body, gif_url: r.gif_url ?? null, gif_label: r.gif_label ?? "",
       author_id: r.author_id, author_username: r.author_username, author_occupation: r.author_occupation ?? "",
-      author_avatar_url: imageUrl(r.author_avatar), author_badges: badgeMap.get(r.author_id) || [], score: hearts?.n ?? 0,
+      author_avatar_url: imageUrl(r.author_avatar), author_badges: badgeMap.get(r.author_id) || [], score: rc.heart,
+      hearts: rc.heart, sad: rc.sad, confused: rc.confused,
       created_at: new Date(r.created_at).toISOString(),
     });
   }

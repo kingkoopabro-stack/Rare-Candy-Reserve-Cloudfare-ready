@@ -10,7 +10,7 @@
 //   public / friends / private (default public).
 // DELETE /api/profile-comments?id=&device_id= — the page owner, the
 //   author, or the operator can delete a comment.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles, commentReactionCounts } from "./_lib.js";
 
 async function isFriendOf(db, viewerId, ownerId) {
   if (!viewerId || viewerId === ownerId) return viewerId === ownerId;
@@ -69,12 +69,15 @@ export async function onRequestGet({ env, request }) {
   for (const c of rows) {
     if (!canSee(c, viewer, isFriend, isOwner)) continue;
     const a = authors.get(c.author_id) || {};
+    // Reactions (v3.15) — heart + sad + confused per comment.
+    const rc = await commentReactionCounts(db, "profile", c.id);
     out.push({
       id: c.id, profile_id: c.profile_id, author_id: c.author_id,
       author_username: a.username ?? "member", author_avatar_url: imageUrl(a.avatar_blob_key ?? null),
       author_badges: badgeMap.get(c.author_id) || [],
       body: c.body, image_url: imageUrl(c.image_blob_key ?? null), gif_url: c.gif_url ?? null,
       visibility: c.visibility, is_mine: !!viewer && c.author_id === viewer.id,
+      score: rc.heart, hearts: rc.heart, sad: rc.sad, confused: rc.confused,
       created_at: iso(c.created_at),
     });
   }

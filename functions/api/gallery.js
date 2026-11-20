@@ -4,8 +4,9 @@
 // here (R2, same putImage pattern as avatars) and records it as a public
 // gallery photo for that profile. The picture viewer on a member page
 // reads this list (public only, max 20) so visitors can scroll through
-// the owner's public pictures. Nothing here is ever a like target —
-// gallery photos have comments only, never likes.
+// the owner's public pictures. Gallery photos are hearted in the viewer
+// (v3.16 — heart or nothing, via /api/picture-hearts); the phone Gallery
+// app itself stays session-only and has no hearts.
 import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs } from "./_lib.js";
 
 const MAX_PUBLIC = 20;

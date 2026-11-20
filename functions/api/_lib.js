@@ -731,8 +731,155 @@ export async function filterVisiblePosts(db, caller, rows) {
   return out;
 }
 
+// --- Reactions (v3.15): heart + sad + confused ------------------------
+// One reaction per person per target; tapping the same kind again takes
+// it off, tapping another kind switches. Heart is the neon star; sad
+// and confused are silent (no notification, no Lucre). Only hearts
+// notify and pay the 5 Lucre, exactly as before.
+// Posts live in post_reactions; every comment surface (thread, listing,
+// profile-page, picture) lives in comment_reactions with a target_type
+// so ids can't collide across the three comment tables. All helpers are
+// defensive: a missing table reads as all zeros / null, so an un-run
+// migration never crashes a fetch.
+export const REACTION_KINDS = ["heart", "sad", "confused"];
+
+export async function postReactionCounts(db, postId) {
+  const out = { heart: 0, sad: 0, confused: 0 };
+  try {
+    const { results } = await db.prepare("SELECT kind, COUNT(*) AS n FROM post_reactions WHERE post_id = ? GROUP BY kind").bind(postId).all();
+    for (const r of (results || [])) if (r.kind in out) out[r.kind] = Number(r.n || 0);
+    // Legacy hearts (rows not yet copied by the migration) count too —
+    // UNION keeps a copied heart from counting twice.
+    try {
+      const legacy = await db.prepare("SELECT COUNT(*) AS n FROM (SELECT profile_id FROM post_votes WHERE post_id = ? AND value = 1 UNION SELECT profile_id FROM post_reactions WHERE post_id = ? AND kind = 'heart')").bind(postId, postId).first();
+      out.heart = Number(legacy?.n || 0);
+    } catch { /* legacy table gone — new counts stand */ }
+  } catch {
+    // Reactions table not there yet — hearts the old way.
+    try {
+      const row = await db.prepare("SELECT COUNT(*) AS n FROM post_votes WHERE post_id = ? AND value = 1").bind(postId).first();
+      out.heart = Number(row?.n || 0);
+    } catch { /* nothing to count */ }
+  }
+  return out;
+}
+
+export async function commentReactionCounts(db, targetType, targetId) {
+  const out = { heart: 0, sad: 0, confused: 0 };
+  try {
+    const { results } = await db.prepare("SELECT kind, COUNT(*) AS n FROM comment_reactions WHERE target_type = ? AND target_id = ? GROUP BY kind").bind(targetType, targetId).all();
+    for (const r of (results || [])) if (r.kind in out) out[r.kind] = Number(r.n || 0);
+    // Thread comments had a legacy heart table (comment_votes) — merge
+    // it the same UNION way so a copied heart never counts twice.
+    // Listing + profile comments never had votes, so nothing to merge.
+    if (targetType === "post") {
+      try {
+        const legacy = await db.prepare("SELECT COUNT(*) AS n FROM (SELECT profile_id FROM comment_votes WHERE comment_id = ? AND value = 1 UNION SELECT profile_id FROM comment_reactions WHERE target_type = 'post' AND target_id = ? AND kind = 'heart')").bind(targetId, targetId).first();
+        out.heart = Number(legacy?.n || 0);
+      } catch { /* legacy table gone — new counts stand */ }
+    }
+  } catch {
+    // Reactions table not there yet — thread hearts the old way.
+    if (targetType === "post") {
+      try {
+        const row = await db.prepare("SELECT COUNT(*) AS n FROM comment_votes WHERE comment_id = ? AND value = 1").bind(targetId).first();
+        out.heart = Number(row?.n || 0);
+      } catch { /* nothing to count */ }
+    }
+  }
+  return out;
+}
+
+// Toggle one member's reaction. Returns { counts, my_reaction } where
+// my_reaction is the kind now held, or null when it was taken off.
+// Returns null when the reactions table isn't there yet — the caller
+// falls back to the legacy heart-only tables for hearts.
+export async function togglePostReaction(db, me, postId, kind) {
+  try {
+    const existing = await db.prepare("SELECT kind FROM post_reactions WHERE post_id = ? AND profile_id = ? LIMIT 1").bind(postId, me.id).first();
+    let my = null;
+    if (existing && existing.kind === kind) {
+      await db.prepare("DELETE FROM post_reactions WHERE post_id = ? AND profile_id = ?").bind(postId, me.id).run();
+    } else if (existing) {
+      await db.prepare("UPDATE post_reactions SET kind = ?, created_at = ? WHERE post_id = ? AND profile_id = ?").bind(kind, nowMs(), postId, me.id).run();
+      my = kind;
+    } else {
+      await db.prepare("INSERT INTO post_reactions (post_id, profile_id, kind, created_at) VALUES (?, ?, ?, ?)").bind(postId, me.id, kind, nowMs()).run();
+      my = kind;
+    }
+    return { counts: await postReactionCounts(db, postId), my_reaction: my };
+  } catch (e) {
+    if (/no such table/i.test(String((e && e.message) || e))) return null;
+    throw e;
+  }
+}
+
+export async function toggleCommentReaction(db, me, targetType, targetId, kind) {
+  try {
+    const existing = await db.prepare("SELECT kind FROM comment_reactions WHERE target_type = ? AND target_id = ? AND profile_id = ? LIMIT 1").bind(targetType, targetId, me.id).first();
+    let my = null;
+    if (existing && existing.kind === kind) {
+      await db.prepare("DELETE FROM comment_reactions WHERE target_type = ? AND target_id = ? AND profile_id = ?").bind(targetType, targetId, me.id).run();
+    } else if (existing) {
+      await db.prepare("UPDATE comment_reactions SET kind = ?, created_at = ? WHERE target_type = ? AND target_id = ? AND profile_id = ?").bind(kind, nowMs(), targetType, targetId, me.id).run();
+      my = kind;
+    } else {
+      await db.prepare("INSERT INTO comment_reactions (target_type, target_id, profile_id, kind, created_at) VALUES (?, ?, ?, ?, ?)").bind(targetType, targetId, me.id, kind, nowMs()).run();
+      my = kind;
+    }
+    return { counts: await commentReactionCounts(db, targetType, targetId), my_reaction: my };
+  } catch (e) {
+    if (/no such table/i.test(String((e && e.message) || e))) return null;
+    throw e;
+  }
+}
+
+// Picture hearts (v3.16) — heart or nothing on actual pictures
+// (profile picture + public gallery photos, as seen in the picture
+// viewer). A picture is (owner_id, subject) where subject is "avatar"
+// or "gallery:<id>" — the same key the picture comments use, so the
+// heart always follows the same picture the comments do. One heart per
+// person per picture, enforced by the primary key. No legacy table:
+// pictures never had likes before, so a missing table just means the
+// migration hasn't run yet — counts read as 0, never a crash.
+export async function pictureHeartCounts(db, ownerId, subject) {
+  try {
+    const row = await db.prepare("SELECT COUNT(*) AS n FROM picture_hearts WHERE owner_id = ? AND subject = ?").bind(ownerId, subject).first();
+    return Number(row?.n || 0);
+  } catch { return 0; }
+}
+
+export async function pictureMyHeart(db, ownerId, subject, profileId) {
+  if (!profileId) return false;
+  try {
+    const row = await db.prepare("SELECT 1 AS x FROM picture_hearts WHERE owner_id = ? AND subject = ? AND profile_id = ? LIMIT 1").bind(ownerId, subject, profileId).first();
+    return !!row;
+  } catch { return false; }
+}
+
+// Toggle one member's heart on a picture. Returns
+// { hearts, my_heart } or null when the table isn't there yet.
+export async function togglePictureHeart(db, me, ownerId, subject) {
+  try {
+    const existing = await db.prepare("SELECT 1 AS x FROM picture_hearts WHERE owner_id = ? AND subject = ? AND profile_id = ? LIMIT 1").bind(ownerId, subject, me.id).first();
+    let myHeart;
+    if (existing) {
+      await db.prepare("DELETE FROM picture_hearts WHERE owner_id = ? AND subject = ? AND profile_id = ?").bind(ownerId, subject, me.id).run();
+      myHeart = false;
+    } else {
+      await db.prepare("INSERT INTO picture_hearts (owner_id, subject, profile_id, created_at) VALUES (?, ?, ?, ?)").bind(ownerId, subject, me.id, nowMs()).run();
+      myHeart = true;
+    }
+    return { hearts: await pictureHeartCounts(db, ownerId, subject), my_heart: myHeart };
+  } catch (e) {
+    if (/no such table/i.test(String((e && e.message) || e))) return null;
+    throw e;
+  }
+}
+
 export async function shapePost(db, row, author) {
-  const hearts = await db.prepare("SELECT COUNT(*) AS n FROM post_votes WHERE post_id = ? AND value = 1").bind(row.id).first();
+  const rc = await postReactionCounts(db, row.id);
+  const hearts = { n: rc.heart };
   const cc = await db.prepare("SELECT COUNT(*) AS n FROM comments WHERE post_id = ?").bind(row.id).first();
   const t = await authTally(db, row.id);
   // Feed redesign (v3.14) — edit count comes from the post_edits log
@@ -754,6 +901,9 @@ export async function shapePost(db, row, author) {
     author_avatar_url: imageUrl(author.avatar_blob_key),
     author_badges: author.badges || [],
     score: hearts?.n ?? 0, comment_count: cc?.n ?? 0,
+    // Reactions (v3.15) — heart + sad + confused on every post.
+    // score stays the heart count (the "top" sort still ranks by it).
+    sad: rc.sad, confused: rc.confused,
     // Feed redesign (v3.14) — visibility + edit count (3-edit limit).
     visibility: row.visibility ?? "public",
     edit_count: editCount,
@@ -1073,10 +1223,15 @@ export async function computeUnlockCounts(db, profileId) {
   const pageComments = await count("SELECT COUNT(*) AS n FROM profile_comments WHERE author_id = ?", profileId);
   const postComments = await count("SELECT COUNT(*) AS n FROM comments WHERE profile_id = ?", profileId);
   counts.comments = pageComments + postComments;
-  const heartsGiven = (await count("SELECT COUNT(*) AS n FROM post_votes WHERE profile_id = ? AND value = 1", profileId))
-    + (await count("SELECT COUNT(*) AS n FROM comment_votes WHERE profile_id = ? AND value = 1", profileId));
-  const heartsOnPosts = await count("SELECT COUNT(*) AS n FROM post_votes pv JOIN posts p ON p.id = pv.post_id WHERE p.profile_id = ? AND pv.value = 1", profileId);
-  const heartsOnComments = await count("SELECT COUNT(*) AS n FROM comment_votes cv JOIN comments c ON c.id = cv.comment_id WHERE c.profile_id = ? AND cv.value = 1", profileId);
+  // Hearts (v3.15) — read from the reaction tables. The migration
+  // copies every legacy heart row into them first, so new-only counts
+  // are exact once it has run. Before that the tables are missing and
+  // these read 0 (grants are insert-only, so nothing already earned is
+  // ever lost — new heart badges just wait for the migration).
+  const heartsGiven = (await count("SELECT COUNT(*) AS n FROM post_reactions WHERE profile_id = ? AND kind = 'heart'", profileId))
+    + (await count("SELECT COUNT(*) AS n FROM comment_reactions WHERE profile_id = ? AND kind = 'heart'", profileId));
+  const heartsOnPosts = await count("SELECT COUNT(*) AS n FROM post_reactions pr JOIN posts p ON p.id = pr.post_id WHERE p.profile_id = ? AND pr.kind = 'heart'", profileId);
+  const heartsOnComments = await count("SELECT COUNT(*) AS n FROM comment_reactions cr JOIN comments c ON c.id = cr.target_id WHERE cr.target_type = 'post' AND c.profile_id = ? AND cr.kind = 'heart'", profileId);
   counts.hearts = heartsGiven + heartsOnPosts + heartsOnComments;
   counts.days = await count("SELECT COUNT(*) AS n FROM profile_activity_days WHERE profile_id = ?", profileId);
   // Completed sales: orders where this member is the seller and the

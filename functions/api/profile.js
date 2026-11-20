@@ -6,7 +6,7 @@
 // human-check. No age proof is required to join — only for the 18+ area.
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
-  checkChallenge, putImage, nowMs, sanitizeLayoutCss, parseTopFriendIds,
+  checkChallenge, putImage, putVideo, fileUrl, nowMs, sanitizeLayoutCss, parseTopFriendIds,
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
   createNotification, cleanWebsiteShow, RELATIONSHIP_IDS, ZODIAC_IDS,
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
@@ -90,6 +90,18 @@ export async function onRequestPost({ env, request }) {
     const up = await putImage(env, "banners", deviceId, a.banner, 2500000);
     if (!up.ok) bannerError = up.error;
     else bannerKey = up.key;
+  }
+  // v3.10 — one profile video (YouTube link or an uploaded clip, stored
+  // in R2 under "profile-video/"). Same pattern as the avatar: a bad
+  // video never kills the whole save; the client shows video_error.
+  // An upload wins over a YouTube link; removing clears both.
+  let videoKey = undefined; // undefined = keep
+  let videoError = null;
+  if (a.remove_video) videoKey = null;
+  else if (a.video) {
+    const up = await putVideo(env, "profile-video", deviceId, a.video, 15000000);
+    if (!up.ok) videoError = up.error;
+    else videoKey = up.key;
   }
 
   const now = nowMs();
@@ -232,6 +244,19 @@ export async function onRequestPost({ env, request }) {
           incoming.display_badges = repaired;
           themeIn = incoming;
         }
+      }
+      // v3.10 — profile video: a fresh upload wins over a YouTube link
+      // and stores the R2 file URL; removing clears both. A failed
+      // upload leaves the previous video alone (video_error tells the
+      // member) instead of wiping it.
+      if (videoKey === null) {
+        incoming.video_url = "";
+        incoming.video_file_url = "";
+        themeIn = incoming;
+      } else if (videoKey) {
+        incoming.video_file_url = fileUrl(videoKey);
+        incoming.video_url = "";
+        themeIn = incoming;
       }
     }
     v3Sets.push("profile_theme = ?");
@@ -443,6 +468,12 @@ export async function onRequestPost({ env, request }) {
     const grants = await grantUnlocks(db, row.id);
     profileOut.unlocked_frames = grants.unlocked;
     profileOut.unlock_counts = grants.counts;
+    // Same three fields the GET attaches — without them the client
+    // replaces its profile with a badge-less copy after every save,
+    // and the badge picker in Edit Profile goes empty until reload.
+    profileOut.badges = badgeListFor(grants.unlocked);
+    profileOut.is_regular_seller = grants.unlocked.includes("badge:sales-5");
+    profileOut.is_adult_seller = (await adultCreatorIds(db, [row.id])).has(row.id);
   }
-  return json({ ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, avatar_error: avatarError, banner_error: bannerError });
+  return json({ ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError });
 }

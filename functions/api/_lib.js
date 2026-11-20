@@ -818,7 +818,9 @@ export function parseAshTracks(stored) {
 // construction: colors must be #rrggbb, the background image must be
 // https://, and the font must be one of the fixed allowlisted stacks.
 export const THEME_FONTS = ["", "comic", "typewriter", "serif", "rounded"];
-export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost"];
+export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost", "insert-coin"];
+// Taffy Layout Builder vibes (v3.10) — one of the fixed vibe ids, or "".
+export const VIBE_IDS = ["", "neon", "midnight", "candy", "classic", "forest", "sunset", "ocean", "bubblegum", "gold", "dark"];
 export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text", "sparkle-name", "sparkle-banner", "ticker-effect", "rgb-comment-border"];
 // Profile customization (v3.9) — preset backgrounds, picture size /
 // position / frame, comment-picture border color. All live in the theme
@@ -1084,8 +1086,15 @@ export function parseWebsiteShow(stored) {
 export function cleanWebsiteShow(input) {
   return JSON.stringify(parseWebsiteShow(input));
 }
+export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation"];
+const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
+export function extractYouTubeId(str) {
+  if (!str) return "";
+  const m = String(str).match(YOUTUBE_ID_RE);
+  return m ? m[1] : "";
+}
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [] };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1099,6 +1108,8 @@ export function parseTheme(stored) {
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = THEME_FONTS.includes(obj.font) ? obj.font : "";
   out.button_style = BUTTON_STYLE_IDS.includes(obj.button_style) ? obj.button_style : "";
+  // Vibe (v3.10) — a full look, one of the fixed ids.
+  out.vibe = VIBE_IDS.includes(String(obj.vibe || "")) ? String(obj.vibe) : "";
   out.button_css = sanitizeLayoutCss(String(obj.button_css || "")).slice(0, 4000);
   const eff = Array.isArray(obj.effects) ? obj.effects : [];
   out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 8);
@@ -1125,13 +1136,32 @@ export function parseTheme(stored) {
   // (cleanDisplayBadges); parsing only keeps known badge keys.
   const db = Array.isArray(obj.display_badges) ? obj.display_badges : [];
   out.display_badges = [...new Set(db.map((k) => String(k || "")))].filter((k) => BADGE_KEYS.includes(k)).slice(0, 2);
+  // Action buttons (v3.10) — which side they sit on ("" = left default)
+  // and whether they show at all (default true — hiding is opt-in).
+  out.buttons_side = (String(obj.buttons_side || "") === "right") ? "right" : "";
+  out.buttons_show = obj.buttons_show === false ? false : true;
+  // One video per profile (v3.10) — a YouTube link (validated: must
+  // carry a real 11-char video id) or an uploaded clip served from R2
+  // (/api/files?key=... or https://). The two are exclusive: an upload
+  // clears the YouTube link on save.
+  const vu = String(obj.video_url || "").trim().slice(0, 500);
+  out.video_url = extractYouTubeId(vu) ? vu : "";
+  const vf = String(obj.video_file_url || "").trim().slice(0, 500);
+  out.video_file_url = (/^\/api\/files\?key=/i.test(vf) || /^https:\/\//i.test(vf)) ? vf : "";
+  // Ticker source (v3.10) — "" = the member's own text, "btc" = live
+  // Bitcoin price from CoinGecko (free, no key, fetched client-side).
+  out.ticker_source = (String(obj.ticker_source || "") === "btc") ? "btc" : "";
+  // Hidden page sections (v3.10) — which card sections the member chose
+  // to hide on their page (MySpace-style: show only what you want).
+  const hs = Array.isArray(obj.hide_sections) ? obj.hide_sections : [];
+  out.hide_sections = [...new Set(hs.map((k) => String(k || "")))].filter((k) => SECTION_HIDE_IDS.includes(k)).slice(0, 9);
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button
@@ -1140,7 +1170,7 @@ export function cleanTheme(input) {
 // Labels are plain text, max 30 chars; colors must be #rrggbb; the solid
 // image (mode "image") must be https://. Only keys the owner actually
 // set are kept; returns "" when nothing is set.
-export const PROFILE_BUTTON_IDS = ["add", "message", "favorite", "group", "report"];
+export const PROFILE_BUTTON_IDS = ["add", "message", "favorite", "group"];
 export function cleanProfileButtons(input) {
   let obj = null;
   try { obj = typeof input === "string" ? JSON.parse(input) : input; } catch { return ""; }

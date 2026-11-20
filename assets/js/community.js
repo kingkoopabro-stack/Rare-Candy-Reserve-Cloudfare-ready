@@ -130,6 +130,12 @@ var state = {
   category: null,
   sort: "new",
   friendsOnly: false,
+  // Feed redesign (v3.14) — single-column Reddit-style feed.
+  savedOnly: false, // show only posts saved by this member (server log, or localStorage for guests)
+  savedServer: null, // server copy of saved post ids; null until loaded
+  composerOpen: false, // composer starts collapsed — a one-line prompt
+  searchPosts: null, // cached posts for header search (lazy-loaded)
+  searchMembers: null, // cached members for header search (lazy-loaded)
   editingProfile: false,
   signupOpen: false,
   challenge: null, // { token, question }
@@ -221,6 +227,69 @@ function fmtDate(isoStr) {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
+// Feed redesign (v3.14) — date + time for the post-card header row
+// (top-right), e.g. "Nov 20, 2026 · 4:05 PM".
+function fmtDateTime(isoStr) {
+  if (!isoStr) return "";
+  var d = new Date(isoStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
+    " · " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+// ---------- Feed redesign (v3.14): saved posts, action icons ----------
+// Saved posts are LOGGED server-side in the post_saves table
+// (functions/api/post-saves.js) when signed in, so a save follows the
+// member between devices. Guests have no account to log under, so their
+// saves stay on this device only (localStorage, key dwc-saved-posts).
+// Comment saves are localStorage-only (post_saves is posts-only).
+// No Lucre is paid for saving. Keys: "post-<id>" / "comment-<id>".
+var SAVED_KEY = "dwc-saved-posts";
+function loadSavedSet() {
+  try { var raw = localStorage.getItem(SAVED_KEY); var arr = raw ? JSON.parse(raw) : []; return Array.isArray(arr) ? arr : []; }
+  catch (e) { return []; }
+}
+function saveSavedSet(arr) { try { localStorage.setItem(SAVED_KEY, JSON.stringify(arr)); } catch (e) {} }
+// The server copy of a member's saved post ids (null until loaded, so
+// we never claim "not saved" before asking the server).
+async function loadSavedServer() {
+  if (!state.profile) { state.savedServer = null; return; }
+  var data = await apiGet("/post-saves?device_id=" + encodeURIComponent(deviceId()));
+  state.savedServer = data && data.ok && Array.isArray(data.saved_post_ids) ? data.saved_post_ids : [];
+}
+function isSavedKey(key) {
+  if (key.indexOf("post-") === 0 && state.profile && state.savedServer !== null) {
+    return state.savedServer.indexOf(parseInt(key.slice(5), 10)) >= 0;
+  }
+  return loadSavedSet().indexOf(key) >= 0;
+}
+function setSavedKey(key, on) {
+  var arr = loadSavedSet().filter(function (k) { return k !== key; });
+  if (on) arr.push(key);
+  saveSavedSet(arr);
+  return on;
+}
+function savedCount() {
+  if (state.profile && state.savedServer !== null) return state.savedServer.length;
+  return loadSavedSet().length;
+}
+// Neon glowing star heart (feed + thread post hearts). The star is an
+// inline SVG so the glow is a real drop-shadow, not an emoji render.
+function starHeartHTML(on, count) {
+  return '<svg class="dwc-star-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>' +
+    '<span class="dwc-act-count">' + (count || 0) + "</span>";
+}
+// Bright-blue bookmark (feed + comments). Filled when saved on this device.
+function bookmarkHTML(saved) {
+  return '<svg class="dwc-bm-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h12a1 1 0 0 1 1 1v19l-7-4.5L5 22V3a1 1 0 0 1 1-1z"/></svg>' +
+    '<span class="dwc-act-count">' + (saved ? "Saved" : "Save") + "</span>";
+}
+// White-filled comment bubble (feed + comments). On a comment it is a
+// Reply button; on a post it opens the thread.
+function commentBubbleHTML(count, label) {
+  return '<svg class="dwc-cmt-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 5.9 2 10.8c0 2.8 1.5 5.2 3.8 6.8L4.5 22l5-2.7c.8.2 1.6.3 2.5.3 5.5 0 10-3.9 10-8.8S17.5 2 12 2z"/></svg>' +
+    '<span class="dwc-act-count">' + (label != null ? label : (count || 0)) + "</span>";
+}
 function $(id) { return document.getElementById(id); }
 function setNotice(msg) { state.notice = msg || null; renderNotice(); }
 function renderNotice() {
@@ -258,6 +327,19 @@ async function apiDelete(path, body) {
   try {
     var res = await fetch(API + path, {
       method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    var data = await res.json().catch(function () { return null; });
+    if (data && data.error === "db_unavailable") { markDbDown(); return data; }
+    return data || { ok: false, error: "Request failed." };
+  } catch (e) { return { ok: false, error: "Couldn't reach the Community — check your connection and try again." }; }
+}
+// Feed redesign (v3.14) — PUT for post edits.
+async function apiPut(path, body) {
+  try {
+    var res = await fetch(API + path, {
+      method: "PUT",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body || {}),
     });
@@ -531,9 +613,11 @@ function copyLink(url, btn) {
   }
   var done = function () {
     if (btn) {
-      var old = btn.textContent;
-      btn.textContent = "Copied ✓";
-      setTimeout(function () { btn.textContent = old; }, 1600);
+      // Save/restore innerHTML (not textContent) — the share button
+      // carries a <span> for its label, and textContent would flatten it.
+      var old = btn.innerHTML;
+      btn.innerHTML = "Copied ✓";
+      setTimeout(function () { btn.innerHTML = old; }, 1600);
     }
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -3230,28 +3314,93 @@ function eventLineHTML(p) {
   return '<p class="dwc-event-line">📅 ' + esc(parts.join(" · ")) + "</p>";
 }
 
+// Feed redesign (v3.14) — one scrolling feed, Reddit-style: a single
+// vertical list, one card after another, full feed width, going DOWN.
+// No multi-column grid for posts anywhere in the community feed.
+// A post can carry one photo, one short video, and one GIF embed —
+// each becomes a carousel slide; one slide = shown as-is, several =
+// carousel with dots + arrows underneath.
+function postTypeLabel(p) {
+  if (p.kind === "event") return "📅 Event";
+  if (p.kind === "card_auth") return "🔍 Card Check";
+  if (p.category === "News") return "📰 News";
+  if (p.kind === "announcement") return "📢 Announcement";
+  return "💬 Post";
+}
+function postMediaSlides(p) {
+  var slides = [];
+  var ph = postPhotoHTML(p);
+  if (ph) slides.push(ph);
+  var vid = postVideoHTML(p);
+  if (vid) slides.push(vid);
+  var gif = gifEmbedHTML(p.gif_url, p.gif_label);
+  if (gif) slides.push(gif);
+  var yt = youtubeEmbedHTML(p.body || "");
+  if (yt) slides.push(yt);
+  return slides;
+}
+function postMediaHTML(p) {
+  var slides = postMediaSlides(p);
+  if (!slides.length) return "";
+  if (slides.length === 1) return '<div class="dwc-feed-media">' + slides[0] + "</div>";
+  var dots = slides.map(function (_, i) {
+    return '<button type="button" class="dwc-dot' + (i === 0 ? " on" : "") + '" data-slide="' + i + '" onclick="DWC.carouselGo(' + p.id + ", " + i + ', this)" aria-label="Show picture ' + (i + 1) + " of " + slides.length + '"></button>';
+  }).join("");
+  var inner = slides.map(function (s, i) {
+    return '<div class="dwc-slide' + (i === 0 ? " on" : "") + '" data-slide="' + i + '"' + (i === 0 ? "" : " hidden") + ">" + s + "</div>";
+  }).join("");
+  return '<div class="dwc-carousel" data-post="' + p.id + '">' +
+    '<div class="dwc-slides">' + inner + "</div>" +
+    '<button type="button" class="dwc-car-arrow dwc-car-prev" onclick="DWC.carouselStep(' + p.id + ', -1, this)" aria-label="Previous picture">‹</button>' +
+    '<button type="button" class="dwc-car-arrow dwc-car-next" onclick="DWC.carouselStep(' + p.id + ', 1, this)" aria-label="Next picture">›</button>' +
+    '<div class="dwc-dots" role="tablist" aria-label="Pictures in this post">' + dots + "</div></div>";
+}
 function postCardHTML(p) {
   var heartOn = myHeart("post-" + p.id);
   var isCreator = !!p.is_creator;
   var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
-  return '<article class="card dwc-post' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '">' +
-    postPhotoHTML(p) +
-    postVideoHTML(p) +
-    gifEmbedHTML(p.gif_url, p.gif_label) +
-    '<div class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "card_auth" ? " · 🔍 Card Check" : p.kind === "adult" ? " · 18+" : p.kind === "event" ? " · 📅 Event" : p.kind === "announcement" ? " · 📢 Announcement" : "") + (isCreator ? " · 🎨 Creator" : "") + "</div>" +
-    '<h3 style="margin:8px 0 4px"><a href="#/post/' + p.id + '" class="dwc-titlelink">' + esc(p.title) + "</a></h3>" +
+  var isMine = state.profile && state.profile.id === p.author_id;
+  var isOp = state.profile && state.profile.is_operator;
+  var canEdit = isMine || isOp;
+  var editsUsed = p.edit_count || 0;
+  var isNews = p.category === "News";
+  var long = (p.body || "").length > 280;
+  var saved = isSavedKey("post-" + p.id);
+  return '<article class="card dwc-post dwc-feed-card' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '" data-post-id="' + p.id + '">' +
+    '<div class="dwc-feed-head">' +
+      '<span class="dwc-feed-who">👤 <a href="#/member/' + p.author_id + '" class="dwc-titlelink"><strong>@' + esc(p.author_username) + "</strong></a>" + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? ' <span class="dwc-feed-occ">· ' + esc(p.author_occupation) + "</span>" : "") + "</span>" +
+      '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(p.created_at) + "</span>" +
+      (canEdit ? '<span class="dwc-feed-menuwrap"><button type="button" class="dwc-feed-dots" onclick="DWC.togglePostMenu(' + p.id + ', this)" aria-label="Post options" aria-haspopup="true">⋯</button>' +
+        '<span class="dwc-feed-menu" id="dwc-menu-' + p.id + '" hidden>' +
+          (editsUsed >= 3
+            ? '<span class="dwc-feed-menu-note">No edits left — 3/3 used</span>'
+            : '<button type="button" onclick="DWC.editPost(' + p.id + ')">✏️ Edit</button>') +
+          '<button type="button" onclick="DWC.showEditHistory(' + p.id + ')">🕘 Edit history</button>' +
+        "</span></span>" : "") +
+      "</span>" +
+    "</div>" +
+    '<div class="dwc-feed-typeline"><span class="dwc-type-label">' + postTypeLabel(p) + "</span>" +
+    '<span class="tag">' + esc(p.category) + (p.flair ? " · " + esc(p.flair) : "") + (p.kind === "adult" ? " · 18+" : "") + (isCreator ? " · 🎨 Creator" : "") + "</span>" +
+    (isNews ? '<span class="dwc-weird-badge">👽 Weird but true</span>' : "") +
+    (p.visibility === "friends" ? '<span class="dwc-vis-badge">👥 Friends only</span>' : "") +
+    (editsUsed > 0 ? '<span class="dwc-edited-badge" title="This post has been changed ' + editsUsed + ' of 3 times">✏️ Edited · ' + editsUsed + "/3</span>" : "") +
+    "</div>" +
+    postMediaHTML(p) +
+    '<h3 class="dwc-feed-title"><a href="#/post/' + p.id + '" class="dwc-titlelink">' + esc(p.title) + "</a></h3>" +
     (p.kind === "announcement" ? '<p class="dwc-announce-line"><span class="dwc-announce-badge">📢 Official announcement from the owner</span></p>' : "") +
     eventLineHTML(p) +
     (isCreator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
       '<strong style="color:var(--green);font-size:17px">' + priceLabel + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file</span>' : "") + "</p>" : "") +
-    '<p>' + memeBodyHTML(p.body.length > 280 ? p.body.slice(0, 280) + "…" : p.body) + "</p>" +
+    '<p class="dwc-feed-body' + (long ? " dwc-clamped" : "") + '" id="dwc-post-body-' + p.id + '">' + memeBodyHTML(p.body) + "</p>" +
+    (long ? '<button type="button" class="dwc-readmore" onclick="DWC.togglePostBody(' + p.id + ', this)">Read more ↓</button>' : "") +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
-    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
-    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
-    '<div class="dwc-actions">' +
-    '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
-    '<a href="#/post/' + p.id + '">💬 ' + (p.comment_count || 0) + " comments</a>" +
+    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
+    '<div class="dwc-feed-actions">' +
+    '<button type="button" class="dwc-act dwc-bookmark' + (saved ? " on" : "") + '" onclick="DWC.toggleSave(' + p.id + ', \'post\', this)" aria-label="Save this post">' + bookmarkHTML(saved) + "</button>" +
+    '<button type="button" class="dwc-act dwc-star' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)" aria-label="Heart this post">' + starHeartHTML(heartOn, p.score) + "</button>" +
+    '<a class="dwc-act dwc-comment-link" href="#/post/' + p.id + '" aria-label="Open comments">' + commentBubbleHTML(p.comment_count) + "</a>" +
+    '<button type="button" class="dwc-act dwc-share" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)" aria-label="Share this post">♻️ <span class="dwc-act-count">Share</span></button>' +
     (p.kind === "card_auth" ? '<span class="dwc-auth">Real ' + p.auth_real + " · Fake " + p.auth_fake + " · Unsure " + p.auth_unsure + "</span>" : "") +
     (isCreator && state.profile && state.profile.id !== p.author_id
       ? (p.pay_unlock && p.price_cents > 0
@@ -3259,9 +3408,68 @@ function postCardHTML(p) {
         : '<button type="button" class="btn small" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">💬 Buy / Message seller</button>') : "") +
     (isCreator && p.file_url && state.profile
       ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
-    '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)">🔗 Copy link</button>' +
-    '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
-    "</div></article>";
+    '<span class="dwc-feed-more"><button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button></span>' +
+    "</div>" +
+    '<div class="dwc-edit-slot" id="dwc-edit-' + p.id + '" hidden></div>' +
+    '<div class="dwc-edit-history" id="dwc-history-' + p.id + '" hidden></div>' +
+    "</article>";
+}
+// Feed redesign (v3.14) — comments use the same layout language as
+// posts: header row (name left, date+time right), compact body with
+// Read more, same action row, same RGB/neon borders. Callers pass
+// their own heart/reply/delete pieces — the backends differ by place:
+// thread comments have a heart endpoint; listing + profile comments
+// do not (no vote backend exists there — see the build log).
+function commentCardHTML(c, o) {
+  o = o || {};
+  var long = (c.body || "").length > 280;
+  var saved = isSavedKey("comment-" + c.id);
+  return '<div class="dwc-comment dwc-comment-card" data-comment-id="' + c.id + '">' +
+    (c.author_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt="">' : "") +
+    '<div class="dwc-comment-main">' +
+    '<div class="dwc-feed-head"><span class="dwc-feed-who"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + "</span>" +
+    '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(c.created_at) + "</span></span></div>" +
+    (o.visibilityNote ? ' <p class="dwc-meta" style="margin:2px 0 0">' + o.visibilityNote + "</p>" : "") +
+    (c.body ? '<p class="dwc-feed-body' + (long ? " dwc-clamped" : "") + '" id="dwc-comment-body-' + c.id + '">' + memeBodyHTML(c.body) + "</p>" +
+      (long ? '<button type="button" class="dwc-readmore" onclick="DWC.toggleCommentBody(' + c.id + ', this)">Read more ↓</button>' : "") : "") +
+    (o.mediaHTML || "") +
+    (o.gifAsImage ? "" : gifEmbedHTML(c.gif_url, c.gif_label)) +
+    '<div class="dwc-feed-actions">' +
+    '<button type="button" class="dwc-act dwc-bookmark' + (saved ? " on" : "") + '" onclick="DWC.toggleSave(' + c.id + ', \'comment\', this)" aria-label="Save this comment">' + bookmarkHTML(saved) + "</button>" +
+    (o.heartHTML || "") +
+    (o.canReply ? '<button type="button" class="dwc-act dwc-reply" onclick="DWC.replyToComment(\'' + esc(String(c.author_username || "").replace(/'/g, "")) + '\')">' + commentBubbleHTML(0, "Reply") + "</button>" : "") +
+    (o.extraActions || "") +
+    "</div></div></div>";
+}
+// Feed redesign (v3.14) — unified feed: listings and squads join the
+// same single-column feed with a clear type label and the same card
+// treatment. Articles have no API type anywhere — see the build log.
+function listingFeedCardHTML(l) {
+  var kindLabel = l.kind === "trade" ? "🔄 Ad · Up for trade" : l.kind === "flea" ? "🔨 Ad · Auction" : "🛒 Ad · For sale";
+  var html = listingCardHTML(l);
+  html = html.replace('<article class="card dwc-listing">', '<article class="card dwc-listing dwc-feed-card">' +
+    '<div class="dwc-feed-typeline"><span class="dwc-type-label">' + kindLabel + "</span></div>");
+  return html;
+}
+function squadFeedCardHTML(s) {
+  var full = s.member_count >= (s.max_players || 4);
+  var joinBtn = !state.profile ? '<span class="dwc-act-count">Join — members only</span>'
+    : s.is_member ? '<a class="btn small" href="nerd.html#groupup">Open room →</a>'
+    : full ? '<span class="dwc-act-count">Full (' + s.member_count + "/" + (s.max_players || 4) + ")</span>"
+    : '<a class="btn small" href="nerd.html#groupup">Join group →</a>';
+  return '<article class="card dwc-feed-card dwc-squad-card">' +
+    '<div class="dwc-feed-head"><span class="dwc-feed-who">👤 <strong>@' + esc(s.creator_username) + "</strong></span>" +
+    '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(s.created_at) + "</span></span></div>" +
+    '<div class="dwc-feed-typeline"><span class="dwc-type-label">🎮 Group · ' + esc(s.platform) + " · " + esc(s.playtime) + "</span></div>" +
+    '<h3 class="dwc-feed-title" style="margin:6px 0 2px">' + esc(s.game) + "</h3>" +
+    '<p style="font-weight:800;margin:0">' + esc(s.title) + "</p>" +
+    (s.description ? '<p class="dwc-feed-body">' + esc(s.description) + "</p>" : "") +
+    '<p class="dwc-meta">Players: <b>' + s.member_count + "/" + (s.max_players || 4) + "</b> · " + (s.is_private ? "🔒 Private" : "🟢 Open") + "</p>" +
+    '<div class="dwc-feed-actions">' + joinBtn + ' <a class="dwc-linklike" href="nerd.html#groupup">Group Up on the Nerd Hub →</a></div>' +
+    "</article>";
+}
+function feedListHTML(items) {
+  return '<div class="dwc-feed-list">' + items.join("") + "</div>";
 }
 function listingCardHTML(l) {
   var price = l.kind === "flea" ? (l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) : l.price_cents;
@@ -3324,47 +3532,89 @@ function renderView() {
 }
 
 // ---------- YourSpace (The Street) ----------
+// ---------- YourSpace (The Street) ----------
+// Feed redesign (v3.14) — the feed sits directly below the profile
+// card: profile at the top, feed right underneath, composer at the top
+// of the feed. The big hero stays on the page shell (compact), and the
+// How-it-works + Taffy cards moved BELOW the feed so nothing buries it.
+// Unified feed: when sort is Newest with no category, no Friends-only
+// and no Saved-only filter, the feed is one scrolling list of
+// everything in the hub — posts, news, ads/listings, and gaming groups
+// (squads) — each with a clear type label. Other tabs/filters stay
+// posts-only (listings and squads have no heart/comment counts to rank
+// by). Articles have no API type anywhere — see the build log.
 async function viewStreet(el) {
   el.innerHTML =
-    '<section class="card"><h2 style="margin-top:0">How YourSpace works</h2><ul class="dwc-rules-list">' +
-    "<li><strong>List it free, sell it fair</strong> — listing costs nothing; a fair 5% cut on a sale keeps the street running.</li>" +
-    "<li><strong>Sell anything legal</strong> — not just cards. Adult content lives in its own separate 18+ area (🌙 After Dark), never mixed into YourSpace — and only if you’ve proved your age (see Rules &amp; After Dark).</li>" +
-    "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
-    "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
-    '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></section>' +
-    '<section class="card"><div class="taffy-row"><div>' + taffySVG("taffy-small", "street") + '</div><div><h3 style="margin:0">🍬 Meet Taffy — your little site helper</h3>' +
-    "<p style=\"margin:6px 0 0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related.</p></div></div>" +
-    taffyHelpHTML() + '</section>' +
+    '<section class="dwc-feed-intro" aria-label="Your feed">' +
+      '<h2 class="dwc-feed-title" style="margin:0">📰 Your feed</h2>' +
+      '<p class="dwc-feed-hint">This is where everyone’s posts live — newest first. Write in the box below and your post shows up right here, at the top of the feed. Tap a tag to see more like it, tap 🔖 to save a post for later.</p>' +
+    "</section>" +
     '<div id="dwc-headlines-strip"></div>' +
     '<div id="dwc-composer"></div>' +
-    '<div class="dwc-filters"><div role="group" aria-label="Filter by corner">' +
+    '<div class="dwc-filters"><div role="group" aria-label="Filter by corner"><span class="dwc-filter-label">Show posts about:</span>' +
     '<button type="button" class="dwc-pill' + (state.category === null ? " active" : "") + '" onclick="DWC.setCategory(null)">All corners</button>' +
     CATEGORIES.map(function (c) {
       return '<button type="button" class="dwc-pill' + (state.category === c ? " active" : "") + '" onclick="DWC.setCategory(\'' + esc(c) + '\')">' + esc(c) + "</button>";
     }).join("") +
-    '</div><div role="group" aria-label="Sort posts">' +
+    '</div><div role="group" aria-label="Sort posts"><span class="dwc-filter-label">Sort by:</span>' +
     [["new", "Newest"], ["top", "Top hearts"], ["discussed", "Most discussed"]].map(function (s) {
       return '<button type="button" class="dwc-pill' + (state.sort === s[0] ? " active" : "") + '" onclick="DWC.setSort(\'' + s[0] + '\')">' + s[1] + "</button>";
     }).join("") +
     (state.profile ? '<button type="button" class="dwc-pill' + (state.friendsOnly ? " active" : "") + '" onclick="DWC.setFriendsOnly(' + (!state.friendsOnly) + ')">👥 Friends</button>' : "") +
+    '<button type="button" class="dwc-pill' + (state.savedOnly ? " active" : "") + '" onclick="DWC.setSavedOnly(' + (!state.savedOnly) + ')">🔖 Saved' + (savedCount() ? " (" + savedCount() + ")" : "") + "</button>" +
     "</div></div>" +
     '<div id="dwc-feed"><p style="color:var(--muted)">Loading posts…</p></div>' +
-    '<div id="dwc-tags"><p style="color:var(--muted)">Loading tags…</p></div>';
+    '<div id="dwc-tags"><p style="color:var(--muted)">Loading tags…</p></div>' +
+    '<details class="card dwc-how"><summary><strong>How YourSpace works — read this first</strong></summary><ul class="dwc-rules-list">' +
+    "<li><strong>List it free, sell it fair</strong> — listing costs nothing; a fair 5% cut on a sale keeps the street running.</li>" +
+    "<li><strong>Sell anything legal</strong> — not just cards. Adult content lives in its own separate 18+ area (🌙 After Dark), never mixed into YourSpace — and only if you’ve proved your age (see Rules &amp; After Dark).</li>" +
+    "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
+    "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
+    '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></details>' +
+    '<section class="card"><div class="taffy-row"><div>' + taffySVG("taffy-small", "street") + '</div><div><h3 style="margin:0">🍬 Meet Taffy — your little site helper</h3>' +
+    "<p style=\"margin:6px 0 0\">Hi, I'm Taffy! I build layouts, help with code, and answer questions about building your site. I can also help with support, reports, blocking, and FAQ — anything site-related.</p></div></div>" +
+    taffyHelpHTML() + "</section>";
   renderComposer("street");
   loadHeadlinesStrip();
+  var savesP = loadSavedServer();
   var data = await apiGet("/posts?device_id=" + encodeURIComponent(deviceId()) + "&sort=" + state.sort + "&limit=50" + (state.category ? "&category=" + encodeURIComponent(state.category) : "") + (state.friendsOnly ? "&friends=1" : ""));
+  await savesP;
   var feed = $("dwc-feed");
   if (!feed) return;
   var posts = (data && data.posts) || [];
-  feed.innerHTML = posts.length
-    ? '<div class="grid">' + posts.map(postCardHTML).join("") + "</div>"
-    : '<div class="note">' + (state.friendsOnly ? "No posts from your friends yet — add some friends and their posts will show up here." : "No posts yet — be the first to post on the street.") + "</div>";
+  if (state.savedOnly) posts = posts.filter(function (p) { return isSavedKey("post-" + p.id); });
+  var unified = state.sort === "new" && !state.category && !state.friendsOnly && !state.savedOnly;
+  if (unified) {
+    var reqs = [
+      apiGet("/listings?kind=market&limit=20"),
+      apiGet("/listings?kind=trade&limit=20"),
+      apiGet("/listings?kind=flea&limit=20"),
+      apiGet("/squads?device_id=" + encodeURIComponent(deviceId())),
+    ];
+    var res = await Promise.all(reqs.map(function (p) { return p.catch(function () { return null; }); }));
+    var items = posts.map(function (p) { return { ts: p.created_at || 0, html: postCardHTML(p) }; });
+    [["listings", 0], ["listings", 1], ["listings", 2]].forEach(function (spec) {
+      var list = (res[spec[1]] && res[spec[1]].listings) || [];
+      list.forEach(function (l) { items.push({ ts: l.created_at || 0, html: listingFeedCardHTML(l) }); });
+    });
+    var squads = (res[3] && res[3].squads) || [];
+    squads.forEach(function (s) { items.push({ ts: s.created_at || 0, html: squadFeedCardHTML(s) }); });
+    items.sort(function (a, b) { return b.ts - a.ts; });
+    items = items.slice(0, 50);
+    feed.innerHTML = items.length
+      ? feedListHTML(items.map(function (it) { return it.html; }))
+      : '<div class="note">Nothing here yet — post something, list an item, or start a group.</div>';
+  } else {
+    feed.innerHTML = posts.length
+      ? feedListHTML(posts.map(postCardHTML))
+      : '<div class="note">' + (state.savedOnly ? "No saved posts yet — tap 🔖 on any post to save it here." : state.friendsOnly ? "No posts from your friends yet — add some friends and their posts will show up here." : "No posts yet — be the first to post on the street.") + "</div>";
+  }
   var tags = await apiGet("/tags?scope=general&device_id=" + encodeURIComponent(deviceId()));
   var tagEl = $("dwc-tags");
   if (tagEl) {
     var list = (tags && tags.tags) || [];
     tagEl.innerHTML = list.length
-      ? '<h3>Trending tags</h3><p class="dwc-tags">' + list.map(function (t) { return '<a href="#/tag/' + encodeURIComponent(t.tag) + '">#' + esc(t.tag) + " (" + t.count + ")</a>"; }).join(" ") + "</p>"
+      ? '<h3>Trending tags</h3><p class="dwc-tags">' + list.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + encodeURIComponent(t.tag) + '">#' + esc(t.tag) + " (" + t.count + ")</a>"; }).join(" ") + "</p>"
       : "";
   }
 }
@@ -3441,8 +3691,23 @@ function renderComposer(context) {
   if (!host) return;
   var isAuth = context === "cardcheck";
   var isOp = state.profile && (state.profile.role === "operator" || state.profile.is_operator);
+  // Feed redesign (v3.14) — the composer is COLLAPSED by default: one
+  // compact line (prompt + Post button). Tapping it expands the FULL
+  // composer — everything it has today, nothing removed — and the
+  // Minimize button at the top right collapses it again so the feed
+  // is immediately visible right below.
+  var prompt = isAuth ? "Check a card — real or fake?…" : (state.profile ? "Share something, @" + state.profile.username + "…" : "Share something…");
   host.innerHTML =
-    '<section class="card" aria-label="New post"><h3 style="margin-top:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
+    '<section class="card dwc-composer" aria-label="New post">' +
+    '<div class="dwc-composer-mini" id="dwc-composer-mini"' + (state.composerOpen ? " hidden" : "") + ">" +
+      (state.profile && state.profile.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(state.profile.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      '<button type="button" class="dwc-composer-prompt" onclick="DWC.toggleComposer(true)">' + esc(prompt) + "</button>" +
+      '<button type="button" class="btn small" onclick="DWC.toggleComposer(true)">Post</button>' +
+    "</div>" +
+    '<div class="dwc-composer-full" id="dwc-composer-full"' + (state.composerOpen ? "" : " hidden") + ">" +
+    '<div class="dwc-composer-head"><h3 style="margin:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
+    '<button type="button" class="dwc-minimize-btn" onclick="DWC.toggleComposer(false)" title="Collapse the post box so you can see the feed">Minimize</button></div>' +
+    '<p class="dwc-composer-hint">Your post shows up in the feed below, right under your profile — newest first.</p>' +
     (state.profile ? "" : "<p>Posting needs an account — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create one, it’s free</button>.</p>") +
     '<form onsubmit="DWC.submitPost(this, \'' + context + '\'); return false;">' +
     '<div class="dwc-kindrow">' +
@@ -3476,7 +3741,7 @@ function renderComposer(context) {
     gifPickerHTML("composer-" + context) +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">Post it →</button></p>' +
-    "</form></section>";
+    "</form></div></section>";
 }
 
 async function viewCardCheck(el) {
@@ -3494,7 +3759,7 @@ async function viewCardCheck(el) {
   if (!feed) return;
   var posts = (data && data.posts) || [];
   feed.innerHTML = posts.length
-    ? "<h3>Card Check posts</h3><div class=\"grid\">" + posts.map(postCardHTML).join("") + "</div>"
+    ? "<h3>Card Check posts</h3>" + feedListHTML(posts.map(postCardHTML))
     : '<div class="note">No Card Check posts yet — post the first card.</div>';
 }
 
@@ -3641,17 +3906,17 @@ async function viewThread(el, postId) {
     '<p style="white-space:pre-wrap">' + memeBodyHTML(p.body) + "</p>" +
     youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
-    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
-    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
-    '<div class="dwc-actions">' +
-    '<button type="button" class="dwc-heart' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)">' + (heartOn ? "❤️" : "🤍") + " " + (p.score || 0) + "</button>" +
+    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDateTime(p.created_at) + "</p>" +
+    (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
+    '<div class="dwc-actions dwc-feed-actions">' +
+    '<button type="button" class="dwc-act dwc-star' + (heartOn ? " on" : "") + '" onclick="DWC.heartPost(' + p.id + ', this)" aria-label="Heart this post">' + starHeartHTML(heartOn, p.score) + "</button>" +
+    '<button type="button" class="dwc-act dwc-share" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)" aria-label="Share this post">♻️ <span class="dwc-act-count">Share</span></button>' +
     (p.is_creator && state.profile && state.profile.id !== p.author_id
       ? (p.pay_unlock && p.price_cents > 0
         ? '<button type="button" class="btn" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">🔓 Pay to unlock — ' + money(p.price_cents) + '</button>'
         : '<button type="button" class="btn small" onclick="DWC.messageSeller(' + p.author_id + ", '" + esc(p.author_username.replace(/'/g, "")) + "', " + p.id + ')">💬 Buy / Message seller</button>') : "") +
     (p.is_creator && p.file_url && state.profile
       ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
-    '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + postLink(p.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
     (canDelete ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete my post</button>' +
       '<button type="button" class="dwc-linklike" onclick="DWC.toggleComments(' + p.id + ", " + (!p.allow_comments) + ')">' + (p.allow_comments ? "🔇 Turn comments off" : "🔊 Turn comments on") + "</button>" : "") +
@@ -3667,21 +3932,17 @@ async function viewThread(el, postId) {
     (list.length ? list.map(function (c) {
       var ch = myHeart("comment-" + c.id);
       var mine = state.profile && state.profile.id === c.author_id;
-      return '<div class="dwc-comment">' +
-        (c.author_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt="">' : "") +
-        '<div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
-        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
-        gifEmbedHTML(c.gif_url, c.gif_label) +
-        '<div class="dwc-actions">' +
-        '<button type="button" class="dwc-heart' + (ch ? " on" : "") + '" onclick="DWC.heartComment(' + p.id + ", " + c.id + ', this)">' + (ch ? "❤️" : "🤍") + " " + (c.score || 0) + "</button>" +
-        '<button type="button" class="dwc-linklike" onclick="DWC.report(\'comment\', ' + c.id + ')">🚩 Report</button>' +
-        (mine ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteComment(' + p.id + ", " + c.id + ')">🗑 Delete</button>' : "") +
-        "</div></div></div>";
+      return commentCardHTML(c, {
+        canReply: true,
+        heartHTML: '<button type="button" class="dwc-act dwc-star' + (ch ? " on" : "") + '" onclick="DWC.heartComment(' + p.id + ", " + c.id + ', this)" aria-label="Heart this comment">' + starHeartHTML(ch, c.score) + "</button>",
+        extraActions: '<button type="button" class="dwc-linklike" onclick="DWC.report(\'comment\', ' + c.id + ')">🚩 Report</button>' +
+          (mine ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteComment(' + p.id + ", " + c.id + ')">🗑 Delete</button>' : ""),
+      });
     }).join("") : "<p>Nothing yet — be the first to say something.</p>") +
     "</section>" +
     (state.profile && (p.allow_comments || isMine)
       ? '<section class="card"><h3 style="margin-top:0">Add a comment</h3><form onsubmit="DWC.submitComment(this, ' + p.id + '); return false;">' +
-        '<textarea name="body" maxlength="2000" placeholder="Say something kind…"></textarea>' +
+        '<textarea id="dwc-comment-box" name="body" maxlength="2000" placeholder="Say something kind…"></textarea>' +
         gifPickerHTML("comment-" + p.id) +
         '<p class="dwc-form-err" data-err hidden></p>' +
         '<p style="margin-top:14px"><button class="btn" type="submit">Comment →</button></p></form></section>'
@@ -3739,14 +4000,12 @@ async function viewListing(el, listingId) {
         '<button type="button" class="btn ghost small" onclick="DWC.tradeVote(' + l.id + ", 'bad')\">👎 Bad deal (" + l.trade_bad + ")</button></div></section>" : "") +
     '<section class="card"><h3 style="margin-top:0">Comments (' + list.length + ')' + (l.allow_comments ? "" : ' <span style="color:var(--amber)">— comments are off on this listing</span>') + "</h3>" +
     (list.length ? list.map(function (c) {
-      return '<div class="dwc-comment"><div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
-        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
-        gifEmbedHTML(c.gif_url, c.gif_label) + "</div></div>";
+      return commentCardHTML(c, { canReply: true });
     }).join("") : "<p>Nothing yet.</p>") +
     "</section>" +
     (state.profile && l.allow_comments
       ? '<section class="card"><h3 style="margin-top:0">Comment on this listing</h3><form onsubmit="DWC.submitListingComment(this, ' + l.id + '); return false;">' +
-        '<textarea name="body" maxlength="2000" placeholder="Say something…"></textarea>' +
+        '<textarea id="dwc-comment-box" name="body" maxlength="2000" placeholder="Say something…"></textarea>' +
         gifPickerHTML("listing-comment-" + l.id) +
         '<p class="dwc-form-err" data-err hidden></p>' +
         '<p style="margin-top:14px"><button class="btn" type="submit">Comment →</button></p></form></section>'
@@ -3763,7 +4022,8 @@ async function viewTag(el, tag, adult) {
   var data = await apiGet("/posts?tag=" + encodeURIComponent(tag) + "&kind=" + (adult ? "adult" : "forum") + "&limit=50&device_id=" + encodeURIComponent(deviceId()));
   var posts = (data && data.posts) || [];
   el.innerHTML = "<h2>#" + esc(tag) + (adult ? " · 18+" : "") + "</h2>" +
-    (posts.length ? '<div class="grid">' + posts.map(postCardHTML).join("") + "</div>" : '<div class="note">No posts with that tag yet.</div>');
+    '<p class="dwc-feed-hint">Every post tagged #' + esc(tag) + ' — newest first. Tap a tag on any post to see more like it.</p>' +
+    (posts.length ? feedListHTML(posts.map(postCardHTML)) : '<div class="note">No posts with that tag yet.</div>');
 }
 
 // ---------- Orders ----------
@@ -3882,7 +4142,10 @@ function badgeHTML(m) {
 // Display rule: ONE badge by default; adult sellers ALWAYS show the 18+
 // badge plus ONE chosen badge; regular sellers showing Regular Seller
 // may add ONE optional secondary badge. Nobody shows more than two.
+// Reporter is FIRST on purpose (mirrors the server list): a member who
+// earns it shows it by default until they pick a different display badge.
 var BADGES = [
+  { key: "badge:reporter", icon: "📰", label: "Reporter", requirement: "Granted by the shop — posts news for the community" },
   { key: "badge:first-post", icon: "📝", label: "First Post", requirement: "Post your first post" },
   { key: "badge:first-comment", icon: "💬", label: "First Comment", requirement: "Leave your first comment" },
   { key: "badge:comments-25", icon: "🗨️", label: "Chatty", requirement: "Leave 25 comments" },
@@ -4400,15 +4663,14 @@ async function loadPageComments(profileId, isMine, isFriend) {
   var comments = (data && data.comments) || [];
   list.innerHTML = comments.length
     ? comments.map(function (c) {
-        return '<div class="dwc-page-comment">' +
-          (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
-          '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + '</span>' +
-          (c.visibility !== "public" ? ' <span class="dwc-meta">· ' + (c.visibility === "friends" ? "friends-only" : "private") + '</span>' : "") +
-          (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
-          (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
-          (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
-          ((c.is_mine || isMine) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "") +
-          "</div></div>";
+        return commentCardHTML(c, {
+          canReply: true,
+          gifAsImage: true, // page comments show a raw GIF link as an image, as before
+          visibilityNote: c.visibility !== "public" ? "· " + (c.visibility === "friends" ? "friends-only" : "private") : "",
+          mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
+            (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
+          extraActions: (c.is_mine || isMine) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "",
+        });
       }).join("")
     : "<p style=\"color:var(--muted)\">No page comments yet — be the first.</p>";
   if (!formHost) return;
@@ -4491,13 +4753,10 @@ async function loadPicViewerComments() {
     '<h4 style="margin:12px 0 6px">💬 Comments on this picture</h4>' +
     (comments.length
       ? comments.map(function (c) {
-          return '<div class="dwc-page-comment">' +
-            (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
-            '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span>" +
-            (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
-            (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
-            ((c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "") +
-            "</div></div>";
+          return commentCardHTML(c, {
+            mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
+            extraActions: (c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "",
+          });
         }).join("")
       : '<p style="color:var(--muted)">No comments on this picture yet — be the first.</p>') +
     (state.profile
@@ -5149,7 +5408,7 @@ async function renderAdultForum() {
   if (!feed) return;
   var posts = (data && data.posts) || [];
   feed.innerHTML = posts.length
-    ? '<div class="grid">' + posts.map(postCardHTML).join("") + "</div>"
+    ? feedListHTML(posts.map(postCardHTML))
     : '<div class="note">The 18+ forum is quiet — post the first one.</div>';
   var tags = await apiGet("/tags?scope=adult&device_id=" + encodeURIComponent(deviceId()));
   var tagEl = $("dwc-adult-tags");
@@ -5341,6 +5600,231 @@ window.DWC = {
   setCategory: function (c) { state.category = c; renderView(); },
   setSort: function (s) { state.sort = s; renderView(); },
   setFriendsOnly: function (on) { state.friendsOnly = !!on; renderView(); },
+  // Feed redesign (v3.14) — Saved filter pill.
+  setSavedOnly: function (on) { state.savedOnly = !!on; renderView(); },
+  // Feed redesign (v3.14) — collapse/expand the composer. Toggling the
+  // two halves directly keeps anything already typed in the form.
+  toggleComposer: function (open) {
+    state.composerOpen = !!open;
+    var mini = $("dwc-composer-mini"), full = $("dwc-composer-full");
+    if (mini) mini.hidden = !!open;
+    if (full) full.hidden = !open;
+    if (open && full) { var t = full.querySelector('textarea[name="body"]'); if (t) t.focus(); }
+  },
+  // Feed redesign (v3.14) — carousel: show slide i of a post's media.
+  carouselGo: function (postId, i, btn) {
+    var car = document.querySelector('.dwc-carousel[data-post="' + postId + '"]');
+    if (!car) return;
+    var slides = car.querySelectorAll(".dwc-slide");
+    var dots = car.querySelectorAll(".dwc-dot");
+    slides.forEach(function (s, idx) { s.hidden = idx !== i; s.classList.toggle("on", idx === i); });
+    dots.forEach(function (d, idx) { d.classList.toggle("on", idx === i); });
+  },
+  carouselStep: function (postId, dir, btn) {
+    var car = document.querySelector('.dwc-carousel[data-post="' + postId + '"]');
+    if (!car) return;
+    var slides = car.querySelectorAll(".dwc-slide");
+    var cur = 0;
+    slides.forEach(function (s, idx) { if (s.classList.contains("on")) cur = idx; });
+    var next = (cur + dir + slides.length) % slides.length;
+    DWC.carouselGo(postId, next, btn);
+  },
+  // Feed redesign (v3.14) — Read more / Show less on a post body.
+  togglePostBody: function (postId, btn) {
+    var body = $("dwc-post-body-" + postId);
+    if (!body) return;
+    var clamped = body.classList.toggle("dwc-clamped");
+    if (btn) btn.textContent = clamped ? "Read more ↓" : "Show less ↑";
+  },
+  toggleCommentBody: function (commentId, btn) {
+    var body = $("dwc-comment-body-" + commentId);
+    if (!body) return;
+    var clamped = body.classList.toggle("dwc-clamped");
+    if (btn) btn.textContent = clamped ? "Read more ↓" : "Show less ↑";
+  },
+  // Feed redesign (v3.14) — save/bookmark a post or comment. Posts are
+  // logged server-side (post_saves) when signed in; if the server log
+  // is unavailable (migration not run yet) it falls back to this device
+  // only. Comment saves are always this-device only.
+  toggleSave: async function (id, kind, btn) {
+    var key = kind + "-" + id;
+    var now = !isSavedKey(key);
+    if (kind === "post" && state.profile) {
+      var data = await apiPost("/post-saves", { device_id: deviceId(), post_id: id, action: now ? "add" : "remove" });
+      if (data && data.ok) {
+        // The endpoint answers saved:true/false, not the full list —
+        // keep our loaded copy in sync locally.
+        if (Array.isArray(state.savedServer)) {
+          if (now && state.savedServer.indexOf(id) < 0) state.savedServer.push(id);
+          if (!now) state.savedServer = state.savedServer.filter(function (x) { return x !== id; });
+        }
+        setSavedKey(key, now); // keep the device copy in sync too
+      } else {
+        setSavedKey(key, now); // server log down — device-only save
+      }
+    } else {
+      setSavedKey(key, now);
+    }
+    if (btn) { btn.classList.toggle("on", now); btn.innerHTML = bookmarkHTML(now); }
+  },
+  // Feed redesign (v3.14) — header search. Hover or tap the magnifier
+  // to reveal the input; Enter or the magnifier runs the search.
+  toggleSearch: function () {
+    var wrap = $("dwc-search-wrap");
+    if (!wrap) return;
+    var open = wrap.classList.toggle("open");
+    var btn = $("dwc-search-btn");
+    if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open) { var input = $("dwc-search-input"); if (input) input.focus(); }
+    else DWC.clearSearch();
+  },
+  closeSearch: function () {
+    var wrap = $("dwc-search-wrap");
+    if (wrap) wrap.classList.remove("open");
+    DWC.clearSearch();
+  },
+  clearSearch: function () {
+    var input = $("dwc-search-input");
+    if (input) input.value = "";
+    var res = $("dwc-search-results");
+    if (res) { res.innerHTML = ""; res.hidden = true; }
+  },
+  runSearch: async function (form) {
+    var input = $("dwc-search-input");
+    var q = input ? input.value.trim() : "";
+    var res = $("dwc-search-results");
+    if (!res) return false;
+    if (!q) { res.innerHTML = '<p class="dwc-search-hint">Type to search posts, tags, and people.</p>'; res.hidden = false; return false; }
+    res.innerHTML = '<p class="dwc-search-hint">Searching…</p>'; res.hidden = false;
+    if (!state.searchPosts || !state.searchMembers) {
+      var p = apiGet("/posts?sort=new&limit=50&device_id=" + encodeURIComponent(deviceId()));
+      var m = apiGet("/members?limit=60");
+      var both = await Promise.all([p, m]);
+      state.searchPosts = (both[0] && both[0].posts) || [];
+      state.searchMembers = (both[1] && both[1].members) || [];
+    }
+    var needle = q.toLowerCase();
+    var posts = state.searchPosts.filter(function (p) {
+      var hay = ((p.title || "") + " " + (p.body || "") + " " + ((p.tags || []).join(" "))).toLowerCase();
+      return hay.indexOf(needle) >= 0;
+    }).slice(0, 8);
+    var members = state.searchMembers.filter(function (m) {
+      var hay = ((m.username || "") + " " + (m.occupation || "") + " " + (m.bio || "")).toLowerCase();
+      return hay.indexOf(needle) >= 0;
+    }).slice(0, 8);
+    var html = "";
+    if (posts.length) {
+      html += '<p class="dwc-search-group">Posts</p><ul class="dwc-search-list">' + posts.map(function (p) {
+        return '<li><a href="#/post/' + p.id + '" onclick="DWC.closeSearch()"><strong>' + esc(p.title) + '</strong><span>' + esc(p.category) + " · @" + esc(p.author_username) + "</span></a></li>";
+      }).join("") + "</ul>";
+    }
+    if (members.length) {
+      html += '<p class="dwc-search-group">People</p><ul class="dwc-search-list">' + members.map(function (m) {
+        return '<li><a href="#/member/' + m.id + '" onclick="DWC.closeSearch()"><strong>@' + esc(m.username) + "</strong><span>" + esc(m.occupation || "") + "</span></a></li>";
+      }).join("") + "</ul>";
+    }
+    res.innerHTML = html || '<p class="dwc-search-hint">Nothing found for “' + esc(q) + '” — try a different word.</p>';
+    return false;
+  },
+  // Feed redesign (v3.14) — the bubble on a comment is a Reply button:
+  // focus the comment form and prefill "@username ".
+  replyToComment: function (username) {
+    var box = $("dwc-comment-box");
+    if (!box) { var pf = $("dwc-page-comments-form"); if (pf) box = pf.querySelector('textarea[name="body"]'); }
+    if (!box) return;
+    var prefix = "@" + username + " ";
+    if (box.value.indexOf(prefix) !== 0) box.value = prefix + box.value;
+    box.focus();
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+  },
+  // Feed redesign (v3.14) — the ⋯ menu on your own post (author or
+  // operator): Edit + Edit history. Only one menu open at a time.
+  togglePostMenu: function (postId, btn) {
+    var menu = $("dwc-menu-" + postId);
+    if (!menu) return;
+    document.querySelectorAll(".dwc-feed-menu").forEach(function (m) { if (m !== menu) m.hidden = true; });
+    menu.hidden = !menu.hidden;
+  },
+  // Feed redesign (v3.14) — edit your own post (or an operator's).
+  // The form lets you change title/body/tags, ADD a photo or video if
+  // you forgot them, flip visibility PUBLIC ↔ FRIENDS ONLY, or DELETE
+  // the post (confirm first — reuses DWC.deletePost, no second delete).
+  // 3-edit limit, enforced server-side; the card shows "Edited · n/3".
+  editPost: async function (postId) {
+    var menu = $("dwc-menu-" + postId);
+    if (menu) menu.hidden = true;
+    var slot = $("dwc-edit-" + postId);
+    if (!slot) return;
+    var data = await apiGet("/posts/" + postId + "?device_id=" + encodeURIComponent(deviceId()));
+    var p = data && data.post;
+    if (!p) { setNotice("Couldn't load that post to edit it."); return; }
+    if ((p.edit_count || 0) >= 3) { setNotice("This post has used all 3 of its edits — it can't be changed again."); return; }
+    var vis = p.visibility || "public";
+    slot.hidden = false;
+    slot.innerHTML =
+      '<form class="dwc-edit-form" onsubmit="DWC.savePostEdit(this, ' + p.id + '); return false;">' +
+      '<p class="dwc-edit-note">Edit ' + ((p.edit_count || 0) + 1) + ' of 3 — you have ' + (3 - (p.edit_count || 0)) + ' edit' + ((3 - (p.edit_count || 0)) === 1 ? "" : "s") + " left on this post.</p>" +
+      '<label>Title</label><input name="title" required minlength="3" maxlength="120" value="' + esc(p.title) + '">' +
+      '<label>What’s on your mind?</label><textarea name="body" required maxlength="4000">' + esc(p.body || "") + "</textarea>" +
+      '<label>Tags (comma separated)</label><input name="tags" maxlength="240" value="' + esc((p.tags || []).join(", ")) + '">' +
+      '<label>Who can see it</label><select name="visibility"><option value="public"' + (vis === "public" ? " selected" : "") + ">🌍 Public — everyone</option><option value=\"friends\"" + (vis === "friends" ? " selected" : "") + ">👥 Friends only — only your friends (and the shop) can see it</option></select>" +
+      '<label>Add a photo (optional — only if the post has none)</label>' +
+      (p.image_url ? '<p class="dwc-meta">This post already has a photo — the edit can’t swap it, only add one if it’s missing.</p>' : '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif">') +
+      '<label>Add a short video (optional — only if the post has none)</label>' +
+      (p.video_url ? '<p class="dwc-meta">This post already has a video.</p>' : '<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime">') +
+      '<p class="dwc-form-err" data-err hidden></p>' +
+      '<p class="dwc-edit-actions"><button class="btn" type="submit">Save changes</button> ' +
+      '<button type="button" class="btn ghost" onclick="DWC.cancelPostEdit(' + p.id + ')">Cancel</button> ' +
+      '<button type="button" class="btn ghost" style="color:var(--danger,#ff5a5a)" onclick="if(confirm(\'Delete this post for good? This can’t be undone.\'))DWC.deletePost(' + p.id + ')">🗑 Delete post</button></p>' +
+      "</form>";
+    slot.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  },
+  cancelPostEdit: function (postId) {
+    var slot = $("dwc-edit-" + postId);
+    if (slot) { slot.innerHTML = ""; slot.hidden = true; }
+  },
+  savePostEdit: async function (form, postId) {
+    var fd = new FormData(form);
+    var photo = await fileToImage(fd.get("photo") && fd.get("photo").size ? fd.get("photo") : null, 2500000, { maxDim: 1600 });
+    if (photo && photo.error) return formErr(form, photo.error);
+    var video = null;
+    var vf = fd.get("video");
+    if (vf && vf.size) {
+      video = await fileToVideo(vf, VIDEO_MAX_BYTES);
+      if (video && video.error) return formErr(form, video.error);
+    }
+    var body = {
+      device_id: deviceId(),
+      title: String(fd.get("title") || "").trim(),
+      body: String(fd.get("body") || "").trim(),
+      tags: String(fd.get("tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean),
+      visibility: String(fd.get("visibility") || "public"),
+    };
+    if (photo) body.image = { dataBase64: photo.dataBase64, mimeType: photo.mimeType };
+    if (video) body.video = { dataBase64: video.dataBase64, mimeType: video.mimeType, fileName: video.fileName };
+    var data = await apiPut("/posts/" + postId, body);
+    if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save that edit.");
+    setNotice(data.video_skipped || data.image_skipped ? "Saved — but the media didn't attach yet; the shop is still running a database update." : "Post updated (" + (data.edit_count || 0) + " of 3 edits used).");
+    renderView();
+  },
+  // Feed redesign (v3.14) — edit history: every edit's date + time,
+  // stored in the post_edits table when an edit is saved.
+  showEditHistory: async function (postId) {
+    var menu = $("dwc-menu-" + postId);
+    if (menu) menu.hidden = true;
+    var slot = $("dwc-history-" + postId);
+    if (!slot) return;
+    slot.hidden = false;
+    slot.innerHTML = '<p class="dwc-meta">Loading edit history…</p>';
+    var data = await apiGet("/posts/" + postId + "/edits?device_id=" + encodeURIComponent(deviceId()));
+    var edits = (data && data.edits) || [];
+    slot.innerHTML = edits.length
+      ? '<p class="dwc-edit-history-title">🕘 Edit history — ' + edits.length + ' of 3 edits used</p><ol class="dwc-edit-history-list">' +
+        edits.map(function (e, i) {
+          return "<li>Edit " + (i + 1) + " — " + fmtDateTime(e.edited_at) + " · by @" + esc(e.editor_username) + "</li>";
+        }).join("") + "</ol>"
+      : '<p class="dwc-meta">This post has never been edited.</p>';
+  },
   openSignup: function () { state.signupOpen = true; state.editingProfile = false; state.challenge = null; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
   // Human check didn't load (slow mobile) — reload it without losing the form.
@@ -5813,6 +6297,9 @@ window.DWC = {
     if (data.video_skipped) postMsg += " The video didn't attach yet — the shop is still running a database update, so the post is live without it.";
     if (data.event_skipped) postMsg += " The event date/time/place didn't save yet — the shop is still running a database update, so the post is live without them.";
     setNotice(postMsg);
+    // Feed redesign (v3.14) — collapse the composer again so the new
+    // post is visible right at the top of the feed below.
+    state.composerOpen = false;
     if (context === "adult") renderAdultForum();
     else if (context === "cardcheck") renderView();
     else renderView();
@@ -6251,17 +6738,19 @@ window.DWC = {
     var data = await apiPost("/posts/" + id + "/vote", { device_id: deviceId() });
     if (data && data.ok) {
       setHeart("post-" + id, data.my_heart);
-      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = (data.my_heart ? "❤️" : "🤍") + " " + data.hearts; }
+      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = starHeartHTML(data.my_heart, data.hearts); }
     } else if (data && data.error) setNotice(data.error);
   },
+  // Feed redesign (v3.14) — the thread post heart is the same neon star.
   heartComment: async function (postId, commentId, btn) {
     if (!state.profile) { setNotice("Create your account first to heart comments."); return; }
     var data = await apiPost("/posts/" + postId + "/comments/" + commentId + "/vote", { device_id: deviceId() });
     if (data && data.ok) {
       setHeart("comment-" + commentId, data.my_heart);
-      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = (data.my_heart ? "❤️" : "🤍") + " " + data.hearts; }
+      if (btn) { btn.classList.toggle("on", data.my_heart); btn.innerHTML = starHeartHTML(data.my_heart, data.hearts); }
     } else if (data && data.error) setNotice(data.error);
   },
+  // Feed redesign (v3.14) — comment hearts are the same neon star.
   authVote: async function (postId, verdict) {
     if (!state.profile) { setNotice("Create your account first to vote."); DWC.openSignup(); return; }
     var data = await apiPost("/posts/" + postId + "/auth-vote", { device_id: deviceId(), verdict: verdict });

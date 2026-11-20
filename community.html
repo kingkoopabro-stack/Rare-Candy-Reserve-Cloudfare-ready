@@ -16,7 +16,7 @@
 <meta name="twitter:title" content="YourSpace · The Wall Market — Rare Candy Reserve">
 <meta name="twitter:description" content="YourSpace — the social side: free profiles, friends, and a feed. The Wall Market is the marketplace inside it: check if a card is real or fake, sell and trade cards and collectibles, bid in the flea market, and hang out. A place to host and be heard.">
 <meta name="twitter:image" content="https://rarecandyreserve.org/images/support-my-dream-merch.jpg">
-<link rel="stylesheet" href="assets/css/style.css?v=memes1">
+<link rel="stylesheet" href="assets/css/style.css?v=feed1">
 <style>
 .yourspace{display:flex;align-items:center;justify-content:center;gap:.4em;flex-wrap:wrap}
 .yourspace .ekg{width:1.15em;height:.6em;flex:none;filter:drop-shadow(0 0 6px rgba(255,45,149,.65)) drop-shadow(0 0 12px rgba(0,229,255,.45))}
@@ -33,7 +33,22 @@
 
 <header class="site">
   <div class="wrap navrow">
-    <a class="logo" href="index.html"><img class="logo-mark" src="images/steady-heart.svg" alt="">Rare Candy <b>Reserve</b></a>
+    <div class="logo-col">
+      <a class="logo" href="index.html"><img class="logo-mark" src="images/steady-heart.svg" alt="">Rare Candy <b>Reserve</b></a>
+      <!-- Feed redesign (v3.14) — header search, small and compact, under
+           the last "e" of "Reserve". Hover or tap the magnifier to reveal
+           the input; Enter or the magnifier runs the search. -->
+      <div class="dwc-search-wrap" id="dwc-search-wrap">
+        <button type="button" class="dwc-search-btn" id="dwc-search-btn" onclick="DWC.toggleSearch()" aria-expanded="false" aria-controls="dwc-search-field"><span class="dwc-search-ico">🔍</span> Search</button>
+        <div class="dwc-search-field" id="dwc-search-field">
+          <form onsubmit="return DWC.runSearch(this)">
+            <input id="dwc-search-input" type="search" name="q" placeholder="Search posts, tags &amp; people…" aria-label="Search posts and people" onkeydown="if(event.key==='Escape')DWC.closeSearch()">
+            <button type="submit" class="dwc-search-go" aria-label="Search">🔍</button>
+          </form>
+          <div class="dwc-search-results" id="dwc-search-results" hidden></div>
+        </div>
+      </div>
+    </div>
     <nav class="main" id="mainNav">
       <a href="index.html" data-page="home">Home</a>
       <a href="shop.html" data-page="shop">Shop</a>
@@ -56,13 +71,13 @@
 </header>
 
 <main class="wrap">
-  <div class="hero">
+  <div class="hero hero-compact">
     <div class="kicker">🤝 The only social media you'll ever need again, welcome to the everything community</div>
     <h1 class="yourspace"><svg class="ekg" viewBox="0 0 64 24" aria-hidden="true"><defs><linearGradient id="ekgGrad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff2d95"/><stop offset=".45" stop-color="#ff9a00"/><stop offset=".75" stop-color="#00e5ff"/><stop offset="1" stop-color="#7c4dff"/></linearGradient></defs><path d="M2 12 H17 L21 4 L27 20 L31 8 L34 12 H62" fill="none" stroke="url(#ekgGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="grad-text">YourSpace</span><svg class="ekg flip" viewBox="0 0 64 24" aria-hidden="true"><path d="M2 12 H17 L21 4 L27 20 L31 8 L34 12 H62" fill="none" stroke="url(#ekgGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></h1>
     <p class="lede" style="font-weight:800;color:var(--green);letter-spacing:.18em">LIST IT FREE · SELL IT FAIR</p>
     <p class="lede" style="font-weight:800;color:var(--green);letter-spacing:.18em">YOUR SPACE, YOUR RULES</p>
-    <p class="lede">YourSpace is the social side — free profiles, friends, and a feed. <strong>The Wall Market</strong> is the marketplace inside it — buy and sell anything legal: cards, collectibles, plants, games, tech, custom work, and everything else. Not just cards.</p>
-    <p class="lede" style="font-size:15px">Post, ask questions, chat live, buy, and sell — one free account does it all. No ID needed to join or sell regular stuff. Age proof is only ever asked for adult content and the 18+ area.</p>
+    <p class="lede hero-long">YourSpace is the social side — free profiles, friends, and a feed. <strong>The Wall Market</strong> is the marketplace inside it — buy and sell anything legal: cards, collectibles, plants, games, tech, custom work, and everything else. Not just cards.</p>
+    <p class="lede hero-long" style="font-size:15px">Post, ask questions, chat live, buy, and sell — one free account does it all. No ID needed to join or sell regular stuff. Age proof is only ever asked for adult content and the 18+ area.</p>
   </div>
 
   <!-- The live Community app mounts here (assets/js/community.js). -->
@@ -71,9 +86,20 @@
   </div>
   <noscript><div class="note" style="margin-top:16px">The Community needs JavaScript to run — turn it on and reload this page.</div></noscript>
 
-  <!-- Meme Stash — starter memes, free for every member. Grab and use anywhere. -->
+  <!-- Dank Meme Drawer (v3.14) — collapsed by default so it doesn't eat
+       the page or slow the load. Meme images lazy-load ONLY when the
+       drawer opens. Header + grab line open it; the drawer slides up
+       from the bottom. Copy-code + save-to-notepad work as before. -->
   <section class="meme-stash" id="meme-stash">
-    <h2>😂 Meme Stash</h2>
+    <button type="button" class="dwc-meme-drawer-head" id="dwc-meme-drawer-head" aria-expanded="false" aria-controls="dwc-meme-drawer-body">
+      <span>😂 Dank Meme Drawer</span>
+      <span class="dwc-meme-drawer-arrows" id="dwc-meme-drawer-arrows" aria-hidden="true">▼▼</span>
+    </button>
+    <div class="dwc-meme-drawer-grab" id="dwc-meme-drawer-grab" role="button" tabindex="0" aria-label="Open the Dank Meme Drawer — drag up or tap">
+      <span class="dwc-meme-drawer-grabline" aria-hidden="true"></span>
+      <span class="dwc-meme-drawer-grabhint">Pull up for memes</span>
+    </div>
+    <div class="dwc-meme-drawer-body" id="dwc-meme-drawer-body" hidden>
     <p class="lede" style="font-size:15px">33 classic memes, free for every member — save one and use it anywhere.</p>
     <p class="lede" style="font-size:14px">Tap 📋 Copy code, paste it into any post or comment, and the meme shows up. Tap 💾 Save to notepad to keep your favorites in your Taffy Phone notes.</p>
     <div class="meme-grid">
@@ -309,7 +335,67 @@
         <button type="button" class="btn small" onclick="DWC.memeSave(this)" data-code=":woman-yelling-at-cat:" title="Save :woman-yelling-at-cat: to your notepad">💾 Save to notepad</button>
       </figure>
     </div>
+    </div>
   </section>
+  <script>
+  // Dank Meme Drawer (v3.14) — collapsed by default; meme images
+  // lazy-load ONLY when the drawer opens, so the page loads fast.
+  (function () {
+    var stash = document.getElementById("meme-stash");
+    if (!stash) return;
+    // Park every meme src in data-src NOW (during parse, before the
+    // browser fetches them) — nothing downloads until the drawer opens.
+    var media = stash.querySelectorAll(".meme-grid img, .meme-grid video");
+    media.forEach(function (el) {
+      if (el.getAttribute("src")) { el.setAttribute("data-src", el.getAttribute("src")); el.removeAttribute("src"); }
+    });
+    var loaded = false;
+    function loadMemes() {
+      if (loaded) return;
+      loaded = true;
+      media.forEach(function (el) {
+        var s = el.getAttribute("data-src");
+        if (s) { el.setAttribute("src", s); if (el.tagName === "VIDEO") el.load(); }
+      });
+    }
+    function setOpen(open) {
+      var body = document.getElementById("dwc-meme-drawer-body");
+      var head = document.getElementById("dwc-meme-drawer-head");
+      var arrows = document.getElementById("dwc-meme-drawer-arrows");
+      if (!body) return;
+      if (open) loadMemes();
+      body.hidden = !open;
+      stash.classList.toggle("open", open);
+      if (head) head.setAttribute("aria-expanded", open ? "true" : "false");
+      if (arrows) arrows.textContent = open ? "▲▲" : "▼▼";
+    }
+    window.__dwcMemeDrawer = setOpen;
+    function toggle() { setOpen(!stash.classList.contains("open")); }
+    var head = document.getElementById("dwc-meme-drawer-head");
+    var grab = document.getElementById("dwc-meme-drawer-grab");
+    if (head) head.addEventListener("click", toggle);
+    if (grab) {
+      var suppressClick = false;
+      grab.addEventListener("click", function () { if (!suppressClick) toggle(); });
+      // Drag the handle: pull up to open, push down to close. A drag
+      // suppresses the click that follows it so it doesn't toggle back.
+      var startY = null;
+      grab.addEventListener("pointerdown", function (e) { startY = e.clientY; });
+      grab.addEventListener("pointerup", function (e) {
+        if (startY == null) return;
+        var dy = e.clientY - startY;
+        startY = null;
+        if (Math.abs(dy) > 10) {
+          suppressClick = true;
+          setTimeout(function () { suppressClick = false; }, 60);
+          if (dy < -40) setOpen(true);
+          else if (dy > 40) setOpen(false);
+        }
+      });
+      grab.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    }
+  })();
+  </script>
 </main>
 
 <footer class="site">
@@ -329,6 +415,6 @@
 </footer>
 
 <script src="assets/js/site.js?v=listed1"></script>
-<script src="assets/js/community.js?v=fonts1"></script>
+<script src="assets/js/community.js?v=feed1"></script>
 </body>
 </html>

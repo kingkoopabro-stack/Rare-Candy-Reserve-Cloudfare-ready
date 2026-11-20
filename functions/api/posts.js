@@ -11,7 +11,7 @@ import {
   json, noDb, getDb, readJson, profileByDevice, isOperator, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
-  createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS,
+  createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS, filterVisiblePosts,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -30,8 +30,9 @@ export async function onRequestGet({ env, request }) {
 
   const wantsAdult = kind === "adult";
   let callerVerified = false;
+  let caller = null;
   if (deviceId) {
-    const caller = await profileByDevice(db, deviceId);
+    caller = await profileByDevice(db, deviceId);
     callerVerified = !!caller && caller.age_verified === 1;
   }
   if (wantsAdult && !callerVerified) return json({ posts: [] });
@@ -74,6 +75,10 @@ export async function onRequestGet({ env, request }) {
     allowed.add(me.id);
     rows = rows.filter((r) => allowed.has(r.profile_id));
   }
+  // Feed redesign (v3.14) — friends-only posts only show to the author,
+  // their friends, and the operator. Guests and strangers never see them
+  // through any listing (tag pages and Card Check use this same list).
+  rows = await filterVisiblePosts(db, caller, rows);
   const shaped = [];
   const badgeMap = await badgesForProfiles(db, rows.map((r) => r.author_id));
   for (const r of rows) {

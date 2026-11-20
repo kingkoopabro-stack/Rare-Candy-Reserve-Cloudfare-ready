@@ -707,10 +707,41 @@ export async function authTally(db, postId) {
   return t;
 }
 
+// --- Feed redesign (v3.14): post visibility ---------------------------
+// "public" = everyone (including guests). "friends" = only the author,
+// their friends (either direction in the friends table — friendships are
+// stored both ways), and the operator. Guests see public posts only.
+// Used by the posts list, single-post view, and Headlines so a
+// friends-only post never leaks to strangers through any listing.
+export async function canSeePost(db, caller, post) {
+  if ((post.visibility ?? "public") !== "friends") return true;
+  if (!caller) return false;
+  if (caller.id === post.profile_id) return true;
+  if (caller.is_operator === 1) return true;
+  try {
+    const r = await db.prepare(
+      "SELECT 1 AS n FROM friends WHERE (profile_id = ? AND friend_id = ?) OR (profile_id = ? AND friend_id = ?) LIMIT 1",
+    ).bind(post.profile_id, caller.id, caller.id, post.profile_id).first();
+    return !!r;
+  } catch { return false; }
+}
+export async function filterVisiblePosts(db, caller, rows) {
+  const out = [];
+  for (const r of (rows || [])) if (await canSeePost(db, caller, r)) out.push(r);
+  return out;
+}
+
 export async function shapePost(db, row, author) {
   const hearts = await db.prepare("SELECT COUNT(*) AS n FROM post_votes WHERE post_id = ? AND value = 1").bind(row.id).first();
   const cc = await db.prepare("SELECT COUNT(*) AS n FROM comments WHERE post_id = ?").bind(row.id).first();
   const t = await authTally(db, row.id);
+  // Feed redesign (v3.14) — edit count comes from the post_edits log
+  // (0 when the migration hasn't run yet — never a crash).
+  let editCount = 0;
+  try {
+    const ec = await db.prepare("SELECT COUNT(*) AS n FROM post_edits WHERE post_id = ?").bind(row.id).first();
+    editCount = Number(ec?.n || 0);
+  } catch { editCount = 0; }
   return {
     id: row.id, title: row.title, body: row.body, category: row.category,
     kind: row.kind ?? "forum", flair: row.flair ?? "", tags: parseTags(row.tags),
@@ -723,6 +754,9 @@ export async function shapePost(db, row, author) {
     author_avatar_url: imageUrl(author.avatar_blob_key),
     author_badges: author.badges || [],
     score: hearts?.n ?? 0, comment_count: cc?.n ?? 0,
+    // Feed redesign (v3.14) — visibility + edit count (3-edit limit).
+    visibility: row.visibility ?? "public",
+    edit_count: editCount,
     // Creator/Seller area (v3) — only set on creator posts; plain posts
     // carry the defaults (is_creator 0, free, no genre, no file).
     is_creator: row.is_creator === 1,
@@ -875,8 +909,15 @@ export const UNLOCKS = [
 // appear. kind: which count the threshold reads. "sales" counts completed
 // orders (status paid/shipped/delivered) where the member is the seller.
 // "member_days" counts days since the profile was created. "verified"
-// is earned by being age-verified (age_verified = 1).
+// is earned by being age-verified (age_verified = 1). "granted" is NEVER
+// auto-earned — it only exists when the shop grants it (D1 INSERT into
+// profile_unlocks), so real press/journalists can earn the same badge
+// later without any code change. Reporter sits FIRST in this list on
+// purpose: displayBadgesFor() falls back to the first earned badge when
+// a member hasn't picked a display badge, so a Reporter always shows
+// their press badge by default (they can still pick a different one).
 export const BADGES = [
+  { key: "badge:reporter", icon: "📰", label: "Reporter", requirement: "Granted by the shop — posts news for the community", kind: "granted", threshold: 0 },
   { key: "badge:first-post", icon: "📝", label: "First Post", requirement: "Post your first post", kind: "posts", threshold: 1 },
   { key: "badge:first-comment", icon: "💬", label: "First Comment", requirement: "Leave your first comment", kind: "comments", threshold: 1 },
   { key: "badge:comments-25", icon: "🗨️", label: "Chatty", requirement: "Leave 25 comments", kind: "comments", threshold: 25 },

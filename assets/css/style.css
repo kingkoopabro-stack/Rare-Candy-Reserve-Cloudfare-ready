@@ -1064,3 +1064,161 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-store-preview{margin:0 0 10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px;padding:10px;background:rgba(0,0,0,.25)}
 .dwc-store-preview .dwc-previewbox{margin:0}
 .tp-icon-store{background:linear-gradient(135deg,#ff9a00,#ff2ea6)}
+
+/* ---------- Community feed redesign (v3.14) ---------- */
+/* Single-column Reddit-style feed: one card after another, full feed
+   width, going DOWN. No multi-column grid for posts anywhere in the
+   community feed. Neon gradient borders reuse the site's --grad. */
+
+/* Compact hero on community.html — keep the heading + green taglines,
+   hide the two long explanatory paragraphs so the feed is the first
+   thing after the profile card. */
+.hero-compact{padding:12px 0 0}
+.hero-compact .hero-long{display:none}
+
+/* Header search — small control under the last "e" of "Reserve"
+   (right edge of the logo). Idle: dimmer/subtle. Hover or tap reveals
+   the input; focused/typing: lights up, fully opaque, readable. */
+.logo-col{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.dwc-search-wrap{position:relative}
+.dwc-search-btn{display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;padding:2px 4px;border-radius:8px;opacity:.75}
+.dwc-search-btn:hover,.dwc-search-wrap.open .dwc-search-btn{color:var(--ink);opacity:1}
+.dwc-search-btn .dwc-search-ico{font-size:14px;line-height:1}
+.dwc-search-field{display:none;position:absolute;top:calc(100% + 4px);right:0;width:280px;max-width:calc(100vw - 32px);z-index:60;opacity:.65;transition:opacity .18s ease}
+.dwc-search-wrap:hover .dwc-search-field,.dwc-search-wrap.open .dwc-search-field{display:block}
+.dwc-search-wrap:hover .dwc-search-field,.dwc-search-wrap.open .dwc-search-field,.dwc-search-field:focus-within{opacity:1}
+.dwc-search-field form{display:flex;gap:6px;align-items:center}
+.dwc-search-field input{flex:1;min-width:0;background:#0d1b3e;border:1px solid var(--pink);border-radius:10px;color:var(--ink);padding:8px 10px;font-size:14px;outline:none}
+.dwc-search-field input::placeholder{color:#8ea0c9}
+.dwc-search-field input:focus{background:#12224d;border-color:#ff5cb0;box-shadow:0 0 0 1px var(--pink),0 0 18px rgba(255,45,149,.55)}
+.dwc-search-go{background:#0d1b3e;border:1px solid var(--pink);border-radius:10px;color:var(--ink);font-size:16px;padding:7px 10px;cursor:pointer}
+.dwc-search-go:hover{background:#12224d}
+.dwc-search-results{margin-top:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);max-height:60vh;overflow:auto;padding:6px 10px}
+.dwc-search-group{margin:8px 0 2px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:800}
+.dwc-search-list{list-style:none;margin:0;padding:0}
+.dwc-search-list a{display:flex;flex-direction:column;gap:0;padding:7px 4px;text-decoration:none;color:var(--ink);border-radius:8px}
+.dwc-search-list a:hover{background:#ffffff14}
+.dwc-search-list a span{font-size:12px;color:var(--muted)}
+.dwc-search-hint{margin:8px 0;font-size:13px;color:var(--muted)}
+
+/* Feed intro + plain-language hint so a new member knows where
+   their post goes and how the feed works. */
+.dwc-feed-intro{margin:0 0 10px}
+.dwc-feed-hint{margin:4px 0 0;color:var(--muted);font-size:14px;max-width:720px}
+.dwc-feed-title{font-size:22px}
+.dwc-feed-list{display:flex;flex-direction:column;gap:14px;width:100%}
+.dwc-feed-list>*{min-width:0}
+
+/* Post cards — full feed width, never overflowing; compact by default.
+   Neon gradient border via the .dwc-headline trick (transparent border
+   + gradient border-box). */
+.dwc-feed-card{width:100%;max-width:100%;box-sizing:border-box;border:2px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;padding:14px 16px}
+.dwc-feed-card:hover{box-shadow:0 0 0 1px var(--violet),0 8px 30px rgba(124,77,255,.25)}
+.dwc-feed-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.dwc-feed-who{min-width:0;overflow-wrap:anywhere}
+.dwc-feed-who .dwc-titlelink{color:var(--ink)}
+.dwc-feed-right{display:flex;align-items:center;gap:6px;flex:none}
+.dwc-feed-when{color:var(--muted);font-size:12.5px;white-space:nowrap}
+.dwc-feed-occ{color:var(--muted);font-size:12.5px}
+.dwc-feed-typeline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px}
+.dwc-type-label{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0b0b14;background:var(--grad);border-radius:999px;padding:2px 9px}
+.dwc-weird-badge{font-size:12.5px;font-weight:800;color:#0b0b14;background:linear-gradient(90deg,#00e5ff,#39ff88);border-radius:999px;padding:2px 9px}
+.dwc-vis-badge{font-size:12.5px;font-weight:800;color:#ffd75e;border:1px solid #ffd75e;border-radius:999px;padding:1px 8px}
+.dwc-edited-badge{font-size:12px;font-weight:700;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.dwc-feed-title{margin:6px 0 4px;font-size:19px}
+.dwc-feed-media{margin:8px 0}
+.dwc-feed-media .dwc-post-img{margin:0}
+.dwc-feed-body{margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.dwc-feed-body.dwc-clamped{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.dwc-readmore{background:none;border:0;color:var(--cyan);font-weight:700;cursor:pointer;padding:0;font-size:13.5px}
+.dwc-tag-chip{display:inline-block;margin:2px 4px 2px 0;padding:2px 9px;border-radius:999px;border:1px solid var(--violet);color:var(--cyan);text-decoration:none;font-size:13px;font-weight:700}
+.dwc-tag-chip:hover{background:var(--violet);color:#fff}
+.dwc-tags{margin:8px 0 0}
+
+/* Media carousel — one dot per picture/media, active dot highlighted. */
+.dwc-carousel{position:relative;margin:8px 0}
+.dwc-slides .dwc-slide.on{display:block}
+.dwc-slides .dwc-slide .dwc-post-img{margin:0}
+.dwc-dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.dwc-dot{width:10px;height:10px;border-radius:50%;border:1px solid var(--cyan);background:transparent;padding:0;cursor:pointer}
+.dwc-dot.on{background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.dwc-car-arrow{position:absolute;top:50%;transform:translateY(-50%);background:rgba(11,11,20,.75);border:1px solid var(--line);color:var(--ink);font-size:22px;line-height:1;width:34px;height:34px;border-radius:50%;cursor:pointer}
+.dwc-car-arrow:hover{border-color:var(--cyan)}
+.dwc-car-prev{left:8px}
+.dwc-car-next{right:8px}
+
+/* Action row — left-aligned, four in a row, counts where they apply.
+   Bookmark bright blue, heart a neon glowing star, comment bubble
+   filled white, share the recycle symbol. */
+.dwc-feed-actions{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.dwc-act{display:inline-flex;align-items:center;gap:5px;background:none;border:0;padding:4px 2px;cursor:pointer;color:var(--ink);font-size:14px;font-weight:700;text-decoration:none}
+.dwc-act:hover{filter:brightness(1.2)}
+.dwc-act-count{font-size:13.5px}
+.dwc-bm-ico{width:20px;height:20px;fill:none;stroke:#2fa8ff;stroke-width:2.2;transition:fill .15s}
+.dwc-bookmark.on .dwc-bm-ico{fill:#2fa8ff;filter:drop-shadow(0 0 6px rgba(47,168,255,.9))}
+.dwc-star-ico{width:22px;height:22px;fill:none;stroke:#ffd75e;stroke-width:1.8}
+.dwc-star.on .dwc-star-ico{fill:#ffd75e;filter:drop-shadow(0 0 6px #ffd75e) drop-shadow(0 0 14px rgba(255,215,94,.7))}
+.dwc-cmt-ico{width:20px;height:20px;fill:#fff;stroke:#fff;stroke-width:1}
+.dwc-share{color:var(--green)}
+.dwc-feed-more{margin-left:auto}
+
+/* ⋯ menu on your own post (top-right, author or operator only). */
+.dwc-feed-menuwrap{position:relative}
+.dwc-feed-dots{background:none;border:0;color:var(--ink);font-size:20px;line-height:1;font-weight:900;cursor:pointer;padding:2px 6px;border-radius:8px;letter-spacing:1px}
+.dwc-feed-dots:hover{background:var(--panel2)}
+.dwc-feed-menu{position:absolute;top:calc(100% + 4px);right:0;z-index:40;min-width:150px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.6);padding:6px;display:flex;flex-direction:column}
+.dwc-feed-menu[hidden]{display:none}
+.dwc-feed-menu button{background:none;border:0;color:var(--ink);text-align:left;font-size:14px;font-weight:700;padding:8px 10px;border-radius:8px;cursor:pointer}
+.dwc-feed-menu button:hover{background:#ffffff14}
+.dwc-feed-menu-note{font-size:12.5px;color:var(--muted);padding:8px 10px}
+
+/* Edit form + edit history (slots inside the post card). */
+.dwc-edit-slot,.dwc-edit-history{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.dwc-edit-form label{display:block;margin:10px 0 4px;font-weight:700;font-size:13.5px}
+.dwc-edit-form input,.dwc-edit-form textarea,.dwc-edit-form select{width:100%}
+.dwc-edit-note{margin:0 0 4px;font-size:13px;color:var(--amber);font-weight:700}
+.dwc-edit-actions{margin:12px 0 0}
+.dwc-edit-history-title{margin:0 0 6px;font-weight:800}
+.dwc-edit-history-list{margin:0;padding-left:20px;font-size:14px}
+.dwc-edit-history-list li{margin:3px 0}
+
+/* Composer — collapsed by default: one compact line. Expanded: the
+   full composer, with a Minimize button (RGB/neon border) top-right. */
+.dwc-composer{margin-bottom:12px}
+.dwc-composer-mini{display:flex;align-items:center;gap:10px}
+.dwc-composer-mini[hidden],.dwc-composer-full[hidden]{display:none}
+.dwc-composer-prompt{flex:1;min-width:0;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--muted);padding:10px 14px;font-size:14.5px;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwc-composer-prompt:hover{border-color:var(--violet);color:var(--ink)}
+.dwc-composer-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dwc-composer-hint{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+.dwc-minimize-btn{flex:none;font-weight:900;font-size:13px;color:var(--ink);background:var(--panel);border:2px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;border-radius:999px;padding:7px 14px;cursor:pointer;box-shadow:0 0 12px rgba(255,45,149,.45),0 0 18px rgba(0,229,255,.3)}
+.dwc-minimize-btn:hover{filter:brightness(1.25)}
+.dwc-minimize-btn::before{content:"⬆ "}
+
+/* Comments — same layout language as posts. */
+.dwc-comment-card{display:flex;gap:10px;align-items:flex-start;border:2px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;border-radius:14px;padding:12px 14px;margin:0 0 10px}
+.dwc-comment-main{flex:1;min-width:0}
+.dwc-comment-card .dwc-feed-actions{border-top:0;margin-top:6px;padding-top:6px}
+
+/* Filters — plain labels so the tabs explain themselves. */
+.dwc-filter-label{font-size:12.5px;font-weight:800;color:var(--muted);letter-spacing:.04em;margin-right:2px}
+.dwc-filters{display:flex;flex-direction:column;gap:6px;margin:0 0 12px}
+.dwc-filters>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.dwc-how summary{cursor:pointer;font-size:16px}
+
+/* ---------- Dank Meme Drawer (v3.14) ---------- */
+/* Collapsed by default: header + grab line only. Meme images lazy-load
+   ONLY when the drawer opens (src is swapped in on first open), so the
+   page loads fast with it closed. Expanding slides the drawer up from
+   the bottom; collapsing hides the memes again. */
+.meme-stash{margin-top:28px}
+.dwc-meme-drawer-head{display:flex;justify-content:space-between;align-items:center;width:100%;background:none;border:0;color:var(--ink);font-size:21px;font-weight:900;padding:6px 2px;cursor:pointer;text-align:left}
+.dwc-meme-drawer-head:hover{color:var(--cyan)}
+.dwc-meme-drawer-arrows{color:var(--cyan);font-size:16px;letter-spacing:2px;flex:none}
+.dwc-meme-drawer-grab{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;cursor:grab;touch-action:pan-y}
+.dwc-meme-drawer-grab:active{cursor:grabbing}
+.dwc-meme-drawer-grabline{width:88px;height:6px;border-radius:999px;background:var(--grad);box-shadow:0 0 10px rgba(255,45,149,.55),0 0 14px rgba(0,229,255,.4)}
+.dwc-meme-drawer-grabhint{font-size:12px;color:var(--muted);font-weight:700}
+.dwc-meme-drawer-body{overflow:hidden}
+.meme-stash.open .dwc-meme-drawer-body{animation:dwcDrawerUp .38s cubic-bezier(.2,.9,.3,1.05) both}
+@keyframes dwcDrawerUp{from{transform:translateY(36px);opacity:0}to{transform:translateY(0);opacity:1}}

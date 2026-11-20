@@ -1111,6 +1111,7 @@ function storePreviewHTML(item) {
   var merged = storeMergedTheme(item);
   var fake = Object.assign({}, state.profile, { is_mine: true, profile_theme: JSON.stringify(merged) });
   var css = scopeStoreCSS(themeCSS(merged)) + scopeStoreCSS(scopeProfileCss(item.css));
+  ensureProfileFonts(merged);
   return '<div id="dwc-store-preview" class="dwc-store-preview">' +
     '<style>' + css + '</style>' +
     '<h4 style="margin:0 0 6px">Preview — your page with “' + esc(item.name) + '”</h4>' +
@@ -2106,7 +2107,9 @@ function profileFormHTML(p) {
     '<input type="color" name="theme_text_color" value="' + (th.text_color || "#f2f2f8") + '" style="width:64px;height:40px;padding:2px">' +
     '<label><input type="checkbox" name="theme_accent_use" style="width:auto"' + (th.accent_color ? " checked" : "") + '> Use a custom accent color (overrides your vibe’s accent — links, headings, friend borders)</label>' +
     '<input type="color" name="theme_accent_color" value="' + (th.accent_color || "#ff2d95") + '" style="width:64px;height:40px;padding:2px" oninput="DWC.setAccent(this.value)">' +
-    '<label>Font (overrides your vibe’s font)</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
+    '<label>Name font — your display name only (overrides your vibe’s name font)</label><select name="theme_name_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.name_font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
+    '<label>Page text font — the rest of your page (this is what your old “Font” pick is now — it still works exactly as before)</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
+    '<p style="margin:6px 0 0"><span id="dwc-font-sample-name" style="font-size:20px;font-weight:700">Your Name</span><br><span id="dwc-font-sample-body" style="font-size:14px">Sample page text — this is how the rest of your page will read.</span></p>' +
     "</div>" +
     '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime. A style here overrides your vibe's buttons.</p>" +
@@ -2251,6 +2254,57 @@ function gifEmbedHTML(url, label) {
   if (!url) return "";
   return '<div class="dwc-gifview"><iframe src="' + esc(url) + '" loading="lazy" title="' + esc(label || "GIF") + '" sandbox="allow-scripts allow-same-origin"></iframe>' +
     '<p>GIF via GIPHY' + (label ? " · " + esc(label) : "") + "</p></div>";
+}
+
+// ---------- Meme Stash codes (v3.13) ----------
+// Members paste a code like :rickroll: into a post or comment and the
+// meme shows up inline. Allowlist only — the code is the filename stem
+// (:stem:), the MP4 gets :rickroll-video:. Unknown codes stay literal
+// text, and the body is escaped FIRST (see memeBodyHTML) so no user
+// HTML can ever pass through.
+var MEME_CODES = {
+  "rickroll": { file: "rickroll.gif", kind: "gif", label: "YOU GOT RICK ROLLED" },
+  "beard-nod": { file: "beard-nod.gif", kind: "gif", label: "The Bearded Nod" },
+  "rickroll-video": { file: "rickroll.mp4", kind: "video", label: "RICKROLL — get rickrolled" },
+  "always-has-been": { file: "always-has-been.gif", kind: "gif", label: "Always Has Been" },
+  "ancient-aliens-guy": { file: "ancient-aliens-guy.gif", kind: "gif", label: "Ancient Aliens Guy" },
+  "bad-luck-brian": { file: "bad-luck-brian.gif", kind: "gif", label: "Bad Luck Brian" },
+  "bernie-once-again-asking": { file: "bernie-once-again-asking.gif", kind: "gif", label: "Bernie Once Again Asking" },
+  "change-my-mind": { file: "change-my-mind.gif", kind: "gif", label: "Change My Mind" },
+  "deal-with-it": { file: "deal-with-it.gif", kind: "gif", label: "Deal With It" },
+  "dicaprio-toast": { file: "dicaprio-toast.gif", kind: "gif", label: "Leo Toast" },
+  "disaster-girl": { file: "disaster-girl.gif", kind: "gif", label: "Disaster Girl" },
+  "distracted-boyfriend": { file: "distracted-boyfriend.gif", kind: "gif", label: "Distracted Boyfriend" },
+  "doge": { file: "doge.gif", kind: "gif", label: "Doge" },
+  "drake-yes-no": { file: "drake-yes-no.gif", kind: "gif", label: "Drake Yes / No" },
+  "grumpy-cat": { file: "grumpy-cat.gif", kind: "gif", label: "Grumpy Cat" },
+  "grus-plan": { file: "grus-plan.gif", kind: "gif", label: "Gru's Plan" },
+  "hide-the-pain-harold": { file: "hide-the-pain-harold.gif", kind: "gif", label: "Hide the Pain Harold" },
+  "ight-imma-head-out": { file: "ight-imma-head-out.gif", kind: "gif", label: "Ight Imma Head Out" },
+  "is-this-a-pigeon": { file: "is-this-a-pigeon.gif", kind: "gif", label: "Is This a Pigeon?" },
+  "keyboard-cat": { file: "keyboard-cat.gif", kind: "gif", label: "Keyboard Cat" },
+  "mocking-spongebob": { file: "mocking-spongebob.gif", kind: "gif", label: "Mocking SpongeBob" },
+  "nyan-cat": { file: "nyan-cat.gif", kind: "gif", label: "Nyan Cat" },
+  "one-does-not-simply": { file: "one-does-not-simply.gif", kind: "gif", label: "One Does Not Simply" },
+  "pepe-the-frog": { file: "pepe-the-frog.gif", kind: "gif", label: "Pepe the Frog" },
+  "philosoraptor": { file: "philosoraptor.png", kind: "png", label: "Philosoraptor" },
+  "shut-up-and-take-my-money": { file: "shut-up-and-take-my-money.gif", kind: "gif", label: "Shut Up and Take My Money" },
+  "success-kid": { file: "success-kid.gif", kind: "gif", label: "Success Kid" },
+  "surprised-pikachu": { file: "surprised-pikachu.gif", kind: "gif", label: "Surprised Pikachu" },
+  "this-is-fine": { file: "this-is-fine.gif", kind: "gif", label: "This Is Fine" },
+  "trollface": { file: "trollface.png", kind: "png", label: "Trollface" },
+  "two-buttons": { file: "two-buttons.gif", kind: "gif", label: "Two Buttons" },
+  "wojak-feels-guy": { file: "wojak-feels-guy.gif", kind: "gif", label: "Wojak (Feels Guy)" },
+  "woman-yelling-at-cat": { file: "woman-yelling-at-cat.gif", kind: "gif", label: "Woman Yelling at Cat" }
+};
+function memeBodyHTML(body) {
+  var out = esc(body);
+  return out.replace(/:([a-z0-9][a-z0-9-]*):/g, function (m, stem) {
+    var it = MEME_CODES[stem];
+    if (!it) return m;
+    if (it.kind === "video") return '<video src="images/memes/' + it.file + '" controls preload="none" playsinline class="dwc-meme-inline"></video>';
+    return '<img src="images/memes/' + it.file + '" class="dwc-meme-inline" alt="' + esc(it.label) + '" loading="lazy">';
+  });
 }
 
 // YouTube embed (v3.8) — a post body may carry a YouTube watch / shorts /
@@ -2606,25 +2660,80 @@ function layoutPresetCSS(id) {
 }
 
 // ---------- Member-page theme pickers (v3.2) ----------
-// Background color/image, text + accent colors, and a font — all optional,
+// Background color/image, text + accent colors, and fonts — all optional,
 // all validated (hex colors, https:// image, allowlisted font stacks), so
 // the CSS built from them can never carry a script or an @import. The
 // theme style is injected AFTER the member's layout CSS on their page, so
 // the pickers win over a preset for the properties they set; custom CSS
 // can still override them with !important.
+// ---------- Profile fonts (v3.13) ----------
+// TWO picks sharing one allowlist: `font` is the page text font, `name_font`
+// is the display-name font. 5 system stacks (kept for back-compat) + 9
+// Google Fonts: 4 elegant (Playfair Display, Cormorant Garamond, Great
+// Vibes script, Cinzel) and 5 cool (Orbitron, Bangers, Press Start 2P,
+// Monoton, Creepster). Each entry carries its full stack (with fallbacks, so
+// the page still looks right if the webfont fails) and, for webfonts, the
+// Google css2 family param. Webfonts load ONLY from this map —
+// ensureProfileFonts() builds the <link> from these params and nothing
+// else, so a font URL can never be built from user input.
 var THEME_FONTS = [
   { id: "", name: "System default" },
-  { id: "comic", name: "Comic / Chalkboard", css: '"Comic Sans MS","Chalkboard SE","Comic Neue",cursive' },
-  { id: "typewriter", name: "Typewriter", css: '"Courier New",Courier,monospace' },
   { id: "serif", name: "Classic serif", css: 'Georgia,"Times New Roman",serif' },
+  { id: "typewriter", name: "Typewriter", css: '"Courier New",Courier,monospace' },
+  { id: "comic", name: "Comic / Chalkboard", css: '"Comic Sans MS","Chalkboard SE","Comic Neue",cursive' },
   { id: "rounded", name: "Rounded", css: '"Trebuchet MS",Verdana,sans-serif' },
+  { id: "playfair", name: "Playfair Display — elegant serif", css: "'Playfair Display',Georgia,serif", google: "Playfair+Display:wght@400;700" },
+  { id: "cormorant", name: "Cormorant Garamond — elegant serif", css: "'Cormorant Garamond',Georgia,serif", google: "Cormorant+Garamond:wght@500;600" },
+  { id: "vibes", name: "Great Vibes — elegant script", css: "'Great Vibes','Segoe Script',cursive", google: "Great+Vibes" },
+  { id: "cinzel", name: "Cinzel — Roman elegant", css: "'Cinzel',Georgia,serif", google: "Cinzel:wght@400;700" },
+  { id: "orbitron", name: "Orbitron — futuristic", css: "'Orbitron','Segoe UI',sans-serif", google: "Orbitron:wght@500;700" },
+  { id: "bangers", name: "Bangers — comic bold", css: "'Bangers','Comic Sans MS',cursive", google: "Bangers" },
+  { id: "pressstart", name: "Press Start 2P — arcade pixel", css: '"Press Start 2P","Courier New",monospace', google: "Press+Start+2P" },
+  { id: "monoton", name: "Monoton — neon retro", css: "'Monoton','Courier New',monospace", google: "Monoton" },
+  { id: "creepster", name: "Creepster — horror", css: "'Creepster',Georgia,serif", google: "Creepster" },
 ];
 function themeFontCSS(id) {
   for (var i = 0; i < THEME_FONTS.length; i++) if (THEME_FONTS[i].id === id) return THEME_FONTS[i].css || "";
   return "";
 }
+function themeFontGoogle(id) {
+  for (var i = 0; i < THEME_FONTS.length; i++) if (THEME_FONTS[i].id === id) return THEME_FONTS[i].google || "";
+  return "";
+}
+// Google css2 family params a theme actually needs, deduped, allowlist-only.
+// A bogus id (or an injection attempt) maps to "" and is never emitted.
+function profileFontFamilies(theme) {
+  var t = parseThemeClient(theme);
+  var out = [];
+  [t.name_font, t.font].forEach(function (id) {
+    var g = themeFontGoogle(id);
+    if (g && out.indexOf(g) === -1) out.push(g);
+  });
+  return out;
+}
+function profileFontsURL(theme) {
+  var fams = profileFontFamilies(theme);
+  if (!fams.length) return "";
+  return "https://fonts.googleapis.com/css2?family=" + fams.join("&family=") + "&display=swap";
+}
+// Adds (or updates) the ONE Google Fonts <link> for this profile's fonts.
+// No-op when the theme uses no webfonts; removes the link when not needed,
+// so a profile that switches back to system fonts stops fetching them.
+function ensureProfileFonts(theme) {
+  if (typeof document === "undefined") return;
+  var url = profileFontsURL(theme);
+  var link = document.getElementById("dwc-profile-fonts");
+  if (!url) { if (link) link.remove(); return; }
+  if (!link) {
+    link = document.createElement("link");
+    link.id = "dwc-profile-fonts";
+    link.rel = "stylesheet";
+    document.head.appendChild(link);
+  }
+  if (link.getAttribute("href") !== url) link.setAttribute("href", url);
+}
 function parseThemeClient(stored) {
-  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "" };
   if (!stored) return empty;
   var obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
@@ -2634,6 +2743,7 @@ function parseThemeClient(stored) {
   var img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = themeFontCSS(obj.font) ? obj.font : "";
+  out.name_font = themeFontCSS(obj.name_font) ? obj.name_font : "";
   out.button_style = (typeof BUTTON_STYLES !== "undefined" && BUTTON_STYLES[obj.button_style]) ? obj.button_style : "";
   // Vibe (Taffy Layout Builder) — a full look, stored as one theme key.
   out.vibe = (typeof LAYOUT_VIBES !== "undefined" && LAYOUT_VIBES[obj.vibe]) ? String(obj.vibe) : "";
@@ -2641,7 +2751,7 @@ function parseThemeClient(stored) {
   var eff = Array.isArray(obj.effects) ? obj.effects : [];
   out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8);
   var presetIds = PRESET_BACKGROUNDS.map(function (p) { return p.id; });
-  out.bg_preset = presetIds.indexOf(String(obj.bg_preset || "")) >= 0 ? String(obj.bg_preset) : "";
+  out.bg_preset = presetIds.indexOf(String(obj.bg_preset || "")) >= 0 ? String(obj.bg_preset || "") : "";
   out.comment_border_color = hex(obj.comment_border_color);
   if (out.effects.indexOf("rgb-comment-border") >= 0) out.comment_border_color = "";
   out.pic_size = (obj.pic_size === "bigger" || obj.pic_size === "smaller") ? obj.pic_size : "";
@@ -2650,7 +2760,7 @@ function parseThemeClient(stored) {
   out.pic_frame = frameIds.indexOf(String(obj.pic_frame || "")) >= 0 ? String(obj.pic_frame) : "";
   out.blood_color = hex(obj.blood_color);
   var gbModes = GB_FRAME_MODES.map(function (m) { return m.id; });
-  out.gb_mode = gbModes.indexOf(String(obj.gb_mode || "")) >= 0 ? String(obj.gb_mode) : "";
+  out.gb_mode = gbModes.indexOf(String(obj.gb_mode || "")) >= 0 ? String(obj.gb_mode || "") : "";
   var gbCols = Array.isArray(obj.gb_colors) ? obj.gb_colors : [];
   out.gb_colors = gbCols.map(function (c) { return hex(c); }).filter(Boolean).slice(0, 3);
   // Chosen display badges (v3.9) — up to 2 known badge keys.
@@ -2730,9 +2840,15 @@ function themeCSS(theme) {
   if (t.text_color) css += ".dwc-myprofile{color:" + t.text_color + ";}.dwc-myprofile p,.dwc-myprofile li{color:" + t.text_color + ";}";
   if (t.accent_color) css += ".dwc-myprofile a{color:" + t.accent_color + ";}.dwc-myprofile h2,.dwc-myprofile h3{color:" + t.accent_color + ";}.dwc-myprofile .dwc-topfriend{border-color:" + t.accent_color + ";}";
   if (t.font) css += ".dwc-myprofile{font-family:" + themeFontCSS(t.font) + ";}";
+  // Display-name font (v3.13) — the name heading only, on the real page
+  // (h2 inside .dwc-profile-row) and in the Edit Profile / store preview
+  // (h3 inside .dwc-mypage-head in the preview box). Comes after the body
+  // font rule so it wins for the name; the vibe's heading color still
+  // applies, and custom CSS can override with !important as usual.
+  if (t.name_font) css += ".dwc-myprofile .dwc-profile-row h2,.dwc-myprofile.dwc-previewbox .dwc-mypage-head h3{font-family:" + themeFontCSS(t.name_font) + ";}";
   // Buttons: preset first, then the member's own button CSS on top.
   if (t.button_style && BUTTON_STYLES[t.button_style]) css += BUTTON_STYLES[t.button_style].css;
-  if (t.button_css) css += sanitizeLayoutCss(t.button_css);
+  if (t.button_css) css += sanitizeLayoutCssClient(t.button_css);
   // Comment-picture border color (v3.9) — any color the member picked
   // (the RGB effect clears it on save, so the two never fight).
   if (t.comment_border_color) css += ".dwc-myprofile .dwc-page-comment .dwc-avatar{border:3px solid " + t.comment_border_color + ";}";
@@ -3129,7 +3245,7 @@ function postCardHTML(p) {
     (isCreator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
       '<strong style="color:var(--green);font-size:17px">' + priceLabel + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file</span>' : "") + "</p>" : "") +
-    '<p>' + esc(p.body.length > 280 ? p.body.slice(0, 280) + "…" : p.body) + "</p>" +
+    '<p>' + memeBodyHTML(p.body.length > 280 ? p.body.slice(0, 280) + "…" : p.body) + "</p>" +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
     '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
@@ -3522,7 +3638,7 @@ async function viewThread(el, postId) {
       '<strong style="color:var(--green);font-size:20px">' + (p.price_cents > 0 ? money(p.price_cents) : "Free") + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file — ' + esc(p.file_name || "download") + "</span>" : "") + "</p>" +
       '<p style="color:var(--muted);font-size:14px">' + (p.pay_unlock && p.price_cents > 0 ? 'This post is pay-to-unlock — hit “Pay to unlock” and sort out payment in a private chat. The receipt marked done in that chat is your proof of purchase.' : 'Payment is arranged privately with the seller — hit “Buy / Message seller” and sort it out in a private chat.') + ' No money moves in this app.</p>' : "") +
-    '<p style="white-space:pre-wrap">' + esc(p.body) + "</p>" +
+    '<p style="white-space:pre-wrap">' + memeBodyHTML(p.body) + "</p>" +
     youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
     '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDate(p.created_at) + "</p>" +
@@ -3554,7 +3670,7 @@ async function viewThread(el, postId) {
       return '<div class="dwc-comment">' +
         (c.author_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt="">' : "") +
         '<div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
-        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
         gifEmbedHTML(c.gif_url, c.gif_label) +
         '<div class="dwc-actions">' +
         '<button type="button" class="dwc-heart' + (ch ? " on" : "") + '" onclick="DWC.heartComment(' + p.id + ", " + c.id + ', this)">' + (ch ? "❤️" : "🤍") + " " + (c.score || 0) + "</button>" +
@@ -3624,7 +3740,7 @@ async function viewListing(el, listingId) {
     '<section class="card"><h3 style="margin-top:0">Comments (' + list.length + ')' + (l.allow_comments ? "" : ' <span style="color:var(--amber)">— comments are off on this listing</span>') + "</h3>" +
     (list.length ? list.map(function (c) {
       return '<div class="dwc-comment"><div style="flex:1"><p style="margin:0"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span></p>" +
-        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+        (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
         gifEmbedHTML(c.gif_url, c.gif_label) + "</div></div>";
     }).join("") : "<p>Nothing yet.</p>") +
     "</section>" +
@@ -4211,6 +4327,9 @@ async function viewMember(el, memberId) {
     tst.textContent = memberThemeCss;
     document.head.appendChild(tst);
   }
+  // Webfonts this profile actually uses (name + page text) — one deduped
+  // <link>, loaded from the allowlist only.
+  ensureProfileFonts(m.profile_theme);
   // v3.9 — website look + picture position drive the layout.
   var mth = parseThemeClient(m.profile_theme);
   var isWebsite = !!m.website_mode;
@@ -4285,7 +4404,7 @@ async function loadPageComments(profileId, isMine, isFriend) {
           (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
           '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + '</span>' +
           (c.visibility !== "public" ? ' <span class="dwc-meta">· ' + (c.visibility === "friends" ? "friends-only" : "private") + '</span>' : "") +
-          (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+          (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
           (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
           (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
           ((c.is_mine || isMine) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "") +
@@ -4375,7 +4494,7 @@ async function loadPicViewerComments() {
           return '<div class="dwc-page-comment">' +
             (c.author_avatar_url ? '<img class="dwc-avatar" src="' + esc(c.author_avatar_url) + '" alt="" style="width:32px;height:32px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:32px;height:32px;font-size:16px">🍬</span>') +
             '<div><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + ' <span class="dwc-meta">' + fmtDate(c.created_at) + "</span>" +
-            (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(c.body) + "</p>" : "") +
+            (c.body ? '<p style="margin:4px 0;white-space:pre-wrap">' + memeBodyHTML(c.body) + "</p>" : "") +
             (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
             ((c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "") +
             "</div></div>";
@@ -5446,7 +5565,7 @@ window.DWC = {
     // opted into (checkbox ticked / URL or font chosen). The server
     // re-validates and stores "" when nothing is set.
     if (form.querySelector('input[name="theme_bg_color"]')) {
-      var theme = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "" };
+      var theme = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "" };
       var hexOk = function (val) { return /^#[0-9a-fA-F]{6}$/.test(String(val || "").trim()) ? String(val).trim() : ""; };
       if (fd.get("theme_bg_use")) theme.bg_color = hexOk(fd.get("theme_bg_color"));
       var bgImg = String(fd.get("theme_bg_image") || "").trim().slice(0, 500);
@@ -5455,6 +5574,8 @@ window.DWC = {
       if (fd.get("theme_accent_use")) theme.accent_color = hexOk(fd.get("theme_accent_color"));
       var fontSel = String(fd.get("theme_font") || "");
       if (themeFontCSS(fontSel)) theme.font = fontSel;
+      var nameFontSel = String(fd.get("theme_name_font") || "");
+      if (themeFontCSS(nameFontSel)) theme.name_font = nameFontSel;
       var btnStyle = String(fd.get("theme_button_style") || "");
       if (BUTTON_STYLES[btnStyle]) theme.button_style = btnStyle;
       // Taffy Layout Builder — the vibe is a real theme setting.
@@ -6746,6 +6867,8 @@ window.DWC = {
     th.accent_color = fd.get("theme_accent_use") ? hexOk(get("theme_accent_color")) : "";
     var fontSel = get("theme_font");
     th.font = themeFontCSS(fontSel) ? fontSel : "";
+    var nameFontSel = get("theme_name_font");
+    th.name_font = themeFontCSS(nameFontSel) ? nameFontSel : "";
     var btnStyle = get("theme_button_style");
     th.button_style = BUTTON_STYLES[btnStyle] ? btnStyle : "";
     th.button_css = get("theme_button_css").slice(0, 4000);
@@ -6824,6 +6947,13 @@ window.DWC = {
     }
     tst.textContent = themeCSS(th);
     document.head.appendChild(tst); // re-append keeps it AFTER the layout CSS
+    // Load the webfonts this preview actually uses, so the sample + the
+    // big preview below show the real fonts, not the fallbacks.
+    ensureProfileFonts(th);
+    var nfSample = document.getElementById("dwc-font-sample-name");
+    if (nfSample) nfSample.style.fontFamily = themeFontCSS(th.name_font) || "";
+    var bfSample = document.getElementById("dwc-font-sample-body");
+    if (bfSample) bfSample.style.fontFamily = themeFontCSS(th.font) || "";
     if (th.ticker_source === "btc") refreshBtcTicker();
   },
   setPresence: async function (status) {
@@ -7419,6 +7549,52 @@ window.DWC = {
     state.phoneNotes = "";
     renderPhone();
     if (state.profile) apiPost("/notes", { device_id: deviceId(), note: "" });
+  },
+  // Meme Stash (v3.13) — copy a meme's code, or save it to the member's
+  // Taffy Phone notepad. Copy works for everyone, no profile needed.
+  memeCopy: function (btn) {
+    var code = btn.getAttribute("data-code") || "";
+    var orig = btn.textContent;
+    var done = function () {
+      btn.textContent = "✅ Copied!";
+      setTimeout(function () { btn.textContent = orig; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(done, function () { copyTextToClipboard(code); done(); });
+    } else { copyTextToClipboard(code); done(); }
+  },
+  // Save a meme code to the member's one persistent note (500 chars).
+  // Loads the live note first so an older tab never wipes newer text.
+  // Never posts a shorter note than the one loaded, and never posts at
+  // all when the code won't fit or the notes table isn't there yet.
+  memeSave: async function (btn) {
+    var code = btn.getAttribute("data-code") || "";
+    var orig = btn.textContent;
+    var flash = function (msg) {
+      btn.textContent = msg;
+      setTimeout(function () { btn.textContent = orig; }, 2200);
+    };
+    if (!state.profile) { flash("Make a profile first"); return; }
+    btn.textContent = "Saving…";
+    var base = state.phoneNotes || "";
+    try {
+      var data = await apiGet("/notes?device_id=" + encodeURIComponent(deviceId()));
+      if (data && data.ok && typeof data.note === "string") base = data.note;
+    } catch (e) { /* keep the local note as the base */ }
+    if (base.indexOf(code) !== -1) { flash("✅ Already saved"); return; }
+    var trimmed = base.replace(/\n+$/, "");
+    var next = trimmed ? trimmed + "\n" + code : code;
+    if (next.length > 500) { flash("Notepad full"); return; }
+    var saved = null;
+    try { saved = await apiPost("/notes", { device_id: deviceId(), note: next }); } catch (e) { saved = null; }
+    if (!saved || !saved.ok) { flash("Notes aren't switched on yet"); return; }
+    state.phoneNotes = next;
+    state.phoneNotesSavedAt = Date.now();
+    var ta = document.querySelector(".tp-notes");
+    if (ta) ta.value = next;
+    var c = $("dwc-notes-count");
+    if (c) c.textContent = next.length + "/500";
+    flash("✅ Saved!");
   },
 
   report: async function (type, id) {

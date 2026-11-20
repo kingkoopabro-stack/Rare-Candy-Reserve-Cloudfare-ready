@@ -816,12 +816,19 @@ export function parseAshTracks(stored) {
 }
 
 // Member-page theme (v3.2) — JSON {bg_color, bg_image_url, text_color,
-// accent_color, font}. Every value is validated here, so the CSS the
+// accent_color, font, name_font}. Every value is validated here, so the CSS the
 // frontend builds from it can never carry a script, an @import, or a
 // non-https image — same rules as sanitizeLayoutCss, enforced by
 // construction: colors must be #rrggbb, the background image must be
 // https://, and the font must be one of the fixed allowlisted stacks.
-export const THEME_FONTS = ["", "comic", "typewriter", "serif", "rounded"];
+// Profile fonts (v3.13) — TWO picks sharing one allowlist: `font` is the
+// page text font, `name_font` is the display-name font. The list is the
+// fixed allowlist: 5 system stacks kept for back-compat ("" / serif /
+// typewriter / comic / rounded) + 9 webfonts (4 elegant, 5 cool). The
+// client map (community.js THEME_FONTS) carries the matching stacks and
+// Google family params — the two lists must stay in sync (the smoke test
+// checks it). Webfonts load only from that map, never from user input.
+export const THEME_FONTS = ["", "serif", "typewriter", "comic", "rounded", "playfair", "cormorant", "vibes", "cinzel", "orbitron", "bangers", "pressstart", "monoton", "creepster"];
 export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost", "insert-coin"];
 // Taffy Layout Builder vibes (v3.10) — one of the fixed vibe ids, or "".
 export const VIBE_IDS = ["", "neon", "midnight", "candy", "classic", "forest", "sunset", "ocean", "bubblegum", "gold", "dark"];
@@ -1211,7 +1218,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [] };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1224,14 +1231,17 @@ export function parseTheme(stored) {
   const img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = THEME_FONTS.includes(obj.font) ? obj.font : "";
+  // Display-name font (v3.13) — same allowlist as the page text font.
+  // `font` stays the page text font, so existing profiles keep their pick.
+  out.name_font = THEME_FONTS.includes(obj.name_font) ? obj.name_font : "";
   out.button_style = BUTTON_STYLE_IDS.includes(obj.button_style) ? obj.button_style : "";
   // Vibe (v3.10) — a full look, one of the fixed ids.
-  out.vibe = VIBE_IDS.includes(String(obj.vibe || "")) ? String(obj.vibe) : "";
+  out.vibe = VIBE_IDS.includes(String(obj.vibe || "")) ? String(obj.vibe || "") : "";
   out.button_css = sanitizeLayoutCss(String(obj.button_css || "")).slice(0, 4000);
   const eff = Array.isArray(obj.effects) ? obj.effects : [];
   out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 8);
   // Preset background (v3.9) — one of the fixed preset ids, or "" for none.
-  out.bg_preset = PRESET_BG_IDS.includes(String(obj.bg_preset || "")) ? String(obj.bg_preset) : "";
+  out.bg_preset = PRESET_BG_IDS.includes(String(obj.bg_preset || "")) ? String(obj.bg_preset || "") : "";
   // Comment-picture border color (v3.9) — any #rrggbb the member picks.
   // Mutually exclusive with the RGB comment-border effect: the RGB
   // effect wins when both are set, so the saved color is dropped.
@@ -1245,7 +1255,7 @@ export function parseTheme(stored) {
   out.blood_color = hex(obj.blood_color);
   // GB/GBA frame colors (v3.9) — handheld body mode + up to 3 custom
   // gradient colors (only used when mode is "custom").
-  out.gb_mode = GB_FRAME_MODES.includes(String(obj.gb_mode || "")) ? String(obj.gb_mode) : "";
+  out.gb_mode = GB_FRAME_MODES.includes(String(obj.gb_mode || "")) ? String(obj.gb_mode || "") : "";
   const gbCols = Array.isArray(obj.gb_colors) ? obj.gb_colors : [];
   out.gb_colors = gbCols.map((c) => hex(c)).filter(Boolean).slice(0, 3);
   // Chosen display badges (v3.9) — up to 2 badge keys the member picked
@@ -1278,7 +1288,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

@@ -101,6 +101,19 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:20px 10px 30p
 .pad-edit{display:none;background:var(--panel);border:1px solid var(--pink);border-radius:10px;margin:10px;padding:12px;gap:8px;flex-wrap:wrap;align-items:center;}
 .pad-edit.open{display:flex;}
 .pad-edit input[type=text]{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px;width:110px;}
+/* Auto-Tune knobs + VST rack (added 2026-11-21) */
+.sec-label{text-align:center;color:var(--cyan);font-size:12px;font-weight:700;margin:10px 0 4px;text-shadow:0 0 6px rgba(47,249,255,.4);}
+.knobrow{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:flex-end;margin:4px 0 8px;}
+.knob{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:76px;}
+.knob-label{font-size:11px;color:var(--muted);text-align:center;}
+.knob-val{font-size:11px;color:var(--cyan);font-weight:700;}
+.knob input[type=range]{width:76px;accent-color:var(--pink);}
+.vst-rack{max-width:640px;margin:10px auto;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--panel2);}
+.vst-title{text-align:center;color:var(--cyan);font-weight:700;font-size:13px;text-shadow:0 0 6px rgba(47,249,255,.4);}
+.vst-sub{text-align:center;margin:2px 0 4px;}
+.vst-slot{border-top:1px solid var(--line);padding:8px 0 4px;}
+.vst-slot-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.vst-slot-name{font-size:12px;font-weight:700;}
 </style>
 </head>
 <body>
@@ -141,7 +154,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:20px 10px 30p
       <option value="dance">Dance Track (Silver Saw)</option>
     </select>
   </div>
-  <p class="small">Beat tracks: Kick/Snare/HiHat/Clap 16-step grid. Melodic tracks: open the Piano Roll to draw a melody — try the Sytrus FM, 3x Osc, Sub Bass or fully-Custom VST. Voice tracks: record, upload an MP3, add Chorus, Reverb, Delay, Distortion or Radio filters, apply Auto-Tune, slice your vocal into a rhythm, and chop it into a melody that plays in key with your beat. Export any single take as its own WAV, or the whole mix. Every channel has a filter, a 16-step filter-automation lane, and an A/B pattern you assign per bar in 🧩 Arrangement. Save your whole song as a project file and reload it later in this same DAW.</p>
+  <p class="small">Beat tracks: Kick/Snare/HiHat/Clap 16-step grid. Melodic tracks: open the Piano Roll to draw a melody — try SilverSaw, Ballerina, Piano, Harpsichord, Electric Piano, Strings Pad, Bass Synth, Sytrus FM, 3x Osc, Sub Bass or fully-Custom VST. Voice tracks: record, upload an MP3, apply Auto-Tune with Retune Speed, Key/Scale, LFO, Humanize, Flex-Tune and Mix knobs, load VST-style effects from the VST Rack, slice your vocal into a rhythm, and chop it into a melody that plays in key with your beat. Export any single take as its own WAV, or the whole mix. Every channel has a filter, a 16-step filter-automation lane, and an A/B pattern you assign per bar in 🧩 Arrangement. Save your whole song as a project file and reload it later in this same DAW.</p>
 </main>
 <footer>Vita Nova Studios V2 — self‑contained, works offline once loaded. 新星</footer>
 
@@ -181,7 +194,7 @@ document.getElementById('master').oninput = e => master.gain.value = parseFloat(
 
 let tracks = []; let idSeq = 1; let playing = false; let schedTimer = null; let currentStep = 0;
 const DRUM_INSTS = ['Kick','Snare','HiHat','Clap'];
-const MELODIC_INSTS = ['Synth','Chiptune 8-bit','Chiptune 16-bit','Strings','Violin','Guitar','KS Silver Saw','Dance Saw','Belliano','Sytrus FM','3x Osc','Sub Bass','Custom'];
+const MELODIC_INSTS = ['Synth','SilverSaw','Ballerina','Piano','Harpsichord','Electric Piano','Strings Pad','Bass Synth','Chiptune 8-bit','Chiptune 16-bit','Strings','Violin','Guitar','KS Silver Saw','Dance Saw','Belliano','Sytrus FM','3x Osc','Sub Bass','Custom'];
 function getBarsCount(){ return parseInt(document.getElementById('loops').value)||4; }
 function newArr(){ return new Array(getBarsCount()).fill('A'); }
 function resizeArrangements(){
@@ -196,6 +209,47 @@ const SCALES = {
   'Chromatic':[0,1,2,3,4,5,6,7,8,9,10,11],'C Major':[0,2,4,5,7,9,11],'A Minor':[9,11,0,2,4,5,7],
   'G Major':[7,9,11,0,2,4,6],'E Minor':[4,6,7,9,11,0,2],'D Major':[2,4,6,7,9,11,1]
 };
+// ---- Vocal key / scale (Antares-style key picker) ----
+// The old key select fused key+scale into six fixed names ('C Major',
+// 'A Minor'...). The new picker is two selects - any of the 12 keys
+// with any scale - and the autotune AND the chop-to-melody arpeggiator
+// both follow it. A spec is {semis: absolute pitch classes in
+// root-first order, root: root pitch class}; it matches the legacy
+// SCALES entries exactly (A + Natural Minor = [9,11,0,2,4,5,7]).
+const TUNE_KEYS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const TUNE_SCALES={
+  'Major':[0,2,4,5,7,9,11],
+  'Natural Minor':[0,2,3,5,7,8,10],
+  'Minor Pentatonic':[0,3,5,7,10],
+  'Major Pentatonic':[0,2,4,7,9],
+  'Blues':[0,3,5,6,7,10],
+  'Chromatic':[0,1,2,3,4,5,6,7,8,9,10,11]
+};
+function tuneScaleSpec(keyName, scaleName){
+  const r=TUNE_KEYS.indexOf(keyName); const root=r<0?0:r;
+  const iv=TUNE_SCALES[scaleName]||TUNE_SCALES['Major'];
+  return {semis:iv.map(function(i){ return (root+i)%12; }), root:root};
+}
+function tuneOpts(t){
+  return {retune:t.tuneRetune!=null?t.tuneRetune:20,
+    lfoRate:t.tuneLfoRate!=null?t.tuneLfoRate:5, lfoDepth:t.tuneLfoDepth||0,
+    humanize:(t.tuneHumanize||0)/100, flex:t.tuneFlex||0, mix:(t.tuneMix!=null?t.tuneMix:100)};
+}
+
+// ---- Knob helper: touch-friendly sliders in the DAW style ----
+// Plain range inputs (not drag-rotary knobs) so they work with a
+// finger on phones. Each knob shows its live value under the slider.
+function makeKnob(label, hint, min, max, step, value, fmt, oninput){
+  const wrap=document.createElement('div'); wrap.className='knob';
+  const lab=document.createElement('div'); lab.className='knob-label'; lab.textContent=label; if(hint) lab.title=hint;
+  const r=document.createElement('input'); r.type='range'; r.min=min; r.max=max; r.step=step; r.value=value; if(hint) r.title=hint;
+  const val=document.createElement('div'); val.className='knob-val';
+  const show=function(){ val.textContent=fmt(parseFloat(r.value)); };
+  r.oninput=function(){ show(); oninput(parseFloat(r.value)); };
+  show();
+  wrap.appendChild(lab); wrap.appendChild(r); wrap.appendChild(val);
+  return wrap;
+}
 function midiToFreq(m){ return 440*Math.pow(2,(m-69)/12); }
 function midiToName(m){ const N=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return N[m%12]+(Math.floor(m/12)-1); }
 const ROLL_LOW=48, ROLL_HIGH=72; // C3..C5
@@ -314,33 +368,46 @@ function makeTrackEl(t){
       }catch(err){ status('Could not decode that audio file'); }
     };
     ctrlRow.appendChild(fileInp);
-    const chorusChip=document.createElement('div'); chorusChip.className='chip'; chorusChip.textContent='CHORUS';
-    chorusChip.onclick=()=>{ t.chorus=!t.chorus; chorusChip.classList.toggle('on',t.chorus); };
-    ctrlRow.appendChild(chorusChip);
-    const keySel = document.createElement('select');
-    ['C Major','A Minor','G Major','E Minor','D Major','Chromatic'].forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; keySel.appendChild(o); });
-    const atBtn = document.createElement('button'); atBtn.textContent='🎤 Auto‑Tune';
-    atBtn.onclick = ()=>{ if(t.buffer){ t.buffer = autoTune(t.buffer, keySel.value); drawWave(t); status('Auto‑tune applied'); } };
-    const atStrength=document.createElement('select'); atStrength.title='Auto-Tune strength — how hard it pulls notes to the scale';
-    [['gentle','Gentle'],['normal','Normal'],['strong','Strong']].forEach(function(pr){ const o=document.createElement('option'); o.value=pr[0]; o.textContent=pr[1]; if(pr[0]==='normal') o.selected=true; atStrength.appendChild(o); });
-    atBtn.onclick=()=>{ if(t.buffer){ t.buffer=autoTune(t.buffer, keySel.value, atStrength.value); drawWave(t); status('Auto-tune applied ('+atStrength.value+')'); } };
-    ctrlRow.appendChild(atBtn); ctrlRow.appendChild(keySel); ctrlRow.appendChild(atStrength);
+    const keyPick=document.createElement('select'); keyPick.title='Auto-Tune key - the root note everything tunes to';
+    TUNE_KEYS.forEach(function(k){ const o=document.createElement('option'); o.value=k; o.textContent='Key: '+k; if(k===t.tuneKey) o.selected=true; keyPick.appendChild(o); });
+    keyPick.onchange=function(e){ t.tuneKey=e.target.value; };
+    const scalePick=document.createElement('select'); scalePick.title='Auto-Tune scale - the notes the vocal is allowed to hit';
+    Object.keys(TUNE_SCALES).forEach(function(sc){ const o=document.createElement('option'); o.value=sc; o.textContent=sc; if(sc===t.tuneScale) o.selected=true; scalePick.appendChild(o); });
+    scalePick.onchange=function(e){ t.tuneScale=e.target.value; };
+    const atBtn = document.createElement('button'); atBtn.textContent='\u{1F3A4} Auto\u2011Tune';
+    atBtn.onclick=function(){ if(!t.buffer){ status('Record or load audio first'); return; }
+      t.buffer=autoTune(t.buffer, tuneScaleSpec(t.tuneKey,t.tuneScale), tuneOpts(t));
+      drawWave(t); status('Auto-tune applied ('+t.tuneKey+' '+t.tuneScale+')'); };
+    ctrlRow.appendChild(atBtn); ctrlRow.appendChild(keyPick); ctrlRow.appendChild(scalePick);
     el.appendChild(ctrlRow);
 
-    const fxRow=document.createElement('div'); fxRow.className='track-head';
-    const fxLabel=document.createElement('span'); fxLabel.className='small'; fxLabel.textContent='Voice FX:'; fxRow.appendChild(fxLabel);
-    [['reverb','REVERB'],['delay','DELAY'],['distortion','DISTORT'],['telephone','RADIO']].forEach(function(pr){
-      const chip=document.createElement('div'); chip.className='chip'+((t.fx&&t.fx[pr[0]])?' on':''); chip.textContent=pr[1];
-      chip.onclick=()=>{ t.fx[pr[0]]=!t.fx[pr[0]]; chip.classList.toggle('on',t.fx[pr[0]]); fxDirty(t); refreshMonitor(t); };
-      fxRow.appendChild(chip);
-    });
-    const monChip=document.createElement('div'); monChip.className='chip'; monChip.textContent='🎧 Monitor FX';
-    monChip.onclick=()=>toggleMonitor(t, monChip);
-    fxRow.appendChild(monChip);
-    const expSampleBtn=document.createElement('button'); expSampleBtn.textContent='⬇ Export Sample WAV';
-    expSampleBtn.onclick=()=>exportSampleWav(t);
-    fxRow.appendChild(expSampleBtn);
-    el.appendChild(fxRow);
+    const tuneLabel=document.createElement('div'); tuneLabel.className='sec-label'; tuneLabel.textContent='\u{1F3A4} Auto-Tune controls';
+    el.appendChild(tuneLabel);
+    const tuneRow=document.createElement('div'); tuneRow.className='knobrow';
+    tuneRow.appendChild(makeKnob('Retune Speed','How fast notes snap to pitch - 0 is the hard T-Pain snap, 100 is slow and natural',0,100,1,t.tuneRetune,function(v){ return v+' ms'; },function(v){ t.tuneRetune=v; }));
+    tuneRow.appendChild(makeKnob('LFO Speed','Vibrato wobble speed on the tuned vocal, in wobbles per second',0.1,10,0.1,t.tuneLfoRate,function(v){ return v.toFixed(1)+' Hz'; },function(v){ t.tuneLfoRate=v; }));
+    tuneRow.appendChild(makeKnob('LFO Depth','How far the vibrato bends the pitch, in cents (100 = one semitone)',0,100,1,t.tuneLfoDepth,function(v){ return v+' cents'; },function(v){ t.tuneLfoDepth=v; }));
+    tuneRow.appendChild(makeKnob('Humanize','Lets some notes stay a little off-pitch so the take still sounds human',0,100,1,t.tuneHumanize,function(v){ return v+'%'; },function(v){ t.tuneHumanize=v; }));
+    tuneRow.appendChild(makeKnob('Flex-Tune',"Notes already this close to pitch are left alone - keeps your natural vibrato",0,100,1,t.tuneFlex,function(v){ return v+' cents'; },function(v){ t.tuneFlex=v; }));
+    tuneRow.appendChild(makeKnob('Mix','Dry/wet blend - 100% is fully tuned, 0% is your raw take',0,100,1,t.tuneMix,function(v){ return v+'% wet'; },function(v){ t.tuneMix=v; }));
+    el.appendChild(tuneRow);
+
+    const monRow=document.createElement('div'); monRow.className='track-head';
+    const monChip=document.createElement('div'); monChip.className='chip'; monChip.textContent='\u{1F3A7} Monitor FX';
+    monChip.onclick=function(){ toggleMonitor(t, monChip); };
+    monRow.appendChild(monChip);
+    const expSampleBtn=document.createElement('button'); expSampleBtn.textContent='\u2B07 Export Sample WAV';
+    expSampleBtn.onclick=function(){ exportSampleWav(t); };
+    monRow.appendChild(expSampleBtn);
+    el.appendChild(monRow);
+
+    const rack=document.createElement('div'); rack.className='vst-rack';
+    const rackTitle=document.createElement('div'); rackTitle.className='vst-title'; rackTitle.textContent='\u{1F39B} VST Rack';
+    rack.appendChild(rackTitle);
+    const rackSub=document.createElement('div'); rackSub.className='vst-sub small'; rackSub.textContent='VST-style effects - each slot has its own knobs. They chain in order, top to bottom.';
+    rack.appendChild(rackSub);
+    VST_SLOT_DEFS.forEach(function(def){ rack.appendChild(makeVstSlotRow(t, def)); });
+    el.appendChild(rack);
 
     const waverow = document.createElement('div'); waverow.className='waverow';
     const canvas = document.createElement('canvas'); canvas.className='wave'; canvas.width=600; canvas.height=50;
@@ -369,7 +436,7 @@ function makeTrackEl(t){
     melChip.onclick=()=>{ t.melodyOn=!t.melodyOn; melChip.classList.toggle('on',t.melodyOn); };
     sliceRow.appendChild(melChip);
     const melBtn=document.createElement('button'); melBtn.textContent='🎹 Chop to Melody';
-    melBtn.onclick=()=>{ if(!t.buffer){ status('Record or load audio first'); return; } chopToMelody(t, keySel.value, melDir.value); drawWave(t); renderSlicePads(t); melChip.classList.add('on'); status('Melody built — '+t.melodySteps.filter(function(x){return x!=null;}).length+' steps'); };
+    melBtn.onclick=()=>{ if(!t.buffer){ status('Record or load audio first'); return; } chopToMelody(t, tuneScaleSpec(t.tuneKey,t.tuneScale), melDir.value); drawWave(t); renderSlicePads(t); melChip.classList.add('on'); status('Melody built — '+t.melodySteps.filter(function(x){return x!=null;}).length+' steps'); };
     sliceRow.appendChild(melBtn);
     el.appendChild(sliceRow);
 
@@ -437,7 +504,8 @@ function addAudioTrack(){
   const t={id:idSeq++, type:'audio', name:'Voice '+idSeq, buffer:null, gain, pan, filter, filterType:'none', filterFreq:2000,
     autoEnabled:false, autoCutoff:new Array(16).fill(1),
     muted:false, chorus:false, sliceMode:false, slices:[], sliceSteps:new Array(16).fill(null), _selectedSlice:null, arr:newArr(),
-    fx:{reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5},
+    tuneKey:'C', tuneScale:'Major', tuneRetune:20, tuneLfoRate:5, tuneLfoDepth:0, tuneHumanize:0, tuneFlex:0, tuneMix:100,
+    vst:defaultVst(),
     melodyOn:false, melodySteps:new Array(16).fill(null), melodyDir:'up'};
   tracks.push(t); document.getElementById('tracks').appendChild(makeTrackEl(t));
 }
@@ -696,8 +764,12 @@ function detectPitch(buf, sampleRate){
 }
 function nearestScaleFreq(freq, keyName){
   if(freq<=0) return freq;
-  const rootMap={'C Major':0,'A Minor':9,'G Major':7,'E Minor':4,'D Major':2,'Chromatic':0};
-  const semis=SCALES[keyName]||SCALES.Chromatic; const root=rootMap[keyName]||0;
+  let semis, root;
+  if(keyName && typeof keyName==='object'){ semis=keyName.semis; root=keyName.root||0; }
+  else {
+    const rootMap={'C Major':0,'A Minor':9,'G Major':7,'E Minor':4,'D Major':2,'Chromatic':0};
+    semis=SCALES[keyName]||SCALES.Chromatic; root=rootMap[keyName]||0;
+  }
   const midi=69+12*Math.log2(freq/440); const oct=Math.floor(midi/12); const rel=((midi-root)%12+12)%12;
   let best=semis[0], bestDist=99;
   semis.forEach(s=>{ const dist=Math.min(Math.abs(rel-s),12-Math.abs(rel-s)); if(dist<bestDist){bestDist=dist; best=s;} });
@@ -705,8 +777,16 @@ function nearestScaleFreq(freq, keyName){
   if(targetMidi-midi>6) targetMidi-=12; if(midi-targetMidi>6) targetMidi+=12;
   return 440*Math.pow(2,(targetMidi-69)/12);
 }
-function autoTune(buffer, key, strength){
-  const sr=buffer.sampleRate; const winSize=Math.floor(sr*0.09); const hop=Math.floor(winSize/2);
+function autoTune(buffer, key, opts){
+  const sr=buffer.sampleRate;
+  const o=(opts&&typeof opts==='object')?opts:{};
+  const strength=(typeof opts==='string')?opts:'normal'; // legacy strength select
+  const retune=(o.retune!=null)?o.retune:20; // 0 = fastest snap, 100 = slowest/natural
+  // Window stays at the proven 90ms: Retune Speed changes how hard each
+  // window is pulled (the clamp below), not the window itself - varying
+  // the window makes the pitch land differently per frequency (overlap
+  // phase artefacts), so the knob would feel random instead of musical.
+  const winSize=Math.floor(sr*0.09); const hop=Math.floor(winSize/2);
   const chans=buffer.numberOfChannels; const outLen=buffer.length;
   const outBuf=ctx.createBuffer(chans,outLen,sr);
   for(let ch=0;ch<chans;ch++){
@@ -716,8 +796,28 @@ function autoTune(buffer, key, strength){
       const seg=inD.slice(pos,pos+winSize); if(seg.length<32) continue;
       const freq=detectPitch(seg,sr); let ratio=1;
       if(freq>60 && freq<1000){ const target=nearestScaleFreq(freq,key); ratio=target/freq;
-        const clamp = strength==='gentle' ? [0.94,1.06] : strength==='strong' ? [0.70,1.40] : [0.85,1.15];
-        ratio=Math.max(clamp[0],Math.min(clamp[1],ratio)); }
+        // Flex-Tune: notes already within this many cents of the target are left alone,
+        // so a singer's natural vibrato survives instead of being flattened.
+        const flexCents=(o.flex!=null)?o.flex:0;
+        if(Math.abs(1200*Math.log2(ratio))<=flexCents){ ratio=1; }
+        else {
+          // Retune Speed: fast = the full strength pull (hard snap), slow = a partial pull.
+          const baseDev = strength==='gentle' ? 0.06 : strength==='strong' ? 0.40 : 0.15;
+          const dev = baseDev*(1-(retune/100)*0.7);
+          ratio=Math.max(1-dev,Math.min(1+dev,ratio));
+          // Humanize: each window gets a random ease on the correction, so the
+          // tuning breathes instead of locking every slice identically.
+          const hum=(o.humanize!=null)?o.humanize:0;
+          if(hum>0){ ratio=1+(ratio-1)*(1-hum*Math.random()); }
+        }
+        // LFO vibrato, baked into the tuned take: a gentle pitch wobble around
+        // the corrected note. Depth is in cents (100 = one semitone).
+        const lfoDepth=(o.lfoDepth!=null)?o.lfoDepth:0;
+        if(lfoDepth>0){
+          const lfoRate=(o.lfoRate!=null)?o.lfoRate:5;
+          ratio*=Math.pow(2,(lfoDepth*Math.sin(2*Math.PI*lfoRate*pos/sr))/1200);
+        }
+      }
       const shifted=new Float32Array(winSize);
       for(let i=0;i<winSize;i++){
         const srcIdx=i*ratio; const i0=Math.floor(srcIdx), i1=Math.min(i0+1,seg.length-1); const frac=srcIdx-i0;
@@ -726,11 +826,21 @@ function autoTune(buffer, key, strength){
       for(let i=0;i<winSize && pos+i<outLen;i++) outD[pos+i]+=shifted[i];
     }
     for(let i=0;i<outLen;i++) outD[i]*=0.7;
+    // Mix: blend the tuned take with the untouched original (100% wet = fully tuned).
+    const mix=(o.mix!=null)?o.mix:100; const wet=mix/100;
+    if(wet<1){ for(let i=0;i<outLen;i++) outD[i]=inD[i]*(1-wet)+outD[i]*wet; }
   }
   return outBuf;
 }
 
-// ---- Voice FX chain: reverb / delay / distortion / telephone ----
+// ---- VST rack: built-in effects in the VST style (see VST_SLOT_DEFS) ----
+// Browsers cannot load real .vst plugin files - these are built-in
+// Web Audio effects labelled the way Chris calls them ("VSTs").
+// One rack per voice track; slots chain in order, top to bottom.
+// Each slot has on/off plus its own knobs; a slot's knobs only show
+// while it is on. Knob changes rebuild the chain (fxDirty) so what
+// you hear is always what you export. Chorus used to sit outside the
+// chain (addChorus) - it is a rack slot now, and addChorus is gone.
 // One chain per (audio track, AudioContext). Live playback and the
 // offline export each build their own chain, so the mix you hear is
 // the mix you export. Chorus stays outside the chain (see
@@ -749,50 +859,176 @@ function makeDistortionCurve(amount){
   for(let i=0;i<n;i++){ const x=i*2/n-1; curve[i]=(3+k)*x*20*(Math.PI/180)/(Math.PI+k*Math.abs(x)); }
   return curve;
 }
+// ---- VST rack slots: on/off + knobs per slot (see buildFxChain) ----
+const VST_SLOT_DEFS=[
+  {id:'eq', icon:'\u{1F39A}', name:'EQ', knobs:[
+    {k:'low', label:'Low', hint:'Bass shelf at 200 Hz', min:-15, max:15, step:0.5, fmt:function(v){ return v+' dB'; }},
+    {k:'mid', label:'Mid', hint:'Midrange bell at 1 kHz', min:-15, max:15, step:0.5, fmt:function(v){ return v+' dB'; }},
+    {k:'high', label:'High', hint:'Treble shelf at 4 kHz', min:-15, max:15, step:0.5, fmt:function(v){ return v+' dB'; }}]},
+  {id:'comp', icon:'\u{1F5DC}', name:'Compressor', knobs:[
+    {k:'threshold', label:'Threshold', hint:'Level where squeezing kicks in', min:-60, max:0, step:1, fmt:function(v){ return v+' dB'; }},
+    {k:'ratio', label:'Ratio', hint:'How hard it squeezes past the threshold', min:1, max:20, step:0.5, fmt:function(v){ return v+':1'; }}]},
+  {id:'distortion', icon:'\u{1F525}', name:'Distortion', knobs:[
+    {k:'amount', label:'Drive', hint:'How much grit', min:0, max:1, step:0.05, fmt:function(v){ return Math.round(v*100)+'%'; }}]},
+  {id:'telephone', icon:'\u{1F4FB}', name:'Radio / Telephone', knobs:[]},
+  {id:'chorus', icon:'\u{1F30A}', name:'Chorus', knobs:[
+    {k:'rate', label:'Rate', hint:'How fast the chorus wobbles', min:0.1, max:8, step:0.1, fmt:function(v){ return v.toFixed(1)+' Hz'; }},
+    {k:'depth', label:'Depth', hint:'How wide the wobble is', min:0, max:10, step:0.5, fmt:function(v){ return v+' ms'; }},
+    {k:'mix', label:'Mix', hint:'How much chorus you hear', min:0, max:100, step:1, fmt:function(v){ return v+'%'; }}]},
+  {id:'doubling', icon:'\u{1F465}', name:'Doubling', knobs:[
+    {k:'delay', label:'Delay', hint:'Gap between your voice and its double', min:10, max:40, step:1, fmt:function(v){ return v+' ms'; }},
+    {k:'detune', label:'Detune', hint:'How far the double drifts off pitch, in cents', min:0, max:15, step:1, fmt:function(v){ return v+' cents'; }},
+    {k:'mix', label:'Mix', hint:'How loud the double sits', min:0, max:100, step:1, fmt:function(v){ return v+'%'; }}]},
+  {id:'flanger', icon:'\u{1F300}', name:'Flanger', knobs:[
+    {k:'rate', label:'Rate', hint:'How fast the sweep moves', min:0.1, max:5, step:0.1, fmt:function(v){ return v.toFixed(1)+' Hz'; }},
+    {k:'depth', label:'Depth', hint:'How deep the sweep goes', min:0, max:4, step:0.1, fmt:function(v){ return v+' ms'; }},
+    {k:'mix', label:'Mix', hint:'How much flanger you hear', min:0, max:100, step:1, fmt:function(v){ return v+'%'; }}]},
+  {id:'echo', icon:'\u{1F501}', name:'Echo / Delay', knobs:[
+    {k:'time', label:'Time', hint:'Gap between repeats (dotted 8th at 100 BPM is 450 ms)', min:50, max:1000, step:10, fmt:function(v){ return v+' ms'; }},
+    {k:'feedback', label:'Feedback', hint:'How many repeats trail off', min:0, max:0.8, step:0.05, fmt:function(v){ return Math.round(v*100)+'%'; }},
+    {k:'mix', label:'Mix', hint:'How loud the repeats sit', min:0, max:100, step:1, fmt:function(v){ return v+'%'; }}]},
+  {id:'reverb', icon:'\u{1F3DB}', name:'Reverb', knobs:[
+    {k:'size', label:'Size', hint:'How big the room sounds', min:0.5, max:4, step:0.1, fmt:function(v){ return v.toFixed(1)+' s'; }},
+    {k:'decay', label:'Decay', hint:'How fast the tail fades', min:1, max:4, step:0.1, fmt:function(v){ return v.toFixed(1); }},
+    {k:'mix', label:'Mix', hint:'How wet the sound is', min:0, max:100, step:1, fmt:function(v){ return v+'%'; }}]}
+];
+function defaultVst(){
+  return {
+    eq:{on:false, low:0, mid:0, high:0},
+    comp:{on:false, threshold:-24, ratio:4},
+    distortion:{on:false, amount:0.5},
+    telephone:{on:false},
+    chorus:{on:false, rate:1.5, depth:5, mix:50},
+    doubling:{on:false, delay:20, detune:8, mix:50},
+    flanger:{on:false, rate:0.5, depth:2, mix:40},
+    echo:{on:false, time:450, feedback:0.35, mix:35},
+    reverb:{on:false, size:2.2, decay:2.5, mix:40}
+  };
+}
+// Old .rcr files saved the four FX chips as t.fx - carry them into the rack.
+function vstFromFx(fx, chorusOn){
+  const v=defaultVst();
+  if(!fx) fx={};
+  if(fx.reverb) v.reverb.on=true;
+  if(fx.delay) v.echo.on=true;
+  if(fx.distortion){ v.distortion.on=true; v.distortion.amount=(fx.distAmount!=null)?fx.distAmount:0.5; }
+  if(fx.telephone) v.telephone.on=true;
+  if(chorusOn) v.chorus.on=true;
+  return v;
+}
+function makeVstSlotRow(t, def){
+  const s=t.vst[def.id];
+  const row=document.createElement('div'); row.className='vst-slot';
+  const head=document.createElement('div'); head.className='vst-slot-head';
+  const nm=document.createElement('span'); nm.className='vst-slot-name'; nm.textContent=def.icon+' '+def.name+' VST';
+  head.appendChild(nm);
+  const chip=document.createElement('div'); chip.className='chip'+(s.on?' on':''); chip.textContent=s.on?'ON':'OFF';
+  const knobs=document.createElement('div'); knobs.className='knobrow'; knobs.style.display=s.on?'flex':'none';
+  chip.onclick=function(){
+    s.on=!s.on; chip.classList.toggle('on',s.on); chip.textContent=s.on?'ON':'OFF';
+    knobs.style.display=s.on?'flex':'none';
+    t.chorus=!!(t.vst.chorus&&t.vst.chorus.on);
+    fxDirty(t); refreshMonitor(t);
+  };
+  head.appendChild(chip); row.appendChild(head);
+  def.knobs.forEach(function(kd){
+    knobs.appendChild(makeKnob(kd.label, kd.hint, kd.min, kd.max, kd.step, s[kd.k], kd.fmt, function(v){ s[kd.k]=v; fxDirty(t); refreshMonitor(t); }));
+  });
+  row.appendChild(knobs);
+  return row;
+}
 function buildFxChain(c, t, dest){
-  const input=c.createGain();
-  let node=input;
-  if(t.fx.distortion){
-    const ws=c.createWaveShaper(); ws.curve=makeDistortionCurve(t.fx.distAmount||0.5); ws.oversample='2x';
+  if(!t.vst) t.vst=defaultVst();
+  const v=t.vst;
+  const liveLfos=[];
+  // Serial rack: each slot feeds the next. Slots with a mix knob are
+  // wet/dry inserts (dry passes through, wet goes through the effect);
+  // EQ / compressor / distortion / telephone are full inserts.
+  function wetDry(input, eff, mix){
+    const out=c.createGain();
+    const dry=c.createGain(); dry.gain.value=1-mix;
+    const wet=c.createGain(); wet.gain.value=mix;
+    input.connect(dry); dry.connect(out);
+    input.connect(eff.inn); eff.out.connect(wet); wet.connect(out);
+    return out;
+  }
+  function single(n){ return {inn:n, out:n}; }
+  let node=c.createGain(); // rack input
+  const rackIn=node;
+  if(v.eq.on){
+    const lo=c.createBiquadFilter(); lo.type='lowshelf'; lo.frequency.value=200; lo.gain.value=v.eq.low;
+    const md=c.createBiquadFilter(); md.type='peaking'; md.frequency.value=1000; md.Q.value=1; md.gain.value=v.eq.mid;
+    const hi=c.createBiquadFilter(); hi.type='highshelf'; hi.frequency.value=4000; hi.gain.value=v.eq.high;
+    lo.connect(md); md.connect(hi); node.connect(lo); node=hi;
+  }
+  if(v.comp.on){
+    const cp=c.createDynamicsCompressor();
+    cp.threshold.value=v.comp.threshold; cp.ratio.value=v.comp.ratio; cp.knee.value=20; cp.attack.value=0.003; cp.release.value=0.25;
+    node.connect(cp); node=cp;
+  }
+  if(v.distortion.on){
+    const ws=c.createWaveShaper(); ws.curve=makeDistortionCurve(v.distortion.amount); ws.oversample='2x';
     node.connect(ws); node=ws;
   }
-  if(t.fx.telephone){
+  if(v.telephone.on){
     const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1200; bp.Q.value=1.2;
     node.connect(bp); node=bp;
   }
-  const dry=c.createGain(); dry.gain.value=0.85; node.connect(dry); dry.connect(dest);
-  if(t.fx.reverb){
-    const conv=c.createConvolver(); conv.buffer=makeImpulse(c, 2.2, 2.5);
-    const wet=c.createGain(); wet.gain.value=0.4;
-    node.connect(conv); conv.connect(wet); wet.connect(dest);
+  if(v.chorus.on){
+    const dl=c.createDelay(0.05); dl.delayTime.value=0.025;
+    const lfo=c.createOscillator(); lfo.frequency.value=v.chorus.rate;
+    const lg=c.createGain(); lg.gain.value=v.chorus.depth/1000; // ms -> seconds
+    lfo.connect(lg); lg.connect(dl.delayTime); lfo.start(); liveLfos.push(lfo);
+    node=wetDry(node, single(dl), v.chorus.mix/100);
   }
-  if(t.fx.delay){
-    const bpm=parseFloat(document.getElementById('bpm').value)||100;
-    const dl=c.createDelay(1); dl.delayTime.value=60/bpm*0.75; // dotted 8th at song BPM
-    const fb=c.createGain(); fb.gain.value=0.35;
-    const wet=c.createGain(); wet.gain.value=0.35;
-    node.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(dest);
+  if(v.doubling.on){
+    const dl=c.createDelay(0.1); dl.delayTime.value=v.doubling.delay/1000;
+    // Detune: a slow LFO wobbles the delay time. Max pitch drift follows
+    // from the max slope of the delay-time curve: d cents needs a depth
+    // of (2^(cents/1200)-1) / (2*pi*rate) seconds.
+    const lfo=c.createOscillator(); lfo.frequency.value=0.5;
+    const lg=c.createGain(); lg.gain.value=(Math.pow(2,v.doubling.detune/1200)-1)/(2*Math.PI*0.5);
+    lfo.connect(lg); lg.connect(dl.delayTime); lfo.start(); liveLfos.push(lfo);
+    node=wetDry(node, single(dl), v.doubling.mix/100);
   }
-  return input;
+  if(v.flanger.on){
+    const dl=c.createDelay(0.02); dl.delayTime.value=0.005;
+    const lfo=c.createOscillator(); lfo.frequency.value=v.flanger.rate;
+    const lg=c.createGain(); lg.gain.value=v.flanger.depth/1000; // ms -> seconds
+    lfo.connect(lg); lg.connect(dl.delayTime); lfo.start(); liveLfos.push(lfo);
+    const fb=c.createGain(); fb.gain.value=0.3;
+    dl.connect(fb); fb.connect(dl);
+    node=wetDry(node, single(dl), v.flanger.mix/100);
+  }
+  if(v.echo.on){
+    const dl=c.createDelay(1.5); dl.delayTime.value=v.echo.time/1000;
+    const fb=c.createGain(); fb.gain.value=v.echo.feedback;
+    dl.connect(fb); fb.connect(dl);
+    node=wetDry(node, single(dl), v.echo.mix/100);
+  }
+  if(v.reverb.on){
+    const conv=c.createConvolver(); conv.buffer=makeImpulse(c, v.reverb.size, v.reverb.decay);
+    node=wetDry(node, single(conv), v.reverb.mix/100);
+  }
+  node.connect(dest);
+  t._rackStop=function(){ liveLfos.forEach(function(o){ try{ o.stop(); }catch(e){} }); };
+  return rackIn;
 }
 function fxInput(t, c, dest){
-  if(!t.fx) t.fx={reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5};
+  if(!t.vst) t.vst=defaultVst();
   if(!t._fx || t._fx.c!==c || t._fx.dest!==dest){
     if(t._fx){ try{ t._fx.input.disconnect(); }catch(e){} }
+    if(t._rackStop){ try{ t._rackStop(); }catch(e){} t._rackStop=null; }
     t._fx={ c:c, dest:dest, input:buildFxChain(c, t, dest) };
   }
   return t._fx.input;
 }
 function fxDirty(t){ t._fx=null; }
-// Route one audio-track source through FX (+ chorus, if on) to dest.
+// Route one audio-track source through the VST rack to dest.
 function playAudioSrc(t, c, src, dest){
-  if(t.chorus){
-    const ig=c.createGain(); src.connect(ig);
-    addChorus(c, ig, fxInput(t, c, dest));
-  } else {
-    src.connect(fxInput(t, c, dest));
-  }
+  src.connect(fxInput(t, c, dest));
 }
+
 // Live FX monitor: hear your mic through the track's FX chain.
 // Headphones only — speakers + live mic = feedback squeal.
 async function toggleMonitor(t, chip){
@@ -866,10 +1102,14 @@ function chopToMelody(t, keyName, dir){
   if(!t.buffer) return;
   if(!t.slices || !t.slices.length){ autoSlice(t); }
   if(!t.slices.length) return;
-  const key=keyName||'C Major';
-  const semis=SCALES[key]||SCALES.Chromatic;
-  const rootMap={'C Major':0,'A Minor':9,'G Major':7,'E Minor':4,'D Major':2,'Chromatic':0};
-  const sd={semis:semis, root:rootMap[key]||0};
+  let semis, root;
+  if(keyName && typeof keyName==='object'){ semis=keyName.semis; root=keyName.root||0; }
+  else {
+    const key=keyName||'C Major';
+    const rootMap={'C Major':0,'A Minor':9,'G Major':7,'E Minor':4,'D Major':2,'Chromatic':0};
+    semis=SCALES[key]||SCALES.Chromatic; root=rootMap[key]||0;
+  }
+  const sd={semis:semis, root:root};
   const sr=t.buffer.sampleRate;
   let baseMidi=60, bestPeak=0;
   for(let i=0;i<t.slices.length;i++){
@@ -995,19 +1235,96 @@ function playMelodic(c, inst, freq, time, dest, custom){
     const voices=Math.max(1,Math.min(5,Math.round(p.unison)||1));
     for(let v=0;v<voices;v++){ const o=c.createOscillator(); o.type=p.wave; o.frequency.value=freq; o.detune.value=(voices>1?(v-(voices-1)/2)*8:0); o.connect(g); o.start(time); o.stop(time+dur+0.05); }
     g.connect(dest);
+  } else if(inst==='SilverSaw'){
+    // Chris's "silversynth / silversaw": a bright saw lead - two detuned
+    // saws plus a sub saw an octave down, filter sweeping open.
+    const g=c.createGain(), f=c.createBiquadFilter();
+    f.type='lowpass'; f.Q.value=6;
+    f.frequency.setValueAtTime(800,time); f.frequency.exponentialRampToValueAtTime(5000,time+0.12); f.frequency.exponentialRampToValueAtTime(1200,time+0.4);
+    g.gain.setValueAtTime(0,time); g.gain.linearRampToValueAtTime(0.26,time+0.01); g.gain.exponentialRampToValueAtTime(0.001,time+0.45);
+    [[-8,1],[8,1],[0,0.5]].forEach(function(cfg){
+      const o=c.createOscillator(); o.type='sawtooth'; o.frequency.value=cfg[1]===0.5?freq/2:freq; o.detune.value=cfg[0]; o.connect(f); o.start(time); o.stop(time+0.45);
+    });
+    f.connect(g); g.connect(dest);
+  } else if(inst==='Ballerina'){
+    // Modelled on the Sytrus "Bellerina" preset Chris used a lot: an FM
+    // bell strike (bright inharmonic partials) that settles into a long
+    // ringing sustain at near-constant pitch, with a harmonizing fifth
+    // layered underneath. Not a music box - it holds and rings.
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,time); g.gain.linearRampToValueAtTime(0.3,time+0.005);
+    g.gain.linearRampToValueAtTime(0.16,time+0.15); g.gain.linearRampToValueAtTime(0.14,time+0.7); g.gain.exponentialRampToValueAtTime(0.001,time+1.4);
+    // Bell voice: carrier + modulator at an inharmonic ratio; the mod
+    // index falls away so the strike turns into a pure ringing tone.
+    const car=c.createOscillator(); car.type='sine'; car.frequency.value=freq;
+    const mod=c.createOscillator(); mod.type='sine'; mod.frequency.value=freq*2.76;
+    const mg=c.createGain(); mg.gain.setValueAtTime(freq*4,time); mg.gain.exponentialRampToValueAtTime(freq*0.05,time+1.2);
+    mod.connect(mg); mg.connect(car.frequency);
+    car.connect(g); car.start(time); car.stop(time+1.4); mod.start(time); mod.stop(time+1.4);
+    // Harmonizing layer: a fifth above, slow attack, same long ring.
+    const harm=c.createOscillator(); harm.type='sine'; harm.frequency.value=freq*1.5;
+    const hg=c.createGain(); hg.gain.setValueAtTime(0,time); hg.gain.linearRampToValueAtTime(0.12,time+0.1); hg.gain.linearRampToValueAtTime(0.1,time+0.7); hg.gain.exponentialRampToValueAtTime(0.001,time+1.4);
+    harm.connect(hg); hg.connect(g); harm.start(time); harm.stop(time+1.4);
+    // Faint octave shimmer on top.
+    const oct=c.createOscillator(); oct.type='sine'; oct.frequency.value=freq*2;
+    const og=c.createGain(); og.gain.value=0.05; oct.connect(og); og.connect(g); oct.start(time); oct.stop(time+1.4);
+    g.connect(dest);
+  } else if(inst==='Piano'){
+    // Synthesized piano approximation (not a sampled piano): additive
+    // harmonics with a fast attack and a natural decay.
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,time); g.gain.linearRampToValueAtTime(0.34,time+0.005); g.gain.exponentialRampToValueAtTime(0.001,time+1.0);
+    [[1,1],[2,0.5],[3,0.25],[4,0.12]].forEach(function(h){
+      const o=c.createOscillator(); o.type='sine'; o.frequency.value=freq*h[0];
+      const og=c.createGain(); og.gain.value=h[1]; o.connect(og); og.connect(g); o.start(time); o.stop(time+1.0);
+    });
+    g.connect(dest);
+  } else if(inst==='Harpsichord'){
+    // Quill pluck: bright, fast decay, strong octave partial.
+    const g=c.createGain();
+    g.gain.setValueAtTime(0.3,time); g.gain.exponentialRampToValueAtTime(0.001,time+0.35);
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=1200;
+    [1,2].forEach(function(m){
+      const o=c.createOscillator(); o.type='sawtooth'; o.frequency.value=freq*m;
+      const og=c.createGain(); og.gain.value=m===1?0.6:0.3; o.connect(og); og.connect(hp); o.start(time); o.stop(time+0.35);
+    });
+    hp.connect(g); g.connect(dest);
+  } else if(inst==='Electric Piano'){
+    // Rhodes-style keys: soft sine body, a fast-decaying tine partial,
+    // and a gentle tremolo shimmer.
+    const g=c.createGain();
+    g.gain.setValueAtTime(0,time); g.gain.linearRampToValueAtTime(0.3,time+0.01); g.gain.exponentialRampToValueAtTime(0.001,time+0.8);
+    const trem=c.createOscillator(); trem.frequency.value=4.5;
+    const tg=c.createGain(); tg.gain.value=0.12; trem.connect(tg); tg.connect(g.gain); trem.start(time); trem.stop(time+0.8);
+    const body=c.createOscillator(); body.type='sine'; body.frequency.value=freq; body.connect(g); body.start(time); body.stop(time+0.8);
+    const tine=c.createOscillator(); tine.type='sine'; tine.frequency.value=freq*2;
+    const tineG=c.createGain(); tineG.gain.setValueAtTime(0.25,time); tineG.gain.exponentialRampToValueAtTime(0.001,time+0.25);
+    tine.connect(tineG); tineG.connect(g); tine.start(time); tine.stop(time+0.8);
+    g.connect(dest);
+  } else if(inst==='Strings Pad'){
+    // Slow warm pad: three detuned saws through a dark lowpass, long swell.
+    const g=c.createGain(), f=c.createBiquadFilter();
+    f.type='lowpass'; f.frequency.value=1800;
+    g.gain.setValueAtTime(0,time); g.gain.linearRampToValueAtTime(0.22,time+0.25); g.gain.linearRampToValueAtTime(0.2,time+0.9); g.gain.exponentialRampToValueAtTime(0.001,time+1.3);
+    [-6,0,6].forEach(function(det){
+      const o=c.createOscillator(); o.type='sawtooth'; o.frequency.value=freq; o.detune.value=det; o.connect(f); o.start(time); o.stop(time+1.3);
+    });
+    f.connect(g); g.connect(dest);
+  } else if(inst==='Bass Synth'){
+    // Punchy synth bass: saw bite plus a sub sine, filter closing down.
+    const g=c.createGain(), f=c.createBiquadFilter();
+    f.type='lowpass'; f.Q.value=8;
+    f.frequency.setValueAtTime(900,time); f.frequency.exponentialRampToValueAtTime(220,time+0.35);
+    g.gain.setValueAtTime(0.4,time); g.gain.exponentialRampToValueAtTime(0.001,time+0.4);
+    const saw=c.createOscillator(); saw.type='sawtooth'; saw.frequency.value=freq; saw.connect(f); saw.start(time); saw.stop(time+0.4);
+    const sub=c.createOscillator(); sub.type='sine'; sub.frequency.value=freq/2;
+    const sg=c.createGain(); sg.gain.value=0.7; sub.connect(sg); sg.connect(f); sub.start(time); sub.stop(time+0.4);
+    f.connect(g); g.connect(dest);
   } else { // Synth
     const o=c.createOscillator(),g=c.createGain(); o.type='sawtooth'; o.frequency.value=freq;
     g.gain.setValueAtTime(0.35,time); g.gain.exponentialRampToValueAtTime(0.001,time+0.25);
     o.connect(g); g.connect(dest); o.start(time); o.stop(time+0.25);
   }
-}
-function addChorus(c, input, dest){
-  const delay=c.createDelay(); delay.delayTime.value=0.025;
-  const lfo=c.createOscillator(); lfo.frequency.value=1.5;
-  const lfoGain=c.createGain(); lfoGain.gain.value=0.005;
-  lfo.connect(lfoGain); lfoGain.connect(delay.delayTime); lfo.start();
-  const wet=c.createGain(); wet.gain.value=0.5; const dry=c.createGain(); dry.gain.value=0.8;
-  input.connect(dry); dry.connect(dest); input.connect(delay); delay.connect(wet); wet.connect(dest);
 }
 
 // ---- Transport / scheduler (live) ----
@@ -1162,7 +1479,8 @@ function serializeProject(){
       vol:t.gain.gain.value, pan:t.pan.pan.value, filterType:t.filterType, filterFreq:t.filterFreq,
       autoEnabled:!!t.autoEnabled, autoCutoff:t.autoCutoff||null, custom:t.custom||null,
       chorus:!!t.chorus, slices:t.slices||null, sliceSteps:t.sliceSteps||null, arr:t.arr,
-      fx:t.fx||null, melodySteps:t.melodySteps||null, melodyOn:!!t.melodyOn, melodyDir:t.melodyDir||'up',
+      vst:t.vst||null, melodySteps:t.melodySteps||null, melodyOn:!!t.melodyOn, melodyDir:t.melodyDir||'up',
+      tuneKey:t.tuneKey||'C', tuneScale:t.tuneScale||'Major', tuneRetune:(t.tuneRetune!=null)?t.tuneRetune:20, tuneLfoRate:(t.tuneLfoRate!=null)?t.tuneLfoRate:5, tuneLfoDepth:t.tuneLfoDepth||0, tuneHumanize:t.tuneHumanize||0, tuneFlex:t.tuneFlex||0, tuneMix:(t.tuneMix!=null)?t.tuneMix:100,
       bufferB64: t.buffer ? bufToB64Wav(t.buffer) : null
     })),
     pads: pads.map(p=>({ name:p.name, vol:p.vol, bufferB64: p.buffer ? bufToB64Wav(p.buffer) : null }))
@@ -1177,8 +1495,13 @@ async function loadProjectData(data){
     let t;
     if(spec.type==='step'){ addStepTrack(); t=tracks[tracks.length-1]; t.inst=spec.inst||t.inst; t.pattern=spec.pattern||t.pattern; t.patternB=spec.patternB||t.patternB; }
     else if(spec.type==='melodic'){ addMelodicTrack(); t=tracks[tracks.length-1]; t.inst=spec.inst||t.inst; t.roll=spec.roll||t.roll; t.rollB=spec.rollB||t.rollB; t.custom=spec.custom||t.custom; }
-    else { addAudioTrack(); t=tracks[tracks.length-1]; t.chorus=!!spec.chorus; t.slices=spec.slices||[]; t.sliceSteps=spec.sliceSteps||new Array(16).fill(null);
-      t.fx=spec.fx||{reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5};
+    else { addAudioTrack(); t=tracks[tracks.length-1]; t.slices=spec.slices||[]; t.sliceSteps=spec.sliceSteps||new Array(16).fill(null);
+      t.vst=spec.vst||vstFromFx(spec.fx, spec.chorus);
+      t.chorus=!!(t.vst.chorus&&t.vst.chorus.on);
+      t.tuneKey=spec.tuneKey||'C'; t.tuneScale=spec.tuneScale||'Major';
+      t.tuneRetune=(spec.tuneRetune!=null)?spec.tuneRetune:20; t.tuneLfoRate=(spec.tuneLfoRate!=null)?spec.tuneLfoRate:5;
+      t.tuneLfoDepth=spec.tuneLfoDepth||0; t.tuneHumanize=spec.tuneHumanize||0; t.tuneFlex=spec.tuneFlex||0;
+      t.tuneMix=(spec.tuneMix!=null)?spec.tuneMix:100;
       t.melodySteps=spec.melodySteps||new Array(16).fill(null); t.melodyOn=!!spec.melodyOn; t.melodyDir=spec.melodyDir||'up';
       if(spec.bufferB64){ try{ t.buffer=await b64WavToBuffer(spec.bufferB64); }catch(e){} } }
     t.name=spec.name||t.name; t.editingPattern=spec.editingPattern||'A';

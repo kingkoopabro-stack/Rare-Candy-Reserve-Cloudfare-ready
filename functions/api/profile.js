@@ -515,7 +515,7 @@ export async function onRequestPost({ env, request }) {
     await createNotification(db, {
       profile_id: 1, actor_profile_id: row.id, kind: "new_member",
       ref_type: "profile", ref_id: row.id,
-      text: `@${row.username} just joined the Wall Market`,
+      text: `@${row.username} just joined the Reserve!`,
       link: `#/member/${row.id}`,
     });
   }

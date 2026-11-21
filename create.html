@@ -275,7 +275,8 @@ function runCode(prefix){
   var html=document.getElementById(prefix+'-html').value;
   var css=document.getElementById(prefix+'-css').value;
   var js=document.getElementById(prefix+'-js').value;
-  document.getElementById(prefix+'-preview').srcdoc='<!DOCTYPE html><html><head><style>'+css+'</style></head><body>'+html+'<script>
+  document.getElementById(prefix+'-preview').srcdoc='<!DOCTYPE html><html><head><style>'+css+'</style></head><body>'+html+'<script>'+js+'<\/script></body></html>';
+}
 // Brand button: stash a pre-written DM to Chris (member 1) and let the
 // link take the visitor to #/chat, where community.js opens the IM
 // window with this draft already in the composer (blank to fill in).
@@ -283,8 +284,6 @@ var BRAND_DRAFT = "I'm interested in learning how to make a brand based on the s
 function brandDM(){
   try{ sessionStorage.setItem("dwc-brand-draft", JSON.stringify({to:1, username:"RareCandyReserve", body:BRAND_DRAFT})); }catch(e){}
   return true;
-}
-'+js+'<\/script></body></html>';
 }
 mountCodeEditor('code-editor-code','code');
 mountCodeEditor('code-editor-game','game');

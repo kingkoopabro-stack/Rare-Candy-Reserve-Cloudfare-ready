@@ -6020,7 +6020,6 @@ function applyPendingIMDraft(id, winEl) {
   state.pendingIMDraft = null;
 }
 function maybeApplyBrandDraft() {
-  if (!state.profile) return;
   if (!state.route || state.route.name !== "chat") return;
   var raw = null;
   try { raw = sessionStorage.getItem("dwc-brand-draft"); } catch (e) { return; }
@@ -6028,6 +6027,27 @@ function maybeApplyBrandDraft() {
   var d = null;
   try { d = JSON.parse(raw); } catch (e) { return; }
   if (!d || !d.body) return;
+  // Guest (no profile yet): the draft is a PRIVATE message to Chris, so
+  // send them to signup instead of leaving them on the public live chat
+  // (guests can post there). The draft stays saved; render() runs again
+  // after signup and the DM opens then. Prompt once per session.
+  if (!state.profile) {
+    var prompted = null;
+    try { prompted = sessionStorage.getItem("dwc-brand-draft-prompted"); } catch (e) {}
+    if (!prompted) {
+      try { sessionStorage.setItem("dwc-brand-draft-prompted", "1"); } catch (e) {}
+      setNotice("That button sends Chris a private message — create your free profile and your message will be waiting for you.");
+      DWC.openSignup();
+    }
+    return;
+  }
+  // Chris himself: you can't DM yourself. Say so instead of silently
+  // doing nothing, and clear the stuck draft.
+  if (state.profile.id === 1) {
+    setNotice("You're signed in as Chris — this button opens a private message to you for your visitors, so there's nothing to send to yourself.");
+    try { sessionStorage.removeItem("dwc-brand-draft"); } catch (e) {}
+    return;
+  }
   DWC.openIM(1, "RareCandyReserve", d.body);
 }
 function syncIMShells() {

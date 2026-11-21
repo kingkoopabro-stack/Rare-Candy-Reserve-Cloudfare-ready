@@ -730,7 +730,7 @@ function runCode(prefix){
 // window with this draft already in the composer (blank to fill in).
 var BRAND_DRAFT = "I'm interested in learning how to make a brand based on the subject of \"___________\". Can you send me your digital ebook on forming your own business with little to no start money? It costs me nothing — once you're able, message me back with a downloadable link to the full guide or quick start based on what I'm working with, so I can learn the basics and jump right in.";
 function brandDM(){
-  try{ sessionStorage.setItem("dwc-brand-draft", JSON.stringify({to:1, username:"RareCandyReserve", body:BRAND_DRAFT})); }catch(e){}
+  try{ sessionStorage.setItem("dwc-brand-draft", JSON.stringify({to:1, username:"RareCandyReserve", body:BRAND_DRAFT})); sessionStorage.removeItem("dwc-brand-draft-prompted"); }catch(e){}
   return true;
 }
 // "Share what you made" (Create tab composer). Posts a normal forum

@@ -136,6 +136,16 @@ function edSlugify(s){ return String(s || "").toLowerCase().replace(/[^a-z0-9]+/
 function edMoney(n){ return "$" + Number(n || 0).toFixed(2); }
 function edDevice(){ try { return localStorage.getItem("dwc-device-id"); } catch(e){ return null; } }
 function edIsUrl(s){ return /^https:\/\//.test(String(s || "")) || String(s || "").indexOf("/api/images?key=") === 0; }
+// The shop's own catalog uses site-relative image paths (images/...).
+// Turn one into a full site URL so the save check (and the server) accept it.
+function edAbsUrl(s){
+  var v = String(s || "").trim();
+  if(!v) return "";
+  if(/^https:\/\//.test(v) || v.indexOf("/api/images?key=") === 0 || v.indexOf("data:") === 0) return v;
+  if(v.indexOf("://") !== -1) return v;
+  var base = (typeof location !== "undefined" && location.origin) ? location.origin : "https://rarecandyreserve.org";
+  return base + "/" + v.replace(/^\.\//, "").replace(/^\//, "");
+}
 function edMsg(t, ok){
   var el = document.getElementById("ed-msg");
   if(el){ el.textContent = t || ""; el.style.color = ok ? "var(--ink)" : "var(--pink)"; }
@@ -167,7 +177,7 @@ async function edStripeCreate(){
   if(!edForm) return;
   var btn = document.getElementById("ed-stripe-btn");
   var id = document.getElementById("ed-f-id").value.trim().toLowerCase();
-  if(!id){ edStripeStatus("Save the listing first — the link is created automatically when you save.", false); return; }
+  if(!id){ edStripeStatus("Open a listing to edit first, then tap this button — it makes the link without needing a save.", false); return; }
   if(btn) btn.disabled = true;
   edStripeStatus("Asking Stripe for a checkout link…", true);
   var res = await edFetch("/api/shop-listings", { device_id: edDeviceId, action: "stripe-create", id: id });
@@ -250,8 +260,8 @@ function edEdit(id){
   if(!base) return;
   edForm = {
     id: base.id, isNew: false, base: base,
-    photos: [0, 1, 2].map(function(i){ return (base.imgs && base.imgs[i]) || ""; }),
-    video: base.video || "",
+    photos: [0, 1, 2].map(function(i){ return edAbsUrl((base.imgs && base.imgs[i]) || ""); }),
+    video: edAbsUrl(base.video || ""),
     options: base.options ? JSON.parse(JSON.stringify(base.options)) : edVariationsToOptions(base),
   };
   document.getElementById("ed-f-id").value = base.id;
@@ -562,11 +572,11 @@ async function edSave(){
   if(name.length < 3){ edMsg("Name must be at least 3 characters."); return; }
   if(!isFinite(price) || price <= 0){ edMsg("Price must be more than $0."); return; }
   if(stripe && !/^https:\/\//.test(stripe)){ edMsg("Stripe link must start with https:// — paste the full payment link."); return; }
-  var photos = edForm.photos.map(function(p){ return String(p || "").trim(); }).filter(Boolean).slice(0, 3);
+  var photos = edForm.photos.map(function(p){ return edAbsUrl(String(p || "").trim()); }).filter(Boolean).slice(0, 3);
   for(var i = 0; i < photos.length; i++){
     if(!edIsUrl(photos[i])){ edMsg("Photo " + (i + 1) + " isn't a valid URL — upload it or paste a full https:// link."); return; }
   }
-  var video = String(edForm.video || "").trim() || null;
+  var video = edAbsUrl(edForm.video || "") || null;
   if(video && !edIsUrl(video)){ edMsg("Video URL must start with https:// — upload a clip or paste a full link."); return; }
   var res = await edFetch("/api/shop-listings", {
     device_id: edDeviceId, id: id, name: name, price: price, description: desc,

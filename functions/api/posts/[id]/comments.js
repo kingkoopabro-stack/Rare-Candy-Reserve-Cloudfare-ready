@@ -1,7 +1,7 @@
 // GET /api/posts/:id/comments — listComments (oldest first; adult posts
 // only to age-verified callers).
 // POST /api/posts/:id/comments — addComment (optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles, awardLucre, LUCRE_AWARDS, commentReactionCounts } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, badgesForProfiles, awardLucre, LUCRE_AWARDS, commentReactionCounts, silenceCheck, bannedMemberCheck } from "../../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -40,6 +40,12 @@ export async function onRequestPost({ env, request, params }) {
   const fail = (error) => json({ ok: false, error, comment_id: null });
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return fail("Create your profile first — commenting needs a username.");
+  // Silence (v3.18) — a silenced member can't comment until it expires.
+  const silenced = silenceCheck(me);
+  if (silenced) return fail(silenced);
+  // Ban (v3.18) — a banned member can't comment at all.
+  const banned = bannedMemberCheck(me);
+  if (banned) return fail(banned);
   const id = Number(params.id);
   const post = await db.prepare("SELECT id, kind, profile_id, allow_comments FROM posts WHERE id = ? LIMIT 1").bind(id).first();
   if (!post) return fail("That post is gone.");
@@ -50,16 +56,19 @@ export async function onRequestPost({ env, request, params }) {
   const r = await db.prepare(
     "INSERT INTO comments (post_id, profile_id, body, gif_url, gif_label, created_at) VALUES (?, ?, ?, ?, ?, ?)",
   ).bind(id, me.id, body, a.gif_url ? String(a.gif_url).slice(0, 500) : null, String(a.gif_label || "").slice(0, 80), nowMs()).run();
-  // Notifications (v3.8) — reply to the post author + @mentions in the body.
-  // createNotification skips quietly when the table isn't there yet or it's
-  // your own post.
-  await createNotification(db, {
-    profile_id: post.profile_id, actor_profile_id: me.id, kind: "reply",
-    ref_type: "comment", ref_id: r.meta.last_row_id,
-    text: `@${me.username} replied to your post`,
-    link: `#/thread/${id}`,
-  });
-  await notifyMentions(db, me, body, { ref_type: "comment", ref_id: r.meta.last_row_id, label: "in a reply", link: `#/thread/${id}` });
+  // Notifications (v3.8) — @mentions in the body first, then a reply
+  // to the post author — unless the author was already mentioned, so
+  // one comment never pings the same person twice. createNotification
+  // skips quietly when the table isn't there yet or it's your own post.
+  const mentioned = await notifyMentions(db, me, body, { ref_type: "comment", ref_id: r.meta.last_row_id, label: "in a reply", link: `#/thread/${id}` });
+  if (!mentioned.has(post.profile_id)) {
+    await createNotification(db, {
+      profile_id: post.profile_id, actor_profile_id: me.id, kind: "reply",
+      ref_type: "comment", ref_id: r.meta.last_row_id,
+      text: `@${me.username} replied to your post`,
+      link: `#/thread/${id}`,
+    });
+  }
   // Lucre (v3.11) — 10 for commenting, once per comment.
   const lw = await awardLucre(db, me.id, LUCRE_AWARDS.comment, "comment", String(r.meta.last_row_id));
   const out = { ok: true, error: null, comment_id: r.meta.last_row_id };

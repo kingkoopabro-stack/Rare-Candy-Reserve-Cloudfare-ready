@@ -824,7 +824,7 @@ function renderAccount() {
         ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Flea Market, Trades, and Auction House.</p>'
         : '<p style="margin:4px 0 0">Add a payout method + handle whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
-      ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top 8: ' + p.top_friend_ids.length + "/8 picked</span>" : "") +
+      ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top Friends: ' + p.top_friend_ids.length + "/10 picked</span>" : "") +
       (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(storeLayoutName(p.layout_preset)) + "</span>" : "") + "</p>" +
       "</div>" +
       '<div style="margin-left:auto"><button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button> <button type="button" class="btn ghost small" onclick="DWC.signOut()">Sign out</button></div>' +
@@ -844,6 +844,7 @@ function renderAccount() {
   if (!state.challenge) loadChallenge();
   if (state.editingProfile) loadTopFriendPicker();
   initLayoutEditor();
+  fitLayoutMinis();
 }
 
 // ---------- Taffy — the little site helper (ONE helper, v5) ----------
@@ -1013,135 +1014,179 @@ var LAYOUT_STORE = [
   {
     id: "store:rainy-night", code: "RAINY", name: "Rainy Night", tag: "Animated · moody", price: 0,
     desc: "Rain falls over a deep-blue night while your words take the stage.",
-    conflict: "Hides your Top 8 and links — those sections won't show while this layout is on.",
-    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", bg_preset: "", button_style: "neon", pic_position: "top", hide_sections: ["top8", "links"] },
+    conflict: "Hides your Top Friends and links — those sections won't show while this layout is on.",
+    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: ["top8", "links"] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
       ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{letter-spacing:.05em;}" +
       "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
-  },
+   +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}" +
+      ".dwc-myprofile .card{background:rgba(10,14,26,.85);border:1px solid #2a3a5f;border-radius:8px;}"},
   {
     id: "store:clean-professional", code: "CLEAN", name: "Clean Professional", tag: "Tidy · business", price: 0,
     desc: "Crisp white page, serif text, a thin navy rule — for selling like a pro.",
     conflict: "",
-    theme: { vibe: "classic", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "serif", bg_preset: "", button_style: "", pic_position: "", hide_sections: [] },
+    theme: { vibe: "classic", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{box-shadow:0 1px 3px rgba(0,0,0,.14);}" +
       ".dwc-myprofile .dwc-mypage-head{border-bottom:2px solid #003399;padding-bottom:8px;}"
-  },
+   +
+      ".dwc-myprofile .btn{background:#00e5ff;color:#1a1405;box-shadow:none;border-radius:8px;}" +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}"},
   {
     id: "store:facebook-style", code: "FACEBOOK", name: "Facebook Style", tag: "Familiar · blue", price: 0,
     desc: "Light grey page, white cards, Facebook blue — the look everyone already knows.",
     conflict: "",
-    theme: { vibe: "", bg_color: "#e9ebee", bg_image_url: "", text_color: "#1c1e21", accent_color: "#1877f2", font: "", bg_preset: "", button_style: "rounded", pic_position: "", hide_sections: [] },
+    theme: { vibe: "", bg_color: "#e9ebee", bg_image_url: "", text_color: "#1c1e21", accent_color: "#1877f2", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{background:#fff;border:1px solid #dddfe2;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.10);}" +
       ".dwc-myprofile .btn{background:#1877f2;color:#fff;}" +
       ".dwc-myprofile .dwc-mypage-head h3{color:#1877f2;}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#1877f2;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #1877f2;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #1877f2;}"},
   {
     id: "store:instagram-style", code: "INSTAGRAM", name: "Instagram Style", tag: "Photo-first · clean", price: 0,
     desc: "Bright white, centered, with a rainbow ring around your picture — built for photos.",
     conflict: "",
-    theme: { vibe: "", bg_color: "#fafafa", bg_image_url: "", text_color: "#262626", accent_color: "#e1306c", font: "", bg_preset: "", button_style: "rounded", pic_position: "", hide_sections: [] },
+    theme: { vibe: "", bg_color: "#fafafa", bg_image_url: "", text_color: "#262626", accent_color: "#e1306c", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "rounded", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{background:#fff;border:1px solid #dbdbdb;border-radius:12px;}" +
       ".dwc-myprofile .dwc-avatar{border:3px solid transparent;border-radius:50%;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5) border-box;}" +
       ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
       ".dwc-myprofile .dwc-mypage-head .dwc-avatar{margin:0 auto;}"
-  },
+   +
+      ".dwc-myprofile .btn{background:#e1306c;color:#ffffff;box-shadow:none;}" +
+      ".dwc-myprofile a{color:#e1306c;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #e1306c;}"},
   {
     id: "store:80s-arcade", code: "ARCADE", name: "80s Arcade", tag: "Neon · pixel", price: 0,
     desc: "Insert coin. Hot pink, electric cyan, scanlines, typewriter type — the arcade never closed.",
     conflict: "",
-    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "typewriter", bg_preset: "", button_style: "arcade", pic_position: "", hide_sections: [] },
+    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "typewriter", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
       ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 2px,transparent 2px 4px);}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{text-transform:uppercase;letter-spacing:.10em;}" +
       ".dwc-myprofile .btn{text-transform:uppercase;letter-spacing:.10em;}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}" +
+      ".dwc-myprofile .card{background:#120a24;border:2px solid #00e5ff;border-radius:8px;}"},
   {
     id: "store:kitsune-shrine", code: "KITSUNE", name: "Kitsune Shrine", tag: "Fox · gold · red", price: 0,
     desc: "Nine-tailed fox at a shrine in RGB — black classy background, golden borders, red accents here and there.",
     conflict: "",
-    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "", bg_preset: "", button_style: "gold", pic_position: "", hide_sections: [] },
+    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "gold", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;}" +
       ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.72));}" +
       ".dwc-myprofile .card{outline:1px solid rgba(212,175,55,.55);outline-offset:3px;}" +
       ".dwc-myprofile h2{border-bottom:2px solid #e53935;padding-bottom:4px;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 0 3px #8a0303,0 0 18px rgba(229,57,53,.6);}"
-  },
+   +
+      ".dwc-myprofile a{color:#d4af37;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;}"},
   {
     id: "store:horror-lover", code: "HORROR", name: "Horror Lover", tag: "Dark · blood", price: 0,
     desc: "Black as the basement, blood-red headings, serif like a tombstone inscription. For the ones who love the dark.",
     conflict: "",
-    theme: { vibe: "dark", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#c41e1e", font: "serif", bg_preset: "", button_style: "ghost", pic_position: "", hide_sections: [] },
+    theme: { vibe: "dark", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#c41e1e", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{box-shadow:0 0 24px rgba(196,30,30,.25);}" +
       ".dwc-myprofile h2{border-bottom:1px solid #5c0000;padding-bottom:4px;letter-spacing:.04em;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 16px rgba(196,30,30,.7);}"
-  },
+   +
+      ".dwc-myprofile a{color:#c41e1e;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #c41e1e;}"},
   {
     id: "store:stardust-diner", code: "DINER", name: "Stardust Diner", tag: "50s · chrome · teal", price: 0,
     desc: "Cream booths, teal chrome, pink neon — a 50s diner at midnight, jukebox optional.",
     conflict: "",
-    theme: { vibe: "", bg_color: "#fff6e5", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#0e7c7b", font: "", bg_preset: "", button_style: "gradient", pic_position: "", hide_sections: [] },
+    theme: { vibe: "", bg_color: "#fff6e5", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#0e7c7b", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;}" +
       ".dwc-myprofile::before{content:\"\";position:absolute;top:0;left:0;right:0;height:18px;pointer-events:none;background-image:repeating-linear-gradient(90deg,#0e7c7b 0 18px,#fff 18px 36px);}" +
       ".dwc-myprofile .card{background:#fff;border:2px solid #0e7c7b;border-radius:18px;}" +
       ".dwc-myprofile .btn{background:linear-gradient(180deg,#f5f5f5,#cfcfcf);color:#222;border:2px solid #0e7c7b;}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#0e7c7b;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #0e7c7b;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #0e7c7b;}"},
   {
     id: "store:deep-forest", code: "FOREST", name: "Deep Forest", tag: "Green · calm", price: 0,
     desc: "Moss, pine, and soft green light — quiet, earthy, and easy on the eyes at 2 AM.",
     conflict: "",
-    theme: { vibe: "forest", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "serif", bg_preset: "", button_style: "", pic_position: "", hide_sections: [] },
+    theme: { vibe: "forest", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{box-shadow:0 4px 14px rgba(0,0,0,.35);}" +
       ".dwc-myprofile h2{letter-spacing:.04em;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 14px rgba(57,255,136,.5);}"
-  },
+   +
+      ".dwc-myprofile .btn{background:#00e5ff;color:#1a1405;box-shadow:none;border-radius:8px;}" +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}"},
   {
     id: "store:cyber-street", code: "CYBER", name: "Cyber Street", tag: "Cyberpunk · angled", price: 0,
     desc: "Rain-slick blacktop, cyan neon, magenta slashes — the street after dark, wired up.",
     conflict: "",
-    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", bg_preset: "", button_style: "neon", pic_position: "", hide_sections: [] },
+    theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile h2,.dwc-myprofile h3{transform:skewX(-8deg);}" +
       ".dwc-myprofile .card{box-shadow:-4px 0 0 #ff2ea6,0 0 12px rgba(0,229,255,.25);}" +
       ".dwc-myprofile .btn{text-transform:uppercase;letter-spacing:.12em;}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}"},
   {
     id: "store:neon-rain", code: "NEONRAIN", name: "Neon Rain", tag: "Animated · premium", price: 20,
     desc: "Rainy Night's storm, turned all the way up — rain, neon glow, and your picture up top.",
     conflict: "Hides your links — that section won't show while this layout is on.",
-    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", bg_preset: "", button_style: "neon", pic_position: "top", hide_sections: ["links"] },
+    theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: ["links"] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
       ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(0,229,255,.28) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
       ".dwc-myprofile h2{text-transform:uppercase;letter-spacing:.10em;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 18px rgba(0,229,255,.8);}" +
       "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
-  },
+   +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}" +
+      ".dwc-myprofile .card{background:rgba(20,0,50,.82);border:1px solid #ff2d95;border-radius:8px;}"},
   {
     id: "store:golden-shrine", code: "GOLD", name: "Golden Shrine", tag: "Fox · deluxe", price: 20,
     desc: "Kitsune Shrine, gilded — double gold frames, red ribbon rules, serif like a temple plaque.",
     conflict: "",
-    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "serif", bg_preset: "", button_style: "gold", pic_position: "", hide_sections: [] },
+    theme: { vibe: "gold", bg_color: "", bg_image_url: "https://rarecandyreserve.org/images/fox-mask-icon.jpg", text_color: "", accent_color: "#d4af37", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "gold", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;}" +
       ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,.72));}" +
       ".dwc-myprofile .card{outline:2px solid #d4af37;outline-offset:4px;}" +
       ".dwc-myprofile h2{border-bottom:2px solid #e53935;padding-bottom:4px;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 0 3px #d4af37,0 0 18px rgba(212,175,55,.7);}"
-  },
+   +
+      ".dwc-myprofile a{color:#d4af37;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;}"},
   {
     id: "store:vaporwave-sunset", code: "SUNSET", name: "Vaporwave Sunset", tag: "Sunset · chrome · grid", price: 0,
     desc: "Driving into the sunset — pink sky, chrome letters, neon grid floor. The signature RCR look, turned golden.",
     conflict: "",
-    theme: { vibe: "sunset", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#ff9a00", font: "", bg_preset: "", button_style: "gradient", pic_position: "", hide_sections: [] },
+    theme: { vibe: "sunset", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#ff9a00", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "gradient", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
       ".dwc-myprofile::after{content:\"\";position:absolute;left:0;right:0;bottom:0;height:120px;pointer-events:none;background-image:linear-gradient(transparent,rgba(255,45,149,.25)),repeating-linear-gradient(90deg,rgba(0,229,255,.35) 0 2px,transparent 2px 28px),repeating-linear-gradient(0deg,rgba(0,229,255,.35) 0 2px,transparent 2px 18px);}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{text-transform:uppercase;letter-spacing:.12em;text-shadow:0 0 14px rgba(255,154,0,.7);}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 18px rgba(255,154,0,.8);}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#ff9a00;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;}" +
+      ".dwc-myprofile .card{background:#ffffff;border:1px solid #dddddd;border-radius:8px;}"},
   {
     id: "store:retro-terminal", code: "TERMINAL", name: "Retro Terminal", tag: "Green · mono · CRT", price: 0,
     desc: "Green phosphor on black, scanlines, blinking cursor — your page is a terminal and you are the operator.",
     conflict: "",
-    theme: { vibe: "", bg_color: "#0a0f0a", bg_image_url: "", text_color: "#33ff66", accent_color: "#33ff66", font: "typewriter", bg_preset: "", button_style: "ghost", pic_position: "", hide_sections: [] },
+    theme: { vibe: "", bg_color: "#0a0f0a", bg_image_url: "", text_color: "#33ff66", accent_color: "#33ff66", font: "typewriter", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
       ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.28) 0 2px,transparent 2px 4px);}" +
       ".dwc-myprofile h2::after{content:\"_\";animation:dwcBlink 1s steps(2,start) infinite;}" +
@@ -1149,29 +1194,207 @@ var LAYOUT_STORE = [
       ".dwc-myprofile .dwc-avatar{border-radius:4px;box-shadow:0 0 14px rgba(51,255,102,.5);}" +
       ".dwc-myprofile .btn{border:2px solid #33ff66;color:#33ff66;}" +
       "@keyframes dwcBlink{50%{opacity:0;}}"
-  },
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#33ff66;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #33ff66;}"},
   {
     id: "store:candy-pop", code: "CANDY", name: "Candy Pop", tag: "Bubblegum · round · sweet", price: 0,
     desc: "Bubblegum pink, big round corners, soft as a jawbreaker — sweet, loud, and impossible to miss.",
     conflict: "",
-    theme: { vibe: "bubblegum", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#ff2d95", font: "", bg_preset: "", button_style: "rounded", pic_position: "", hide_sections: [] },
+    theme: { vibe: "bubblegum", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#ff2d95", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile .card{border-radius:26px;box-shadow:0 6px 0 rgba(255,45,149,.25);}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{letter-spacing:.03em;}" +
       ".dwc-myprofile .dwc-avatar{border:3px solid #ff5cb8;box-shadow:0 0 16px rgba(255,92,184,.6);}" +
       ".dwc-myprofile .btn{border-radius:999px;box-shadow:0 4px 0 rgba(214,0,122,.35);}"
-  },
+   +
+      ".dwc-myprofile a{color:#ff2d95;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2d95;}"},
   {
     id: "store:midnight-garden", code: "GARDEN", name: "Midnight Garden", tag: "Dark · fireflies · serif", price: 0,
     desc: "A garden after dark — deep green, soft gold fireflies, serif like a pressed flower. Quiet and a little haunted.",
     conflict: "",
-    theme: { vibe: "forest", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#a3e635", font: "serif", bg_preset: "", button_style: "ghost", pic_position: "", hide_sections: [] },
+    theme: { vibe: "forest", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#a3e635", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;}" +
       ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 22% 28%,#d9f99d,transparent),radial-gradient(2px 2px at 68% 18%,#a3e635,transparent),radial-gradient(1.5px 1.5px at 84% 62%,#fef08a,transparent),radial-gradient(2px 2px at 38% 74%,#a3e635,transparent);animation:dwcSparkleTwinkle 3.2s ease-in-out infinite;}" +
       ".dwc-myprofile .card{box-shadow:0 4px 18px rgba(0,0,0,.45);}" +
       ".dwc-myprofile h2{border-bottom:1px solid #3f6212;padding-bottom:4px;letter-spacing:.05em;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 16px rgba(163,230,53,.55);}"
-  }
+   +
+      ".dwc-myprofile a{color:#a3e635;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #a3e635;}"},
+  {
+    id: "store:shopfront", code: "SHOP", name: "Corner Shop", tag: "Website template · shop", price: 20,
+    desc: "A full website template for your shop — your name big at the top, what you sell, and about the shop. Turns Website look on when you apply it.",
+    conflict: "",
+    website: true,
+    theme: { vibe: "", bg_color: "#fdf6ec", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#c41e1e", font: "rounded", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [], custom_page_html: "<section><h1>{{name}}</h1><p>Welcome to my shop — cards, prints, and more, all in one place.</p></section><section><h2>What I sell</h2><p>Browse my listings below — every item is in hand and ready to ship. Message me if you want a bundle deal.</p></section><section><h2>About the shop</h2><p>Run by {{name}} — a collector first, a seller second. Every order ships with care.</p></section>" },
+    css: ".dwc-myprofile{background:#fdf6ec;}" +
+      ".dwc-custom-page section{background:#fff;border:1px solid #e8d9c8;border-radius:14px;padding:16px;margin-bottom:12px;}" +
+      ".dwc-custom-page h1{font-size:34px;color:#c41e1e;margin:0 0 8px;}" +
+      ".dwc-custom-page h2{font-size:22px;color:#3a2a1a;margin:0 0 6px;}" +
+      ".dwc-custom-page p{color:#3a2a1a;line-height:1.5;margin:0;}" +
+      ".dwc-myprofile .btn{border-radius:999px;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#c41e1e;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #c41e1e;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #c41e1e;}" +
+      ".dwc-myprofile .card{background:#ffffff;border:1px solid #dddddd;border-radius:8px;}"},
+  {
+    id: "store:band-stand", code: "ENCORE", name: "Encore", tag: "Website template · band", price: 20,
+    desc: "A full website template for a band or musician — your name in lights, your latest release, and how to book a show. Turns Website look on when you apply it.",
+    conflict: "",
+    website: true,
+    theme: { vibe: "", bg_color: "#0b0b14", bg_image_url: "", text_color: "#f2f2f8", accent_color: "#ff2d95", font: "", name_font: "bangers", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [], custom_page_html: "<section><h1>{{name}}</h1><p>Music, merch, and show dates — all in one place.</p></section><section><h2>Latest release</h2><p>New music is out now. Listen on the player, grab the merch, and come see a show.</p></section><section><h2>Book a show</h2><p>Want {{name}} at your venue? Message me — let’s make it happen.</p></section>" },
+    css: ".dwc-myprofile{background:linear-gradient(180deg,#0b0b14,#1a0b2e);}" +
+      ".dwc-custom-page section{background:rgba(20,0,50,.82);border:1px solid #ff2d95;border-radius:16px;padding:16px;margin-bottom:12px;}" +
+      ".dwc-custom-page h1{font-size:38px;color:#ff5cb8;text-shadow:0 0 12px rgba(255,45,149,.8);margin:0 0 8px;}" +
+      ".dwc-custom-page h2{font-size:24px;color:#00e5ff;margin:0 0 6px;}" +
+      ".dwc-custom-page p{color:#f2f2f8;line-height:1.5;margin:0;}" +
+      ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#00e5ff);}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#ff2d95;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ff2d95;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2d95;}" +
+      ".dwc-myprofile .card{background:rgba(255,255,255,.06);border:1px solid #333;border-radius:8px;}"},
+  {
+    id: "store:portfolio", code: "PORTFOLIO", name: "Portfolio", tag: "Website template · portfolio", price: 20,
+    desc: "A full website template for showing off your work — your name, your selected pieces, and how to reach you. Turns Website look on when you apply it.",
+    conflict: "",
+    website: true,
+    theme: { vibe: "", bg_color: "#ffffff", bg_image_url: "", text_color: "#1a1a1a", accent_color: "#003399", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [], custom_page_html: "<section><h1>{{name}}</h1><p>Work, projects, and things I’ve made — a portfolio in progress.</p></section><section><h2>Selected work</h2><p>A few favorite pieces. More below in my listings — everything here is made by hand.</p></section><section><h2>Contact</h2><p>Message me for commissions, collaborations, or just to say hi.</p></section>" },
+    css: ".dwc-myprofile{background:#fff;}" +
+      ".dwc-custom-page section{border-bottom:2px solid #003399;padding:14px 0;margin-bottom:12px;}" +
+      ".dwc-custom-page h1{font-size:36px;color:#003399;margin:0 0 8px;}" +
+      ".dwc-custom-page h2{font-size:22px;color:#1a1a1a;margin:0 0 6px;}" +
+      ".dwc-custom-page p{color:#1a1a1a;line-height:1.6;margin:0;}" +
+      ".dwc-myprofile .card{border:1px solid #6699cc;border-radius:4px;}"
+   +
+      ".dwc-myprofile a{color:#003399;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #003399;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #003399;}"},
+  {
+    id: "store:neojapan-rain", code: "NEORAIN", name: "Neo-Japan Rain", tag: "Rainy · city lights · lofi", price: 0,
+    desc: "Rain over a lit-up city at night — warm windows, traffic glow, lights in the distance. Like the relaxing videos, on your page.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "#0a0e1a", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#ff9a00", font: "typewriter", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;background:linear-gradient(180deg,#05070f 0%,#0a0e1a 55%,#131a2e 100%);}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 12% 68%,#ffb347,transparent),radial-gradient(2px 2px at 28% 74%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 44% 70%,#ffd166,transparent),radial-gradient(2px 2px at 61% 76%,#ff9a00,transparent),radial-gradient(1.5px 1.5px at 78% 72%,#ff5c8a,transparent),radial-gradient(2px 2px at 90% 78%,#ffb347,transparent),radial-gradient(1.5px 1.5px at 20% 82%,#ffd166,transparent),radial-gradient(2px 2px at 55% 84%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 85% 86%,#ff9a00,transparent);animation:dwcSparkleTwinkle 4s ease-in-out infinite;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcNeoRain 1.1s linear infinite;}" +
+      ".dwc-myprofile .card{background:rgba(10,14,26,.82);border:1px solid #2a3a5f;border-radius:12px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#ffd166;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ff9a00;box-shadow:0 0 14px rgba(255,154,0,.55);}" +
+      "@keyframes dwcNeoRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+   +
+      ".dwc-myprofile a{color:#ff9a00;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;}"},
+  {
+    id: "store:neojapan-night", code: "NEONIGHT", name: "Neo-Japan Clear Night", tag: "Clear night · city lights", price: 0,
+    desc: "The same lit-up city, rain cleared — a pale moon, stars, and warm windows over a dark skyline.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "#0a0e1a", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#00e5ff", font: "typewriter", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;background:linear-gradient(180deg,#04060d 0%,#0a0e1a 55%,#131a2e 100%);}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle at 82% 14%,rgba(255,248,225,.95) 0 30px,rgba(255,248,225,.28) 30px 56px,transparent 56px),radial-gradient(1px 1px at 8% 12%,#fff,transparent),radial-gradient(1px 1px at 32% 8%,#fff,transparent),radial-gradient(1.5px 1.5px at 55% 20%,#fff,transparent),radial-gradient(1px 1px at 70% 6%,#fff,transparent),radial-gradient(1px 1px at 94% 24%,#fff,transparent)radial-gradient(2px 2px at 12% 68%,#ffb347,transparent),radial-gradient(2px 2px at 28% 74%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 44% 70%,#ffd166,transparent),radial-gradient(2px 2px at 61% 76%,#ff9a00,transparent),radial-gradient(1.5px 1.5px at 78% 72%,#ff5c8a,transparent),radial-gradient(2px 2px at 90% 78%,#ffb347,transparent),radial-gradient(1.5px 1.5px at 20% 82%,#ffd166,transparent),radial-gradient(2px 2px at 55% 84%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 85% 86%,#ff9a00,transparent);animation:dwcSparkleTwinkle 5s ease-in-out infinite;}" +
+      ".dwc-myprofile .card{background:rgba(10,14,26,.82);border:1px solid #2a3a5f;border-radius:12px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#00e5ff;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;box-shadow:0 0 14px rgba(0,229,255,.55);}"
+   +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}"},
+  {
+    id: "store:brass-knuckles", code: "BRASS", name: "Brass Knuckles", tag: "Street · gold · MySpace", price: 0,
+    desc: "Super MySpace — dark street, brass-gold everything, big bold letters. Loud, proud, and a little bit trouble.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#161210", bg_image_url: "", text_color: "#f5ead6", accent_color: "#c9962e", font: "typewriter", name_font: "bangers", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{background:linear-gradient(160deg,#161210,#241a12 60%,#161210);}" +
+      ".dwc-myprofile .card{background:#1e1712;border:2px solid #c9962e;border-radius:6px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#e8b64c;text-shadow:0 2px 0 #000;letter-spacing:.04em;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #c9962e;box-shadow:0 0 14px rgba(201,150,46,.6);}" +
+      ".dwc-myprofile .btn{background:linear-gradient(90deg,#8a6d1f,#e8b64c,#8a6d1f);color:#1a1206;font-weight:800;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#c9962e;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #c9962e;}"},
+  {
+    id: "store:too-much", code: "TOOMUCH", name: "TOO MUCH", tag: "Pink · bows · cute overload", price: 0,
+    desc: "Pink, bows, and cute overload — polka dots, round corners, and a red bow on everything. Sweet enough to hurt.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#ffd7ef", bg_image_url: "", text_color: "#4a1942", accent_color: "#e53935", font: "rounded", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{background-color:#ffd7ef;background-image:radial-gradient(10px 10px at 20% 20%,#fff 98%,transparent),radial-gradient(10px 10px at 70% 60%,#fff 98%,transparent),radial-gradient(10px 10px at 40% 85%,#fff 98%,transparent),radial-gradient(8px 8px at 90% 15%,#fff 98%,transparent);background-size:180px 180px;}" +
+      ".dwc-myprofile .card{background:#fff;border:2px solid #ff8fc7;border-radius:22px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#d81b60;}" +
+      ".dwc-myprofile h2::before{content:\"\";display:inline-block;width:16px;height:12px;margin-right:8px;background:#e53935;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;box-shadow:20px 0 0 #e53935;transform:rotate(-18deg);vertical-align:middle;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #e53935;box-shadow:0 0 14px rgba(229,57,53,.5);}" +
+      ".dwc-myprofile .btn{background:#e53935;border-radius:999px;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#e53935;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #e53935;}"},
+  {
+    id: "store:cat-faces", code: "CATS", name: "Cat Faces", tag: "Cats · art-styled · cream", price: 0,
+    desc: "A warm cream background covered in different art-styled cat faces — solid, outline, and striped. All original, all cats.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#fff6e5", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#ff9a00", font: "rounded", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{background-color:#fff6e5;background-image:url(\"data:image/svg+xml,%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20width%3D'240'%20height%3D'240'%3E%3Cpath%20d%3D'M32%2044%20L46%2012%20L62%2040%20Z'%20fill%3D'%23ffb74d'%2F%3E%3Cpath%20d%3D'M78%2040%20L92%2012%20L108%2044%20Z'%20fill%3D'%23ffb74d'%2F%3E%3Ccircle%20cx%3D'70'%20cy%3D'62'%20r%3D'34'%20fill%3D'%23ffb74d'%2F%3E%3Ccircle%20cx%3D'58'%20cy%3D'56'%20r%3D'4'%20fill%3D'%233a2a1a'%2F%3E%3Ccircle%20cx%3D'82'%20cy%3D'56'%20r%3D'4'%20fill%3D'%233a2a1a'%2F%3E%3Cpath%20d%3D'M62%2070%20Q70%2076%2078%2070'%20stroke%3D'%233a2a1a'%20stroke-width%3D'2'%20fill%3D'none'%2F%3E%3Cpath%20d%3D'M152%2044%20L166%2012%20L182%2040%20Z'%20fill%3D'none'%20stroke%3D'%2326a69a'%20stroke-width%3D'3'%2F%3E%3Cpath%20d%3D'M198%2040%20L212%2012%20L228%2044%20Z'%20fill%3D'none'%20stroke%3D'%2326a69a'%20stroke-width%3D'3'%2F%3E%3Ccircle%20cx%3D'190'%20cy%3D'62'%20r%3D'34'%20fill%3D'none'%20stroke%3D'%2326a69a'%20stroke-width%3D'3'%2F%3E%3Ccircle%20cx%3D'178'%20cy%3D'56'%20r%3D'4'%20fill%3D'%2326a69a'%2F%3E%3Ccircle%20cx%3D'202'%20cy%3D'56'%20r%3D'4'%20fill%3D'%2326a69a'%2F%3E%3Cpath%20d%3D'M92%20164%20L106%20132%20L122%20160%20Z'%20fill%3D'%23b0bec5'%2F%3E%3Cpath%20d%3D'M138%20160%20L154%20132%20L168%20164%20Z'%20fill%3D'%23b0bec5'%2F%3E%3Ccircle%20cx%3D'130'%20cy%3D'182'%20r%3D'34'%20fill%3D'%23b0bec5'%2F%3E%3Cpath%20d%3D'M118%20156%20L122%20168%20M130%20154%20L130%20166%20M142%20156%20L138%20168'%20stroke%3D'%2378909c'%20stroke-width%3D'3'%2F%3E%3Ccircle%20cx%3D'118'%20cy%3D'176'%20r%3D'4'%20fill%3D'%233a2a1a'%2F%3E%3Ccircle%20cx%3D'142'%20cy%3D'176'%20r%3D'4'%20fill%3D'%233a2a1a'%2F%3E%3C%2Fsvg%3E\");background-size:240px 240px;}" +
+      ".dwc-myprofile .card{background:#fffdf7;border:2px solid #ffcc80;border-radius:18px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#e65100;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ff9a00;box-shadow:0 0 14px rgba(255,154,0,.5);}" +
+      ".dwc-myprofile .btn{background:#ff9a00;border-radius:999px;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#ff9a00;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;}"},
+  {
+    id: "store:burton", code: "BURTON", name: "Burton", tag: "Stripes · moon · spooky", price: 0,
+    desc: "Black-and-white stripes, a pale moon, and haunted-holiday purple — the striped nightmare look, no film characters.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#0b0b14", bg_image_url: "", text_color: "#f2f2f8", accent_color: "#7c4dff", font: "serif", name_font: "creepster", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;background:#0b0b14;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;top:14px;right:18px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,#fff8e1,#f5e6b8);box-shadow:0 0 42px rgba(255,248,225,.45);pointer-events:none;}" +
+      ".dwc-myprofile .card{background:#14141f;border:1px solid #2e2e4a;border-top:8px solid transparent;border-image:repeating-linear-gradient(90deg,#fff 0 12px,#000 12px 24px) 8;border-radius:4px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#b388ff;letter-spacing:.08em;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #b388ff;box-shadow:0 0 14px rgba(124,77,255,.6);}" +
+      ".dwc-myprofile .btn{border:2px solid #b388ff;color:#b388ff;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#7c4dff;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #7c4dff;}"},
+  {
+    id: "store:christmas-cozy", code: "SNOW", name: "Christmas Cozy", tag: "Cozy · snow · warm", price: 0,
+    desc: "Nice and cozy, filled with snow — warm cream, red and green, snow drifting down, and a string of lights across the top.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#fdf6ec", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#c41e1e", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;background:#fdf6ec;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(5px 5px at 10% 12px,#ff5252,transparent),radial-gradient(5px 5px at 30% 12px,#69f0ae,transparent),radial-gradient(5px 5px at 50% 12px,#ffd740,transparent),radial-gradient(5px 5px at 70% 12px,#448aff,transparent),radial-gradient(5px 5px at 90% 12px,#ff5252,transparent);background-repeat:repeat-x;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 12% 18%,#fff,transparent),radial-gradient(1.5px 1.5px at 30% 8%,#fff,transparent),radial-gradient(2px 2px at 52% 24%,#fff,transparent),radial-gradient(1.5px 1.5px at 68% 10%,#fff,transparent),radial-gradient(2px 2px at 84% 30%,#fff,transparent),radial-gradient(1.5px 1.5px at 94% 14%,#fff,transparent);animation:dwcStarDrift 30s linear infinite;}" +
+      ".dwc-myprofile .card{background:#fff;border:2px solid #c41e1e;border-radius:16px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#c41e1e;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #2e7d32;box-shadow:0 0 14px rgba(46,125,50,.5);}" +
+      ".dwc-myprofile .btn{background:#c41e1e;border-radius:999px;}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#c41e1e;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #c41e1e;}"},
+  {
+    id: "store:christmas-lights", code: "LIGHTS", name: "Christmas Lights", tag: "Dark · lights · snow", price: 0,
+    desc: "The darker version of the Christmas lights look — a deep night sky, bright colored lights, and snow falling.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#0b0f1a", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#39ff88", font: "serif", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;overflow:hidden;background:linear-gradient(180deg,#0b0f1a,#101a30);}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(5px 5px at 10% 12px,#ff5252,transparent),radial-gradient(5px 5px at 30% 12px,#69f0ae,transparent),radial-gradient(5px 5px at 50% 12px,#ffd740,transparent),radial-gradient(5px 5px at 70% 12px,#448aff,transparent),radial-gradient(5px 5px at 90% 12px,#ff5252,transparent);background-repeat:repeat-x;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 12% 18%,#fff,transparent),radial-gradient(1.5px 1.5px at 30% 8%,#fff,transparent),radial-gradient(2px 2px at 52% 24%,#fff,transparent),radial-gradient(1.5px 1.5px at 68% 10%,#fff,transparent),radial-gradient(2px 2px at 84% 30%,#fff,transparent),radial-gradient(1.5px 1.5px at 94% 14%,#fff,transparent);animation:dwcStarDrift 30s linear infinite;}" +
+      ".dwc-myprofile .card{background:rgba(16,26,48,.85);border:1px solid #2e4a7a;border-radius:14px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#69f0ae;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ffd740;box-shadow:0 0 14px rgba(255,215,64,.6);}" +
+      ".dwc-myprofile .btn{background:linear-gradient(90deg,#39ff88,#00e5ff);}"
+   +
+      ".dwc-myprofile .btn{box-shadow:none;}" +
+      ".dwc-myprofile a{color:#39ff88;text-shadow:none;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #39ff88;}"}
 ];
+
 function storeItemById(id) {
   var found = null;
   LAYOUT_STORE.forEach(function (x) { if (x.id === id) found = x; });
@@ -1185,15 +1408,83 @@ function storeLayoutName(id) {
 // The member's theme merged with a store preset's theme bits — the
 // exact theme the preview shows AND the apply call saves, so the two
 // can never disagree.
+// A layout REPLACES the look (v3.20 root fix): the preset's theme
+// fragment is the whole look — the member's old vibe, glow, effects,
+// and custom button CSS do NOT survive the merge, or the old neon look
+// would keep winning over the new preset (themeCSS is injected after
+// the layout CSS, and the base .btn glow survives anything a preset
+// doesn't explicitly kill). Structural settings are NOT part of a
+// layout and stay exactly as the member set them: Top Friends, feed
+// privacy, divider, buttons, video, ticker. The item's custom page
+// wins when it has one; otherwise the member's own page stays.
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "ticker_source", "buttons_side", "buttons_show", "display_badges"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
-  return Object.assign({}, cur, item.theme);
+  var merged = Object.assign({}, item.theme || {});
+  LAYOUT_STRUCTURAL_FIELDS.forEach(function (k) { if (cur[k] !== undefined) merged[k] = cur[k]; });
+  if (!merged.custom_page_html && cur.custom_page_html) merged.custom_page_html = cur.custom_page_html;
+  return merged;
 }
 // Scope CSS to the store preview box so a preview can never restyle
 // the page behind the phone. themeCSS + layout_css both use
 // .dwc-myprofile selectors; keyframes stay global (harmless).
 function scopeStoreCSS(css) {
   return String(css || "").replace(/\.dwc-myprofile/g, "#dwc-store-preview .dwc-myprofile");
+}
+
+// ---------- Layout miniatures (v3.20) ----------
+// Previewing a layout used to mean opening a separate phone-sized
+// preview off to the side — cut off and awkward. Now every layout
+// carries its own miniature: a live, scaled-down sample profile page
+// rendered inline in a small frame, in the store grid AND in the Edit
+// Profile picker. It's a LIVE render, not a static image — the layout's
+// own colors, background, fonts, and CSS are applied to a sample
+// profile (banner strip, name, two cards, a button), so every layout
+// gets a preview automatically, including new ones and member-published
+// ones. The sample renders at a fixed width (360px in the store, 280px
+// in the picker) and fitLayoutMinis() scales it down to the frame, so
+// it stays legible on mobile and desktop. Each mini's CSS is scoped to
+// its own .dwc-mini-<uid> class, so two dozen minis on one page can
+// never restyle each other.
+function layoutMiniHTML(item, innerW, small) {
+  var w = innerW || 360;
+  var uid = "m" + String(item.id || "x").replace(/[^a-z0-9]+/gi, "-");
+  var th = parseThemeClient(item.theme || {});
+  // The mini shows the LAYOUT as designed (its own theme only — not
+  // merged with the member's current look, or every mini would show
+  // the member's background instead of the layout's).
+  var css = themeCSS(th) + scopeProfileCss(item.css || "");
+  css = css.split(".dwc-myprofile").join(".dwc-mini-" + uid);
+  ensureProfileFonts(th);
+  var accent = th.accent_color || "#00e5ff";
+  var bannerStyle = "background:linear-gradient(90deg," + accent + "," + (th.bg_color || "#223") + ")";
+  return '<div class="dwc-layout-mini' + (small ? " dwc-layout-mini-sm" : "") + '" data-mini-w="' + w + '">' +
+    "<style>" + css + "</style>" +
+    '<div class="dwc-layout-mini-inner" style="width:' + w + 'px">' +
+    '<div class="dwc-mini-' + uid + ' dwc-previewbox">' +
+    '<div class="dwc-mini-banner" style="' + bannerStyle + '"></div>' +
+    '<section class="card dwc-mypage-head"><div class="dwc-avatar dwc-mini-avatar">S</div><h3>Sample Member</h3><p class="dwc-meta">@sample · your page, this layout</p></section>' +
+    '<section class="card"><p>About me — this is how your page will look with this layout on it.</p></section>' +
+    '<section class="card"><p>🎵 My latest post shows here, in the feed.</p></section>' +
+    '<p><button type="button" class="btn">Message</button></p>' +
+    "</div></div></div>";
+}
+// Scale every miniature's inner sample down to its frame (never up —
+// a frame wider than the sample just shows it at full size). Called
+// after the store grid and the Edit Profile picker render, and on
+// resize, so the minis always fill their frame on any screen.
+function fitLayoutMinis() {
+  if (typeof document === "undefined") return;
+  var minis = document.querySelectorAll(".dwc-layout-mini");
+  for (var i = 0; i < minis.length; i++) {
+    var frame = minis[i];
+    var inner = frame.querySelector(".dwc-layout-mini-inner");
+    if (!inner) continue;
+    var w = parseInt(frame.getAttribute("data-mini-w") || "360", 10) || 360;
+    var fw = frame.clientWidth || w;
+    var scale = Math.min(1, fw / w);
+    inner.style.transform = "scale(" + scale + ")";
+  }
 }
 async function loadLucre() {
   if (!state.profile) { state.lucre = null; return; }
@@ -1280,7 +1571,13 @@ async function loadUserLayouts() {
 function storePreviewHTML(item) {
   if (!item || !state.profile) return "";
   var merged = storeMergedTheme(item);
-  var fake = Object.assign({}, state.profile, { is_mine: true, profile_theme: JSON.stringify(merged) });
+  // A website template's preview shows the website look (its custom
+  // page is the page) — force website_mode on the fake profile and
+  // fill in the member's name where the template says {{name}}.
+  if (item.website) {
+    merged.custom_page_html = String(merged.custom_page_html || "").split("{{name}}").join(state.profile.username || "Your name");
+  }
+  var fake = Object.assign({}, state.profile, { is_mine: true, website_mode: item.website ? true : state.profile.website_mode, profile_theme: JSON.stringify(merged) });
   var css = scopeStoreCSS(themeCSS(merged)) + scopeStoreCSS(scopeProfileCss(item.css));
   ensureProfileFonts(merged);
   return '<div id="dwc-store-preview" class="dwc-store-preview">' +
@@ -1318,6 +1615,7 @@ function phoneStoreHTML() {
         var isOwned = x.price === 0 || owned.indexOf(x.id) >= 0;
         var isCurrent = current === x.id;
         return '<div class="dwc-store-card">' +
+          layoutMiniHTML(x, 360) +
           '<div class="dwc-store-head"><strong>' + esc(x.name) + '</strong><span class="dwc-store-price">' + (x.price === 0 ? "FREE" : x.price + " " + LUCRE_SYMBOL) + '</span></div>' +
           '<p class="dwc-store-tag">' + esc(x.tag) + '</p>' +
           '<p class="dwc-store-desc">' + esc(x.desc) + '</p>' +
@@ -1325,7 +1623,7 @@ function phoneStoreHTML() {
           '<p class="dwc-store-code">Code: <code>' + esc(x.code || "") + '</code> <button type="button" class="dwc-linklike" onclick="DWC.copyLayoutCode(\'' + x.id + '\')">📋 Copy</button>' +
           (x.author_name ? ' · by <strong>@' + esc(x.author_name) + '</strong>' : "") +
           (x.author_id && state.profile && x.author_id === state.profile.id ? ' · <button type="button" class="dwc-linklike" onclick="DWC.unpublishLayout(\'' + x.id + '\')">Take down</button>' : "") + '</p>' +
-          '<p class="dwc-store-btns"><button type="button" class="btn ghost small" onclick="DWC.storePreview(\'' + x.id + '\')">Preview</button> ' +
+          '<p class="dwc-store-btns"><button type="button" class="btn ghost small" onclick="DWC.storePreview(\'' + x.id + '\')">Full preview</button> ' +
           (isCurrent ? '<span class="dwc-store-wearing">✓ Wearing it</span>'
             : '<button type="button" class="btn small" ' + (state.storeApplying === x.id ? "disabled" : "") + ' onclick="DWC.storeApply(\'' + x.id + '\')">' + (isOwned ? "Apply" : "Buy · " + x.price + " " + LUCRE_SYMBOL) + '</button>') +
           '</p></div>';
@@ -1636,7 +1934,7 @@ function taffyReply(raw) {
     return { text: taffyPick(["On a seller's page, hit their Subscribe button — the label is theirs, so it might say something custom. It's how you follow a seller.", "Find a seller you like and tap Subscribe on their page. The button text is theirs, so it might say anything — but it means follow them."]), emoji: taffyPickEmoji(["⭐", "✨"]), working: false };
   // Top Friends
   if (has(/\b(top friends|top 8|top eight)\b/))
-    return { text: taffyPick(["Edit Profile, pick up to 8 Top Friends — they show up as tiles on your page, MySpace-style. Your friends, front and center.", "Top Friends are your Top 8 — pick them in Edit Profile and they show as tiles on your page. Change them anytime."]), emoji: taffyPickEmoji(["🌟", "✨"]), working: false };
+    return { text: taffyPick(["Edit Profile, pick up to 10 Top Friends — they show up as tiles on your page, MySpace-style. Your friends, front and center.", "Top Friends are your Top 10 — pick them in Edit Profile and they show as tiles on your page. Change them anytime."]), emoji: taffyPickEmoji(["🌟", "✨"]), working: false };
   // Friends / favorites / page URL (v3.6) — the buttons on a member page.
   if (has(/\b(add (a )?friend|add me|unfriend|favorite (someone|a member|them)|add to favorites|my page url|page url|custom (page )?url|change my (page )?url)\b/))
     return { text: taffyPick(["On someone's page, hit “Add me” to add them as a friend — it flips to “Unfriend” once you're friends. The star next to “Add to Favorites” lights up gold when they're favorited. Your own page URL lives in Edit Profile under “My page URL” — 3 changes per 5 years, 1-year cooldown, or appeal to Chris.", "Friends and favorites live on the member page: “Add me” adds them (it turns into “Unfriend” when you're already friends), and the ☆ star fills gold when you favorite someone. Your custom page URL is in Edit Profile — “My page URL” — 3 changes in 5 years, 1-year cooldown after each one."]), emoji: taffyPickEmoji(["👥", "⭐"]), working: false };
@@ -1756,7 +2054,7 @@ function phoneMsgHTML() {
     rows += '<p class="tp-note">Loading friends…</p>';
     loadPhoneMsgList();
   } else if (!state.phoneMsgList.length) {
-    rows += '<p class="tp-note">No other members yet — you’re the first one here. Add friends in Edit profile (Top 8) and they’ll show up here.</p>';
+    rows += '<p class="tp-note">No other members yet — you’re the first one here. Add friends in Edit profile (Top Friends) and they’ll show up here.</p>';
   } else {
     rows += state.phoneMsgList.map(function (m) {
       return '<button type="button" class="tp-contact" onclick="DWC.phoneMsgMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">' +
@@ -1849,6 +2147,7 @@ function phoneNotifKindIcon(kind) {
     case "tag": return "🏷️";
     case "follow": return "➕";
     case "unfollow": return "➖";
+    case "team": return "🪙";
     default: return "🔔";
   }
 }
@@ -1867,6 +2166,12 @@ async function loadPhoneAlerts() {
   state.phoneAlertsStamp = Date.now();
   if (state.phone.open && state.phone.app === "alerts") renderPhone();
 }
+// Notification sound toggle (v3.17) — same localStorage key the header
+// bell in site.js uses ("dwc-notif-sound" = "off" disables it), default
+// ON. The bell poll owns the coin ding; this switch just controls it.
+function phoneNotifSoundOn() {
+  try { return localStorage.getItem("dwc-notif-sound") !== "off"; } catch (e) { return true; }
+}
 function phoneAlertsHTML() {
   var rows = "";
   if (!state.profile) {
@@ -1877,14 +2182,22 @@ function phoneAlertsHTML() {
   } else if (!state.phoneAlertsList.length) {
     rows = '<p class="tp-note">No alerts yet — when someone comments, messages, hearts, or mentions you, it’ll show up here.</p>';
   } else {
-    rows = state.phoneAlertsList.map(function (n) {
-      return '<button type="button" class="tp-contact' + (n.read ? "" : " tp-notif-unread") + '" onclick="DWC.phoneAlertOpen(' + n.id + ', \'' + String(n.link || "").replace(/'/g, "") + '\')">' +
+    // Team pings first (the server already sorts them first — this keeps
+    // the list right even if it arrives from an older fetch).
+    var sorted = state.phoneAlertsList.slice().sort(function (a, b) {
+      var ta = a.kind === "team" ? 0 : 1, tb = b.kind === "team" ? 0 : 1;
+      if (ta !== tb) return ta - tb;
+      return (b.created_at || 0) - (a.created_at || 0);
+    });
+    rows = sorted.map(function (n) {
+      var isTeam = n.kind === "team";
+      return '<button type="button" class="tp-contact' + (n.read ? "" : " tp-notif-unread") + (isTeam ? " tp-notif-team" : "") + '" onclick="DWC.phoneAlertOpen(' + n.id + ', \'' + String(n.link || "").replace(/'/g, "") + '\')">' +
         '<span class="tp-contact-av">' + phoneNotifKindIcon(n.kind) + '</span>' +
-        '<span><strong>' + esc(n.text || "") + '</strong><em>' + phoneNotifTime(n.created_at) + '</em></span><span class="tp-contact-go">›</span></button>';
+        '<span><strong>' + (isTeam ? '<span class="tp-notif-team-tag">Team</span> ' : "") + esc(n.text || "") + '</strong><em>' + phoneNotifTime(n.created_at) + '</em></span><span class="tp-contact-go">›</span></button>';
     }).join("");
   }
   return phoneTopbarHTML("Alerts") + '<div class="tp-appview">' +
-    '<p><button type="button" class="btn ghost small" onclick="DWC.phoneAlertsMarkAll()">Mark all read</button></p>' + rows + '</div>';
+    '<p><button type="button" class="btn ghost small" onclick="DWC.phoneAlertsMarkAll()">Mark all read</button> <button type="button" class="btn ghost small" onclick="DWC.phoneAlertsSoundToggle()">' + (phoneNotifSoundOn() ? "🔊 Sound on" : "🔇 Sound off") + '</button></p>' + rows + '</div>';
 }
 // Badges app (v3.9) — your unlocked badges + the locked ones with what
 // earns them. Same list as Edit Profile "Badge display". v3.11 — also
@@ -1958,6 +2271,16 @@ function renderPhone() {
   if (key === state.phoneRenderedKey) return; // already showing this — keeps the radio playing + notes focused
   state.phoneRenderedKey = key;
   root.innerHTML = '<div class="tp-phone" role="dialog" aria-label="Taffy’s phone">' + phoneScreenHTML() + '</div>';
+  fitLayoutMinis();
+  // Re-fit the miniatures when the window changes size (phone popup and
+  // store grid are fluid) — one listener, debounced.
+  if (typeof window !== "undefined" && !window.__dwcMiniResize) {
+    window.__dwcMiniResize = true;
+    window.addEventListener("resize", function () {
+      if (window.__dwcMiniT) clearTimeout(window.__dwcMiniT);
+      window.__dwcMiniT = setTimeout(fitLayoutMinis, 120);
+    });
+  }
 }
 function ensurePhoneRoot() {
   if ($("dwc-phone-root")) return;
@@ -2009,7 +2332,7 @@ function profileButtonsSectionHTML(p) {
   var th = parseThemeClient(p && p.profile_theme);
   var side = (th.buttons_side === "right") ? "right" : "left";
   return '<div class="dwc-layoutbox" id="dwc-sec-buttons"><h4 style="margin:0 0 6px">🔘 Profile buttons — your action buttons</h4>' +
-    "<p style=\"margin:0 0 8px\">These are the buttons visitors see on YOUR page — just four: Add me, Message me, Add to Favorites, Add to group. They sit in a 2×2 block on one side of your page, with your video on the other side. (Only on the standard look — with Website look on, your page shows just a Message button + your video instead, so this block is hidden.) Change each one's wording and colors, or put one solid image behind the whole block instead. Reporting lives on posts, comments, and listings now — that's where the 🚩 Report button is.</p>" +
+    "<p style=\"margin:0 0 8px\">These are the buttons visitors see on YOUR page — just four: Add me, Message me, Add to Favorites, Add to group. They sit in a 2×2 block on one side of your page, with your video on the other side. (Only on the standard look — with Website look on, your page shows just a Message button + your video, unless you tick “Show the buttons too” in the Website look box.) Change each one's wording and colors, or put one solid image behind the whole block instead. Reporting lives on posts, comments, and listings now — that's where the 🚩 Report button is.</p>" +
     '<label><input type="checkbox" name="theme_buttons_show" style="width:auto"' + (th.buttons_show !== false ? " checked" : "") + '> Show the buttons on my page (untick to hide the whole block — MySpace-style, your call)</label>' +
     '<label>Buttons side — which side of the page the button block sits on (your video goes on the other side)</label>' +
     '<div class="dwc-presets">' +
@@ -2053,7 +2376,7 @@ function profileHideSectionsHTML(p, th) {
     SECTION_HIDE_IDS.map(function (k) {
       return '<label><input type="checkbox" name="theme_hide_sections" value="' + k + '" style="width:auto"' + (hidden.indexOf(k) >= 0 ? " checked" : "") + "> Hide " + esc(SECTION_HIDE_LABELS[k]) + "</label>";
     }).join("") + "</div>" +
-    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Your picture, name, and bio always show. Top 8 only shows when you have Top Friends picked; My links only shows when you have links.</p></div>';
+    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Your picture, name, and bio always show. Top Friends only show when you have Top Friends picked; My links only shows when you have links. Hiding Relationship status here hides it even if its Show box is ticked above.</p></div>';
 }
 // v3.6 — the My page URL section for Edit Profile. Shows the current
 // slug, how many of the 3 changes are used, and the next-change date
@@ -2103,14 +2426,16 @@ function presetBackgroundsHTML(th) {
 // v3.9 — website-look fields: each of the five has its own show checkbox.
 function websiteFieldsHTML(p) {
   var show = (p && p.website_show) || {};
+  var th = parseThemeClient(p && p.profile_theme);
   var val = function (k) { return p ? esc(p[k] || "") : ""; };
   var chk = function (k) { return show[k] ? " checked" : ""; };
   var signs = Object.keys(ZODIAC_SIGNS).map(function (id) {
     return '<option value="' + id + '"' + (p && p.birthsign === id ? " selected" : "") + ">" + ZODIAC_SIGNS[id].symbol + " " + esc(ZODIAC_SIGNS[id].name) + "</option>";
   }).join("");
   return '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌐 Website look — make my profile look like a real website</h4>' +
-    "<p style=\"margin:0 0 8px\">Turn this on and your page stops looking like a MySpace card stack — it gets a Home + Community nav bar, clean website sections, and just a “Message me” button under your picture. Top Friends hide in this mode (may cause Top 8 to not show on your page). Tick the boxes for the bits you want to show.</p>" +
+    "<p style=\"margin:0 0 8px\">Website look turns your profile into your own standalone website — your banner with your page name on it at the top, your colors and fonts, your products and your references, and a message link for contact. Visitors should feel like they're on YOUR site, not a hosted community page. The five bits below show whenever their Show box is ticked, in either look — Website look only changes the layout, never hides what you chose to show. Top Friends hide in this mode. Your shop listings show on the page too, so it works as your personal shop.</p>" +
     '<label><input type="checkbox" name="website_mode" style="width:auto"' + (p && p.website_mode ? " checked" : "") + '> 🌐 Website look — my profile looks like a real website</label>' +
+    '<label><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> Show the Add me / Favorite / Add to group buttons too (otherwise visitors just get the Message link)</label>' +
     '<label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies</label>' +
     '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
     '<label><input type="checkbox" name="website_show_workplace" style="width:auto"' + chk("workplace") + '> Show where I work</label>' +
@@ -2121,7 +2446,12 @@ function websiteFieldsHTML(p) {
     '<label><input type="checkbox" name="website_show_sign" style="width:auto"' + chk("sign") + '> Show my Sign</label>' +
     '<label>Sign</label><select name="birthsign"><option value="">— pick your sign —</option>' + signs + "</select>" +
     '<label><input type="checkbox" name="website_show_accomplishments" style="width:auto"' + chk("accomplishments") + '> Show my Recent accomplishments</label>' +
-    '<label>Recent accomplishments</label><textarea name="accomplishments" rows="3" maxlength="500" placeholder="What have you pulled off lately?">' + val("accomplishments") + "</textarea></div>";
+    '<label>Recent accomplishments</label><textarea name="accomplishments" rows="3" maxlength="500" placeholder="What have you pulled off lately?">' + val("accomplishments") + "</textarea>" +
+    '<h4 style="margin:14px 0 6px">🌐 Custom page — your own code IS the page</h4>' +
+    '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Write your own page here — HTML for the words and pictures, and your CSS in the code box below for how it looks. When Website look is on and this box has something in it, this code IS your page (it replaces the MySpace columns — your listings and message link still show below it). Scripts and iframes are stripped out for safety — plain HTML only.</p>' +
+    '<textarea name="custom_page_html" rows="8" maxlength="8000" placeholder="e.g. Welcome to my shop — cards, prints, and more." oninput="DWC.customPagePreview(this)">' + esc(th.custom_page_html || "") + '</textarea>' +
+    '<div id="dwc-custompage-preview" style="margin-top:8px"></div>' +
+    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Page comments are optional on a professional page too — hide them from “What shows on my page” below if you don\'t want them.</p></div>';
 }
 
 function profileFormHTML(p) {
@@ -2135,7 +2465,7 @@ function profileFormHTML(p) {
     (isNew ? '<p style="color:var(--muted);margin-top:0">Just 4 things and you’re in — username, birthday, your name, and a quick human check. Picture, bio, links, layout, and payout can all wait until after — hit Edit profile any time.</p><p style="color:var(--green);font-weight:700;margin-top:0">Free to join — no ID needed. Selling regular stuff never needs an ID. ID is only ever asked for adult content and digital assets.</p>' : "") +
     '<form onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
     (isNew ? "" :
-    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-ticker">Ticker</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top 8</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Make it yours</a> · <a href="#dwc-sec-taffy">Taffy</a> · <a href="#dwc-sec-badges">Badges</a></p>' +
+    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-ticker">Ticker</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Make it yours</a> · <a href="#dwc-sec-taffy">Taffy</a> · <a href="#dwc-sec-badges">Badges</a></p>' +
     '<p id="dwc-unsaved-note" class="dwc-unsaved" hidden>✏️ You have unsaved changes — hit <strong>Save profile</strong> at the bottom to keep them. Nothing saves until you do.</p>') +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
@@ -2189,8 +2519,9 @@ function profileFormHTML(p) {
     // optional custom-text ticker (above the main page; the name stays put).
     (isNew ? "" :
     '<label>🖼️ Banner / cover photo — shows centered at the top of your page</label>' +
-    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to fit across the top of your page. A banner is optional.</p>' +
-    '<input name="banner" type="file" accept="image/jpeg,image/png,image/webp,image/gif">' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to fit across the top of your page. A banner is optional. A wide picture stretches across the top like a cover photo; a small or square one stays centered and small, like a logo.</p>' +
+    '<input name="banner" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.bannerPicked(this)">' +
+    '<div id="dwc-banner-preview" style="margin-top:8px">' + (p && p.banner_url ? '<div class="dwc-banner"><img src="' + esc(p.banner_url) + '" alt="Current banner" onload="DWC.bannerFit(this)"></div>' : "") + '</div>' +
     (p && p.banner_url ? '<label><input type="checkbox" name="remove_banner" style="width:auto"> Remove my current banner</label>' : "") +
     '<label id="dwc-sec-ticker">📜 Ticker — optional scrolling text above your page</label>' +
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page — or pick Bitcoin and it shows the live price instead, updating every minute. Your name stays put — it never scrolls.</p>' +
@@ -2199,6 +2530,7 @@ function profileFormHTML(p) {
     '<option value="btc"' + (th.ticker_source === "btc" ? " selected" : "") + '>₿ Live Bitcoin price (updates every minute — needs CoinGecko to answer; if it can’t, your own words show instead)</option></select>' +
     '<input name="ticker_text" maxlength="200" value="' + esc(p ? (p.ticker_text || "") : "") + '" placeholder="e.g. New drops every Friday — check the Flea Market!">' +
     '<label><input type="checkbox" name="ticker_enabled" style="width:auto"' + (p && p.ticker_enabled ? " checked" : "") + '> Show the ticker on my page</label>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick this AND type your own words below, or pick Bitcoin above — the ticker only shows when it’s ticked and has something to show.</p>' +
     '<label>Ticker color</label>' +
     '<input name="ticker_color" type="color" value="' + esc((p && /^#[0-9a-fA-F]{6}$/.test(p.ticker_color || "")) ? p.ticker_color : "#00e5ff") + '" style="width:64px;height:36px;padding:2px">') +
     (isNew ? "" :
@@ -2207,10 +2539,17 @@ function profileFormHTML(p) {
     '<div id="dwc-links-list">' + myLinksRowsHTML(p ? (p.my_links || []) : []) + '</div>' +
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/6</span></p></div>') +
     (isNew ? "" :
-      '<div class="dwc-layoutbox" id="dwc-sec-top8"><h4 style="margin:0 0 6px">🌟 Top 8 — your Top Friends</h4>' +
-      "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 8 friends to show on your page. Thanks for the add — now show it off.</p>" +
+      '<div class="dwc-layoutbox" id="dwc-sec-top8"><h4 style="margin:0 0 6px">🌟 Top Friends — your Top Friends</h4>' +
+      "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 10 friends to show on your page. Thanks for the add — now show it off. They sit in the right-hand column of your page by default, above your page comments. They don’t show in Website look — your page is a website then, not a MySpace page.</p>" +
+      '<label>How many Top Friends to show</label><select name="theme_topfriends_count">' + [3, 4, 5, 8, 10].map(function (n) { return '<option value="' + n + '"' + ((th.topfriends_count || 8) === n ? " selected" : "") + ">" + (n === 10 ? "Top 10" : n === 8 ? "Top 8" : "Top " + n) + "</option>"; }).join("") + "</select>" +
+      '<label>Top Friends side — which side of your page the Top Friends column sits on (your info goes on the other side)</label>' +
+      '<div class="dwc-presets">' +
+      '<button type="button" class="dwc-pill' + (th.topfriends_side !== "left" ? " active" : "") + '" data-tfsidebtn="right" onclick="DWC.applyTopFriendsSide(\'right\')">Right</button>' +
+      '<button type="button" class="dwc-pill' + (th.topfriends_side === "left" ? " active" : "") + '" data-tfsidebtn="left" onclick="DWC.applyTopFriendsSide(\'left\')">Left</button>' +
+      "</div>" +
+      '<input type="hidden" name="theme_topfriends_side" value="' + esc(th.topfriends_side === "left" ? "left" : "right") + '">' +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
-      '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/8</p></div>') +
+      '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') +
     (isNew ? "" : profileButtonsSectionHTML(p)) +
     (isNew ? "" : profileVideoSectionHTML(p, th)) +
     (isNew ? "" : profileHideSectionsHTML(p, th)) +
@@ -2243,6 +2582,7 @@ function profileFormHTML(p) {
       "<p style=\"margin:0 0 8px\">The live station stream on your page — one button, SteadyWave Live.</p>" +
       '<label><input type="checkbox" name="show_vnr_player" style="width:auto"' + (p && p.show_vnr_player ? " checked" : "") + '> 📻 Show Steady Wave player on my profile</label>' +
       '<label><input type="checkbox" name="autoplay_vnr" style="width:auto"' + (p && p.autoplay_vnr ? " checked" : "") + '> ▶️ Autoplay the Steady Wave player when someone visits my page</label>' +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Autoplay only starts after a visitor taps something on your page — browsers won’t start sound on their own.</p>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A small live player for the Steady Wave stream shows on your page. It just streams the station — no track selection, no playlist.</p></div>') +
     (isNew ? "" :
     '<div class="dwc-layoutbox" id="dwc-sec-layout"><h4 style="margin:0 0 6px">🎨 Make it yours — layout, colors &amp; code</h4>' +
@@ -2250,7 +2590,8 @@ function profileFormHTML(p) {
     '<div class="dwc-presets">' +
     '<button type="button" class="dwc-pill' + (v("layout_preset") === "" ? " active" : "") + '" data-presetbtn="" onclick="DWC.applyLayoutPreset(\'\')">None</button>' +
     LAYOUT_PRESETS.map(function (pr) {
-      return '<button type="button" class="dwc-pill' + (v("layout_preset") === pr.id ? " active" : "") + '" data-presetbtn="' + pr.id + '" onclick="DWC.applyLayoutPreset(\'' + pr.id + '\')">' + esc(pr.name) + "</button>";
+      return '<div class="dwc-preset-card">' + layoutMiniHTML({ id: "preset:" + pr.id, css: pr.css, theme: pr.theme || {} }, 280, true) +
+        '<button type="button" class="dwc-pill' + (v("layout_preset") === pr.id ? " active" : "") + '" data-presetbtn="' + pr.id + '" onclick="DWC.applyLayoutPreset(\'' + pr.id + '\')">' + esc(pr.name) + "</button></div>";
     }).join("") + "</div>" +
     '<label>💻 My Code — your own CSS, hand-written by you</label>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">This is YOUR code box — paste a MySpace layout’s CSS here, or write your own. Taffy can’t write code, and nobody else’s code goes here: what you type is what shows. Rules only ever restyle YOUR page — start every rule with <code>.dwc-myprofile</code> and it stays on your page. Your vibe + color/font picks still win over this CSS — add !important to force it.</p>' +
@@ -2263,17 +2604,22 @@ function profileFormHTML(p) {
     '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.publishLayout()">📣 Publish as a layout</button> <span style="color:var(--muted);font-size:13px">Publishes this box’s CSS with your saved look. You can take it down from the store later.</span></p></div>' +
     '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
     "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
-    '<h4 style="margin:14px 0 6px">🎨 Preset backgrounds</h4>' +
-    "<p style=\"margin:0 0 8px\">Pick a ready-made background for your page — one tap, done. These sit on top of the plain color / image pickers below, and they override your vibe's background.</p>" +
-    '<div class="dwc-presets">' + presetBackgroundsHTML(th) + "</div>" +
+    '<h4 style="margin:14px 0 6px">🖼️ Page background — pick ONE: a preset, your own picture, or None</h4>' +
+    "<p style=\"margin:0 0 8px\">These three are either/or — picking one turns the others off, so a preset can never sit on top of your picture again. Your background color below still shows behind a picture (or on its own).</p>" +
+    '<p id="dwc-bg-now" style="margin:0 0 4px;font-size:13px"><strong>Showing now:</strong> ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset “" + esc((PRESET_BACKGROUNDS.filter(function (pr) { return pr.id === th.bg_preset; })[0] || {}).name || th.bg_preset) + "”" : "no picture or preset — your background color / vibe shows") + '</p>' +
+    '<p id="dwc-bg-note" style="margin:0 0 8px;color:var(--muted);font-size:13px"></p>' +
+    '<div class="dwc-presets">' + presetBackgroundsHTML(th) +
+    '<button type="button" class="dwc-pill' + (th.bg_preset ? "" : " active") + '" data-bgpresetbtn="" onclick="DWC.applyBgPreset(\'\')">None — no preset</button></div>' +
+    '<label>Your own picture — paste an image URL (https://), or use your banner below</label>' +
+    '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url) + '" placeholder="https://…" oninput="DWC.bgImageChanged(this)">' +
+    '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.useBannerAsBackground()">🖼️ Use my banner as the background</button></p>' +
     '<input type="hidden" name="theme_bg_preset" value="' + esc(th.bg_preset || "") + '">' +
     '<h4 style="margin:14px 0 6px">🎨 My page theme — colors, background &amp; font</h4>' +
     "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. These sit on top of your preset and your vibe — a pick here wins over the vibe for that one thing. Your custom CSS can still override them with !important.</p>" +
     '<div class="dwc-themebox">' +
     '<label><input type="checkbox" name="theme_bg_use" style="width:auto"' + (th.bg_color ? " checked" : "") + '> Use a custom background color (overrides your vibe’s background)</label>' +
     '<input type="color" name="theme_bg_color" value="' + (th.bg_color || "#12002e") + '" style="width:64px;height:40px;padding:2px">' +
-    '<label>Background image URL (https:// — optional, shows behind everything on your page; overrides your vibe’s background, and a preset background above wins over this)</label>' +
-    '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url) + '" placeholder="https://…">' +
+    '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Your background picture lives in the “Page background” group above — pick a preset, a picture, or None, one at a time, so nothing can cover it up.</p>' +
     '<label><input type="checkbox" name="theme_text_use" style="width:auto"' + (th.text_color ? " checked" : "") + '> Use a custom text color (overrides your vibe’s text)</label>' +
     '<input type="color" name="theme_text_color" value="' + (th.text_color || "#f2f2f8") + '" style="width:64px;height:40px;padding:2px">' +
     '<label><input type="checkbox" name="theme_accent_use" style="width:auto"' + (th.accent_color ? " checked" : "") + '> Use a custom accent color (overrides your vibe’s accent — links, headings, friend borders)</label>' +
@@ -2281,6 +2627,27 @@ function profileFormHTML(p) {
     '<label>Name font — your display name only (overrides your vibe’s name font)</label><select name="theme_name_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.name_font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
     '<label>Page text font — the rest of your page (this is what your old “Font” pick is now — it still works exactly as before)</label><select name="theme_font">' + THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (th.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select>" +
     '<p style="margin:6px 0 0"><span id="dwc-font-sample-name" style="font-size:20px;font-weight:700">Your Name</span><br><span id="dwc-font-sample-body" style="font-size:14px">Sample page text — this is how the rest of your page will read.</span></p>' +
+    '<label><input type="checkbox" name="theme_glow" style="width:auto"' + (th.glow ? " checked" : "") + '> ✨ Glow text — make your fonts glow (works with any font you pick above)</label>' +
+    '<label>Glow color — the color of the glow</label>' +
+    '<input type="color" name="theme_glow_color" value="' + (th.glow_color || "#00e5ff") + '" style="width:64px;height:40px;padding:2px">' +
+    '<label>Outline color — the outline around your glowing text</label>' +
+    '<input type="color" name="theme_outline_color" value="' + (th.outline_color || "#000000") + '" style="width:64px;height:40px;padding:2px">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only shows when Glow text is ticked above.</p>' +
+    '<h4 style="margin:14px 0 6px">➗ Divider — the line between Top Friends and comments</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick the divider that sits between your Top Friends and your page comments. It only draws when Top Friends AND comments both show — hide either one and there’s no line to draw. The free designs are yours now — more unlock with Lucre or achievements later. Pick a color to match your page.</p>" +
+    '<div class="dwc-presets" id="dwc-divider-picks">' +
+    Object.keys(DIVIDERS).map(function (id) {
+      var d = DIVIDERS[id];
+      var locked = !d.free;
+      return '<button type="button" class="dwc-pill dwc-divider-pick' + ((th.divider || "") === id ? " active" : "") + '"' + (locked ? " disabled title=\"Unlock with " + esc(d.unlock) + " — coming soon\"" : "") + ' data-dividerbtn="' + id + '" onclick="DWC.applyDivider(\'' + id + '\')">' + (locked ? "🔒 " : "") + esc(d.name) + (locked ? " · " + esc(d.unlock) : "") + "</button>";
+    }).join("") + "</div>" +
+    '<input type="hidden" name="theme_divider" value="' + esc(th.divider || "") + '">' +
+    '<label>Divider color — the color of the line</label>' +
+    '<input type="color" name="theme_divider_color" value="' + esc(dividerColorFor(th, th.divider || "")) + '" data-custom="' + (th.divider_color ? "1" : "0") + '" style="width:64px;height:40px;padding:2px" oninput="this.setAttribute(\'data-custom\',\'1\');DWC.refreshDividerPreview()">' +
+    '<div id="dwc-divider-preview" style="margin-top:8px">' + dividerHTML(th.divider || "", dividerColorFor(th, th.divider || "")) + "</div>" +
+    '<label>Who can see my posts on my page</label><select name="theme_feed_privacy">' +
+    [["public", "🌍 Public — everyone can see my post feed"], ["friends", "👥 Friends only — only my friends (and me) see it"], ["private", "🔒 Private — only I see my post feed"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.feed_privacy || "public") === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>" +
+    "<p style=\"margin:4px 0 0;color:var(--muted);font-size:13px\">Private means only you see your post feed here. Friends-only means only your friends (and you) see it. Public means everyone — friends-only posts still only show to your friends.</p>" +
     "</div>" +
     '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime. A style here overrides your vibe's buttons.</p>" +
@@ -2298,7 +2665,7 @@ function profileFormHTML(p) {
     '<div class="dwc-checkgrid">' +
     Object.keys(MYSPACE_EFFECTS).map(function (k) {
       var fx = MYSPACE_EFFECTS[k];
-      return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
+      return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto" onchange="DWC.bgEffectChanged(this)"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
     }).join("") + "</div>" +
     '<label><input type="checkbox" name="theme_comment_border_use" style="width:auto"' + (th.comment_border_color ? " checked" : "") + ' onchange="DWC.commentBorderUseChanged(this)"> Use a custom color for comment-picture borders — any color (this turns off the RGB border effect above)</label>' +
     '<input name="theme_comment_border_color" type="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(th.comment_border_color || "") ? th.comment_border_color : "#000000") + '" style="width:64px;height:36px;padding:2px">' +
@@ -2318,7 +2685,7 @@ function profileFormHTML(p) {
       return '<button type="button" class="dwc-swatch" style="background:' + c + '" title="' + c + '" onclick="DWC.setAccent(\'' + c + '\')">&nbsp;</button>';
     }).join("") + "</div>" +
     '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Browse layouts in Taffy’s store →</button></p>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab in Taffy’s Layout Store — 14 free, 2 priced in Lucre. Members publish their own there too, free. Pick a vibe above for a quick look that works right now.</p>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab in Taffy’s Layout Store — 22 free, 5 priced in Lucre, including 3 website templates and 8 new themes. Members publish their own there too, free. Pick a vibe above for a quick look that works right now.</p>' +
     '<h4 style="margin:16px 0 6px">🗣️ Tell Taffy what you want — in plain words</h4>' +
     "<p style=\"margin:0 0 8px\">One box, one ask: type what you want for your page — buttons side, button style, ticker, video, what shows and what hides — and I'll set it up. I match words I know (buttons, arcade, insert coin, bitcoin, top friends, links, videos…). Anything I don't get, I'll tell you plainly and set the rest. No AI service involved — I match your words right here, nothing leaves your browser.</p>" +
     '<input id="dwc-builder-prompt" maxlength="500" placeholder="e.g. buttons on the right, arcade buttons, bitcoin ticker, hide everything but my top friends and my videos">' +
@@ -2398,6 +2765,8 @@ function initLayoutEditor() {
   var ta0 = document.querySelector('textarea[name="layout_css"]');
   if (count && ta0) count.textContent = (ta0.value || "").length + "/8000";
   if (typeof DWC !== "undefined" && DWC.refreshLayoutPreview) DWC.refreshLayoutPreview();
+  var cta = document.querySelector('textarea[name="custom_page_html"]');
+  if (cta && typeof DWC !== "undefined" && DWC.customPagePreview) DWC.customPagePreview(cta);
   else {
     var ta = document.querySelector('textarea[name="layout_css"]');
     if (ta) applyPreviewCSS(ta.value);
@@ -2725,7 +3094,7 @@ function clearVideoPick(key) {
 //   .dwc-myprofile .dwc-avatar  avatar ring  ·  .btn buttons
 //   .dwc-myprofile .dwc-topfriend  Top 8 tiles  ·  .dwc-mypage-head header
 var LAYOUT_PRESETS = [
-  { id: "classic", name: "Classic MySpace (2005)", css:
+  { id: "classic", name: "Classic MySpace (2005)", theme: { vibe: "", bg_color: "#ffffff", bg_image_url: "", text_color: "#000000", accent_color: "#003399", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:#fff;font-family:Verdana,Tahoma,Arial,sans-serif;}" +
     ".dwc-myprofile .card{background:#fff;border:1px solid #6699cc;border-radius:4px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#003399;font-family:Verdana,Tahoma,Arial,sans-serif;text-shadow:none;}" +
@@ -2733,10 +3102,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#666;}" +
     ".dwc-myprofile a{color:#003399;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #003399;box-shadow:none;}" +
-    ".dwc-myprofile .btn{background:#003399;color:#fff;}" +
+    ".dwc-myprofile .btn{background:#003399;color:#fff;box-shadow:none;}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #6699cc;border-radius:4px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #003399;}" },
-  { id: "neon", name: "Neon Vaporwave", css:
+  { id: "neon", name: "Neon Vaporwave", theme: { vibe: "", bg_color: "#12002e", bg_image_url: "", text_color: "#f2f2f8", accent_color: "#ff2d95", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#12002e 0%,#2b0057 55%,#0a2a4a 100%);}" +
     ".dwc-myprofile .card{background:rgba(20,0,50,.82);border:1px solid #ff2d95;border-radius:16px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;text-shadow:0 0 12px rgba(255,45,149,.8);}" +
@@ -2744,10 +3113,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#c9b8ff;}" +
     ".dwc-myprofile a{color:#00e5ff;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #ff2d95;box-shadow:0 0 12px rgba(255,45,149,.8);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#00e5ff);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#00e5ff);box-shadow:0 0 12px rgba(255,45,149,.8);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2d95;border-radius:16px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2d95;}" },
-  { id: "midnight", name: "Midnight", css:
+  { id: "midnight", name: "Midnight", theme: { vibe: "", bg_color: "#05050a", bg_image_url: "", text_color: "#e8e8f5", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#05050a 0%,#0d0d1f 100%);}" +
     ".dwc-myprofile .card{background:#12122a;border:1px solid #2a2a44;border-radius:12px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#00e5ff;text-shadow:0 0 10px rgba(0,229,255,.6);}" +
@@ -2755,10 +3124,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#8a8aa8;}" +
     ".dwc-myprofile a{color:#00e5ff;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;box-shadow:0 0 10px rgba(0,229,255,.6);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#00a8cc,#7c4dff);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#00a8cc,#7c4dff);box-shadow:0 0 10px rgba(0,229,255,.6);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #2a2a44;border-radius:12px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #00e5ff;}" },
-  { id: "candy", name: "Candy Pop", css:
+  { id: "candy", name: "Candy Pop", theme: { vibe: "", bg_color: "#ffd7ef", bg_image_url: "", text_color: "#3a0a2a", accent_color: "#d6007a", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#ffd7ef 0%,#e9d5ff 55%,#bff3ff 100%);}" +
     ".dwc-myprofile .card{background:rgba(255,255,255,.9);border:2px solid #ff2d95;border-radius:24px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#d6007a;text-shadow:none;}" +
@@ -2766,10 +3135,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#8a5a7a;}" +
     ".dwc-myprofile a{color:#d6007a;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #ff2d95;box-shadow:0 0 12px rgba(255,45,149,.45);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ff9a00);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ff9a00);box-shadow:0 0 12px rgba(255,45,149,.45);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;border-radius:24px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2d95;}" },
-  { id: "afterdark", name: "After Dark 🌙", css:
+  { id: "afterdark", name: "After Dark 🌙", theme: { vibe: "", bg_color: "#0a0014", bg_image_url: "", text_color: "#f5e8f5", accent_color: "#ff2ea6", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#0a0014 0%,#1a002e 50%,#2b001f 100%);}" +
     ".dwc-myprofile .card{background:rgba(26,0,46,.88);border:1px solid #ff2ea6;border-radius:16px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#ff5cb8;text-shadow:0 0 14px rgba(255,46,166,.9);}" +
@@ -2777,10 +3146,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#c9a8d8;}" +
     ".dwc-myprofile a{color:#ff2ea6;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #ff2ea6;box-shadow:0 0 14px rgba(255,46,166,.9);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2ea6,#7c4dff);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2ea6,#7c4dff);box-shadow:0 0 14px rgba(255,46,166,.9);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #ff2ea6;border-radius:16px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff2ea6;}" },
-  { id: "creatorgold", name: "Creator Gold 👑", css:
+  { id: "creatorgold", name: "Creator Gold 👑", theme: { vibe: "", bg_color: "#0d0a02", bg_image_url: "", text_color: "#f5eed8", accent_color: "#d4af37", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#0d0a02 0%,#241a05 55%,#3a2c08 100%);}" +
     ".dwc-myprofile .card{background:#1a1405;border:1px solid #d4af37;border-radius:12px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#f5d76e;text-shadow:0 0 12px rgba(212,175,55,.7);}" +
@@ -2788,10 +3157,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#b8a468;}" +
     ".dwc-myprofile a{color:#f5d76e;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #d4af37;box-shadow:0 0 12px rgba(212,175,55,.7);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#d4af37,#ffec99);color:#1a1405;}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#d4af37,#ffec99);color:#1a1405;box-shadow:0 0 12px rgba(212,175,55,.7);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;border-radius:12px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #d4af37;}" },
-  { id: "candyshop", name: "Candy Shop 🍬", css:
+  { id: "candyshop", name: "Candy Shop 🍬", theme: { vibe: "", bg_color: "#fff0f7", bg_image_url: "", text_color: "#3a0a2a", accent_color: "#ff5cb8", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#fff0f7 0%,#ffe3f2 40%,#d8f3ff 75%,#e9d5ff 100%);}" +
     ".dwc-myprofile .card{background:rgba(255,255,255,.92);border:2px solid #ff5cb8;border-radius:22px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#c4007a;text-shadow:none;}" +
@@ -2799,10 +3168,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#9a5a8a;}" +
     ".dwc-myprofile a{color:#c4007a;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #ff5cb8;box-shadow:0 0 14px rgba(255,92,184,.5);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff5cb8,#00c8ff);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff5cb8,#00c8ff);box-shadow:0 0 14px rgba(255,92,184,.5);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #00c8ff;border-radius:22px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #ff5cb8;}" },
-  { id: "arcade", name: "Retro Arcade 🕹️", css:
+  { id: "arcade", name: "Retro Arcade 🕹️", theme: { vibe: "", bg_color: "#0a0a12", bg_image_url: "", text_color: "#e8f6ff", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#0a0a12 0%,#1a0b2e 55%,#0b1a2e 100%);font-family:'Courier New',Courier,monospace;}" +
     ".dwc-myprofile .card{background:#120a24;border:2px solid #00e5ff;border-radius:8px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#ffe600;text-shadow:0 0 12px rgba(255,230,0,.7);}" +
@@ -2810,10 +3179,10 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#8ab8d8;}" +
     ".dwc-myprofile a{color:#00e5ff;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #ffe600;box-shadow:0 0 12px rgba(255,230,0,.6);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ffe600);color:#0a0a12;}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ffe600);color:#0a0a12;box-shadow:0 0 12px rgba(255,230,0,.6);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #ffe600;border-radius:8px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #00e5ff;}" },
-  { id: "ocean", name: "Ocean Deep 🌊", css:
+  { id: "ocean", name: "Ocean Deep 🌊", theme: { vibe: "", bg_color: "#001a2e", bg_image_url: "", text_color: "#e8f8ff", accent_color: "#4dd8ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] }, css:
     ".dwc-myprofile{background:linear-gradient(160deg,#001a2e 0%,#003a5c 55%,#005c5c 100%);}" +
     ".dwc-myprofile .card{background:rgba(0,40,70,.85);border:1px solid #4dd8ff;border-radius:16px;}" +
     ".dwc-myprofile h2,.dwc-myprofile h3{color:#7de8ff;text-shadow:0 0 12px rgba(77,216,255,.7);}" +
@@ -2821,7 +3190,7 @@ var LAYOUT_PRESETS = [
     ".dwc-myprofile .dwc-meta{color:#8ab8d8;}" +
     ".dwc-myprofile a{color:#4dd8ff;}" +
     ".dwc-myprofile .dwc-avatar{border:3px solid #4dd8ff;box-shadow:0 0 12px rgba(77,216,255,.6);}" +
-    ".dwc-myprofile .btn{background:linear-gradient(90deg,#0077b6,#00c8a8);}" +
+    ".dwc-myprofile .btn{background:linear-gradient(90deg,#0077b6,#00c8a8);box-shadow:0 0 12px rgba(77,216,255,.6);}" +
     ".dwc-myprofile .dwc-topfriend{border:2px solid #4dd8ff;border-radius:16px;}" +
     ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #4dd8ff;}" },
 ];
@@ -2842,7 +3211,10 @@ function layoutPresetCSS(id) {
 // is the display-name font. 5 system stacks (kept for back-compat) + 9
 // Google Fonts: 4 elegant (Playfair Display, Cormorant Garamond, Great
 // Vibes script, Cinzel) and 5 cool (Orbitron, Bangers, Press Start 2P,
-// Monoton, Creepster). Each entry carries its full stack (with fallbacks, so
+// Audiowide, Creepster). The "monoton" id now loads Audiowide — Monoton's
+// broken-up glyphs misread as other letters (A looks like Q), so the id
+// was remapped instead of repaired; every existing pick keeps working and
+// just renders the readable font. Each entry carries its full stack (with
 // the page still looks right if the webfont fails) and, for webfonts, the
 // Google css2 family param. Webfonts load ONLY from this map —
 // ensureProfileFonts() builds the <link> from these params and nothing
@@ -2860,7 +3232,7 @@ var THEME_FONTS = [
   { id: "orbitron", name: "Orbitron — futuristic", css: "'Orbitron','Segoe UI',sans-serif", google: "Orbitron:wght@500;700" },
   { id: "bangers", name: "Bangers — comic bold", css: "'Bangers','Comic Sans MS',cursive", google: "Bangers" },
   { id: "pressstart", name: "Press Start 2P — arcade pixel", css: '"Press Start 2P","Courier New",monospace', google: "Press+Start+2P" },
-  { id: "monoton", name: "Monoton — neon retro", css: "'Monoton','Courier New',monospace", google: "Monoton" },
+  { id: "monoton", name: "Neon retro — reads right (Audiowide)", css: "'Audiowide','Courier New',monospace", google: "Audiowide" },
   { id: "creepster", name: "Creepster — horror", css: "'Creepster',Georgia,serif", google: "Creepster" },
 ];
 function themeFontCSS(id) {
@@ -2904,7 +3276,7 @@ function ensureProfileFonts(theme) {
   if (link.getAttribute("href") !== url) link.setAttribute("href", url);
 }
 function parseThemeClient(stored) {
-  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "" };
+  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   var obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
@@ -2915,6 +3287,32 @@ function parseThemeClient(stored) {
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   out.font = themeFontCSS(obj.font) ? obj.font : "";
   out.name_font = themeFontCSS(obj.name_font) ? obj.name_font : "";
+  // Font glow (v3.19) — checkbox + two colors, works with any font.
+  // Colors are hex-validated; empty means "not picked" (the form shows
+  // the defaults). Glow off means no glow CSS, even if colors are set.
+  out.glow = obj.glow === true;
+  out.glow_color = hex(obj.glow_color);
+  out.outline_color = hex(obj.outline_color);
+  // Member page layout (v3.20) — how many Top Friends show (3/4/5/8/10,
+  // default 8), which side the Top Friends column sits on ("" = right
+  // default, "left" swaps it with the info column), who can see the
+  // member's post feed (public / friends / private), and the divider
+  // between Top Friends and Page comments (any known design id).
+  var tfc = Number(obj.topfriends_count);
+  out.topfriends_count = [3, 4, 5, 8, 10].indexOf(tfc) >= 0 ? tfc : 8;
+  out.topfriends_side = (String(obj.topfriends_side || "") === "left") ? "left" : "";
+  out.feed_privacy = ["public", "friends", "private"].indexOf(obj.feed_privacy) >= 0 ? obj.feed_privacy : "public";
+  // Website look (v3.20) — the Add me / Favorite / Add to group
+  // buttons on a professional page are the member's choice: off by
+  // default (contact is just the message link), on when they tick
+  // "Show the buttons too" in the Website look box.
+  out.website_buttons = obj.website_buttons === true;
+  out.divider = DIVIDERS[String(obj.divider || "")] ? String(obj.divider) : "";
+  out.divider_color = hex(obj.divider_color);
+  var du = Array.isArray(obj.divider_unlocks) ? obj.divider_unlocks : [];
+  out.divider_unlocks = du.map(function (k) { return String(k || ""); }).filter(function (k) { return DIVIDERS[k]; });
+  // Custom page (v3.20) — sanitized HTML, renders only in website mode.
+  out.custom_page_html = sanitizeCustomPageHtml(obj.custom_page_html);
   out.button_style = (typeof BUTTON_STYLES !== "undefined" && BUTTON_STYLES[obj.button_style]) ? obj.button_style : "";
   // Vibe (Taffy Layout Builder) — a full look, stored as one theme key.
   out.vibe = (typeof LAYOUT_VIBES !== "undefined" && LAYOUT_VIBES[obj.vibe]) ? String(obj.vibe) : "";
@@ -2923,8 +3321,15 @@ function parseThemeClient(stored) {
   out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8);
   var presetIds = PRESET_BACKGROUNDS.map(function (p) { return p.id; });
   out.bg_preset = presetIds.indexOf(String(obj.bg_preset || "")) >= 0 ? String(obj.bg_preset || "") : "";
+  // Background choices are either/or (v3.20): a custom picture and a
+  // preset can never both be on — the picture wins. Same rule as the
+  // server parseTheme, so the form and the live page can never disagree.
+  if (out.bg_image_url) out.bg_preset = "";
   out.comment_border_color = hex(obj.comment_border_color);
   if (out.effects.indexOf("rgb-comment-border") >= 0) out.comment_border_color = "";
+  // Animated rainbow background (v3.20) — the effect IS the background,
+  // so it wins over a picture or a preset. Same rule as the server.
+  if (out.effects.indexOf("animated-bg") >= 0) { out.bg_preset = ""; out.bg_image_url = ""; }
   out.pic_size = (obj.pic_size === "bigger" || obj.pic_size === "smaller") ? obj.pic_size : "";
   out.pic_position = (obj.pic_position === "normal" || obj.pic_position === "top") ? obj.pic_position : "";
   var frameIds = PIC_FRAMES.map(function (f) { return f.id; });
@@ -2953,12 +3358,12 @@ function parseThemeClient(stored) {
   // Hidden page sections (v3.10) — which card sections the member chose
   // to hide on their page (MySpace-style: show only what you want).
   var hs = Array.isArray(obj.hide_sections) ? obj.hide_sections : [];
-  out.hide_sections = hs.map(function (k) { return String(k || ""); }).filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 9);
+  out.hide_sections = hs.map(function (k) { return String(k || ""); }).filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 10);
   return out;
 }
 // Section keys a member can hide on their page (v3.10).
-var SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation"];
-var SECTION_HIDE_LABELS = { top8: "Top 8", links: "My links", seller: "What I sell", about: "About", comments: "Page comments", radio: "Steady Wave player", video: "My video", relationship: "Relationship status", occupation: "Occupation" };
+var SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation", "listings"];
+var SECTION_HIDE_LABELS = { top8: "Top Friends", links: "My links", seller: "What I sell", about: "About", comments: "Page comments", radio: "Steady Wave player", video: "My video", relationship: "Relationship status", occupation: "Occupation", listings: "My listings (professional mode)" };
 // Plain-words keywords Taffy's builder matches to each hideable section
 // (client-side only — the builder never leaves the browser).
 var SECTION_KEYWORDS = {
@@ -3016,7 +3421,17 @@ function themeCSS(theme) {
   // (h3 inside .dwc-mypage-head in the preview box). Comes after the body
   // font rule so it wins for the name; the vibe's heading color still
   // applies, and custom CSS can override with !important as usual.
-  if (t.name_font) css += ".dwc-myprofile .dwc-profile-row h2,.dwc-myprofile.dwc-previewbox .dwc-mypage-head h3{font-family:" + themeFontCSS(t.name_font) + ";}";
+  if (t.name_font) css += ".dwc-myprofile .dwc-profile-row h2,.dwc-myprofile.dwc-previewbox .dwc-mypage-head h3,.dwc-myprofile .dwc-website-banner-name{font-family:" + themeFontCSS(t.name_font) + ";}";
+  // Font glow (v3.19) — member-picked glow + outline for page text and
+  // display name, works with ANY font in the list. Comes after the vibe
+  // and font rules so the member's glow wins. paint-order:stroke fill
+  // keeps the 1px outline behind the glyph fill so small text stays
+  // readable; the glow is a plain text-shadow in the chosen color.
+  if (t.glow) {
+    var gc = t.glow_color || "#00e5ff";
+    var oc = t.outline_color || "#000000";
+    css += ".dwc-myprofile h2,.dwc-myprofile h3,.dwc-myprofile p,.dwc-myprofile li,.dwc-myprofile .dwc-meta,.dwc-myprofile a,.dwc-myprofile .dwc-profile-row h2,.dwc-myprofile.dwc-previewbox .dwc-mypage-head h3{text-shadow:0 0 6px " + gc + ",0 0 16px " + gc + ",0 0 32px " + gc + ";-webkit-text-stroke:1px " + oc + ";paint-order:stroke fill;}";
+  }
   // Buttons: preset first, then the member's own button CSS on top.
   if (t.button_style && BUTTON_STYLES[t.button_style]) css += BUTTON_STYLES[t.button_style].css;
   if (t.button_css) css += sanitizeLayoutCssClient(t.button_css);
@@ -3173,6 +3588,38 @@ function sanitizeLayoutCssClient(css) {
   return out.trim();
 }
 
+// Custom-page HTML sanitizer (v3.20) — client mirror of the server one
+// in functions/api/_lib.js. Same rules: small allowlist of plain tags,
+// script/iframe/object/embed/form/input dropped with contents, on*
+// handlers + inline styles stripped, javascript:/data: links killed,
+// images https:// or site-relative / only. Used for the Edit Profile
+// live preview and the render path (defense in depth — the server
+// already sanitized on save).
+var CUSTOM_PAGE_TAGS = ["div", "section", "article", "header", "footer", "nav", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "img", "ul", "ol", "li", "span", "strong", "em", "b", "i", "u", "small", "br", "hr", "blockquote", "figure", "figcaption"];
+function sanitizeCustomPageHtml(html) {
+  var out = String(html || "").slice(0, 8000);
+  out = out.replace(/<!--[\s\S]*?-->/g, "");
+  out = out.replace(/<(script|style|iframe|object|embed|form|textarea|select|button)[\s\S]*?<\/\1\s*>/gi, "");
+  out = out.replace(/<\/?(script|style|iframe|object|embed|link|meta|base|form|input|textarea|select|button|title)\b[^>]*>/gi, "");
+  out = out.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  out = out.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  out = out.replace(/href\s*=\s*"\s*(javascript|vbscript|data)\s*:[^"]*"/gi, 'href="#"');
+  out = out.replace(/href\s*=\s*'\s*(javascript|vbscript|data)\s*:[^']*'/gi, "href='#'");
+  out = out.replace(/href\s*=\s*(javascript|vbscript|data)\s*:[^\s>]*/gi, 'href="#"');
+  out = out.replace(/src\s*=\s*"([^"]*)"/gi, function (_m, v) {
+    var u = String(v || "").trim();
+    return (/^https:\/\//i.test(u) || u.indexOf("/") === 0) ? 'src="' + u.replace(/"/g, "") + '"' : 'src=""';
+  });
+  out = out.replace(/src\s*=\s*'([^']*)'/gi, function (_m, v) {
+    var u = String(v || "").trim();
+    return (/^https:\/\//i.test(u) || u.indexOf("/") === 0) ? "src='" + u.replace(/'/g, "") + "'" : "src=''";
+  });
+  out = out.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, function (m, tag) {
+    return CUSTOM_PAGE_TAGS.indexOf(tag.toLowerCase()) >= 0 ? m : "";
+  });
+  return out.trim();
+}
+
 // Scope a member's hand-written CSS to their profile container.
 // Rules that already mention .dwc-myprofile are left alone; bare
 // selectors get ".dwc-myprofile " in front, so a layout can never
@@ -3260,7 +3707,7 @@ function layoutPreviewInnerHTML(p) {
   var hidden = function (k) { return (th.hide_sections || []).indexOf(k) >= 0; };
   var top8 = "";
   if (friends.length && !hidden("top8")) {
-    top8 = '<div class="card"><h3>🌟 Top 8</h3><p style="color:var(--muted)">Your ' + friends.length + ' Top Friend' + (friends.length === 1 ? "" : "s") + ' show here.</p></div>';
+    top8 = '<div class="card"><h3>🌟 Top Friends</h3><p style="color:var(--muted)">Your ' + friends.length + ' Top Friend' + (friends.length === 1 ? "" : "s") + ' show here.</p></div>';
   }
   // v3.10 — the preview shows the buttons/video side row too, so the
   // member (and Taffy's builder) can see the layout. pointer-events
@@ -3273,10 +3720,14 @@ function layoutPreviewInnerHTML(p) {
   // Website look — the five fields as website sections, plus an honest
   // note for anything filled in but not switched on (so a filled-in
   // field that doesn't show is never a mystery).
+  // v3.20 (corrected) — the five sections show whenever their own Show
+  // box is ticked, in EITHER look (Website look only changes the
+  // layout), so the preview always renders them. The old "Website look
+  // is off — they won't show" message was the backwards gate, now gone.
   var website = "";
-  if (p && p.website_mode) {
+  var show = (p && p.website_show) || {};
+  if (p) {
     website = websiteSectionsHTML(p, th, true);
-    var show = p.website_show || {};
     var offBits = [];
     if (p.hobbies && !show.hobbies) offBits.push("Hobbies");
     if (p.workplace && !show.workplace) offBits.push("Where I work");
@@ -3284,20 +3735,23 @@ function layoutPreviewInnerHTML(p) {
     if (p.birthsign && !show.sign) offBits.push("Sign");
     if (p.accomplishments && !show.accomplishments) offBits.push("Recent accomplishments");
     if (offBits.length) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Hidden — tick Show to publish: ' + esc(offBits.join(", ")) + '.</p>';
-  } else {
-    var filled = [];
-    if (p && p.hobbies) filled.push("Hobbies");
-    if (p && p.workplace) filled.push("Where I work");
-    if (p && p.relationship_status) filled.push("Relationship status");
-    if (p && p.birthsign) filled.push("Sign");
-    if (p && p.accomplishments) filled.push("Recent accomplishments");
-    if (filled.length) website = '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">🌐 Website look is off — your ' + esc(filled.join(", ")) + ' are filled in but won\u2019t show until you turn Website look on.</p>';
   }
   // Hidden sections — one line so the member sees the hide worked.
   var hiddenLabels = (th.hide_sections || []).map(function (k) { return SECTION_HIDE_LABELS[k] || k; });
   var hiddenNote = hiddenLabels.length ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">🙈 Hidden on your page: ' + esc(hiddenLabels.join(", ")) + '.</p>' : "";
   var about = hidden("about") ? "" :
     '<div class="card"><h3>About me</h3>' + (bio ? '<p style="white-space:pre-wrap">' + bio + "</p>" : '<p style="color:var(--muted)">No bio yet.</p>') + "</div>";
+  // Custom page (v3.20) — website mode + the member's own HTML: their
+  // code IS the page, so the preview shows it (sanitized) instead of
+  // the MySpace columns. The actions row (message link) still shows
+  // below it, like on the real page.
+  if (p && p.website_mode && th.custom_page_html) {
+    return '<div class="dwc-myprofile dwc-previewbox">' +
+      '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(th.custom_page_html) + "</div>" +
+      '<div style="pointer-events:none">' + actionsBlock + "</div>" +
+      '<p style="color:var(--muted);font-size:13px">Your listings still show below this on your page.</p>' +
+      "</div>";
+  }
   return '<div class="dwc-myprofile dwc-previewbox">' +
     tickerHTML(p, th) +
     '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
@@ -3448,7 +3902,11 @@ function postCardHTML(p) {
   var priceLabel = isCreator ? (p.price_cents > 0 ? money(p.price_cents) : "Free") : "";
   var isMine = state.profile && state.profile.id === p.author_id;
   var isOp = state.profile && state.profile.is_operator;
+  var isAdmin = state.profile && state.profile.role === "admin";
   var canEdit = isMine || isOp;
+  // Team moderation (v3.18) — admins can delete any post (never edit
+  // one that isn't theirs); the ⋯ menu shows for them with Delete only.
+  var canDeletePost = isMine || isOp || isAdmin;
   var editsUsed = p.edit_count || 0;
   var isNews = p.category === "News";
   var long = (p.body || "").length > 280;
@@ -3457,12 +3915,13 @@ function postCardHTML(p) {
     '<div class="dwc-feed-head">' +
       '<span class="dwc-feed-who">👤 <a href="#/member/' + p.author_id + '" class="dwc-titlelink"><strong>@' + esc(p.author_username) + "</strong></a>" + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? ' <span class="dwc-feed-occ">· ' + esc(p.author_occupation) + "</span>" : "") + "</span>" +
       '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(p.created_at) + "</span>" +
-      (canEdit ? '<span class="dwc-feed-menuwrap"><button type="button" class="dwc-feed-dots" onclick="DWC.togglePostMenu(' + p.id + ', this)" aria-label="Post options" aria-haspopup="true">⋯</button>' +
+      (canEdit || isAdmin ? '<span class="dwc-feed-menuwrap"><button type="button" class="dwc-feed-dots" onclick="DWC.togglePostMenu(' + p.id + ', this)" aria-label="Post options" aria-haspopup="true">⋯</button>' +
         '<span class="dwc-feed-menu" id="dwc-menu-' + p.id + '" hidden>' +
-          (editsUsed >= 3
+          (canEdit ? (editsUsed >= 3
             ? '<span class="dwc-feed-menu-note">No edits left — 3/3 used</span>'
             : '<button type="button" onclick="DWC.editPost(' + p.id + ')">✏️ Edit</button>') +
-          '<button type="button" onclick="DWC.showEditHistory(' + p.id + ')">🕘 Edit history</button>' +
+          '<button type="button" onclick="DWC.showEditHistory(' + p.id + ')">🕘 Edit history</button>' : "") +
+          (canDeletePost ? '<button type="button" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete post</button>' : "") +
         "</span></span>" : "") +
       "</span>" +
     "</div>" +
@@ -3595,6 +4054,9 @@ function renderView() {
     var pel = document.getElementById(id);
     if (pel) pel.remove();
   });
+  // Website-mode chrome fade lives only on a website-mode member page —
+  // take the body class down whenever we navigate anywhere else.
+  if (typeof document !== "undefined" && document.body) document.body.classList.remove("dwc-website-view");
   if (r.name === "street") return viewStreet(el);
   if (r.name === "cardcheck") return viewCardCheck(el);
   if (r.name === "market" || r.name === "trade" || r.name === "flea") return viewMarket(el, r.name);
@@ -3974,7 +4436,11 @@ async function viewThread(el, postId) {
   var list = (comments && comments.comments) || [];
   var isMine = state.profile && state.profile.id === p.author_id;
   var isOperator = state.profile && state.profile.is_operator;
-  var canDelete = isMine || isOperator;
+  var isAdmin = state.profile && state.profile.role === "admin";
+  // Team moderation (v3.18) — admins can delete any post and any
+  // comment on it; turning comments on/off stays author/operator only.
+  var canDelete = isMine || isOperator || isAdmin;
+  var canMod = isOperator || isAdmin;
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + (p.kind === "adult" ? "adult" : "street") + '\')">← Back</button></p>' +
     '<article class="card' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '">' +
@@ -4004,8 +4470,8 @@ async function viewThread(el, postId) {
     (p.is_creator && p.file_url && state.profile
       ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button>' +
-    (canDelete ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 Delete my post</button>' +
-      '<button type="button" class="dwc-linklike" onclick="DWC.toggleComments(' + p.id + ", " + (!p.allow_comments) + ')">' + (p.allow_comments ? "🔇 Turn comments off" : "🔊 Turn comments on") + "</button>" : "") +
+    (canDelete ? '<button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 ' + (isMine ? "Delete my post" : "Delete post") + "</button>" : "") +
+    ((isMine || isOperator) ? '<button type="button" class="dwc-linklike" onclick="DWC.toggleComments(' + p.id + ", " + (!p.allow_comments) + ')">' + (p.allow_comments ? "🔇 Turn comments off" : "🔊 Turn comments on") + "</button>" : "") +
     "</div></article>" +
     (p.kind === "card_auth"
       ? '<section class="card"><h3 style="margin-top:0">Is it real?</h3><p>Vote — Real, Looks Fake, or Not Sure. The votes stay on the post so the next person can learn from it.</p>' +
@@ -4021,7 +4487,7 @@ async function viewThread(el, postId) {
         canReply: true,
         react: { ctype: "thread", ref: p.id },
         extraActions: '<button type="button" class="dwc-linklike" onclick="DWC.report(\'comment\', ' + c.id + ')">🚩 Report</button>' +
-          (mine ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteComment(' + p.id + ", " + c.id + ')">🗑 Delete</button>' : ""),
+          ((mine || canMod) ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteComment(' + p.id + ", " + c.id + ')">🗑 Delete</button>' : ""),
       });
     }).join("") : "<p>Nothing yet — be the first to say something.</p>") +
     "</section>" +
@@ -4358,17 +4824,83 @@ function armBtcTicker() {
   refreshBtcTicker();
   state.btcTimer = setInterval(refreshBtcTicker, 60000);
 }
+// ---------- Dividers (v3.20) ----------
+// The line between Top Friends and Page comments on a member page.
+// Rendered as inline SVG (NOT images) so the color is changeable.
+// Free designs are always pickable; locked ones need the unlock key
+// (Lucre purchase or achievement — the purchase flow isn't built yet,
+// so locked designs show in the picker but can't be selected).
+// The gold swirl is Chris's pick: a line whose left end curls into a
+// swirl, mirrored on the right so it curls the opposite way.
+var DIVIDERS = {
+  line: { name: "Simple line", free: true },
+  dots: { name: "Dotted line", free: true },
+  double: { name: "Double line", free: true },
+  stars: { name: "Star line", free: true },
+  goldswirl: { name: "Gold swirl", free: true, color: "#d4af37" },
+  neonwave: { name: "Neon wave", free: false, unlock: "Lucre" },
+  hearts: { name: "Heart line", free: false, unlock: "achievement" },
+};
+function dividerSVG(id) {
+  if (id === "dots") return '<line x1="2" y1="14" x2="198" y2="14" stroke-width="4" stroke-dasharray="0.1 8" stroke-linecap="round"/>';
+  if (id === "double") return '<line x1="2" y1="10" x2="198" y2="10"/><line x1="2" y1="18" x2="198" y2="18"/>';
+  if (id === "stars") return '<line x1="2" y1="14" x2="84" y2="14"/><line x1="116" y1="14" x2="198" y2="14"/><path d="M100 5 L103 11 L109 14 L103 17 L100 23 L97 17 L91 14 L97 11 Z" fill="currentColor" stroke="none"/>';
+  if (id === "goldswirl") return '<line x1="76" y1="14" x2="124" y2="14"/>' +
+    '<path d="M76 14 C64 14 56 10 57 5 C58 1 65 1 66 6 C67 10 62 12 60 9 C58 7 60 4 63 5"/>' +
+    '<path d="M124 14 C136 14 144 10 143 5 C142 1 135 1 134 6 C133 10 138 12 140 9 C142 7 140 4 137 5"/>';
+  if (id === "neonwave") return '<path d="M2 14 Q14 4 26 14 T50 14 T74 14 T98 14 T122 14 T146 14 T170 14 T194 14"/>';
+  if (id === "hearts") return '<line x1="2" y1="14" x2="86" y2="14"/><line x1="114" y1="14" x2="198" y2="14"/><path d="M100 21 C92 15 90 9 96 6 C99 5 100 8 100 8 C100 8 101 5 104 6 C110 9 108 15 100 21 Z" fill="currentColor" stroke="none"/>';
+  return '<line x1="2" y1="14" x2="198" y2="14"/>';
+}
+// The divider's color: the member's pick wins; otherwise the design's
+// own default (gold for the gold swirl); otherwise a neutral grey.
+function dividerColorFor(th, id) {
+  if (th && th.divider_color) return th.divider_color;
+  var d = DIVIDERS[id] || {};
+  return d.color || "#9a9ab0";
+}
+function dividerHTML(id, color) {
+  var d = DIVIDERS[id] || DIVIDERS.line;
+  var col = color || d.color || "#9a9ab0";
+  return '<div class="dwc-divider" role="separator" style="color:' + esc(col) + '">' +
+    '<svg viewBox="0 0 200 28" width="100%" height="28" preserveAspectRatio="xMidYMid meet" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + dividerSVG(id) + "</svg></div>";
+}
 // v3.7 banner / cover photo — centered at the top of the profile.
+// Website-mode business header (v3.20) — the banner with the member's
+// page name ON it, like a business website header. Wide pictures
+// stretch across the top (auto-fit); small ones stay centered. The name
+// renders in the member's chosen name font + glow (themeCSS covers
+// .dwc-website-banner-name for both). No banner? The name still shows
+// as the header, on the page background.
+function websiteBannerHTML(m, mth) {
+  var name = '<h2 class="dwc-website-banner-name">' + esc(m.username) + "</h2>";
+  if (!m || !m.banner_url) return '<div class="dwc-banner dwc-website-banner dwc-website-banner-none">' + name + "</div>";
+  return '<div class="dwc-banner dwc-website-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)">' + name + "</div>";
+}
 function bannerHTML(m) {
   if (!m || !m.banner_url) return "";
-  return '<div class="dwc-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo"></div>';
+  // Banner auto-fit (v3.20) — the shape decides the size. DWC.bannerFit
+  // runs on load (and again after render, for cached images) and tags
+  // the wrapper wide or small: a wide/horizontal picture stretches
+  // across the top to almost the width of the profile walls; a
+  // small/square picture stays centered and small, like a logo.
+  return '<div class="dwc-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)"></div>';
+}
+// Banner auto-fit (v3.20) — wide (aspect >= 1.6) stretches across the
+// top; anything squarer stays centered and small. Called on the img's
+// load event and from viewMember after render (cached images).
+function bannerFit(img) {
+  if (!img || !img.naturalWidth || !img.parentNode) return;
+  var wide = (img.naturalWidth / img.naturalHeight) >= 1.6;
+  img.parentNode.classList.toggle("dwc-banner-wide", wide);
+  img.parentNode.classList.toggle("dwc-banner-small", !wide);
 }
 // Chris (member id 1) is the site's Tom — every new member's first Top
 // Friend by default. His tile says "Chris (Ash)" with his profile picture,
 // not @RareCandyReserve.
 function topFriendLabel(f) { return f.id === 1 ? "Chris (Ash)" : "@" + f.username; }
 function topFriendsRowHTML(friends) {
-  if (!friends || !friends.length) return '<p style="color:var(--muted)">No Top 8 yet — pick yours in Edit profile.</p>';
+  if (!friends || !friends.length) return '<p style="color:var(--muted)">No Top Friends yet — pick yours in Edit profile.</p>';
   return '<div class="dwc-top8">' + friends.map(function (f) {
     return '<a class="dwc-topfriend" href="#/member/' + f.id + '">' +
       (f.avatar_url ? '<img class="dwc-avatar" src="' + esc(f.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
@@ -4541,7 +5073,7 @@ function picAvatarHTML(m, th) {
   if (frame === "gb" || frame === "gba") {
     var cols = gbFrameColors(th);
     style = ' style="--gb-c1:' + cols[0] + ';--gb-c2:' + cols[1] + ';--gb-c3:' + cols[2] + '"';
-    return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')">' +
+    return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' +
       '<span class="dwc-gb-screen">' + img + '</span>' +
       '<span class="dwc-gb-label">' + (frame === "gba" ? "GAME BOY ADVANCE" : "GAME BOY") + '</span>' +
       '<span class="dwc-gb-dpad"></span>' +
@@ -4550,7 +5082,7 @@ function picAvatarHTML(m, th) {
       '<span class="dwc-gb-speaker"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
       "</span>";
   }
-  return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')">' + img + "</span>";
+  return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' + img + "</span>";
 }
 // The picture + name + bio block (no card wrapper — the caller wraps it).
 // v3.10 — the occupation line respects "Hide Occupation" (hide_sections).
@@ -4567,37 +5099,42 @@ function profileHeadInnerHTML(m, th) {
     (m.presence === "away" && m.away_message ? '<p style="margin:4px 0">🌙 Away: “' + esc(m.away_message) + "”</p>" : "") +
     "</div></div>";
 }
+// The Edit / All-members nav row on a member page (standard look).
+// Split out of profileActionsHTML (v3.20) so the row stays in the page
+// header while the buttons + video move into the middle column.
+function profileNavRowHTML(m) {
+  return '<div class="dwc-actions" style="margin-top:14px">' +
+    (m.is_mine
+      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
+      : "") +
+    '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
+    "</div>";
+}
 // Action buttons for a member page. Website mode shows ONLY "Message me"
-// under the picture (plus their video, if they set one — no Add me /
-// Follow / Block / Favorite / Group / Report). Standard mode shows the
-// nav row (Edit / All members) plus the buttons + video side row.
+// under the picture (plus their video, if they set one) — contact is
+// mainly just a message link. The Add me / Favorite / Add to group
+// buttons are the MEMBER'S choice there: off by default, on only when
+// they tick "Show the buttons too" in the Website look box (theme
+// website_buttons). Standard mode shows the buttons + video side row
+// (the nav row lives in profileNavRowHTML now, in the page header).
 // On your own page the buttons are a disabled preview.
 function profileActionsHTML(m, websiteMode, th) {
   var uname = esc(m.username.replace(/'/g, ""));
   var pb = m.profile_buttons || null;
   if (websiteMode) {
     var dis = m.is_mine ? " disabled" : "";
-    return '<div class="dwc-actions" style="margin-top:14px">' +
-      (m.is_mine ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
+    // v3.20 — the button block brings its own "Preview" line on your
+    // own page, so only add one here when the block is off.
+    var showBtns = !!(th && th.website_buttons);
+    var out = '<div class="dwc-actions" style="margin-top:14px">' +
+      ((m.is_mine && !showBtns) ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
       '<button type="button" class="btn"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + actionButtonStyle(pb, "message") + ">💬 " + esc(actionButtonLabel(pb, "message", "Message me")) + "</button>" +
-      "</div>" + profileVideoHTML(m, th);
+      "</div>";
+    if (showBtns) out += actionButtonsHTML(m, !!m.is_mine);
+    return out + profileVideoHTML(m, th);
   }
-  return '<div class="dwc-actions" style="margin-top:14px">' +
-    (m.is_mine
-      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
-      : "") +
-    '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
-    "</div>" +
-    profileSideRowHTML(m, th) +
+  return profileSideRowHTML(m, th) +
     (m.is_mine ? vanityURLHTML(m) : '<div id="dwc-group-picker"></div>' + vanityURLHTML(m));
-}
-// Website-look nav bar — Home + Community, plus Edit for the owner.
-function websiteNavHTML(m) {
-  return '<nav class="dwc-website-nav">' +
-    '<a class="btn small" href="https://rarecandyreserve.org">🏠 Home</a>' +
-    '<a class="btn small" href="community.html">💬 Community</a>' +
-    (m.is_mine ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>' : "") +
-    "</nav>";
 }
 // Website-look sections — only the checked fields, in order.
 // v3.10 — relationship also respects "Hide Relationship status".
@@ -4640,6 +5177,9 @@ function vibeTickerHTML(m, th) {
 }
 
 async function viewMember(el, memberId) {
+  // Website-mode chrome fade lives only on a website-mode member page —
+  // take it down first (a gated / missing member still shows the chrome).
+  if (typeof document !== "undefined" && document.body) document.body.classList.remove("dwc-website-view");
   el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
   var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
   var m = data && data.member;
@@ -4683,60 +5223,107 @@ async function viewMember(el, memberId) {
   var isWebsite = !!m.website_mode;
   var picOnTop = mth.pic_position === "top";
   var hidden = function (key) { return (mth.hide_sections || []).indexOf(key) >= 0; };
-  var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + profileActionsHTML(m, isWebsite, mth) + "</section>";
-  var headTop = '<section class="dwc-mypage-top">' + profileHeadInnerHTML(m, mth) + "</section>";
-  var actionsBelowBanner = '<div class="dwc-mypage-actionsbelow">' + profileActionsHTML(m, isWebsite, mth) + "</div>";
+  // v3.20 — MySpace three columns: LEFT = info (website sections,
+  // About, What I sell, Steady Wave), MIDDLE = goods (video + buttons,
+  // or Message + video in website mode) on top with the post feed
+  // scrolling endlessly below, RIGHT = Top Friends on top, divider,
+  // then Page comments. The right column sits on the right by default
+  // and stays put unless the member picks Left in settings.
+  var tfCount = mth.topfriends_count || 8;
+  var tfSideLeft = mth.topfriends_side === "left";
+  var topFriends = (m.top_friends || []).slice(0, tfCount);
+  var navRow = isWebsite ? "" : profileNavRowHTML(m);
+  var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
+  var headTop = '<section class="dwc-mypage-top">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
   var isBtcTicker = mth.ticker_source === "btc";
-  el.innerHTML =
-    '<div class="dwc-myprofile' + (isWebsite ? " dwc-website" : "") + '">' +
-    (isWebsite ? websiteNavHTML(m) : "") +
-    // Picture position "top": the big picture first, banner below it,
-    // then the buttons below the banner. Normal: banner, ticker, then
-    // the head card with the picture + buttons inside it.
-    (picOnTop ? headTop + bannerHTML(m) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth)) + actionsBelowBanner
-      : bannerHTML(m) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth)) + headCard) +
-    // Website look: the five checked fields as website sections.
-    (isWebsite ? websiteSectionsHTML(m, mth) : "") +
-    // My links (v3.4) — only when the member actually has links.
-    // My links (v3.4, button system v3.12) — no separate card here
-    // anymore; the buttons render under the 2×2 block in
-    // profileSideRowHTML, so they sit in the member's chosen button
-    // area on both the real page and the Edit Profile preview.
-    // Top 8 — hidden in website mode. Otherwise only when the member
-    // actually has Top Friends. No friends, no section at all.
-    ((!isWebsite && !hidden("top8") && m.top_friends && m.top_friends.length)
-      ? '<section class="card"><h3 style="margin-top:0">🌟 Top 8</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the 8.</p>' + topFriendsRowHTML(m.top_friends) + "</section>"
-      : "") +
-    (((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to) && !hidden("seller")
-      ? '<section class="card dwc-sellercard"><h3 style="margin-top:0">🎨 What I sell</h3>' +
-        ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
-        ((m.seller_tags && m.seller_tags.length) ? '<p class="dwc-tags">' + m.seller_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
-        (m.seller_open_to ? "<p>Open to: “" + esc(m.seller_open_to) + "”</p>" : "") +
-        ((m.seller_price_min_cents || m.seller_price_max_cents) ? "<p>Price range: <strong>" + money(m.seller_price_min_cents) + " – " + money(m.seller_price_max_cents) + "</strong></p>" : "") +
-        (m.is_mine ? "" : '<p><button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> <button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
-        "</section>"
-      : "") +
-    (m.show_vnr_player && !hidden("radio")
-      ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — tap play (browsers won’t start sound on their own until you tap something).</p>' +
-        '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
-        '<button type="button" class="btn" onclick="DWC.playVNR()">▶ Play Steady Wave</button> ' +
-        '<audio id="dwc-vnr-audio" controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
-        '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
-      : "") +
-    (!hidden("about") ? '<section class="card"><h3 style="margin-top:0">About</h3>' +
+  var topBanner = (isWebsite ? websiteBannerHTML(m, mth) : bannerHTML(m)) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
+  // LEFT — info.
+  var sellerSection = (((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to) && !hidden("seller")
+    ? '<section class="card dwc-sellercard"><h3 style="margin-top:0">🎨 What I sell</h3>' +
+      ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
+      ((m.seller_tags && m.seller_tags.length) ? '<p class="dwc-tags">' + m.seller_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
+      (m.seller_open_to ? "<p>Open to: “" + esc(m.seller_open_to) + "”</p>" : "") +
+      ((m.seller_price_min_cents || m.seller_price_max_cents) ? "<p>Price range: <strong>" + money(m.seller_price_min_cents) + " – " + money(m.seller_price_max_cents) + "</strong></p>" : "") +
+      (m.is_mine ? "" : '<p><button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> <button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
+      "</section>"
+    : "");
+  var radioSection = (m.show_vnr_player && !hidden("radio")
+    ? '<section class="card dwc-vnrcard"><h3 style="margin-top:0">📻 Steady Wave</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Live from the station — tap play (browsers won’t start sound on their own until you tap something).</p>' +
+      '<div class="dwc-vnr-player"><span class="dwc-vnr-label">🎙️ Steady Wave · LIVE</span>' +
+      '<button type="button" class="btn" onclick="DWC.playVNR()">▶ Play Steady Wave</button> ' +
+      '<audio id="dwc-vnr-audio" controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
+      '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
+    : "");
+  var aboutSection = (!hidden("about") ? '<section class="card"><h3 style="margin-top:0">About</h3>' +
     (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
     (!hidden("occupation") && m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
-    "</section>" : "") +
-    // v3.7 — page comments (spec section 9): anyone who added this
-    // member can leave a comment — public, friends-only, or private.
-    (!hidden("comments") ? '<section class="card" id="dwc-page-comments"><h3 style="margin-top:0">💬 Page comments</h3><div id="dwc-page-comments-list"><p style="color:var(--muted)">Loading comments…</p></div><div id="dwc-page-comments-form"></div></section>' : "") +
+    "</section>" : "");
+  // v3.20 (corrected 2026-11-20) — the five website sections show
+  // whenever their OWN Show box is ticked, in EITHER layout: MySpace
+  // mode renders them as cards in this left info column, website mode
+  // renders them as the website sections. "Website look" only changes
+  // the LAYOUT — it never hides content the member chose to show.
+  var infoCol =
+    websiteSectionsHTML(m, mth) +
+    aboutSection + sellerSection + radioSection;
+  // MIDDLE — goods on top, then the post feed scrolling endlessly below.
+  var mainCol = profileActionsHTML(m, isWebsite, mth) +
+    '<section class="card dwc-member-feed"><h3 style="margin-top:0">📝 Posts</h3>' +
+    '<div class="dwc-member-feed-list" id="dwc-member-feed-list"><p style="color:var(--muted)">Loading posts…</p></div>' +
+    '<div id="dwc-member-feed-more" style="margin-top:10px"></div></section>';
+  // RIGHT — Top Friends (compact, bordered) + divider + Page comments.
+  // The divider only renders between Top Friends and comments — if
+  // either side is hidden, there's no line to draw.
+  var top8Section = ((!isWebsite && !hidden("top8") && topFriends.length)
+    ? '<section class="card dwc-topfriends-box"><h3 style="margin-top:0">🌟 Top ' + tfCount + '</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Thanks for the add — these are the ' + tfCount + '.</p>' + topFriendsRowHTML(topFriends) + "</section>"
+    : "");
+  var divId = mth.divider || (m.id === 1 ? "goldswirl" : "");
+  var dividerStr = (top8Section && !hidden("comments")) ? dividerHTML(divId, dividerColorFor(mth, divId)) : "";
+  // v3.7 — page comments (spec section 9): anyone who added this
+  // member can leave a comment — public, friends-only, or private.
+  var commentsSection = (!hidden("comments") ? '<section class="card dwc-side-comments" id="dwc-page-comments"><h3 style="margin-top:0">💬 Page comments</h3><div id="dwc-page-comments-list"><p style="color:var(--muted)">Loading comments…</p></div><div id="dwc-page-comments-form"></div></section>' : "");
+  var sideCol = top8Section + dividerStr + commentsSection;
+  // Website mode is the member's own standalone site: the platform
+  // chrome fades away (body class hides the site header, hero,
+  // community pills, profile card, meme drawer, and footer — the tiny
+  // footer link below is the only way back). Standard mode leaves the
+  // chrome alone.
+  if (typeof document !== "undefined" && document.body) document.body.classList.toggle("dwc-website-view", !!isWebsite);
+  // Custom page (v3.20) — website mode + the member's own HTML: their
+  // code IS the page. It replaces the banner header and the three
+  // columns (but not the listings, the message link, or the way back).
+  var hasCustomPage = !!(isWebsite && mth.custom_page_html);
+  // Professional mode (v3.20) — the member's listings on their page,
+  // so the page works as their personal website/shop. Full width below
+  // the columns (or below the custom page); hidden when they have no
+  // active listings.
+  var listingsSection = (isWebsite && !hidden("listings") ? '<section class="card" id="dwc-member-listings"><h3 style="margin-top:0">🛒 Shop — my listings</h3><div id="dwc-member-listings-list"><p style="color:var(--muted)">Loading listings…</p></div></section>' : "");
+  // The only way back — tiny and unobtrusive, on purpose. The owner
+  // also gets an Edit link here (their website nav bar is gone).
+  var websiteBack = (isWebsite ? '<p class="dwc-website-back"><a href="community.html">🍬 ← Rare Candy Reserve</a>' + (m.is_mine ? ' · <button type="button" class="dwc-linklike" onclick="DWC.editProfile()">Edit profile</button>' : "") + "</p>" : "");
+  el.innerHTML =
+    '<div class="dwc-myprofile' + (isWebsite ? " dwc-website" : "") + '">' +
+    (hasCustomPage
+      ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth) + listingsSection + websiteBack
+      : (picOnTop ? headTop + topBanner : topBanner + headCard) +
+        '<div class="dwc-member-cols' + (tfSideLeft ? " dwc-member-cols-flip" : "") + '">' +
+        '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>" +
+        '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>" +
+        '<div class="dwc-member-col dwc-member-col-side">' + sideCol + "</div>" +
+        "</div>" +
+        listingsSection + websiteBack) +
     "</div>";
   // Start the Steady Wave stream on the visitor's first tap/click/scroll
   // (browsers block autoplay with sound until a real gesture).
   DWC.armVNRAutoplay();
   // v3.10 — live Bitcoin ticker: refresh the price now + every minute.
   armBtcTicker();
-  if (!hidden("comments")) loadPageComments(m.id, m.is_mine, m.is_friend);
+  // Banner auto-fit for cached images (the onload may already have fired).
+  var bannerImg = el.querySelector(".dwc-banner img");
+  if (bannerImg && bannerImg.complete) bannerFit(bannerImg);
+  if (!hasCustomPage) loadMemberFeed(m.id);
+  if (isWebsite && !hidden("listings")) loadMemberListings(m.id);
+  if (!hasCustomPage && !hidden("comments")) loadPageComments(m.id, m.is_mine, m.is_friend);
 }
 
 // ---------- v3.7 page comments ----------
@@ -4744,6 +5331,8 @@ async function loadPageComments(profileId, isMine, isFriend) {
   var list = $("dwc-page-comments-list");
   var formHost = $("dwc-page-comments-form");
   if (!list) return;
+  // Team moderation (v3.18) — admins can delete page comments too.
+  var canMod = state.profile && (state.profile.is_operator || state.profile.role === "admin");
   var data = await apiGet("/profile-comments?profile_id=" + profileId + (state.profile ? "&device_id=" + encodeURIComponent(deviceId()) : ""));
   var comments = (data && data.comments) || [];
   list.innerHTML = comments.length
@@ -4755,7 +5344,7 @@ async function loadPageComments(profileId, isMine, isFriend) {
           visibilityNote: c.visibility !== "public" ? "· " + (c.visibility === "friends" ? "friends-only" : "private") : "",
           mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
             (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
-          extraActions: (c.is_mine || isMine) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "",
+          extraActions: (c.is_mine || isMine || canMod) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "",
         });
       }).join("")
     : "<p style=\"color:var(--muted)\">No page comments yet — be the first.</p>";
@@ -4777,6 +5366,74 @@ async function loadPageComments(profileId, isMine, isFriend) {
     '<button class="btn" type="submit">Post comment</button></form>' +
     '<p class="dwc-form-err" data-err hidden></p>';
 }
+
+// ---------- v3.20 member post feed ----------
+// The member's own posts on their page, newest first, in the middle
+// column under the video + buttons. The feed lives in its own scroll
+// region and loads endlessly: scrolling near the bottom fetches the
+// next page, and the Load more button does the same. Privacy is
+// server-enforced (feed_visible:false → a plain private note, never
+// an error). News posts show here too — no category filter, so
+// @WallMarketNews's feed reads directly on his page.
+async function loadMemberFeed(memberId) {
+  var list = $("dwc-member-feed-list");
+  var moreHost = $("dwc-member-feed-more");
+  if (!list) return;
+  var feed = { before: null, hasMore: true, loading: false, loaded: 0 };
+  async function loadPage() {
+    if (feed.loading || !feed.hasMore) return;
+    feed.loading = true;
+    var q = "/posts?profile_id=" + memberId + "&limit=10&device_id=" + encodeURIComponent(deviceId());
+    if (feed.before) q += "&before=" + feed.before;
+    var data = await apiGet(q);
+    feed.loading = false;
+    if (!data) return;
+    if (data.feed_visible === false) {
+      list.innerHTML = '<p style="color:var(--muted)">This member’s posts are private.</p>';
+      if (moreHost) moreHost.innerHTML = "";
+      feed.hasMore = false;
+      return;
+    }
+    var posts = (data && data.posts) || [];
+    if (feed.loaded === 0 && !posts.length) {
+      list.innerHTML = '<p style="color:var(--muted)">No posts yet.</p>';
+      if (moreHost) moreHost.innerHTML = "";
+      feed.hasMore = false;
+      return;
+    }
+    if (feed.loaded === 0) list.innerHTML = "";
+    list.innerHTML += posts.map(postCardHTML).join("");
+    feed.loaded += posts.length;
+    if (posts.length) feed.before = posts[posts.length - 1].id;
+    feed.hasMore = !!data.has_more;
+    if (moreHost) moreHost.innerHTML = feed.hasMore
+      ? '<button type="button" class="btn ghost small" onclick="DWC.loadMoreMemberFeed()">Load more posts ↓</button>'
+      : (feed.loaded > 10 ? '<p style="color:var(--muted);font-size:13px">That’s everything they’ve posted.</p>' : "");
+  }
+  state.feedLoader = loadPage;
+  list.addEventListener("scroll", function () {
+    if (list.scrollTop + list.clientHeight > list.scrollHeight - 200) loadPage();
+  });
+  loadPage();
+}
+
+// ---------- v3.20 professional-mode listings ----------
+// Website look only: the member's active listings on their page, so
+// the page works as their personal website/shop. Full-width section
+// below the columns; hidden entirely when they have nothing listed.
+async function loadMemberListings(memberId) {
+  var host = $("dwc-member-listings-list");
+  if (!host) return;
+  var data = await apiGet("/listings?profile_id=" + memberId + "&limit=12");
+  var items = (data && data.listings) || [];
+  if (!items.length) {
+    var sec = $("dwc-member-listings");
+    if (sec) sec.style.display = "none";
+    return;
+  }
+  host.innerHTML = '<div class="dwc-member-listings-grid">' + items.map(listingCardHTML).join("") + "</div>";
+}
+
 
 // ---------- v3.9 picture viewer (lightbox + comments + heart) ----------
 // Opened by tapping a profile picture. Shows the picture large in the
@@ -4845,7 +5502,7 @@ async function loadPicViewerComments() {
             canReply: true,
             react: { ctype: "profile", ref: pv.memberId },
             mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
-            extraActions: (c.is_mine || (state.viewingMember && state.viewingMember.is_mine)) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "",
+            extraActions: (c.is_mine || (state.viewingMember && state.viewingMember.is_mine) || (state.profile && (state.profile.is_operator || state.profile.role === "admin"))) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePicComment(' + c.id + ')">Delete</button>' : "",
           });
         }).join("")
       : '<p style="color:var(--muted)">No comments on this picture yet — be the first.</p>') +
@@ -5169,11 +5826,15 @@ async function viewReports(el) {
   el.innerHTML =
     '<section aria-label="Reports inbox"><h2 style="margin-top:0">🚩 Reports — operator inbox</h2>' +
     (list.length ? list.map(function (r) {
-      return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-' + esc(r.status) + '">' + esc(r.status) + "</span></p>" +
+      return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-' + esc(r.status) + '">' + esc(r.status) + "</span>" +
+        (r.assignee_username ? ' · Handling: <strong>@' + esc(r.assignee_username) + "</strong>" : "") + "</p>" +
         '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p>" +
         (r.reason ? '<p style="margin:4px 0">Reason: ' + esc(r.reason) + "</p>" : "") +
-        (r.status === "open" ? '<p><button type="button" class="btn ghost small" onclick="DWC.resolveReport(' + r.id + ')">Mark reviewed</button></p>' : "") +
-        "</article>";
+        '<p>' +
+        (r.status === "open" ? '<button type="button" class="btn small" onclick="DWC.reportAction(' + r.id + ", 'claim')\">I'll take care of that</button> " : "") +
+        (r.status === "claimed" ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'release')\">Put it back</button> " : "") +
+        (r.status !== "resolved" ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'resolve')\">Resolve</button>" : "") +
+        "</p></article>";
     }).join("") : '<div class="note">No reports — nothing to review.</div>') +
     "</section>" +
     '<section aria-label="Age verification reviews" class="dwc-age-reviews"><h2 style="margin-top:24px">🪪 Age verification reviews</h2>' +
@@ -5203,6 +5864,13 @@ var adminWantsFilter = "";
 function renderAdminMembers() {
   var host = $("dwc-admin-members");
   if (!host) return;
+  // Team moderation (v3.18) — who is looking decides which controls a
+  // row shows. The operator sees everything; admins see silence only
+  // (roles, permanent bans, and profile deletion are the operator's
+  // call, and the server enforces that too — never just the UI).
+  var viewerRole = myTeamRole();
+  var viewerIsOp = viewerRole === "operator";
+  var viewerIsAdmin = viewerRole === "admin";
   if (!adminMembersAll.length) { host.innerHTML = '<p style="color:var(--muted)">No members yet.</p>'; return; }
   var members = adminMembersAll.filter(function (m) {
     if (adminSellsFilter && (m.seller_types || []).indexOf(adminSellsFilter) === -1) return false;
@@ -5228,21 +5896,38 @@ function renderAdminMembers() {
           var isOp = m.role === "operator";
           var sells = (m.seller_types || []).filter(Boolean);
           var wants = (m.buyer_types || []).filter(Boolean);
+          var muted = m.muted_until && Number(m.muted_until) > Date.now();
+          var controls = "";
+          if (isOp) {
+            controls = '<span style="color:var(--muted);font-size:12px">Operator</span>';
+          } else {
+            if (viewerIsOp) {
+              controls += '<select onchange="DWC.adminSetRole(' + m.id + ', this.value)" title="Grant a role">' +
+                '<option value="member"' + (m.role === "member" ? " selected" : "") + '>Member</option>' +
+                '<option value="mod"' + (m.role === "mod" ? " selected" : "") + '>Mod</option>' +
+                '<option value="admin"' + (m.role === "admin" ? " selected" : "") + '>Admin</option></select> ' +
+                (m.banned
+                  ? '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", false)\">Unban</button> "
+                  : '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", true)\">Ban</button> ") +
+                '<button type="button" class="btn ghost small" style="color:var(--danger,#ff5a5a)" onclick="DWC.adminDeleteProfile(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\')">Delete profile</button> ';
+            }
+            if (viewerIsOp || viewerIsAdmin) {
+              if (muted) {
+                controls += '<span style="color:var(--amber,#ffb020);font-size:12px">Silenced until ' + fmtMuteDate(m.muted_until) + (m.muted_reason ? " — " + esc(m.muted_reason) : "") + '</span> ' +
+                  '<button type="button" class="btn ghost small" onclick="DWC.adminUnsilence(' + m.id + ')">Unsilence</button>';
+              } else {
+                controls += '<select id="dwc-silence-' + m.id + '" title="Silence for…">' + silenceOptionsHTML(viewerRole) + '</select> ' +
+                  '<button type="button" class="btn ghost small" onclick="DWC.adminSilence(' + m.id + ')">Silence</button>';
+              }
+            }
+          }
           return '<div class="dwc-admin-row">' +
             (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
             '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
             '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + "</div>" +
             (sells.length ? '<div style="font-size:12px">Sells: ' + sells.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
             (wants.length ? '<div style="font-size:12px">Wants: ' + wants.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
-            "</div>" +
-            (isOp ? '<span style="color:var(--muted);font-size:12px">Operator</span>'
-              : '<select onchange="DWC.adminSetRole(' + m.id + ', this.value)" title="Grant a role">' +
-                '<option value="member"' + (m.role === "member" ? " selected" : "") + '>Member</option>' +
-                '<option value="mod"' + (m.role === "mod" ? " selected" : "") + '>Mod</option>' +
-                '<option value="admin"' + (m.role === "admin" ? " selected" : "") + '>Admin</option></select> ' +
-                (m.banned
-                  ? '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", false)\">Unban</button>"
-                  : '<button type="button" class="btn ghost small" onclick="DWC.adminBan(' + m.id + ", true)\">Ban</button>")) +
+            "</div>" + controls +
             "</div>";
         }).join("") + "</div>"
       : '<p style="color:var(--muted)">No members match these filters.</p>');
@@ -5256,11 +5941,17 @@ async function viewAdmin(el) {
     return;
   }
   /* Members, bans, roles, requests, and shop listings stay operator-only.
-     The radio text + DJ console below are open to admins too. */
+     The radio text + DJ console below are open to admins too.
+     v3.18 — the member LIST is open to admins as well (they need it to
+     silence members); the role/ban/delete-profile controls inside each
+     row stay operator-only (renderAdminMembers gates them, and the
+     server enforces it too). */
   el.innerHTML =
+    ((isOp || isAdmin)
+      ? '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">' + (isOp ? "Members, bans, roles, and requests — all in one place. Only you can see the role and ban controls." : "Members — you can silence members here for up to 3 months. Roles, permanent bans, and profile deletion are the operator's call.") + '</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>'
+      : "") +
     (isOp
-      ? '<section class="card"><h2 style="margin-top:0">🛡️ Admin panel</h2><p style="color:var(--muted)">Members, bans, roles, and requests — all in one place. Only you can see this.</p><div id="dwc-admin-members"><p style="color:var(--muted)">Loading members…</p></div></section>' +
-        '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
+      ? '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
         '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>'
       : "") +
     '<section class="card"><h2 style="margin-top:0">📻 Radio player text</h2><p style="color:var(--muted)">Change the words on the live radio page — they update within 30 seconds. Leave a field blank to leave it as-is.</p>' +
@@ -5275,8 +5966,8 @@ async function viewAdmin(el) {
     "</form></section>" +
     '<section class="card"><h2 style="margin-top:0">🎧 DJ Console</h2><p style="color:var(--muted)">Run the show from the browser — deck, mic, talk-over, soundboard, and the auto-DJ rotation. Operator + admin only. Keep the tab open while you DJ.</p><p><a class="btn" href="dj-console.html">Open the full DJ Console →</a> <a class="btn ghost" href="dj-lite.html">🎧 Pocket DJ (phone) →</a></p></section>';
   loadRadioSettingsForm();
-  if (!isOp) return;
-  var data = await apiGet("/admin/members?device_id=" + encodeURIComponent(deviceId()));
+  if (!isOp && !isAdmin) return;
+  var data = await apiGet("/admin?device_id=" + encodeURIComponent(deviceId()));
   var host = $("dwc-admin-members");
   if (!host) return;
   if (!data || !data.ok) { host.innerHTML = '<p style="color:var(--muted)">' + esc((data && data.error) || "Couldn't load members.") + "</p>"; return; }
@@ -5295,6 +5986,41 @@ async function loadRadioSettingsForm() {
   });
 }
 
+// ---------- v3.18 Team moderation: silence durations ----------
+// Same keys as the server's SILENCE_DURATIONS — the dropdown only ever
+// offers what this viewer's role may use (the server caps it again, so
+// a forged request still can't go further). "A few days" = 3 days and
+// the mod cap of 1 week are PROPOSED defaults for Chris to correct.
+var SILENCE_OPTIONS = [
+  { key: "1d", label: "1 day" },
+  { key: "3d", label: "A few days (3 days)" },
+  { key: "1w", label: "1 week" },
+  { key: "2w", label: "2 weeks" },
+  { key: "6w", label: "6 weeks" },
+  { key: "3mo", label: "3 months" },
+  { key: "permanent", label: "Permanently" },
+];
+var SILENCE_MAX_KEY = { operator: "permanent", admin: "3mo", mod: "1w" };
+function silenceOptionsFor(role) {
+  var order = SILENCE_OPTIONS.map(function (o) { return o.key; });
+  var max = SILENCE_MAX_KEY[role] || null;
+  if (!max) return [];
+  return SILENCE_OPTIONS.filter(function (o) { return order.indexOf(o.key) <= order.indexOf(max); });
+}
+function silenceOptionsHTML(role) {
+  return silenceOptionsFor(role).map(function (o) { return '<option value="' + o.key + '">' + esc(o.label) + "</option>"; }).join("");
+}
+function myTeamRole() {
+  if (!state.profile) return "member";
+  return state.profile.role || (state.profile.is_operator ? "operator" : "member");
+}
+function fmtMuteDate(ms) {
+  if (!ms) return "";
+  var d = new Date(ms);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 // ---------- v3.7 Team (operator + admin + mod) ----------
 async function viewTeam(el) {
   var role = state.profile ? (state.profile.role || (state.profile.is_operator ? "operator" : "member")) : "member";
@@ -5304,6 +6030,7 @@ async function viewTeam(el) {
     return;
   }
   el.innerHTML =
+    '<section class="card"><h2 style="margin-top:0">🚩 Reports — team queue</h2><p style="color:var(--muted)">Reports from the street. Claim one to own it — “I’ll take care of that” — and resolve it when it’s handled. Everyone on the team sees who’s on what.</p><div id="dwc-team-reports"><p style="color:var(--muted)">Loading reports…</p></div></section>' +
     '<section class="card"><h2 style="margin-top:0">👥 Team roster</h2><p style="color:var(--muted)">Everyone on the RCR website team — who’s online and who’s not.</p><div id="dwc-team-roster"><p style="color:var(--muted)">Loading roster…</p></div></section>' +
     '<section class="card"><h2 style="margin-top:0">💬 Team chat</h2><p style="color:var(--muted)">Check in here — leave a note about what you handled and who dealt with it, so the rest of the team knows.</p>' +
     '<div id="dwc-team-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading team chat…</p></div>' +
@@ -5324,8 +6051,45 @@ async function viewTeam(el) {
         }).join("") + "</div>"
       : '<p style="color:var(--muted)">No team members yet.</p>';
   }
+  await loadTeamReports();
   await loadTeamChat();
   state.chatTimer = setInterval(function () { loadTeamChat(); }, 15000);
+}
+// Team reports queue (v3.18) — open + claimed reports with assignee,
+// status, claim/resolve, and a silence control for the reported member.
+async function loadTeamReports() {
+  var host = $("dwc-team-reports");
+  if (!host) return;
+  var data = await apiGet("/reports?device_id=" + encodeURIComponent(deviceId()));
+  var list = (data && data.reports) || [];
+  var role = myTeamRole();
+  var open = list.filter(function (r) { return r.status === "open" || r.status === "claimed"; });
+  if (!list.length) { host.innerHTML = '<p style="color:var(--muted)">No reports — nothing to review.</p>'; return; }
+  host.innerHTML = (open.length ? open.map(function (r) {
+    var mine = r.assignee_id && state.profile && r.assignee_id === state.profile.id;
+    var silenceRow = "";
+    if (r.target_author_id && state.profile && r.target_author_id !== state.profile.id) {
+      silenceRow = '<p style="margin:8px 0 0"><label style="font-size:13px">Silence @' + esc(r.target_author_username || "member") + ' <select id="dwc-report-silence-' + r.id + '">' + silenceOptionsHTML(role) + '</select></label> ' +
+        '<button type="button" class="btn ghost small" onclick="DWC.adminSilence(' + r.target_author_id + ", 'dwc-report-silence-" + r.id + '\')">Silence</button></p>';
+    }
+    return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-' + esc(r.status) + '">' + esc(r.status) + "</span>" +
+      (r.assignee_username ? ' · Handling: <strong>@' + esc(r.assignee_username) + "</strong>" : "") + "</p>" +
+      '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p>" +
+      (r.reason ? '<p style="margin:4px 0">Reason: ' + esc(r.reason) + "</p>" : "") +
+      '<p style="margin:8px 0 0">' +
+      (r.status === "open" ? '<button type="button" class="btn small" onclick="DWC.reportAction(' + r.id + ", 'claim')\">I'll take care of that</button> " : "") +
+      (r.status === "claimed" && (mine || role === "operator") ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'release')\">Put it back</button> " : "") +
+      (r.status !== "resolved" ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'resolve')\">Resolve</button>" : "") +
+      "</p>" + silenceRow + "</article>";
+  }).join("") : '<p style="color:var(--muted)">All caught up — nothing open.</p>') +
+    (list.some(function (r) { return r.status === "resolved"; })
+      ? '<details style="margin-top:10px"><summary style="cursor:pointer;color:var(--muted)">Resolved (' + list.filter(function (r) { return r.status === "resolved"; }).length + ')</summary>' +
+        list.filter(function (r) { return r.status === "resolved"; }).map(function (r) {
+          return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-resolved">resolved</span>' +
+            (r.assignee_username ? ' · Handled by <strong>@' + esc(r.assignee_username) + "</strong>" : "") + "</p>" +
+            '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p></article>";
+        }).join("") + "</details>"
+      : "");
 }
 async function loadTeamChat() {
   var log = $("dwc-team-log");
@@ -5334,7 +6098,7 @@ async function loadTeamChat() {
   var msgs = (data && data.messages) || [];
   log.innerHTML = msgs.length
     ? msgs.map(function (m) {
-        return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        return '<div class="dwc-chatmsg dwc-team-role-' + esc(m.author_role || "member") + '"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
       }).join("")
     : "<p>No team notes yet — say what you handled.</p>";
   log.scrollTop = log.scrollHeight;
@@ -5918,7 +6682,13 @@ window.DWC = {
       : '<p class="dwc-meta">This post has never been edited.</p>';
   },
   openSignup: function () { state.signupOpen = true; state.editingProfile = false; state.challenge = null; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
-  editProfile: function () { state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" }); },
+  editProfile: async function () {
+    // Re-fetch the profile first (v3.20) — the form must be built from
+    // fresh saved settings, never from a stale in-memory copy, or a
+    // preset can silently come back over a picture the member removed.
+    await refreshProfile();
+    state.editingProfile = true; state.signupOpen = true; renderAccount(); var el = $("dwc-account"); if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  },
   // Human check didn't load (slow mobile) — reload it without losing the form.
   retryChallenge: function () { var el = $("dwc-challenge"); if (el) el.innerHTML = "Loading human check…"; state.challenge = null; loadChallenge(); },
   // Dismiss the post-signup unlock card.
@@ -6111,7 +6881,7 @@ window.DWC = {
         var n = parseInt(cb.value, 10);
         if (n > 0 && tf.indexOf(n) === -1) tf.push(n);
       });
-      body.top_friends = tf.slice(0, 8);
+      body.top_friends = tf.slice(0, 10);
     }
     var cssEl = form.querySelector('textarea[name="layout_css"]');
     if (cssEl) body.layout_css = cssEl.value;
@@ -6152,6 +6922,25 @@ window.DWC = {
       if (themeFontCSS(fontSel)) theme.font = fontSel;
       var nameFontSel = String(fd.get("theme_name_font") || "");
       if (themeFontCSS(nameFontSel)) theme.name_font = nameFontSel;
+      // Font glow (v3.19) — checkbox-gated, same opt-in pattern as the
+      // custom text/accent colors: unticked means no glow fields at all.
+      if (fd.get("theme_glow")) {
+        theme.glow = true;
+        theme.glow_color = hexOk(fd.get("theme_glow_color")) || "#00e5ff";
+        theme.outline_color = hexOk(fd.get("theme_outline_color")) || "#000000";
+      }
+      // Member page layout (v3.20) — Top Friends count/side, feed
+      // privacy, divider + color. Defaults stay unset in the theme
+      // (8 / right / public / no divider) so old saves never change.
+      var tfCount = parseInt(String(fd.get("theme_topfriends_count") || ""), 10);
+      if ([3, 4, 5, 8, 10].indexOf(tfCount) >= 0 && tfCount !== 8) theme.topfriends_count = tfCount;
+      if (String(fd.get("theme_topfriends_side") || "") === "left") theme.topfriends_side = "left";
+      var feedPriv = String(fd.get("theme_feed_privacy") || "");
+      if (["friends", "private"].indexOf(feedPriv) >= 0) theme.feed_privacy = feedPriv;
+      var divId = String(fd.get("theme_divider") || "");
+      if (DIVIDERS[divId]) theme.divider = divId;
+      var divCol = hexOk(fd.get("theme_divider_color"));
+      if (divCol) theme.divider_color = divCol;
       var btnStyle = String(fd.get("theme_button_style") || "");
       if (BUTTON_STYLES[btnStyle]) theme.button_style = btnStyle;
       // Taffy Layout Builder — the vibe is a real theme setting.
@@ -6167,6 +6956,19 @@ window.DWC = {
       // exclusive: ticking the RGB effect drops the custom color.
       var bgPreset = String(fd.get("theme_bg_preset") || "");
       if (PRESET_BACKGROUNDS.some(function (pr) { return pr.id === bgPreset; })) theme.bg_preset = bgPreset;
+      // Background choices are either/or (v3.20): the animated-bg
+      // effect wins over both, and a picture wins over a preset — so a
+      // preset can never silently sit on top of a custom picture again.
+      if (theme.effects.indexOf("animated-bg") >= 0) {
+        theme.bg_preset = "";
+        theme.bg_image_url = "";
+      } else if (theme.bg_image_url) {
+        theme.bg_preset = "";
+      }
+      // Custom page (v3.20) — sanitized on the way in; the server
+      // sanitizes again on save.
+      var customPage = String(fd.get("custom_page_html") || "").slice(0, 8000);
+      if (customPage.trim()) theme.custom_page_html = sanitizeCustomPageHtml(customPage);
       if (theme.effects.indexOf("rgb-comment-border") >= 0) {
         theme.comment_border_color = "";
       } else if (fd.get("theme_comment_border_use")) {
@@ -6190,6 +6992,9 @@ window.DWC = {
       var btnSide = String(fd.get("theme_buttons_side") || "");
       if (btnSide === "right") theme.buttons_side = "right";
       theme.buttons_show = !!fd.get("theme_buttons_show");
+      // Website look (v3.20) — the Add me / Favorite / Add to group
+      // buttons on a professional page are the member's choice.
+      theme.website_buttons = !!fd.get("theme_website_buttons");
       var vidUrl = String(fd.get("theme_video_url") || "").trim().slice(0, 500);
       if (extractYouTubeId(vidUrl)) theme.video_url = vidUrl;
       var vidFile = String(fd.get("theme_video_file_url") || "").trim().slice(0, 500);
@@ -6197,7 +7002,7 @@ window.DWC = {
       var tickSrc = String(fd.get("theme_ticker_source") || "");
       if (tickSrc === "btc") theme.ticker_source = "btc";
       var hideSecs = fd.getAll ? fd.getAll("theme_hide_sections") : [];
-      theme.hide_sections = hideSecs.map(function (k) { return String(k || ""); }).filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 9);
+      theme.hide_sections = hideSecs.map(function (k) { return String(k || ""); }).filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 10);
       // v3.9 — chosen display badges (1–2 slots; the server enforces
       // the slot rules on save, so the client just passes the picks).
       // Never wipe them: if the form has no badge picks (or none are
@@ -7022,7 +7827,7 @@ window.DWC = {
 
   // v3.7 admin panel — grant a role, ban/unban.
   adminSetRole: async function (profileId, role) {
-    var data = await apiPost("/admin/set-role", { device_id: deviceId(), action: "set-role", profile_id: profileId, role: role });
+    var data = await apiPost("/admin", { device_id: deviceId(), action: "set-role", profile_id: profileId, role: role });
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't change that role."); renderView(); return; }
     setNotice("Role updated to " + role + ".");
     renderView();
@@ -7033,7 +7838,7 @@ window.DWC = {
       reason = prompt("Ban reason (optional — shown to the team):", "") || "";
     }
     if (ban && !confirm("Ban this member? They won't be able to post or list until you unban them.")) return;
-    var data = await apiPost("/admin/ban", { device_id: deviceId(), action: "ban", profile_id: profileId, banned: ban, reason: reason });
+    var data = await apiPost("/admin", { device_id: deviceId(), action: "ban", profile_id: profileId, banned: ban, reason: reason });
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't change that ban."); return; }
     setNotice(ban ? "Member banned." : "Member unbanned.");
     renderView();
@@ -7079,9 +7884,9 @@ window.DWC = {
   // ---------- MySpace throwback v2 actions ----------
   topFriendChanged: function (cb) {
     var n = document.querySelectorAll('input[name="top_friend"]:checked').length;
-    if (n > 8) {
+    if (n > 10) {
       cb.checked = false;
-      setNotice("Top 8 means 8 — unpick one first.");
+      setNotice("Top Friends means 10 — unpick one first.");
     }
     updateTop8Count();
     DWC.refreshLayoutPreviewSoon();
@@ -7135,23 +7940,104 @@ window.DWC = {
     updateLinksCount();
   },
   applyLayoutPreset: function (id) {
+    var pr = null;
+    if (id) { for (var i = 0; i < LAYOUT_PRESETS.length; i++) if (LAYOUT_PRESETS[i].id === id) pr = LAYOUT_PRESETS[i]; }
     var form = document.querySelector("#dwc-account form");
     var ta = form && form.querySelector('textarea[name="layout_css"]');
     var hidden = form && form.querySelector('input[name="layout_preset"]');
-    if (id === "") {
-      if (ta) ta.value = "";
-      if (hidden) hidden.value = "";
-    } else {
-      if (ta) ta.value = layoutPresetCSS(id);
-      if (hidden) hidden.value = id;
-    }
+    if (ta) ta.value = pr ? pr.css : "";
+    if (hidden) hidden.value = id || "";
+    // Reset the theme pickers to the preset's theme (v3.20 root fix) —
+    // the old neon look (vibe, glow, effects, custom button CSS) must
+    // NOT survive, or it would keep winning over the new preset. The
+    // preset's CSS + its theme fragment, together, ARE the look.
+    DWC.applyPresetThemeToForm(pr ? pr.theme || {} : {});
+    // Say what changed: the preset's look replaces the old one, so a
+    // background picture the member had is off now (the preset's own
+    // background shows instead).
+    if (pr) DWC.bgNote("Preset “" + pr.name + "” is on — your old background picture and preset are off; the preset’s own look is showing.");
+    else DWC.bgNote("Preset off — your page is back to your own picks.");
     applyPreviewCSS(ta ? ta.value : "");
     document.querySelectorAll("[data-presetbtn]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-presetbtn") === id);
     });
     DWC.refreshLayoutPreviewSoon();
   },
-  // v3.9 — preset background picker.
+  // Write a preset's theme fragment into the Edit Profile form fields
+  // (look fields only — Top Friends, feed privacy, divider, video, and
+  // ticker are structural and stay as the member set them). Every field
+  // is guarded: a missing field just doesn't change.
+  applyPresetThemeToForm: function (th) {
+    var form = document.querySelector("#dwc-account form");
+    if (!form) return;
+    var setVal = function (name, v) { var el = form.querySelector('[name="' + name + '"]'); if (el) el.value = v; };
+    var setChk = function (name, on) { var el = form.querySelector('[name="' + name + '"]'); if (el) el.checked = !!on; };
+    var setPills = function (attr, val) {
+      document.querySelectorAll("[" + attr + "]").forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute(attr) === val);
+      });
+    };
+    th = th || {};
+    setVal("theme_vibe", th.vibe || "");
+    setChk("theme_bg_use", !!th.bg_color);
+    setVal("theme_bg_color", th.bg_color || "#12002e");
+    setVal("theme_bg_image", th.bg_image_url || "");
+    setVal("theme_bg_preset", th.bg_preset || "");
+    setPills("data-bgpresetbtn", th.bg_preset || "");
+    setChk("theme_text_use", !!th.text_color);
+    setVal("theme_text_color", th.text_color || "#f2f2f8");
+    setChk("theme_accent_use", !!th.accent_color);
+    setVal("theme_accent_color", th.accent_color || "#ff2d95");
+    var botAccent = document.getElementById("dwc-bot-accent");
+    if (botAccent && th.accent_color) botAccent.value = th.accent_color;
+    setVal("theme_name_font", th.name_font || "");
+    setVal("theme_font", th.font || "");
+    setChk("theme_glow", th.glow === true);
+    setVal("theme_glow_color", th.glow_color || "#00e5ff");
+    setVal("theme_outline_color", th.outline_color || "#000000");
+    setVal("theme_button_style", th.button_style || "");
+    document.querySelectorAll('[onclick*="applyButtonStyle"]').forEach(function (b) {
+      var oc = b.getAttribute("onclick") || "";
+      b.classList.toggle("active", (th.button_style || "") === "" ? oc.indexOf("''") >= 0 : oc.indexOf("'" + th.button_style + "'") >= 0);
+    });
+    setVal("theme_button_css", th.button_css || "");
+    form.querySelectorAll('input[name="theme_effects"]').forEach(function (cb) {
+      cb.checked = (th.effects || []).indexOf(cb.value) >= 0;
+    });
+    setChk("theme_comment_border_use", !!th.comment_border_color);
+    setVal("theme_comment_border_color", th.comment_border_color || "#000000");
+    setVal("theme_pic_size", th.pic_size || "bigger");
+    setPills("data-picsizebtn", th.pic_size || "bigger");
+    setVal("theme_pic_position", th.pic_position || "normal");
+    setPills("data-picposbtn", th.pic_position || "normal");
+    setVal("theme_pic_frame", th.pic_frame || "none");
+    setPills("data-picframebtn", th.pic_frame || "none");
+    DWC.refreshBgNow();
+  },
+  // v3.20 — background mutual exclusion: a preset, a custom picture,
+  // or None — picking one turns the others OFF, in the form AND in the
+  // save path, so a preset can never silently sit on top of a custom
+  // picture again. Every switch says what changed, right there.
+  bgNote: function (text) {
+    var n = document.getElementById("dwc-bg-note");
+    if (n) n.textContent = text || "";
+  },
+  refreshBgNow: function () {
+    var form = document.querySelector("#dwc-account form");
+    var now = document.getElementById("dwc-bg-now");
+    if (!now || !form) return;
+    var img = form.querySelector('input[name="theme_bg_image"]');
+    var hidden = form.querySelector('input[name="theme_bg_preset"]');
+    var imgVal = img ? String(img.value || "").trim() : "";
+    var presetVal = hidden ? String(hidden.value || "") : "";
+    var label = "no picture or preset — your background color / vibe shows";
+    if (imgVal) label = "your picture";
+    else if (presetVal) {
+      var pr = PRESET_BACKGROUNDS.filter(function (x) { return x.id === presetVal; })[0];
+      label = "preset “" + (pr ? pr.name : presetVal) + "”";
+    }
+    now.innerHTML = "<strong>Showing now:</strong> " + esc(label);
+  },
   applyBgPreset: function (id) {
     var form = document.querySelector("#dwc-account form");
     var hidden = form && form.querySelector('input[name="theme_bg_preset"]');
@@ -7159,6 +8045,80 @@ window.DWC = {
     document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === id);
     });
+    if (id) {
+      // A preset turns the picture OFF.
+      var img = form && form.querySelector('input[name="theme_bg_image"]');
+      if (img) img.value = "";
+      var pr = PRESET_BACKGROUNDS.filter(function (x) { return x.id === id; })[0];
+      DWC.bgNote("Your picture is off — preset “" + (pr ? pr.name : id) + "” is now showing.");
+    } else {
+      DWC.bgNote("Preset off — your background color / vibe shows (add a picture below if you want one).");
+    }
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // A picture turns the preset OFF.
+  bgImageChanged: function (input) {
+    var v = String((input && input.value) || "").trim();
+    if (v) {
+      var form = document.querySelector("#dwc-account form");
+      var hidden = form && form.querySelector('input[name="theme_bg_preset"]');
+      if (hidden) hidden.value = "";
+      document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
+      });
+      DWC.bgNote("Preset turned off — your custom picture is now showing.");
+    } else {
+      DWC.bgNote("Picture removed — your preset / background color shows.");
+    }
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // The animated rainbow background IS the background — it wins over a
+  // picture or a preset, so ticking it turns both off (and says so).
+  bgEffectChanged: function (cb) {
+    if (!cb || cb.value !== "animated-bg") return;
+    if (cb.checked) {
+      var form = document.querySelector("#dwc-account form");
+      var img = form && form.querySelector('input[name="theme_bg_image"]');
+      if (img) img.value = "";
+      var hidden = form && form.querySelector('input[name="theme_bg_preset"]');
+      if (hidden) hidden.value = "";
+      document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
+        b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
+      });
+      DWC.bgNote("Animated background is on — your picture and preset are off while it runs.");
+    } else {
+      DWC.bgNote("Animated background off — your picture / preset can show again (re-pick it below).");
+    }
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // One tap: use the member's own banner picture as the background.
+  useBannerAsBackground: function () {
+    var banner = state.profile && state.profile.banner_url;
+    if (!banner) { DWC.bgNote("You don’t have a banner uploaded yet — upload one above first."); return; }
+    var form = document.querySelector("#dwc-account form");
+    var img = form && form.querySelector('input[name="theme_bg_image"]');
+    if (img) img.value = banner;
+    var hidden = form && form.querySelector('input[name="theme_bg_preset"]');
+    if (hidden) hidden.value = "";
+    document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
+    });
+    DWC.bgNote("Preset turned off — your banner picture is now showing.");
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Custom page live preview (v3.20) — sanitized, so the preview shows
+  // exactly what visitors would see, scripts stripped and all.
+  customPagePreview: function (ta) {
+    var host = document.getElementById("dwc-custompage-preview");
+    if (!host) return;
+    var html = sanitizeCustomPageHtml(ta ? ta.value : "");
+    host.innerHTML = html
+      ? '<div class="card" style="margin-top:4px"><p style="margin:0 0 6px;color:var(--muted);font-size:13px">Preview — what visitors see with Website look on:</p><div class="dwc-custom-page">' + html + "</div></div>"
+      : "";
   },
   // v3.9 — picture size / position pickers.
   applyPicSize: function (size) {
@@ -7296,6 +8256,65 @@ window.DWC = {
     });
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
+  },
+  // Banner auto-fit (v3.20) — see bannerFit above; the DWC wrapper so
+  // the inline onload handler can reach it.
+  bannerFit: function (img) { bannerFit(img); },
+  // Banner picked in Edit Profile — show it in the preview area, fitted
+  // the same way it'll look on the page (wide stretches, square stays
+  // small). The file still only saves when the member hits Save.
+  bannerPicked: function (input) {
+    var host = $("dwc-banner-preview");
+    var f = input && input.files && input.files[0];
+    if (!host || !f) return;
+    var url = URL.createObjectURL(f);
+    host.innerHTML = '<div class="dwc-banner"><img src="' + esc(url) + '" alt="Banner preview" onload="DWC.bannerFit(this)"></div>';
+  },
+  // Top Friends side picker (v3.20) — Right / Left pills in the Top
+  // Friends section. Sets the hidden theme_topfriends_side field.
+  applyTopFriendsSide: function (side) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_topfriends_side"]');
+    if (hidden) hidden.value = side;
+    document.querySelectorAll("[data-tfsidebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-tfsidebtn") === side);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Divider picker (v3.20) — sets the hidden theme_divider field and
+  // the pill states, then refreshes the live preview. A design's own
+  // default color applies when the member hasn't picked a custom one
+  // (tracked by the color input's data-custom flag).
+  applyDivider: function (id) {
+    if (!DIVIDERS[id] || !DIVIDERS[id].free) return;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_divider"]');
+    if (hidden) hidden.value = id;
+    document.querySelectorAll("[data-dividerbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-dividerbtn") === id);
+    });
+    var col = form && form.querySelector('input[name="theme_divider_color"]');
+    if (col && col.getAttribute("data-custom") !== "1") {
+      col.value = (DIVIDERS[id].color || "#9a9ab0");
+    }
+    DWC.refreshDividerPreview();
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Divider live preview (v3.20) — re-renders the preview under the
+  // picker from the current pick + color input.
+  refreshDividerPreview: function () {
+    var host = $("dwc-divider-preview");
+    var form = document.querySelector("#dwc-account form");
+    if (!host || !form) return;
+    var id = (form.querySelector('input[name="theme_divider"]') || {}).value || "";
+    var col = (form.querySelector('input[name="theme_divider_color"]') || {}).value || "";
+    host.innerHTML = dividerHTML(id, col);
+  },
+  // Member feed "Load more" (v3.20) — the fallback for endless scroll.
+  loadMoreMemberFeed: function () {
+    if (typeof state !== "undefined" && state.feedLoader) state.feedLoader();
   },
   // Profile video file picked — instant feedback (name, size, too big).
   videoPicked: function (input) {
@@ -7484,12 +8503,34 @@ window.DWC = {
     th.font = themeFontCSS(fontSel) ? fontSel : "";
     var nameFontSel = get("theme_name_font");
     th.name_font = themeFontCSS(nameFontSel) ? nameFontSel : "";
+    // Font glow (v3.19) — same fields saveProfile reads, so preview and
+    // save can never drift.
+    th.glow = !!fd.get("theme_glow");
+    th.glow_color = th.glow ? (hexOk(get("theme_glow_color")) || "#00e5ff") : "";
+    th.outline_color = th.glow ? (hexOk(get("theme_outline_color")) || "#000000") : "";
+    // Member page layout (v3.20) — same fields saveProfile reads.
+    var tfCount2 = parseInt(String(get("theme_topfriends_count") || ""), 10);
+    th.topfriends_count = [3, 4, 5, 8, 10].indexOf(tfCount2) >= 0 ? tfCount2 : 8;
+    th.topfriends_side = (get("theme_topfriends_side") === "left") ? "left" : "";
+    var feedPriv2 = get("theme_feed_privacy");
+    th.feed_privacy = ["public", "friends", "private"].indexOf(feedPriv2) >= 0 ? feedPriv2 : "public";
+    var divId2 = get("theme_divider");
+    th.divider = DIVIDERS[divId2] ? divId2 : "";
+    th.divider_color = hexOk(get("theme_divider_color"));
     var btnStyle = get("theme_button_style");
     th.button_style = BUTTON_STYLES[btnStyle] ? btnStyle : "";
     th.button_css = get("theme_button_css").slice(0, 4000);
     th.effects = fd.getAll ? fd.getAll("theme_effects").filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8) : [];
     var bgPreset = get("theme_bg_preset");
     th.bg_preset = PRESET_BACKGROUNDS.some(function (pr) { return pr.id === bgPreset; }) ? bgPreset : "";
+    // Same either/or rule as saveProfile, so the live preview and the
+    // save can never disagree.
+    if (th.effects.indexOf("animated-bg") >= 0) {
+      th.bg_preset = "";
+      th.bg_image_url = "";
+    } else if (th.bg_image_url) {
+      th.bg_preset = "";
+    }
     if (th.effects.indexOf("rgb-comment-border") >= 0) th.comment_border_color = "";
     else if (fd.get("theme_comment_border_use")) th.comment_border_color = hexOk(get("theme_comment_border_color")) || "#000000";
     else th.comment_border_color = "";
@@ -7506,12 +8547,15 @@ window.DWC = {
     var btnSide = get("theme_buttons_side");
     th.buttons_side = (btnSide === "right") ? "right" : "";
     th.buttons_show = !!fd.get("theme_buttons_show");
+    // Website look (v3.20) — same field saveProfile reads.
+    th.website_buttons = !!fd.get("theme_website_buttons");
+    th.custom_page_html = sanitizeCustomPageHtml(get("custom_page_html"));
     var vidUrl = get("theme_video_url").trim().slice(0, 500);
     th.video_url = extractYouTubeId(vidUrl) ? vidUrl : "";
     th.video_file_url = get("theme_video_file_url").trim().slice(0, 500);
     var tickSrc = get("theme_ticker_source");
     th.ticker_source = (tickSrc === "btc") ? "btc" : "";
-    th.hide_sections = fd.getAll ? fd.getAll("theme_hide_sections").filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 9) : [];
+    th.hide_sections = fd.getAll ? fd.getAll("theme_hide_sections").filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 10) : [];
     var dbPicked = [get("theme_display_badge_1"), get("theme_display_badge_2")].filter(function (k) { return BADGES.some(function (b) { return b.key === k; }); });
     if (dbPicked.length) th.display_badges = dbPicked;
     // Links + Top Friends, straight from the form editors.
@@ -7565,10 +8609,25 @@ window.DWC = {
     // Load the webfonts this preview actually uses, so the sample + the
     // big preview below show the real fonts, not the fallbacks.
     ensureProfileFonts(th);
+    // Font glow on the samples (v3.19) — same colors as the page glow,
+    // cleared when the box is unticked.
+    var glowOn = !!th.glow;
+    var gCol = th.glow_color || "#00e5ff";
+    var oCol = th.outline_color || "#000000";
     var nfSample = document.getElementById("dwc-font-sample-name");
-    if (nfSample) nfSample.style.fontFamily = themeFontCSS(th.name_font) || "";
+    if (nfSample) {
+      nfSample.style.fontFamily = themeFontCSS(th.name_font) || "";
+      nfSample.style.textShadow = glowOn ? ("0 0 6px " + gCol + ",0 0 16px " + gCol) : "";
+      nfSample.style.webkitTextStroke = glowOn ? ("1px " + oCol) : "";
+      nfSample.style.paintOrder = glowOn ? "stroke fill" : "";
+    }
     var bfSample = document.getElementById("dwc-font-sample-body");
-    if (bfSample) bfSample.style.fontFamily = themeFontCSS(th.font) || "";
+    if (bfSample) {
+      bfSample.style.fontFamily = themeFontCSS(th.font) || "";
+      bfSample.style.textShadow = glowOn ? ("0 0 6px " + gCol + ",0 0 16px " + gCol) : "";
+      bfSample.style.webkitTextStroke = glowOn ? ("1px " + oCol) : "";
+      bfSample.style.paintOrder = glowOn ? "stroke fill" : "";
+    }
     if (th.ticker_source === "btc") refreshBtcTicker();
   },
   setPresence: async function (status) {
@@ -7842,12 +8901,22 @@ window.DWC = {
         state.lucre.balance = buy.balance;
         state.lucre.owned = buy.owned || owned.concat([id]);
       }
+      // Re-fetch first (v3.20) — the merge must start from fresh
+      // saved settings, or a stale in-memory copy can resurrect a
+      // preset the member already turned off.
+      await refreshProfile();
       var p = state.profile;
       var merged = storeMergedTheme(item);
+      // A website template turns Website look ON and fills in the
+      // member's name where the template says {{name}}.
+      if (item.website) {
+        merged.custom_page_html = String(merged.custom_page_html || "").split("{{name}}").join(p.username || "Your name");
+      }
       var data = await apiPost("/profile", {
         device_id: deviceId(),
         username: p.username, chat_name: p.chat_name || "", occupation: p.occupation || "",
         bio: p.bio || "", payout_method: p.payout_method || "", payout_handle: p.payout_handle || "",
+        website_mode: item.website ? true : !!p.website_mode,
         layout_preset: item.id, layout_css: item.css, profile_theme: JSON.stringify(merged),
       });
       if (!data || !data.ok) {
@@ -7967,6 +9036,13 @@ window.DWC = {
     apiPost("/notifications", { device_id: deviceId(), action: "read_all" }).then(function () {
       loadPhoneAlerts();
     });
+  },
+  // Sound toggle (v3.17) — same key the header bell uses, so one switch
+  // controls the coin ding everywhere. Re-renders the Alerts app so the
+  // button label flips right away.
+  phoneAlertsSoundToggle: function () {
+    try { localStorage.setItem("dwc-notif-sound", phoneNotifSoundOn() ? "off" : "on"); } catch (e) {}
+    renderPhone();
   },
   phoneWallpaper: function (id) {
     state.phone.wallpaper = id;
@@ -8220,10 +9296,46 @@ window.DWC = {
     if (data && data.ok) setNotice("Reported — it goes straight to the operator's inbox for Chris to review. Thanks.");
     else if (data && data.error) setNotice(data.error);
   },
-  resolveReport: async function (id) {
-    var data = await apiPost("/reports/" + id + "/resolve", { device_id: deviceId() });
-    if (data && data.ok) { setNotice("Report marked reviewed."); renderView(); }
-    else if (data && data.error) setNotice(data.error);
+  // Team moderation (v3.18) — claim / release / resolve a report.
+  // Any team member can claim or resolve; the server enforces it.
+  reportAction: async function (id, action) {
+    var data = await apiPost("/reports/" + id + "/resolve", { device_id: deviceId(), action: action });
+    if (data && data.ok) {
+      setNotice(action === "claim" ? "It's yours — the team can see you're handling it." : action === "release" ? "Put back in the queue." : "Report resolved.");
+      renderView();
+    } else if (data && data.error) setNotice(data.error);
+  },
+  resolveReport: async function (id) { return DWC.reportAction(id, "resolve"); },
+  // Team moderation (v3.18) — silence a member for a duration picked
+  // from the dropdown. selectId defaults to the Admin panel row's
+  // select; report cards pass their own select id. The server caps the
+  // duration by role (admins ≤ 3 months, mods ≤ 1 week, permanent is
+  // operator-only) — the dropdown only ever shows what's allowed.
+  adminSilence: async function (profileId, selectId) {
+    var sel = document.getElementById(selectId || ("dwc-silence-" + profileId));
+    var duration = sel ? sel.value : "";
+    if (!duration) { setNotice("Pick how long first."); return; }
+    var reason = prompt("Silence reason (shown to the team — and to them when they try to post):", "") || "";
+    var data = await apiPost("/admin", { device_id: deviceId(), action: "silence", profile_id: profileId, duration: duration, reason: reason });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't silence them."); return; }
+    setNotice(data.banned ? "Member banned permanently." : "Member silenced.");
+    renderView();
+  },
+  adminUnsilence: async function (profileId) {
+    if (!confirm("Lift the silence? They'll be able to post and comment again.")) return;
+    var data = await apiPost("/admin", { device_id: deviceId(), action: "unsilence", profile_id: profileId });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't lift the silence."); return; }
+    setNotice("Silence lifted.");
+    renderView();
+  },
+  // Team moderation (v3.18) — operator only. Deletes the member's
+  // account row for good; their posts and comments stop showing.
+  adminDeleteProfile: async function (profileId, username) {
+    if (!confirm("Delete @" + username + "'s profile for good? Their account is gone — their posts and comments stop showing. This can't be undone.")) return;
+    var data = await apiPost("/admin", { device_id: deviceId(), action: "delete-profile", profile_id: profileId });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't delete that profile."); return; }
+    setNotice("Profile deleted.");
+    renderView();
   },
   submitId: async function (form) {
     var fd = new FormData(form);

@@ -6,7 +6,7 @@
 // be changed at most 3 times — every edit is logged in post_edits, and
 // the limit is enforced here, server-side. Needs the feed-redesign
 // migration (post_edits table + posts.visibility column) to run first.
-import { json, noDb, getDb, readJson, profileByDevice, shapePost, normalizeTags, putImage, putVideo, nowMs, canSeePost } from "../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, shapePost, normalizeTags, putImage, putVideo, nowMs, canSeePost, roleOf, canDeleteContent } from "../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -98,8 +98,10 @@ export async function onRequestDelete({ env, request, params }) {
   const id = Number(params.id);
   const post = await db.prepare("SELECT * FROM posts WHERE id = ? LIMIT 1").bind(id).first();
   if (!post) return json({ ok: false, error: "That post is already gone." });
-  // Author can delete their own post; the operator (Chris) can delete any post.
-  if (post.profile_id !== me.id && me.is_operator !== 1) return json({ ok: false, error: "You can only delete your own posts." });
+  // Author can delete their own post; the operator (Chris) and admins
+  // can delete any post (v3.18 — mods cannot). Editing stays
+  // author/operator only; admins delete, they don't rewrite.
+  if (post.profile_id !== me.id && !canDeleteContent(roleOf(me))) return json({ ok: false, error: "You can only delete your own posts." });
   const { results } = await db.prepare("SELECT id FROM comments WHERE post_id = ?").bind(id).all();
   const stmts = [db.prepare("DELETE FROM post_votes WHERE post_id = ?").bind(id)];
   for (const c of (results || [])) stmts.push(db.prepare("DELETE FROM comment_votes WHERE comment_id = ?").bind(c.id));

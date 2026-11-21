@@ -10,7 +10,7 @@
 //   public / friends / private (default public).
 // DELETE /api/profile-comments?id=&device_id= — the page owner, the
 //   author, or the operator can delete a comment.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles, commentReactionCounts } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, roleOf, canDeleteContent, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles, commentReactionCounts, silenceCheck, bannedMemberCheck } from "./_lib.js";
 
 async function isFriendOf(db, viewerId, ownerId) {
   if (!viewerId || viewerId === ownerId) return viewerId === ownerId;
@@ -90,6 +90,12 @@ export async function onRequestPost({ env, request }) {
   const a = await readJson(request);
   const me = a.device_id ? await profileByDevice(db, String(a.device_id)) : null;
   if (!me) return json({ ok: false, error: "Sign in to leave a page comment." });
+  // Silence (v3.18) — a silenced member can't comment until it expires.
+  const silenced = silenceCheck(me);
+  if (silenced) return json({ ok: false, error: silenced });
+  // Ban (v3.18) — a banned member can't comment at all.
+  const banned = bannedMemberCheck(me);
+  if (banned) return json({ ok: false, error: banned });
   const profileId = Number(a.profile_id);
   if (!profileId) return json({ ok: false, error: "Pick a page first." });
   const owner = await db.prepare("SELECT id FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
@@ -136,15 +142,21 @@ export async function onRequestPost({ env, request }) {
       return json({ ok: false, error: "Page comments aren't switched on yet — run the v3.7 update first." });
     }
   }
-  // Notifications (v3.8) — never block the response; createNotification
-  // skips quietly when the table isn't there yet or it's your own page.
-  await createNotification(db, {
-    profile_id: profileId, actor_profile_id: me.id, kind: "comment",
-    ref_type: "profile_comment", ref_id: commentId,
-    text: subject ? `@${me.username} commented on your picture` : `@${me.username} commented on your page`,
-    link: `#/member/${profileId}`,
-  });
-  await notifyMentions(db, me, body, { ref_type: "profile_comment", ref_id: commentId, label: "in a page comment", link: `#/member/${profileId}` });
+  // Notifications (v3.8) — @mentions in the body first, then the page
+  // owner — unless the owner was already mentioned, so one comment never
+  // pings the same person twice. Never block the response;
+  // createNotification skips quietly when the table isn't there yet or
+  // it's your own page. Picture comments (subject set) ride this same
+  // path, so they ping the same way.
+  const mentioned = await notifyMentions(db, me, body, { ref_type: "profile_comment", ref_id: commentId, label: "in a page comment", link: `#/member/${profileId}` });
+  if (!mentioned.has(profileId)) {
+    await createNotification(db, {
+      profile_id: profileId, actor_profile_id: me.id, kind: "comment",
+      ref_type: "profile_comment", ref_id: commentId,
+      text: subject ? `@${me.username} commented on your picture` : `@${me.username} commented on your page`,
+      link: `#/member/${profileId}`,
+    });
+  }
   return json({ ok: true, error: null, subject_skipped: subjectSkipped });
 }
 
@@ -160,7 +172,7 @@ export async function onRequestDelete({ env, request }) {
   if (!c) return json({ ok: false, error: "That comment is gone already." });
   const isOwner = me.id === c.profile_id;
   const isAuthor = me.id === c.author_id;
-  if (!isOwner && !isAuthor && !isOperator(env, me)) return json({ ok: false, error: "Only the page owner, the author, or the operator can delete this." });
+  if (!isOwner && !isAuthor && !canDeleteContent(roleOf(me))) return json({ ok: false, error: "Only the page owner, the author, or the team (operator + admins) can delete this." });
   await db.prepare("DELETE FROM profile_comments WHERE id = ?").bind(id).run();
   return json({ ok: true, error: null });
 }

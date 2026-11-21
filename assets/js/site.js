@@ -1054,6 +1054,7 @@ function notifKindIcon(kind) {
     case "new_member": return "👋";
     case "new_content": return "🛒";
     case "new_post": return "📝";
+    case "team": return "🪙";
     default: return "🔔";
   }
 }
@@ -1079,12 +1080,67 @@ function renderNotifPanel(list) {
     body.innerHTML = '<p class="notif-empty">No notifications yet.</p>';
     return;
   }
-  body.innerHTML = list.map(function (n) {
-    return '<a class="notif-item' + (n.read ? "" : " unread") + '" href="' + notifEsc(notifLinkHref(n.link)) + '" data-notif-id="' + n.id + '">' +
+  // Team pings first (the server already sorts them first — this keeps
+  // the panel right even if a list arrives from an older fetch).
+  var sorted = list.slice().sort(function (a, b) {
+    var ta = a.kind === "team" ? 0 : 1, tb = b.kind === "team" ? 0 : 1;
+    if (ta !== tb) return ta - tb;
+    return (b.created_at || 0) - (a.created_at || 0);
+  });
+  body.innerHTML = sorted.map(function (n) {
+    var isTeam = n.kind === "team";
+    return '<a class="notif-item' + (n.read ? "" : " unread") + (isTeam ? " team" : "") + '" href="' + notifEsc(notifLinkHref(n.link)) + '" data-notif-id="' + n.id + '">' +
       '<span class="notif-ic">' + notifKindIcon(n.kind) + '</span>' +
-      '<span class="notif-tx">' + notifEsc(n.text || "") + '<em>' + notifTime(n.created_at) + '</em></span>' +
+      '<span class="notif-tx">' + (isTeam ? '<span class="notif-team-tag">Team</span> ' : "") + notifEsc(n.text || "") + '<em>' + notifTime(n.created_at) + '</em></span>' +
       '</a>';
   }).join("");
+}
+/* ---------- notification sound (v3.17) — arcade coin ding ----------
+   Two-tone coin, synthesized with the Web Audio API (no audio files):
+   B5 then E6, short and bright. Plays only when a NEW team/priority
+   notification arrives while the page is open — never for old ones on
+   page load, never for non-team notifications. Toggle persists in
+   localStorage ("dwc-notif-sound" = "off" disables it), default ON.
+   The bell poll (60s) owns the sound; the Alerts app shares the same
+   toggle key so one switch controls both. */
+var notifSeenIds = null; // null until the first fetch seeds it (no sound on load)
+var notifAudioCtx = null;
+function notifSoundOn() {
+  try { return localStorage.getItem("dwc-notif-sound") !== "off"; } catch (e) { return true; }
+}
+function notifSoundSet(on) {
+  try { localStorage.setItem("dwc-notif-sound", on ? "on" : "off"); } catch (e) {}
+  updateNotifSoundBtn();
+}
+function updateNotifSoundBtn() {
+  var b = document.getElementById("notifSoundToggle");
+  if (b) b.textContent = notifSoundOn() ? "🔊 Sound on" : "🔇 Sound off";
+}
+function playCoinSound() {
+  if (!notifSoundOn()) return;
+  try {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!notifAudioCtx) notifAudioCtx = new AC();
+    var ctx = notifAudioCtx;
+    if (ctx.state === "suspended") { ctx.resume().catch(function () {}); }
+    if (ctx.state !== "running") return; // no user gesture yet — browsers keep it suspended; skip quietly
+    var t = ctx.currentTime;
+    // B5 (987.77 Hz) short, then E6 (1318.51 Hz) longer — classic coin.
+    [[987.77, 0, 0.09], [1318.51, 0.09, 0.4]].forEach(function (note) {
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.value = note[0];
+      gain.gain.setValueAtTime(0.0001, t + note[1]);
+      gain.gain.exponentialRampToValueAtTime(0.12, t + note[1] + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + note[1] + note[2]);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t + note[1]);
+      osc.stop(t + note[1] + note[2] + 0.05);
+    });
+  } catch (e) { /* audio unavailable — never break the bell */ }
 }
 function fetchNotifs() {
   if (!notifDeviceId) return Promise.resolve(null);
@@ -1099,6 +1155,19 @@ function fetchNotifs() {
       if (badge) {
         badge.textContent = unread > 99 ? "99+" : String(unread);
         badge.hidden = unread <= 0;
+      }
+      // Coin ding: only for team pings that arrived AFTER this page
+      // loaded. The first fetch just seeds the seen set (no sound).
+      var freshTeam = false;
+      if (notifSeenIds === null) {
+        notifSeenIds = {};
+        list.forEach(function (n) { notifSeenIds[n.id] = true; });
+      } else {
+        list.forEach(function (n) {
+          if (n.kind === "team" && !n.read && !notifSeenIds[n.id]) freshTeam = true;
+          notifSeenIds[n.id] = true;
+        });
+        if (freshTeam) playCoinSound();
       }
       if (notifOpen) renderNotifPanel(list);
       return data;
@@ -1140,9 +1209,11 @@ function initNotifBell() {
   panel.id = "notifPanel";
   panel.hidden = true;
   panel.innerHTML =
-    '<div class="notif-head"><b>🔔 Notifications</b><button type="button" class="btn ghost small" id="notifMarkAll">Mark all read</button></div>' +
+    '<div class="notif-head"><b>🔔 Notifications</b><span><button type="button" class="btn ghost small" id="notifSoundToggle">🔊 Sound on</button> <button type="button" class="btn ghost small" id="notifMarkAll">Mark all read</button></span></div>' +
     '<div class="notif-list"><p class="notif-empty">No notifications yet.</p></div>';
   document.body.appendChild(panel);
+  updateNotifSoundBtn();
+  panel.querySelector("#notifSoundToggle").addEventListener("click", function () { notifSoundSet(!notifSoundOn()); });
   panel.querySelector("#notifMarkAll").addEventListener("click", function () { markAllNotifRead(); });
   // Tapping a notification marks it read (fire-and-forget) then follows the link.
   panel.addEventListener("click", function (ev) {

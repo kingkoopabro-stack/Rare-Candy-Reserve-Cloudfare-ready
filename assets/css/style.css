@@ -50,6 +50,11 @@ nav.main a.active{background:var(--grad);color:#0b0b14}
 .notif-item{display:flex;gap:10px;align-items:flex-start;padding:10px;border-radius:10px;text-decoration:none;color:var(--ink)}
 .notif-item:hover{background:#ffffff14}
 .notif-item.unread{background:#7c4dff22;font-weight:700}
+.notif-item.team{border-left:3px solid #ffd700;background:#ffd70014}
+.notif-item.team.unread{background:#ffd70026}
+.notif-team-tag{display:inline-block;background:#ffd700;color:#1a1405;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:5px;vertical-align:1px}
+.tp-contact.tp-notif-team{border-left:3px solid #ffd700;background:rgba(255,215,0,.12)}
+.tp-notif-team-tag{display:inline-block;background:#ffd700;color:#1a1405;font-size:10px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:1px 7px;margin-right:5px;vertical-align:1px}
 .notif-ic{font-size:18px;line-height:1.2;flex:none}
 .notif-tx{flex:1;font-size:14px;line-height:1.4}
 .notif-tx em{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:2px}
@@ -436,8 +441,18 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-chatmsg{padding:6px 0;border-top:1px solid var(--line);font-size:14px}
 .dwc-chatmsg:first-child{border-top:0}
 .dwc-guest{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 7px}
+/* Team moderation (v3.18) — team chat role colors, team panel only.
+   Operator: neon magenta with a black outline + glow, so it stays easy
+   to read. Admin: gold. Mod: cyan (PROPOSED — Chris to correct). The
+   class sits on the whole message, so the name and the check-in text
+   both take the role color; the date keeps its muted color. */
+.dwc-team-role-operator{color:#ff2fd6;text-shadow:1px 0 #000,-1px 0 #000,0 1px #000,0 -1px #000,0 0 10px #ff2fd6,0 0 24px rgba(255,47,214,.6)}
+.dwc-team-role-admin{color:#ffd700}
+.dwc-team-role-mod{color:#22d3ee}
 .dwc-status-open{color:#ff8fb8;font-weight:800}
 .dwc-status-reviewed{color:var(--green);font-weight:800}
+.dwc-status-claimed{color:var(--amber,#ffb020);font-weight:800}
+.dwc-status-resolved{color:var(--green);font-weight:800}
 .dwc-report{margin:10px 0}
 .dwc-rules-list{line-height:1.6}
 .dwc-rules-list li{margin:6px 0}
@@ -983,6 +998,105 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-icon-badges{background:linear-gradient(135deg,#ffd700,#ff9a00)}
 .dwc-banner{margin:0 0 12px;text-align:center}
 .dwc-banner img{max-width:100%;max-height:260px;border-radius:14px;object-fit:cover;display:block;margin:0 auto}
+
+/* ---------- Member page three columns (v3.20) ---------- */
+/* MySpace layout: LEFT = info, MIDDLE = goods + endless feed, RIGHT =
+   Top Friends + divider + comments. The right column sits on the right
+   by default and stays put unless the member picks Left (flip class).
+   On narrow screens the columns stack: feed first, then the right
+   column, then info — so the posts are never buried. */
+.dwc-member-cols{display:flex;gap:16px;align-items:flex-start;margin-top:16px}
+.dwc-member-col{min-width:0}
+.dwc-member-col-info{flex:0 0 260px}
+.dwc-member-col-main{flex:1 1 auto}
+.dwc-member-col-side{flex:0 0 300px}
+.dwc-member-cols-flip{flex-direction:row-reverse}
+/* The post feed scrolls in its own region — the page doesn't have to
+   grow forever for a member with a hundred posts. */
+.dwc-member-feed-list{max-height:720px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+/* Top Friends: compact tiles in a clearly bordered box. */
+.dwc-topfriends-box{border:2px solid var(--pink,#ff2d95);border-radius:14px}
+.dwc-topfriends-box .dwc-top8{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.dwc-topfriends-box .dwc-topfriend{padding:8px 4px;font-size:12px;gap:4px}
+.dwc-topfriends-box .dwc-topfriend .dwc-avatar{width:48px;height:48px}
+/* Page comments in the right column: slightly smaller and tighter,
+   but never below 13px and never cramped — readable on any platform. */
+.dwc-side-comments .dwc-comment{padding:8px 0;font-size:13px;line-height:1.45}
+.dwc-side-comments .dwc-comment .dwc-avatar-sm{width:28px;height:28px}
+/* Dividers: inline SVG, color comes from the wrapping span. */
+.dwc-divider{margin:14px 0}
+.dwc-divider svg{display:block}
+/* Banner auto-fit (v3.20): wide pictures stretch across the top to
+   almost the width of the profile walls (small margin, never full
+   bleed); small/square ones stay centered and small, like a logo. */
+.dwc-banner-wide img{width:calc(100% - 24px);height:200px;max-height:200px}
+.dwc-banner-small img{max-width:260px;max-height:260px}
+/* Professional-mode listings grid on a member page. */
+.dwc-member-listings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:10px}
+
+/* Website banner-name header (v3.20) — the member's name overlaid on
+   their banner in website mode, like a business website header. The
+   banner is the positioning context; the name sits on it in the
+   member's chosen name font + glow (themeCSS covers the class). */
+.dwc-website-banner{position:relative;}
+.dwc-website-banner .dwc-website-banner-name{position:absolute;left:16px;bottom:10px;margin:0;font-size:30px;line-height:1.1;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.7);}
+.dwc-website-banner-none{min-height:64px;background:linear-gradient(90deg,var(--accent,#00e5ff),transparent);border-radius:10px;}
+.dwc-website-banner-none .dwc-website-banner-name{position:static;padding:12px 16px;}
+
+/* Website-mode chrome fade (v3.20) — the platform chrome fades away so
+   a visitor thinks they are on the member's own standalone site. The
+   member's banner, colors, fonts, listings, and references carry the
+   page; the tiny footer link (below) is the only way back. */
+body.dwc-website-view header.site,
+body.dwc-website-view footer.site,
+body.dwc-website-view .hero,
+body.dwc-website-view #meme-stash,
+body.dwc-website-view .dwc-pills,
+body.dwc-website-view .dwc-stats,
+body.dwc-website-view .dwc-coin-row,
+body.dwc-website-view .dwc-profile-card{display:none !important;}
+/* The tiny way back — small and unobtrusive, on purpose. */
+.dwc-website-back{margin:18px 0 0;text-align:center;font-size:13px;color:var(--muted);}
+.dwc-website-back a{color:var(--muted);text-decoration:none;}
+.dwc-website-back a:hover{text-decoration:underline;}
+
+/* Custom page (v3.20) — the member's own HTML as their website-mode
+   page. Their code is scoped by the sanitizer; the wrapper just gives
+   it the same canvas as the rest of the profile. */
+.dwc-custom-page{margin:0 0 14px;}
+.dwc-custom-page img{max-width:100%;height:auto;}
+
+/* Layout miniatures (v3.20) — a live, scaled-down sample profile page
+   in a small frame. The inner sample renders at a fixed width (360px
+   store / 280px picker) and JS scales it to the frame, so it stays
+   legible on mobile and desktop. Fixed height crops the sample after
+   the banner, the name, and the first card — the color scheme and the
+   layout's look read at a glance. */
+.dwc-layout-mini{position:relative;overflow:hidden;height:160px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;background:var(--surface);}
+.dwc-layout-mini-sm{height:110px;}
+.dwc-layout-mini-inner{transform-origin:top left;}
+.dwc-layout-mini-inner>div{position:relative;overflow:hidden;padding:10px;min-height:340px;}
+.dwc-mini-banner{height:64px;border-radius:8px;margin-bottom:8px;}
+.dwc-layout-mini .dwc-mypage-head{margin-bottom:8px;}
+.dwc-layout-mini .dwc-mypage-head h3{font-size:26px;margin:2px 0 0;}
+.dwc-layout-mini .dwc-meta{font-size:13px;margin:2px 0 0;}
+.dwc-layout-mini .card{margin-bottom:8px;padding:10px;}
+.dwc-layout-mini .card p{font-size:15px;line-height:1.4;margin:0;}
+.dwc-layout-mini .btn{font-size:15px;padding:6px 14px;}
+.dwc-mini-avatar{width:44px;height:44px;line-height:44px;text-align:center;font-size:22px;font-weight:700;}
+/* Edit Profile preset cards — a miniature above each preset button, so
+   the picker shows what each preset looks like instead of just a name. */
+.dwc-preset-card{flex:1 1 180px;max-width:230px;}
+.dwc-preset-card .dwc-pill{width:100%;margin-top:2px;}
+@media (max-width: 960px) {
+  .dwc-member-cols{flex-direction:column}
+  .dwc-member-col-info,.dwc-member-col-main,.dwc-member-col-side{flex:1 1 auto;width:100%}
+  .dwc-member-col-main{order:1}
+  .dwc-member-col-side{order:2}
+  .dwc-member-col-info{order:3}
+  .dwc-member-feed-list{max-height:560px}
+  .dwc-banner-wide img{height:150px}
+}
 .dwc-ticker{overflow:hidden;white-space:nowrap;border:1px solid var(--line);border-radius:10px;background:#0e0e1a;padding:8px 0;margin:0 0 12px;font-weight:800;letter-spacing:.04em}
 .dwc-ticker-inner{display:inline-block;padding-left:100%;animation:dwcTickerScroll 18s linear infinite}
 @keyframes dwcTickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-100%)}}

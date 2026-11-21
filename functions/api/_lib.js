@@ -179,11 +179,14 @@ export async function createNotification(db, n) {
 
 // notifyMentions scans a body for @username mentions and notifies each
 // matching profile (once each, never the author). Simple scan: @ followed
-// by the username characters the signup form allows.
+// by the username characters the signup form allows. Returns the set of
+// profile ids that were notified, so callers can skip a second
+// owner/author notification for someone the mention already covered.
 export async function notifyMentions(db, actor, body, opts) {
-  if (!db || !actor || !body) return;
+  const notified = new Set();
+  if (!db || !actor || !body) return notified;
   const names = [...new Set([...String(body).matchAll(/@([A-Za-z0-9_.-]{2,24})/g)].map((m) => m[1]))];
-  if (!names.length) return;
+  if (!names.length) return notified;
   const o = opts || {};
   for (const name of names) {
     try {
@@ -195,8 +198,36 @@ export async function notifyMentions(db, actor, body, opts) {
         text: `@${actor.username} mentioned you${o.label ? " " + o.label : ""}`,
         link: o.link,
       });
+      notified.add(target.id);
     } catch { /* keep going — one bad lookup never blocks the rest */ }
   }
+  return notified;
+}
+
+// notifyTeam notifies every OTHER team member (operator / admin / mod)
+// with one high-priority "team" notification. The poster is never
+// notified about their own message. kind "team" is the priority marker
+// the bell and the Alerts app sort first — no schema change needed.
+export async function notifyTeam(db, actor, text, link, refId) {
+  if (!db || !actor) return 0;
+  let rows = [];
+  try {
+    const { results } = await db.prepare(
+      "SELECT id FROM profiles WHERE role IN ('operator', 'admin', 'mod') OR is_operator = 1",
+    ).all();
+    rows = results || [];
+  } catch { return 0; /* profiles table not there yet */ }
+  let n = 0;
+  for (const r of rows) {
+    if (!r || r.id === actor.id) continue;
+    await createNotification(db, {
+      profile_id: r.id, actor_profile_id: actor.id, kind: "team",
+      ref_type: "team_chat", ref_id: refId || null,
+      text: String(text || "").slice(0, 200), link: link || "#/team",
+    });
+    n++;
+  }
+  return n;
 }
 
 export const nowMs = () => Date.now();
@@ -460,6 +491,45 @@ export function sanitizeLayoutCss(input) {
   return css.trim();
 }
 
+// Custom-page HTML sanitizer (v3.20) — website mode lets a member's own
+// HTML BE their page, but scripts and iframes stay stripped (one
+// person's script could steal another's login — a safety rule, not a
+// missing feature). Allows a small set of plain layout/text tags; drops
+// script/iframe/object/embed/form/input (with their contents); strips
+// on* handlers + inline styles (all styling lives in the CSS box);
+// kills javascript:/vbscript:/data: links; images keep only https:// or
+// site-relative / sources. Returns clean HTML (max 8000 chars).
+const CUSTOM_PAGE_TAGS = new Set(["div", "section", "article", "header", "footer", "nav", "h1", "h2", "h3", "h4", "h5", "h6", "p", "a", "img", "ul", "ol", "li", "span", "strong", "em", "b", "i", "u", "small", "br", "hr", "blockquote", "figure", "figcaption"]);
+export function sanitizeCustomPageHtml(input) {
+  var html = String(input || "").slice(0, 8000);
+  html = html.replace(/<!--[\s\S]*?-->/g, "");
+  // Drop dangerous blocks WITH their contents (a lazy match on the
+  // opening tag alone would leave a script's body behind).
+  html = html.replace(/<(script|style|iframe|object|embed|form|textarea|select|button)[\s\S]*?<\/\1\s*>/gi, "");
+  html = html.replace(/<\/?(script|style|iframe|object|embed|link|meta|base|form|input|textarea|select|button|title)\b[^>]*>/gi, "");
+  // Event handlers + inline styles go (styling lives in the CSS box).
+  html = html.replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  html = html.replace(/\sstyle\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // Links: kill javascript:/vbscript:/data: schemes. Images: keep only
+  // https:// or site-relative / sources.
+  html = html.replace(/href\s*=\s*"\s*(javascript|vbscript|data)\s*:[^"]*"/gi, 'href="#"');
+  html = html.replace(/href\s*=\s*'\s*(javascript|vbscript|data)\s*:[^']*'/gi, "href='#'");
+  html = html.replace(/href\s*=\s*(javascript|vbscript|data)\s*:[^\s>]*/gi, 'href="#"');
+  html = html.replace(/src\s*=\s*"([^"]*)"/gi, function (_m, v) {
+    var u = String(v || "").trim();
+    return (/^https:\/\//i.test(u) || u.startsWith("/")) ? 'src="' + u.replace(/"/g, "") + '"' : 'src=""';
+  });
+  html = html.replace(/src\s*=\s*'([^']*)'/gi, function (_m, v) {
+    var u = String(v || "").trim();
+    return (/^https:\/\//i.test(u) || u.startsWith("/")) ? "src='" + u.replace(/'/g, "") + "'" : "src=''";
+  });
+  // Unwrap any tag not on the allowlist (keep its inner text).
+  html = html.replace(/<\/?([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g, function (m, tag) {
+    return CUSTOM_PAGE_TAGS.has(tag.toLowerCase()) ? m : "";
+  });
+  return html.trim();
+}
+
 // Top Friends: stored as a comma-separated list of profile IDs, max 8.
 export function parseTopFriendIds(stored) {
   if (!stored) return [];
@@ -467,7 +537,7 @@ export function parseTopFriendIds(stored) {
   for (const part of String(stored).split(",")) {
     const n = parseInt(part.trim(), 10);
     if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n);
-    if (out.length >= 8) break;
+    if (out.length >= 10) break;
   }
   return out;
 }
@@ -534,7 +604,7 @@ export function presenceOf(row) {
 
 // Resolve Top Friend IDs to public cards, in the member's chosen order.
 export async function topFriendCards(db, ids) {
-  const list = (ids || []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 8);
+  const list = (ids || []).filter((n) => Number.isInteger(n) && n > 0).slice(0, 10);
   if (!list.length) return [];
   const placeholders = list.map(() => "?").join(",");
   const { results } = await db.prepare(
@@ -686,6 +756,61 @@ export function isOperatorRow(row) {
   return roleOf(row) === "operator";
 }
 
+// --- Team moderation (v3.18): silence / mute --------------------------
+// A silenced member cannot post or comment until muted_until passes.
+// "permanent" is not a mute — it is the existing banned flag, and only
+// the operator may set it. Durations are fixed keys so the client
+// dropdown and the server can never disagree about what a label means.
+// "3mo" is 90 days (calendar months vary — 90 days is the working
+// definition, flagged for Chris to correct). "A few days" is 3 days
+// (also Chris's call — flagged in the build log).
+export const SILENCE_DURATIONS = [
+  { key: "1d", label: "1 day", ms: 86400000 },
+  { key: "3d", label: "A few days (3 days)", ms: 3 * 86400000 },
+  { key: "1w", label: "1 week", ms: 7 * 86400000 },
+  { key: "2w", label: "2 weeks", ms: 14 * 86400000 },
+  { key: "6w", label: "6 weeks", ms: 42 * 86400000 },
+  { key: "3mo", label: "3 months", ms: 90 * 86400000 },
+  { key: "permanent", label: "Permanently", ms: null },
+];
+// Longest silence each role may hand out. Mods are capped at 1 week
+// (PROPOSED default — Chris to correct); admins at 3 months; only the
+// operator may go permanent. Server-enforced everywhere it matters.
+export const SILENCE_MAX_BY_ROLE = { operator: "permanent", admin: "3mo", mod: "1w" };
+export function canSilenceFor(role, key) {
+  const order = SILENCE_DURATIONS.map((d) => d.key);
+  const max = SILENCE_MAX_BY_ROLE[role] || null;
+  if (!max) return false;
+  return order.indexOf(key) >= 0 && order.indexOf(key) <= order.indexOf(max);
+}
+// Returns the plain-language block for a silenced member, or null when
+// they are free to post. Reads muted_until/muted_reason off the profile
+// row (profileByDevice does SELECT *, so the columns are simply absent
+// — undefined, never a crash — when the migration hasn't run yet).
+export function silenceCheck(me, now) {
+  if (!me) return null;
+  const until = Number(me.muted_until || 0);
+  if (until && until > (now || Date.now())) {
+    const when = new Date(until).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const reason = String(me.muted_reason || "").trim();
+    return `You're silenced until ${when}${reason ? " — " + reason : ""}. You can't post or comment until then.`;
+  }
+  return null;
+}
+// Ban (v3.18) — a banned member can't post or comment at all. The ban flag
+// is the permanent ban (operator-only); without this check a banned member
+// who isn't also muted could still post, because silence and ban are separate.
+export function bannedMemberCheck(me) {
+  if (!me) return null;
+  if (me.banned === 1) return "Your account is banned — you can't post or comment. If you think that's a mistake, contact the team.";
+  return null;
+}
+// Admins (and the operator) may delete other people's posts/comments;
+// mods may not. Server-enforced in the delete endpoints, never just UI.
+export function canDeleteContent(role) {
+  return role === "operator" || role === "admin";
+}
+
 export function shapeModelCard(row) {
   return {
     id: row.id, username: row.username, model_bio: row.model_bio ?? "",
@@ -718,10 +843,15 @@ export async function canSeePost(db, caller, post) {
   if (!caller) return false;
   if (caller.id === post.profile_id) return true;
   if (caller.is_operator === 1) return true;
+  return isFriendWith(db, post.profile_id, caller.id);
+}
+// Are two members friends (either direction)? Defensive: a missing
+// friends table just reads as false, never a crash.
+export async function isFriendWith(db, aId, bId) {
   try {
     const r = await db.prepare(
       "SELECT 1 AS n FROM friends WHERE (profile_id = ? AND friend_id = ?) OR (profile_id = ? AND friend_id = ?) LIMIT 1",
-    ).bind(post.profile_id, caller.id, caller.id, post.profile_id).first();
+    ).bind(aId, bId, bId, aId).first();
     return !!r;
   } catch { return false; }
 }
@@ -1051,6 +1181,24 @@ export const UNLOCKS = [
   { key: "frame-gba", label: "GBA frame", requirement: "Post 50 times and use the site 14 different days", kind: "posts_days", threshold: 50, threshold2: 14 },
   { key: "frame-vita-nova", label: "VITA NOVA frame", requirement: "Fully set up your profile", kind: "profile_complete", threshold: 1 },
 ];
+// --- Dividers (v3.20) -------------------------------------------------------
+// The line between Top Friends and Page comments on a member page.
+// Free designs are always pickable; locked ones need the unlock key
+// (Lucre purchase or achievement — the purchase flow isn't built yet,
+// so locked designs are listed but not selectable). The registry is the
+// single source of truth — the client renders the same ids.
+export const DIVIDER_IDS = ["line", "dots", "double", "stars", "goldswirl", "neonwave", "hearts"];
+export const FREE_DIVIDERS = ["line", "dots", "double", "stars", "goldswirl"];
+export const DIVIDER_UNLOCK_KEY = {
+  "neonwave": "divider:neonwave",
+  "hearts": "divider:hearts",
+};
+export function unlockForDivider(dividerId) {
+  return DIVIDER_UNLOCK_KEY[dividerId] || null;
+}
+export function isFreeDivider(dividerId) {
+  return FREE_DIVIDERS.includes(dividerId);
+}
 // --- Badges (v3.9) ---------------------------------------------------------
 // Achievement badges live in the SAME profile_unlocks table as frames
 // (badge keys are prefixed "badge:" so they never collide with frame
@@ -1310,6 +1458,9 @@ export const LUCRE_AWARDS = {
 export const LUCRE_STORE_PRICES = {
   "store:neon-rain": 20,
   "store:golden-shrine": 20,
+  "store:shopfront": 20,
+  "store:band-stand": 20,
+  "store:portfolio": 20,
 };
 export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
 export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window
@@ -1406,7 +1557,7 @@ export function parseWebsiteShow(stored) {
 export function cleanWebsiteShow(input) {
   return JSON.stringify(parseWebsiteShow(input));
 }
-export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation"];
+export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation", "listings"];
 const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
 export function extractYouTubeId(str) {
   if (!str) return "";
@@ -1414,7 +1565,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [] };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1430,6 +1581,11 @@ export function parseTheme(stored) {
   // Display-name font (v3.13) — same allowlist as the page text font.
   // `font` stays the page text font, so existing profiles keep their pick.
   out.name_font = THEME_FONTS.includes(obj.name_font) ? obj.name_font : "";
+  // Font glow (v3.19) — checkbox + two hex colors; rides in the theme
+  // JSON, so no migration. Colors are hex-validated; empty = not picked.
+  out.glow = obj.glow === true;
+  out.glow_color = hex(obj.glow_color);
+  out.outline_color = hex(obj.outline_color);
   out.button_style = BUTTON_STYLE_IDS.includes(obj.button_style) ? obj.button_style : "";
   // Vibe (v3.10) — a full look, one of the fixed ids.
   out.vibe = VIBE_IDS.includes(String(obj.vibe || "")) ? String(obj.vibe || "") : "";
@@ -1438,11 +1594,20 @@ export function parseTheme(stored) {
   out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 8);
   // Preset background (v3.9) — one of the fixed preset ids, or "" for none.
   out.bg_preset = PRESET_BG_IDS.includes(String(obj.bg_preset || "")) ? String(obj.bg_preset || "") : "";
+  // Background choices are either/or (v3.20): a custom picture and a
+  // preset can never both be on — the picture wins, so a preset can
+  // never silently sit on top of it again. The form enforces the same
+  // rule live; this is the backstop for stale or forged saves.
+  if (out.bg_image_url) out.bg_preset = "";
   // Comment-picture border color (v3.9) — any #rrggbb the member picks.
   // Mutually exclusive with the RGB comment-border effect: the RGB
   // effect wins when both are set, so the saved color is dropped.
   out.comment_border_color = hex(obj.comment_border_color);
   if (out.effects.includes("rgb-comment-border")) out.comment_border_color = "";
+  // Animated rainbow background (v3.20) — the effect IS the background,
+  // so it wins over a picture or a preset. The form says so when the
+  // effect is ticked; this is the backstop for stale or forged saves.
+  if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; }
   // Picture size / position / frame (v3.9) — fixed ids, "" = default.
   out.pic_size = PIC_SIZE_IDS.includes(String(obj.pic_size || "")) ? String(obj.pic_size) : "";
   out.pic_position = PIC_POSITION_IDS.includes(String(obj.pic_position || "")) ? String(obj.pic_position) : "";
@@ -1477,14 +1642,38 @@ export function parseTheme(stored) {
   // Hidden page sections (v3.10) — which card sections the member chose
   // to hide on their page (MySpace-style: show only what you want).
   const hs = Array.isArray(obj.hide_sections) ? obj.hide_sections : [];
-  out.hide_sections = [...new Set(hs.map((k) => String(k || "")))].filter((k) => SECTION_HIDE_IDS.includes(k)).slice(0, 9);
+  out.hide_sections = [...new Set(hs.map((k) => String(k || "")))].filter((k) => SECTION_HIDE_IDS.includes(k)).slice(0, 10);
+  // Member page layout (v3.20) — how many Top Friends show (3/4/5/8/10,
+  // default 8), which side the Top Friends column sits on ("" = right
+  // default, "left" swaps it with the info column), and who can see the
+  // member's post feed on their page (public / friends / private).
+  const tfc = Number(obj.topfriends_count);
+  out.topfriends_count = [3, 4, 5, 8, 10].includes(tfc) ? tfc : 8;
+  out.topfriends_side = (String(obj.topfriends_side || "") === "left") ? "left" : "";
+  out.feed_privacy = ["public", "friends", "private"].includes(obj.feed_privacy) ? obj.feed_privacy : "public";
+  // Website look (v3.20) — the Add me / Favorite / Add to group
+  // buttons on a professional page are the member's choice: off by
+  // default (contact is just the message link), on when they tick
+  // "Show the buttons too" in the Website look box.
+  out.website_buttons = obj.website_buttons === true;
+  // Dividers (v3.20) — the line between Top Friends and Page comments.
+  // Any known id parses; the save path (profile.js) enforces the unlock,
+  // so a locked divider can't be smuggled in by a forged request.
+  out.divider = DIVIDER_IDS.includes(String(obj.divider || "")) ? String(obj.divider) : "";
+  out.divider_color = hex(obj.divider_color);
+  const du = Array.isArray(obj.divider_unlocks) ? obj.divider_unlocks : [];
+  out.divider_unlocks = [...new Set(du.map((k) => String(k || "")))].filter((k) => DIVIDER_IDS.includes(k));
+  // Custom page (v3.20) — the member's own HTML as their website-mode
+  // page. Sanitized on the way in (scripts/iframes stripped); renders
+  // only when website_mode is on.
+  out.custom_page_html = sanitizeCustomPageHtml(obj.custom_page_html);
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

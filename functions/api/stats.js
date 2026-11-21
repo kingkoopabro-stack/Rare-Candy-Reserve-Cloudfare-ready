@@ -14,6 +14,6 @@ export async function onRequestGet({ env }) {
     comments: await count("comments"),
     listings: await count("listings"),
     card_checks: await count("posts", "kind = 'card_auth'"),
-    open_reports: await count("reports", "status = 'open'"),
+    open_reports: await count("reports", "status IN ('open', 'claimed')"),
   });
 }

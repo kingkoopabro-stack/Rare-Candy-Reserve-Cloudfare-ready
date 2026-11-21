@@ -11,7 +11,8 @@ import {
   json, noDb, getDb, readJson, profileByDevice, isOperator, shapePost,
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
-  createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS, filterVisiblePosts,
+  createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS, filterVisiblePosts, silenceCheck, bannedMemberCheck,
+  parseTheme, isFriendWith,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -27,6 +28,10 @@ export async function onRequestGet({ env, request }) {
   const onlyCreator = q.get("creator") === "1";
   const genre = q.get("genre") || null;
   const friendsOnly = q.get("friends") === "1";
+  // Member post feed (v3.20) — one member's posts for their profile page.
+  // profile_id filters to that author; before=<post id> pages older.
+  const profileId = q.get("profile_id") ? Number(q.get("profile_id")) : null;
+  const before = q.get("before") ? Number(q.get("before")) : null;
 
   const wantsAdult = kind === "adult";
   let callerVerified = false;
@@ -37,11 +42,34 @@ export async function onRequestGet({ env, request }) {
   }
   if (wantsAdult && !callerVerified) return json({ posts: [] });
 
+  // Member-level feed privacy (v3.20, server-enforced, never UI-only):
+  // "private" = owner + operator only; "friends" = owner + operator +
+  // friends; "public" = everyone. A blocked viewer gets an empty feed
+  // with feed_visible:false — the page shows a plain note, not an error.
+  // Friends-only POSTS are still filtered per post by filterVisiblePosts.
+  if (profileId) {
+    const memberRow = await db.prepare("SELECT id, profile_theme FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
+    if (!memberRow) return json({ posts: [], feed_visible: false, has_more: false });
+    const fp = parseTheme(memberRow.profile_theme).feed_privacy || "public";
+    let visible = true;
+    if (fp === "private") {
+      visible = !!caller && (caller.id === profileId || caller.is_operator === 1);
+    } else if (fp === "friends") {
+      visible = !!caller && (caller.id === profileId || caller.is_operator === 1 || await isFriendWith(db, profileId, caller.id));
+    }
+    if (!visible) return json({ posts: [], feed_visible: false, has_more: false });
+  }
+
   const { results } = await db.prepare(
-    `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
-     FROM posts p JOIN profiles a ON a.id = p.profile_id ORDER BY p.id DESC LIMIT 200`,
-  ).all();
+    profileId
+      ? `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
+         FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.profile_id = ? ORDER BY p.id DESC LIMIT 200`
+      : `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
+         FROM posts p JOIN profiles a ON a.id = p.profile_id ORDER BY p.id DESC LIMIT 200`,
+  ).bind(...(profileId ? [profileId] : [])).all();
   let rows = results || [];
+  if (profileId) rows = rows.filter((r) => r.profile_id === profileId);
+  if (before) rows = rows.filter((r) => r.id < before);
   rows = rows.filter((r) => {
     const k = r.kind ?? "forum";
     if (wantsAdult) return k === "adult";
@@ -49,7 +77,7 @@ export async function onRequestGet({ env, request }) {
     if (kind) return k === kind;
     return true;
   });
-  if (category) rows = rows.filter((r) => r.category === category);
+  if (category && !profileId) rows = rows.filter((r) => r.category === category);
   if (tag) {
     const want = tag.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     rows = rows.filter((r) => parseTags(r.tags).includes(want));
@@ -89,6 +117,10 @@ export async function onRequestGet({ env, request }) {
     if (sort === "discussed") return b.comment_count - a.comment_count || b.id - a.id;
     return b.id - a.id;
   });
+  // Member feed (v3.20) — the page needs to know whether there's another
+  // page (endless scroll) and that the feed is visible to this viewer.
+  // The main feed's shape is unchanged when profile_id isn't passed.
+  if (profileId) return json({ posts: shaped.slice(0, limit), has_more: shaped.length > limit, feed_visible: true });
   return json({ posts: shaped.slice(0, limit) });
 }
 
@@ -99,6 +131,12 @@ export async function onRequestPost({ env, request }) {
   const fail = (error) => json({ ok: false, error, post_id: null });
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return fail("Create your profile first — posting needs a username.");
+  // Silence (v3.18) — a silenced member can't post until it expires.
+  const silenced = silenceCheck(me);
+  if (silenced) return fail(silenced);
+  // Ban (v3.18) — a banned member can't post at all.
+  const banned = bannedMemberCheck(me);
+  if (banned) return fail(banned);
   const kind = ["forum", "card_auth", "adult", "event", "announcement"].includes(a.kind) ? a.kind : "forum";
   // Announcements are operator-only (Chris). The pill only renders for
   // the operator, but the gate lives here — a forged request gets a 403.

@@ -15,8 +15,9 @@ export async function onRequestGet({ env, request }) {
   if (!me) return json(EMPTY);
   let rows = [];
   try {
+    // Team pings first (kind "team" is the priority marker), then newest.
     const { results } = await db.prepare(
-      "SELECT * FROM notifications WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 50",
+      "SELECT * FROM notifications WHERE profile_id = ? ORDER BY CASE WHEN kind = 'team' THEN 0 ELSE 1 END, created_at DESC, id DESC LIMIT 50",
     ).bind(me.id).all();
     rows = results || [];
   } catch { return json(EMPTY); /* notifications table not there yet */ }

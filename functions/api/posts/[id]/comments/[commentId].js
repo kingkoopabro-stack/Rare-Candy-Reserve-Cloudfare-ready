@@ -1,5 +1,7 @@
-// DELETE /api/posts/:id/comments/:commentId — deleteComment (own comments only).
-import { json, noDb, getDb, readJson, profileByDevice } from "../../../_lib.js";
+// DELETE /api/posts/:id/comments/:commentId — deleteComment (own
+// comments, or any comment for the operator and admins — v3.18; mods
+// cannot delete).
+import { json, noDb, getDb, readJson, profileByDevice, roleOf, canDeleteContent } from "../../../_lib.js";
 
 export async function onRequestDelete({ env, request, params }) {
   const db = getDb(env);
@@ -10,7 +12,7 @@ export async function onRequestDelete({ env, request, params }) {
   const commentId = Number(params.commentId);
   const comment = await db.prepare("SELECT * FROM comments WHERE id = ? LIMIT 1").bind(commentId).first();
   if (!comment) return json({ ok: false, error: "That comment is already gone." });
-  if (comment.profile_id !== me.id) return json({ ok: false, error: "You can only delete your own comments." });
+  if (comment.profile_id !== me.id && !canDeleteContent(roleOf(me))) return json({ ok: false, error: "You can only delete your own comments." });
   await db.batch([
     db.prepare("DELETE FROM comment_votes WHERE comment_id = ?").bind(commentId),
     db.prepare("DELETE FROM comments WHERE id = ?").bind(commentId),

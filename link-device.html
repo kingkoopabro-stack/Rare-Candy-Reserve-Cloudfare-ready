@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Link this device — Rare Candy Reserve</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+.linkbox{max-width:560px;margin:40px auto;padding:24px}
+.linkbox input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px}
+.warn{border:1px solid rgba(255,45,149,.5);border-radius:12px;padding:12px 14px;background:rgba(255,45,149,.08);font-size:14px}
+</style>
+</head>
+<body data-page="link-device">
+<main class="wrap">
+  <div class="linkbox">
+    <div class="kicker">Rare Candy Reserve · Device link</div>
+    <h1>Use this browser <span class="grad-text">as your account.</span></h1>
+    <p style="color:var(--muted)">Your account lives in this browser as a device ID. Paste your device ID below to switch this browser to that account — for example, your operator account from your PC.</p>
+    <p class="warn">⚠️ Your device ID is the key to your account. Never share it with anyone. This is a temporary way to move between your own devices until real sign-in arrives.</p>
+    <label for="did" style="font-size:13px;color:var(--muted);font-weight:700">Device ID</label>
+    <input id="did" type="text" placeholder="paste your device ID here" autocomplete="off" spellcheck="false">
+    <p style="margin-top:14px"><button class="btn" type="button" onclick="linkDevice()">Use this device ID →</button></p>
+    <p id="linkMsg" style="color:var(--muted);font-size:14px"></p>
+    <p style="color:var(--muted);font-size:13px">This browser's current device ID: <code id="curDid">…</code></p>
+    <p><a href="community.html">← Back to the Community</a></p>
+  </div>
+</main>
+<script>
+function linkDevice(){
+  var v = document.getElementById('did').value.trim();
+  var msg = document.getElementById('linkMsg');
+  if(!v){ msg.textContent = 'Paste a device ID first.'; return; }
+  try{ localStorage.setItem('dwc-device-id', v); }catch(e){ msg.textContent = 'This browser would not save it — try another browser.'; return; }
+  msg.textContent = 'Saved — taking you to the Community as that account…';
+  setTimeout(function(){ location.href = 'community.html'; }, 800);
+}
+try{ document.getElementById('curDid').textContent = localStorage.getItem('dwc-device-id') || '(none yet)'; }catch(e){ document.getElementById('curDid').textContent = '(unavailable)'; }
+</script>
+</body>
+</html>

@@ -86,7 +86,10 @@
 
       <label for="ed-f-stripe">Stripe payment link (optional)</label>
       <input id="ed-f-stripe" placeholder="https://buy.stripe.com/…" inputmode="url" autocomplete="off">
-      <p style="color:var(--muted);font-size:13px;margin:0">Paste a Stripe payment link made for this listing's base price. Leave it blank for PayPal-only.</p>
+      <p style="color:var(--muted);font-size:13px;margin:0">Leave it blank and saving makes one for you (once Stripe is connected). Paste a link by hand and it stays as-is — it will never be replaced automatically.</p>
+      <p style="margin:8px 0 0"><button class="btn ghost" type="button" id="ed-stripe-btn" onclick="edStripeCreate()">🔗 Create Stripe checkout link</button></p>
+      <p id="ed-stripe-note" style="color:var(--muted);font-size:13px;margin:6px 0 0"></p>
+      <p id="ed-stripe-status" style="font-size:13px;margin:6px 0 0"></p>
 
       <p style="margin-top:18px">
         <button class="btn" type="button" onclick="edSave()">💾 Save listing</button>
@@ -112,6 +115,7 @@
       </div>
     <p><img class="logo-mark" src="images/steady-heart.svg" alt=""> <b>Rare Candy Reserve</b> — a Vita Nova Records property · <span class="grad-text">Level up your collection.</span></p>
     <p>PayPal · Stripe (Card · Cash App Pay · Bank)</p>
+    <p style="font-size:12px">🌱 <a href="https://climate.stripe.com/w4kjw7" target="_blank" rel="noopener">Thank you for committing 0.5% of your revenue to carbon removal</a></p>
     <p style="font-size:12px">© 2026 Rare Candy Reserve. All Rights Reserved.</p>
     </div>
   </div>
@@ -135,6 +139,47 @@ function edIsUrl(s){ return /^https:\/\//.test(String(s || "")) || String(s || "
 function edMsg(t, ok){
   var el = document.getElementById("ed-msg");
   if(el){ el.textContent = t || ""; el.style.color = ok ? "var(--ink)" : "var(--pink)"; }
+}
+function edStripeStatus(t, ok){
+  var el = document.getElementById("ed-stripe-status");
+  if(el){ el.textContent = t || ""; el.style.color = ok ? "var(--ink)" : "var(--pink)"; }
+}
+// True when any dropdown option changes the price — the Stripe link
+// covers the base price only, so buyers who pick a priced option pay
+// by PayPal instead (the shop already hides the Stripe button then).
+function edHasPricedOptions(){
+  return edCollectOptions().some(function(g){
+    return (g.options || []).some(function(o){ return Number(o.price_delta) !== 0; });
+  });
+}
+function edStripeNote(){
+  var el = document.getElementById("ed-stripe-note");
+  if(!el) return;
+  el.textContent = edHasPricedOptions()
+    ? "This listing has priced options — the Stripe link covers the base price only. Buyers who pick a priced option pay by PayPal."
+    : "";
+}
+// Make a Stripe checkout link on demand for the listing open in the
+// form (for listings saved before auto-create existed, like the
+// Beholder). The server only creates one when the listing has no link
+// yet — an existing link is never replaced from here.
+async function edStripeCreate(){
+  if(!edForm) return;
+  var btn = document.getElementById("ed-stripe-btn");
+  var id = document.getElementById("ed-f-id").value.trim().toLowerCase();
+  if(!id){ edStripeStatus("Save the listing first — the link is created automatically when you save.", false); return; }
+  if(btn) btn.disabled = true;
+  edStripeStatus("Asking Stripe for a checkout link…", true);
+  var res = await edFetch("/api/shop-listings", { device_id: edDeviceId, action: "stripe-create", id: id });
+  if(btn) btn.disabled = false;
+  if(!res || !res.ok){ edStripeStatus((res && res.error) || "Couldn't reach the server — try again.", false); return; }
+  if(res.listing && res.listing.stripe_link){
+    document.getElementById("ed-f-stripe").value = res.listing.stripe_link;
+    edApplySaved(res.listing);
+  }
+  var good = res.stripe_status === "created" || res.stripe_status === "already_has_link";
+  edStripeStatus(res.stripe_message || "", good);
+  edRefreshList();
 }
 async function edFetch(path, body, method){
   var res = await fetch(path, { method: method || (body ? "POST" : "GET"), headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
@@ -225,6 +270,7 @@ function edEdit(id){
   document.getElementById("ed-view-link").href = "shop.html?item=" + encodeURIComponent(base.id);
   edRenderPhotos(); edRenderVideo(); edRenderOptions();
   edMsg("");
+  edStripeStatus(""); edStripeNote();
   document.getElementById("ed-form-card").hidden = false;
   document.getElementById("ed-form-card").scrollIntoView();
 }
@@ -243,6 +289,7 @@ function edNew(){
   document.getElementById("ed-view-link").href = "shop.html";
   edRenderPhotos(); edRenderVideo(); edRenderOptions();
   edMsg("");
+  edStripeStatus(""); edStripeNote();
   document.getElementById("ed-form-card").hidden = false;
   document.getElementById("ed-form-card").scrollIntoView();
   document.getElementById("ed-f-name").focus();
@@ -452,6 +499,7 @@ function edRenderOptions(){
   + (edForm.options.length < 4
     ? '<p><button type="button" class="btn ghost" onclick="edAddGroup()">+ Add a dropdown (Color, Size, Add-ons…)</button></p>'
     : '<p style="color:var(--muted)">Max 4 dropdowns per listing.</p>');
+  edStripeNote();
 }
 function edAddGroup(){
   if(edForm.options.length >= 4) return;
@@ -526,6 +574,11 @@ async function edSave(){
   });
   if(!res || !res.ok){ edMsg((res && res.error) || "Couldn't save — try again."); return; }
   edApplySaved(res.listing);
+  if(res.listing && res.listing.stripe_link) document.getElementById("ed-f-stripe").value = res.listing.stripe_link;
+  if(res.stripe_message){
+    var goodStripe = ["created", "recreated", "kept", "manual", "cleared"].indexOf(res.stripe_status) !== -1;
+    edStripeStatus(res.stripe_message, goodStripe);
+  }
   edForm.id = id;
   edForm.isNew = false;
   document.getElementById("ed-f-id").readOnly = true;

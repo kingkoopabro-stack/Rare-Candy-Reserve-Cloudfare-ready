@@ -23,7 +23,8 @@ export async function onRequestGet({ env, request }) {
   for (const r of (results || [])) {
     let label = `${r.target_type} #${r.target_id}`;
     let targetAuthorId = null;
-    if (r.target_type === "post") {
+    if (r.target_type === "general") label = "General ticket";
+    else if (r.target_type === "post") {
       const p = await db.prepare("SELECT title, profile_id FROM posts WHERE id = ? LIMIT 1").bind(r.target_id).first();
       if (p) { label = `Post: “${p.title}”`; targetAuthorId = p.profile_id; }
     } else if (r.target_type === "listing") {
@@ -66,9 +67,13 @@ export async function onRequestPost({ env, request }) {
   const a = await readJson(request);
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return json({ ok: false, error: "Create your account first — reports come from members so they're accountable." });
-  if (!["post", "comment", "listing", "profile", "slug_appeal"].includes(a.target_type)) return json({ ok: false, error: "Pick what you're reporting." });
-  const targetId = Math.round(Number(a.target_id) || 0);
-  if (targetId <= 0) return json({ ok: false, error: "Missing item to report." });
+  // General tickets (v3.21) — a member filing for help with no specific
+  // post/comment/listing attached (harassment in DMs, account help, …).
+  // target_id is 0; the ticket text is the reason and it is required.
+  const isGeneral = a.target_type === "general";
+  if (!isGeneral && !["post", "comment", "listing", "profile", "slug_appeal"].includes(a.target_type)) return json({ ok: false, error: "Pick what you're reporting." });
+  const targetId = isGeneral ? 0 : Math.round(Number(a.target_id) || 0);
+  if (!isGeneral && targetId <= 0) return json({ ok: false, error: "Missing item to report." });
   // A profile report needs a real member; a page-URL appeal can only be
   // filed by the member themself, for their own page.
   if (a.target_type === "profile") {
@@ -79,12 +84,18 @@ export async function onRequestPost({ env, request }) {
   if (a.target_type === "slug_appeal" && targetId !== me.id) {
     return json({ ok: false, error: "You can only appeal for your own page URL." });
   }
-  const exists = await db.prepare(
-    "SELECT id FROM reports WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'open' LIMIT 1",
-  ).bind(me.id, a.target_type, targetId).first();
-  if (exists) return json({ ok: true, error: null });
+  const reason = String(a.reason || "").trim().slice(0, isGeneral ? 1000 : 300);
+  if (isGeneral && !reason) return json({ ok: false, error: "Say what happened first — a blank ticket helps nobody." });
+  // Content reports dedup (one open report per member per item); general
+  // tickets don't — each ticket is its own issue.
+  if (!isGeneral) {
+    const exists = await db.prepare(
+      "SELECT id FROM reports WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'open' LIMIT 1",
+    ).bind(me.id, a.target_type, targetId).first();
+    if (exists) return json({ ok: true, error: null });
+  }
   await db.prepare(
     "INSERT INTO reports (reporter_id, target_type, target_id, reason, status, created_at) VALUES (?, ?, ?, ?, 'open', ?)",
-  ).bind(me.id, a.target_type, targetId, String(a.reason || "").trim().slice(0, 300), Date.now()).run();
+  ).bind(me.id, a.target_type, targetId, reason, Date.now()).run();
   return json({ ok: true, error: null });
 }

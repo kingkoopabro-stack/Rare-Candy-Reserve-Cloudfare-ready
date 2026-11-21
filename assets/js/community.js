@@ -164,7 +164,8 @@ var state = {
   // changes never rebuild it (that keeps the radio playing and the notes
   // textarea focused). All phone data is in-memory / this session only.
   phone: { open: false, app: "home", wallpaper: "vaporwave" },
-  phoneGallery: [], // [{ url, name, timer, publicId }] — session only, auto-deleted after 10 min
+  phoneGallery: [], // [{ url, name, caption, timer, publicId }] — session only, auto-deleted after 10 min
+  galleryStoredCount: null, // v3.21 — stored/published photos on the profile (GET /api/gallery total), null = not loaded yet
   phoneNotes: "", // the member's one saved note (D1, loaded on demand)
   phoneNotesLoaded: false, // true once the saved note has been fetched
   phoneNotesSavedAt: 0, // timestamp of the last successful note save
@@ -1417,7 +1418,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "ticker_source", "buttons_side", "buttons_show", "display_badges"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -1688,7 +1689,7 @@ function phoneTickClock() {
 var TP_SIGNAL_BARS =
   '<svg width="17" height="11" viewBox="0 0 17 11" aria-hidden="true"><rect x="0" y="7" width="3" height="4" rx="0.5" fill="#fff"/><rect x="4.5" y="5" width="3" height="6" rx="0.5" fill="#fff"/><rect x="9" y="2.5" width="3" height="8.5" rx="0.5" fill="#fff"/><rect x="13.5" y="0" width="3" height="11" rx="0.5" fill="#fff"/></svg>';
 var TP_STATUS_ICONS =
-  '<svg width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1.5 4.5a9 9 0 0 1 13 0"/><path d="M4 7.5a5.5 5.5 0 0 1 8 0"/><circle cx="8" cy="10" r="1.2" fill="#fff" stroke="none"/></svg>' +
+  '<svg class="tp-wifi" width="16" height="12" viewBox="0 0 16 12" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M1.5 4.5a9 9 0 0 1 13 0"/><path d="M4 7.5a5.5 5.5 0 0 1 8 0"/><circle cx="8" cy="10" r="1.2" fill="#fff" stroke="none"/></svg>' +
   '<svg width="25" height="12" viewBox="0 0 25 12" aria-hidden="true"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" fill="none" stroke="#fff" stroke-opacity=".5"/><rect x="2" y="2" width="16" height="8" rx="2" fill="#fff"/><path d="M23.5 4v4a2 2 0 0 0 0-4z" fill="#fff" fill-opacity=".5"/></svg>';
 var TP_ICON_MSG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.5 2 2 5.9 2 10.8c0 2.8 1.5 5.2 3.8 6.8L4.5 22l5-2.7c.8.2 1.6.3 2.5.3 5.5 0 10-3.9 10-8.8S17.5 2 12 2z" fill="#fff"/></svg>';
 var TP_ICON_GALLERY = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" fill="#fff"/><path d="M5 17l4.5-4.5L12 15l3-3 4 4" stroke="#f59e0b" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="9" cy="9" r="1.6" fill="#f59e0b"/></svg>';
@@ -1696,7 +1697,7 @@ var TP_ICON_NOTES = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="
 var TP_ICON_ALERTS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z" fill="#fff"/></svg>';
 
 function phoneTopbarHTML(title) {
-  return '<div class="tp-topbar"><button type="button" class="tp-back" onclick="DWC.phoneGo(\'home\')">‹ Home</button><strong>' + esc(title) + '</strong><button type="button" class="tp-min" onclick="DWC.phoneMinimize()" title="Minimize the phone">—</button></div>';
+  return '<div class="tp-topbar"><button type="button" class="tp-back" onclick="DWC.phoneGo(\'home\')">‹ Home</button><strong>' + esc(title) + '</strong><button type="button" class="tp-min" onclick="DWC.phoneMinimize()" title="Close the phone">✕ Close</button></div>';
 }
 function phoneAppTile(app, label, iconHTML) {
   return '<button type="button" class="tp-app" onclick="DWC.phoneGo(\'' + app + '\')">' + iconHTML + '<span>' + esc(label) + '</span></button>';
@@ -1704,6 +1705,7 @@ function phoneAppTile(app, label, iconHTML) {
 function phoneHomeHTML() {
   var name = state.profile ? "@" + state.profile.username : "friend";
   return '<div class="tp-home">' +
+    '<div class="tp-home-top"><button type="button" class="tp-min" onclick="DWC.phoneMinimize()" title="Close the phone">✕ Close</button></div>' +
     '<p class="tp-hello">Hi, ' + esc(name) + ' 🍬</p>' +
     '<p class="tp-sub">Taffy lives in the Vita Nova app.</p>' +
     '<div class="tp-grid">' +
@@ -1723,7 +1725,7 @@ function phoneHomeHTML() {
       return '<button type="button" class="tp-wall-sw' + (state.phone.wallpaper === w.id ? " active" : "") + '" style="background:' + w.bg + '" title="' + esc(w.label) + '" aria-label="' + esc(w.label) + ' wallpaper" onclick="DWC.phoneWallpaper(\'' + w.id + '\')"></button>';
     }).join("") +
     '</div></div>' +
-    '<p class="tp-note">Tap an app to open it. The — button (top right) minimizes the phone back to the green button.</p>' +
+    '<p class="tp-note">Tap an app to open it. The ✕ Close button (top right) closes the phone back to the green button.</p>' +
     '</div>';
 }
 // ---------- Taffy chat — lightweight, client-side only ----------
@@ -2064,23 +2066,74 @@ function phoneMsgHTML() {
   }
   return phoneTopbarHTML("MSG — Contacts") + '<div class="tp-appview">' + rows + '</div>';
 }
+// Gallery visibility (v3.21) — per photo: Private / Public / Friends.
+// The delete ✕ sits top-LEFT of the photo, the visibility chip top-RIGHT,
+// so nothing overlaps. The picker under each photo always shows the
+// current choice, so you can tell at a glance whether a photo is public.
+function phoneGalleryVisChip(it, i, noClick) {
+  var vis = it.visibility || "private";
+  var inner = vis === "public" ? "🌍 Public" : vis === "friends" ? "👥 Friends" : "🔒 Private";
+  var cls = vis === "public" ? "tp-vis-public" : vis === "friends" ? "tp-vis-friends" : "tp-vis-private";
+  var title = vis === "public" ? "Public — everyone can see it" : vis === "friends" ? "Friends-only" : "Private — only you can see it";
+  return '<span class="tp-vis-chip ' + cls + '"' + (noClick ? "" : ' onclick="DWC.phoneGalleryOpen(' + i + ')"') + ' title="' + title + '">' + inner + "</span>";
+}
+function phoneGalleryVisPicker(it, i) {
+  var vis = it.visibility || "private";
+  return '<select class="tp-visselect" ' + (it.uploading ? "disabled" : "") + ' onchange="DWC.phoneGallerySetVisibility(' + i + ', this.value)" title="Who can see this photo">' +
+    '<option value="private"' + (vis === "private" ? " selected" : "") + '>🔒 Private</option>' +
+    '<option value="public"' + (vis === "public" ? " selected" : "") + '>🌍 Public</option>' +
+    '<option value="friends"' + (vis === "friends" ? " selected" : "") + '>👥 Friends</option></select>';
+}
 function phoneGalleryHTML() {
   var items = state.phoneGallery;
   var thumbs = items.length
     ? '<div class="tp-gallery">' + items.map(function (it, i) {
-        return '<figure><img src="' + esc(it.url) + '" alt="" onclick="DWC.phoneGalleryOpen(' + i + ')"><button type="button" onclick="DWC.phoneGalleryDel(' + i + ')" title="Delete">✕</button><figcaption>' + esc(it.name) + "</figcaption>" +
-          (state.profile
-            ? (it.publicId
-              ? '<button type="button" class="btn ghost small" onclick="DWC.phoneGalleryUnpublish(' + i + ')">🌍 Public ✓ — take down</button>'
-              : '<button type="button" class="btn ghost small" onclick="DWC.phoneGalleryPublish(' + i + ')">📣 Make public</button>')
-            : "") + "</figure>";
+        return '<figure draggable="true" ondragstart="DWC.phoneGalleryDragStart(event,' + i + ')" ondragend="DWC.phoneGalleryDragEnd()" ontouchstart="DWC.phoneGalleryLongStart(' + i + ', this)" ontouchend="DWC.phoneGalleryLongEnd()" ontouchmove="DWC.phoneGalleryLongEnd()" oncontextmenu="return false"><img src="' + esc(it.url) + '" alt="" onclick="DWC.phoneGalleryOpen(' + i + ')"><button type="button" class="tp-gal-del" onclick="DWC.phoneGalleryDel(' + i + ')" title="Delete this photo">✕</button>' + phoneGalleryVisChip(it, i) + '<figcaption>' + esc(it.caption || it.name) + "</figcaption>" +
+          (state.profile ? phoneGalleryVisPicker(it, i) + (it.uploading ? '<p class="tp-visstatus">Uploading… 🍬 please wait</p>' : "") : "") + "</figure>";
       }).join("") + "</div>"
     : '<p class="tp-note">No photos here yet — add one below.</p>';
+  var storedLine = state.profile
+    ? '<p class="tp-note" id="dwc-gallery-stored-count">' + (state.galleryStoredCount == null ? "Your saved photos: loading…" : state.galleryStoredCount + " of 20 photos saved on your profile") + "</p>"
+    : "";
   return phoneTopbarHTML("Gallery") + '<div class="tp-appview">' +
-    '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site. Tap “Make public” on a photo to keep it public on your page (up to 20) so visitors can scroll through it in your picture viewer.</p>' +
+    '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site until you pick Public or Friends on a photo. Tap a photo to see it big and pick who can see it. Long-hold a photo to delete it; on a computer, drag one to the trash can.</p>' +
     thumbs +
     '<label class="btn small tp-filebtn">+ Add a photo<input type="file" accept="image/*" hidden onchange="DWC.phoneGalleryAdd(this)"></label>' +
-    '<p class="tp-note">' + items.length + ' / 6 photos</p></div>';
+    '<p class="tp-note">' + items.length + ' / 6 photos in this session</p>' + storedLine + '</div>';
+}
+// Gallery photo detail (v3.21) — tap a phone gallery photo to see it big
+// and pick who can see it. The ✕ Close sits top-LEFT, opposite the
+// visibility chip top-right, so nothing overlaps.
+function phoneGalleryPhotoHTML() {
+  var it = state.phoneGallery[state.phoneGalleryView];
+  if (!it) return phoneTopbarHTML("Gallery") + '<div class="tp-appview"><p class="tp-note">That photo is gone — it may have hit its 10 minutes.</p><p><button type="button" class="btn" onclick="DWC.phoneGo(\'gallery\')">Back to Gallery</button></p></div>';
+  var i = state.phoneGalleryView;
+  var vis = it.visibility || "private";
+  var status = it.uploading
+    ? "Uploading… 🍬 please wait"
+    : vis === "public"
+      ? "✓ Public — visitors can see it on your page"
+      : vis === "friends"
+        ? "✓ Friends-only — only your friends can see it"
+        : "🔒 Private — only you can see it, here in your session gallery";
+  return '<div class="tp-appview"><div class="tp-photoview-head"><button type="button" class="tp-min" onclick="DWC.phoneGo(\'gallery\')" title="Close this photo">✕ Close</button><strong>Photo</strong>' + phoneGalleryVisChip(it, i, true) + '</div>' +
+    '<div class="tp-photoview"><img src="' + esc(it.url) + '" alt="' + esc(it.name || "Photo") + '"></div>' +
+    '<p class="tp-visstatus">' + status + '</p>' +
+    (state.profile
+      ? '<label class="tp-caption-label">Short description <span style="color:var(--muted)">(shows under the photo — 140 characters max)</span></label>' +
+        '<input type="text" class="tp-caption" maxlength="140" placeholder="e.g. My favorite pull — Charizard, mint!" value="' + esc(it.caption || "") + '" oninput="DWC.phoneGalleryCaption(' + i + ', this.value)"' + (it.uploading ? " disabled" : "") + '>' +
+        '<p class="tp-caption-count">' + (it.caption || "").length + '/140</p>' +
+        '<div class="tp-visrow">' +
+        ["private", "public", "friends"].map(function (v) {
+          var label = v === "private" ? "🔒 Private" : v === "public" ? "🌍 Public" : "👥 Friends";
+          return '<button type="button" class="tp-visbtn' + (vis === v ? " active" : "") + '"' + (it.uploading ? " disabled" : "") + ' onclick="DWC.phoneGallerySetVisibility(' + i + ', \'' + v + '\')">' + label + "</button>";
+        }).join("") + "</div>"
+      : "") +
+    '<p class="tp-note">' + esc(it.name || "photo") + '</p>' +
+    (state.profile
+      ? '<p><button type="button" class="btn small" onclick="DWC.phoneGallerySetAvatar(' + i + ')"' + (it.uploading ? " disabled" : "") + '>🖼️ Set as profile picture</button> <button type="button" class="btn ghost small" onclick="DWC.phoneGalleryDel(' + i + ')">🗑️ Delete photo</button></p>'
+      : "") +
+    '</div>';
 }
 function phoneSosHTML() {
   return phoneTopbarHTML("SOS") + '<div class="tp-appview tp-sosview">' +
@@ -2234,6 +2287,7 @@ function phoneScreenHTML() {
   if (app === "vitanova") inner = phoneTaffyHTML();
   else if (app === "msg") inner = phoneMsgHTML();
   else if (app === "gallery") inner = phoneGalleryHTML();
+  else if (app === "gallery-photo") inner = phoneGalleryPhotoHTML();
   else if (app === "sos") inner = phoneSosHTML();
   else if (app === "notes") inner = phoneNotesHTML();
   else if (app === "radio") inner = phoneRadioHTML();
@@ -2250,12 +2304,16 @@ function phoneScreenHTML() {
     '</div>';
 }
 function phoneRenderedKey() {
-  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x") + "|" + (state.phoneAlertsList ? state.phoneAlertsList.length : "x") + "|" + state.phoneAlertsStamp +
+  return (state.phone.open ? "1" : "0") + "|" + state.phone.app + "|" + state.phone.wallpaper + "|" + state.phoneGallery.length + "|" + state.phoneGallery.map(function (it) { return (it.publicId || "") + ":" + (it.visibility || "private") + ":" + (it.uploading ? "1" : ""); }).join(",") + "|" + (state.phoneGalleryView == null ? "" : state.phoneGalleryView) + "|" + (state.phoneMsgList ? state.phoneMsgList.length : "x") + "|" + (state.phoneAlertsList ? state.phoneAlertsList.length : "x") + "|" + state.phoneAlertsStamp +
     // Lucre + Layout Store (v3.11) — filter, preview, applying, balance,
     // owned, and the current layout all change what the phone shows.
     "|" + (state.storeFilter || "all") + "|" + (state.storePreview || "") + "|" + (state.storeApplying || "") +
     "|" + (state.lucre ? state.lucre.balance : "x") + "|" + (state.lucre ? state.lucre.owned.length : "x") +
-    "|" + (state.profile ? (state.profile.layout_preset || "") : "");
+    "|" + (state.profile ? (state.profile.layout_preset || "") : "") +
+    // v3.21 — saved-photo count, only while the gallery is open: a count
+    // change must not rebuild the phone (and restart the radio) while
+    // another app is showing.
+    "|" + (state.phone.app === "gallery" ? (state.galleryStoredCount == null ? "-" : state.galleryStoredCount) : "-");
 }
 function renderPhone() {
   var root = $("dwc-phone-root");
@@ -2282,11 +2340,27 @@ function renderPhone() {
     });
   }
 }
+// v3.21 — drag-to-trash can (desktop gallery): a fixed drop target at
+// the bottom of the screen. It lives OUTSIDE the phone root on purpose
+// — renderPhone() rewrites the root on every key change, which would
+// drop the can mid-drag. Hidden until a drag starts.
+function ensureTrashCan() {
+  if ($("dwc-trashcan")) return;
+  var can = document.createElement("div");
+  can.id = "dwc-trashcan";
+  can.className = "tp-trashcan";
+  can.innerHTML = "🗑️ Drop here to delete";
+  can.ondragover = function (e) { e.preventDefault(); can.classList.add("over"); };
+  can.ondragleave = function () { can.classList.remove("over"); };
+  can.ondrop = function (e) { e.preventDefault(); DWC.phoneGalleryDropTrash(); };
+  document.body.appendChild(can);
+}
 function ensurePhoneRoot() {
   if ($("dwc-phone-root")) return;
   var root = document.createElement("div");
   root.id = "dwc-phone-root";
   document.body.appendChild(root);
+  ensureTrashCan();
   var btn = document.createElement("button");
   btn.id = "dwc-phone-btn";
   btn.type = "button";
@@ -2331,6 +2405,12 @@ function profileButtonsSectionHTML(p) {
   var img = (pb && pb.image_url) || "";
   var th = parseThemeClient(p && p.profile_theme);
   var side = (th.buttons_side === "right") ? "right" : "left";
+  // v3.21 — Buttons group: size, which show, professional-mode button.
+  var btnSize = th.button_size || "";
+  var visSet = th.buttons_visible;
+  var visOn = function (k) { return !visSet || visSet.indexOf(k) >= 0; };
+  var proSide = th.pro_button_side || "";
+  var proCol = th.pro_button_color || "";
   return '<div class="dwc-layoutbox" id="dwc-sec-buttons"><h4 style="margin:0 0 6px">🔘 Profile buttons — your action buttons</h4>' +
     "<p style=\"margin:0 0 8px\">These are the buttons visitors see on YOUR page — just four: Add me, Message me, Add to Favorites, Add to group. They sit in a 2×2 block on one side of your page, with your video on the other side. (Only on the standard look — with Website look on, your page shows just a Message button + your video, unless you tick “Show the buttons too” in the Website look box.) Change each one's wording and colors, or put one solid image behind the whole block instead. Reporting lives on posts, comments, and listings now — that's where the 🚩 Report button is.</p>" +
     '<label><input type="checkbox" name="theme_buttons_show" style="width:auto"' + (th.buttons_show !== false ? " checked" : "") + '> Show the buttons on my page (untick to hide the whole block — MySpace-style, your call)</label>' +
@@ -2345,6 +2425,39 @@ function profileButtonsSectionHTML(p) {
     '<label>Button-block image URL (https:// — only used with “One solid image”)</label>' +
     '<input name="pb_image_url" maxlength="500" value="' + esc(img) + '" placeholder="https://…">' +
     '<div class="dwc-pb-rows">' + profileButtonsRowsHTML(p) + "</div>" +
+    '<h4 style="margin:16px 0 6px">📏 Button size</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">How big the buttons on your page are — your action buttons, your link buttons, and the buttons inside your page sections. M is the size everyone sees now. S is the smallest still easy to read; XL is decently large.</p>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (btnSize === "s" ? " active" : "") + '" data-btnsizebtn="s" onclick="DWC.applyButtonSize(\'s\')">S — small</button>' +
+    '<button type="button" class="dwc-pill' + (btnSize === "" ? " active" : "") + '" data-btnsizebtn="m" onclick="DWC.applyButtonSize(\'m\')">M — medium (current)</button>' +
+    '<button type="button" class="dwc-pill' + (btnSize === "l" ? " active" : "") + '" data-btnsizebtn="l" onclick="DWC.applyButtonSize(\'l\')">L — large</button>' +
+    '<button type="button" class="dwc-pill' + (btnSize === "xl" ? " active" : "") + '" data-btnsizebtn="xl" onclick="DWC.applyButtonSize(\'xl\')">XL — extra large</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_button_size" value="' + esc(btnSize) + '">' +
+    '<h4 style="margin:16px 0 6px">✅ Which buttons show</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Tick only the ones you want — show just “Message me” if you like. Unticking all hides the button block (your video and links still show). The Message button on the professional look always shows — it’s how people reach you.</p>' +
+    '<div class="dwc-checkgrid">' +
+    [["add", "Add me"], ["message", "Message me"], ["favorite", "Add to Favorites"], ["group", "Add to group"], ["subscribe", "Subscribe (on my shop card)"]].map(function (kv) {
+      return '<label><input type="checkbox" name="theme_buttons_visible" value="' + kv[0] + '" style="width:auto"' + (visOn(kv[0]) ? " checked" : "") + "> " + kv[1] + "</label>";
+    }).join("") + "</div>" +
+    '<h4 style="margin:16px 0 6px">🌐 Professional-mode button</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">On the professional (website) look, visitors get one button under your picture. Pick which side it sits on, and its color — big enough to see. (Pick a bigger size above to make it stand out even more.)</p>' +
+    '<label>Which side, under your picture</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (proSide === "" ? " active" : "") + '" data-prosidebtn="left" onclick="DWC.applyProButtonSide(\'left\')">Left</button>' +
+    '<button type="button" class="dwc-pill' + (proSide === "center" ? " active" : "") + '" data-prosidebtn="center" onclick="DWC.applyProButtonSide(\'center\')">Center</button>' +
+    '<button type="button" class="dwc-pill' + (proSide === "right" ? " active" : "") + '" data-prosidebtn="right" onclick="DWC.applyProButtonSide(\'right\')">Right</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_pro_button_side" value="' + esc(proSide) + '">' +
+    '<label>Button color</label>' +
+    '<div class="dwc-presets">' +
+    [["#ff2d95", "Pink"], ["#00e5ff", "Cyan"], ["#22c55e", "Green"], ["#d4af37", "Gold"], ["#7c4dff", "Purple"], ["#ef4444", "Red"]].map(function (kv) {
+      return '<button type="button" class="dwc-pill' + (proCol === kv[0] ? " active" : "") + '" data-procolorbtn="' + kv[0] + '" onclick="DWC.applyProButtonColor(\'' + kv[0] + '\')">' + kv[1] + "</button>";
+    }).join("") + "</div>" +
+    '<label>Or pick any color</label>' +
+    '<input type="hidden" name="theme_pro_button_color" value="' + esc(proCol) + '">' +
+    '<input type="color" id="dwc-pro-color-pick" value="' + (proCol || "#ff2d95") + '" style="width:64px;height:36px;padding:2px" onchange="DWC.applyProButtonColor(this.value)"> ' +
+    '<span style="color:var(--muted);font-size:13px">Leave it alone to keep the default look.</span>' +
     '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Leave a label blank to keep the standard wording, and leave a color unticked to keep the default. Colors are #rrggbb; the image must be https://.</p></div>';
 }
 // v3.10 — one video per profile: a YouTube link OR an uploaded clip.
@@ -2433,9 +2546,12 @@ function websiteFieldsHTML(p) {
     return '<option value="' + id + '"' + (p && p.birthsign === id ? " selected" : "") + ">" + ZODIAC_SIGNS[id].symbol + " " + esc(ZODIAC_SIGNS[id].name) + "</option>";
   }).join("");
   return '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌐 Website look — make my profile look like a real website</h4>' +
-    "<p style=\"margin:0 0 8px\">Website look turns your profile into your own standalone website — your banner with your page name on it at the top, your colors and fonts, your products and your references, and a message link for contact. Visitors should feel like they're on YOUR site, not a hosted community page. The five bits below show whenever their Show box is ticked, in either look — Website look only changes the layout, never hides what you chose to show. Top Friends hide in this mode. Your shop listings show on the page too, so it works as your personal shop.</p>" +
-    '<label><input type="checkbox" name="website_mode" style="width:auto"' + (p && p.website_mode ? " checked" : "") + '> 🌐 Website look — my profile looks like a real website</label>' +
-    '<label><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> Show the Add me / Favorite / Add to group buttons too (otherwise visitors just get the Message link)</label>' +
+    "<p style=\"margin:0 0 8px\">Website look is the professional mode — the opposite of the MySpace look. It turns your profile into your own clean standalone website: your banner as the header at the top, just a Message link for contact, your shop listings, and nothing else cluttering it up. The personal bits below (hobbies, where you work, relationship status, sign, accomplishments) stay hidden while this is on. MySpace mode shows everything, arranged like a MySpace profile. Top Friends hide in this mode.</p>" +
+    '<label class="dwc-enable-toggle"><input type="checkbox" name="website_mode" style="width:auto"' + (p && p.website_mode ? " checked" : "") + '> <span>🌐 Website look — click to enable button</span></label>' +
+    '<label class="dwc-enable-toggle"><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> <span>Show the Add me / Favorite / Add to group buttons too (otherwise visitors just get the Message link)</span></label>' +
+    '<label>Contact email — the email visitors can reach you at (only shows on your page if you tick Show below)</label>' +
+    '<input type="email" name="contact_email" maxlength="120" value="' + val("contact_email") + '" placeholder="you@example.com">' +
+    '<label class="dwc-enable-toggle"><input type="checkbox" name="show_contact_email" style="width:auto"' + (p && p.show_contact_email ? " checked" : "") + '> <span>Show my contact email on my page</span></label>' +
     '<label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies</label>' +
     '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
     '<label><input type="checkbox" name="website_show_workplace" style="width:auto"' + chk("workplace") + '> Show where I work</label>' +
@@ -2790,8 +2906,16 @@ function gifPickerHTML(formKey) {
     "</div></div>";
   return html;
 }
-function gifEmbedHTML(url, label) {
+// Professional mode (2026-11-21) — GIF comments don't autoplay on a
+// clean website-mode profile: they sit behind a button until the
+// visitor taps it. True only while a website-mode member page is open
+// (the body class is set in viewMember and cleared on navigation).
+function isWebsiteView() {
+  return typeof document !== "undefined" && document.body && document.body.classList.contains("dwc-website-view");
+}
+function gifEmbedHTML(url, label, gate) {
   if (!url) return "";
+  if (gate) return '<button type="button" class="btn ghost small dwc-gif-gate" data-gif-url="' + esc(url) + '" data-gif-label="' + esc(label || "") + '" onclick="DWC.loadGifEmbed(this)">▶ Load GIF' + (label ? " · " + esc(label) : "") + "</button>";
   return '<div class="dwc-gifview"><iframe src="' + esc(url) + '" loading="lazy" title="' + esc(label || "GIF") + '" sandbox="allow-scripts allow-same-origin"></iframe>' +
     '<p>GIF via GIPHY' + (label ? " · " + esc(label) : "") + "</p></div>";
 }
@@ -3346,6 +3470,18 @@ function parseThemeClient(stored) {
   // whether they show at all (default true — hiding is opt-in).
   out.buttons_side = (String(obj.buttons_side || "") === "right") ? "right" : "";
   out.buttons_show = obj.buttons_show === false ? false : true;
+  // Button size + which buttons show + professional-mode button
+  // (v3.21) — the Buttons group in Edit Profile. Size "" = M, the
+  // current size; "s" is the smallest clearly readable, "xl" decently
+  // large. buttons_visible null = all show; an array lists exactly
+  // which of add/message/favorite/group/subscribe show. pro_button_side
+  // "" = left, "center" / "right" under the picture in professional
+  // mode. pro_button_color any #rrggbb, "" = default.
+  out.button_size = ["s", "l", "xl"].indexOf(String(obj.button_size || "")) >= 0 ? String(obj.button_size) : "";
+  var bv = Array.isArray(obj.buttons_visible) ? obj.buttons_visible : null;
+  out.buttons_visible = bv === null ? null : bv.map(function (k) { return String(k || ""); }).filter(function (k) { return ["add", "message", "favorite", "group", "subscribe"].indexOf(k) >= 0; });
+  out.pro_button_side = (String(obj.pro_button_side || "") === "center" || String(obj.pro_button_side || "") === "right") ? String(obj.pro_button_side) : "";
+  out.pro_button_color = hex(obj.pro_button_color);
   // One video per profile (v3.10) — a YouTube link (must carry a real
   // 11-char video id) or an uploaded clip served from R2.
   var vu = String(obj.video_url || "").trim().slice(0, 500);
@@ -3700,7 +3836,6 @@ function myLinksButtonsHTML(links) {
 // (their bio, their Top Friends, their links), never fake demo content.
 // Empty sections are left out entirely so the preview is honest.
 function layoutPreviewInnerHTML(p) {
-  var bio = p && p.bio ? esc(p.bio) : null;
   var friends = p && p.top_friend_ids ? p.top_friend_ids : [];
   var links = p && p.my_links ? p.my_links : [];
   var th = parseThemeClient(p && p.profile_theme);
@@ -3712,18 +3847,18 @@ function layoutPreviewInnerHTML(p) {
   // v3.10 — the preview shows the buttons/video side row too, so the
   // member (and Taffy's builder) can see the layout. pointer-events
   // off: it's a preview, the buttons can't be clicked here.
+  // v3.21 — same Connect card as the live page, so the preview matches.
   var sideRow = profileSideRowHTML(p, th);
+  if (sideRow) sideRow = '<section class="card dwc-connect-card"><h3 style="margin-top:0">💬 Connect</h3>' + sideRow + "</section>";
   // Website look ON: the real page shows the website-mode actions
   // (Message button + video, no 2×2 block) — the preview must match
   // what visitors actually see, so render those instead of the row.
   var actionsBlock = (p && p.website_mode) ? profileActionsHTML(p, true, th) : sideRow;
   // Website look — the five fields as website sections, plus an honest
   // note for anything filled in but not switched on (so a filled-in
-  // field that doesn't show is never a mystery).
-  // v3.20 (corrected) — the five sections show whenever their own Show
-  // box is ticked, in EITHER look (Website look only changes the
-  // layout), so the preview always renders them. The old "Website look
-  // is off — they won't show" message was the backwards gate, now gone.
+  // field that doesn't show is never a mystery). Professional mode
+  // (2026-11-21) hides them all on the live page, whatever the Show
+  // boxes say — the preview dims them with that note instead.
   var website = "";
   var show = (p && p.website_show) || {};
   if (p) {
@@ -3735,29 +3870,31 @@ function layoutPreviewInnerHTML(p) {
     if (p.birthsign && !show.sign) offBits.push("Sign");
     if (p.accomplishments && !show.accomplishments) offBits.push("Recent accomplishments");
     if (offBits.length) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Hidden — tick Show to publish: ' + esc(offBits.join(", ")) + '.</p>';
+    if (p.website_mode && (p.hobbies || p.workplace || p.relationship_status || p.birthsign || p.accomplishments)) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Professional mode is on — the bits above stay hidden on your page until you turn it off.</p>';
   }
   // Hidden sections — one line so the member sees the hide worked.
   var hiddenLabels = (th.hide_sections || []).map(function (k) { return SECTION_HIDE_LABELS[k] || k; });
   var hiddenNote = hiddenLabels.length ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">🙈 Hidden on your page: ' + esc(hiddenLabels.join(", ")) + '.</p>' : "";
-  var about = hidden("about") ? "" :
-    '<div class="card"><h3>About me</h3>' + (bio ? '<p style="white-space:pre-wrap">' + bio + "</p>" : '<p style="color:var(--muted)">No bio yet.</p>') + "</div>";
+  // v3.21 — the bio lives inside the grouped About card now
+  // (websiteSectionsHTML above), so there is no separate About card.
+  // Button size — the member's pick, so the preview shows it too.
+  var btnSizeCls = th.button_size ? " dwc-btn-" + th.button_size : "";
   // Custom page (v3.20) — website mode + the member's own HTML: their
   // code IS the page, so the preview shows it (sanitized) instead of
   // the MySpace columns. The actions row (message link) still shows
   // below it, like on the real page.
   if (p && p.website_mode && th.custom_page_html) {
-    return '<div class="dwc-myprofile dwc-previewbox">' +
+    return '<div class="dwc-myprofile dwc-previewbox' + btnSizeCls + '">' +
       '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(th.custom_page_html) + "</div>" +
       '<div style="pointer-events:none">' + actionsBlock + "</div>" +
       '<p style="color:var(--muted);font-size:13px">Your listings still show below this on your page.</p>' +
       "</div>";
   }
-  return '<div class="dwc-myprofile dwc-previewbox">' +
+  return '<div class="dwc-myprofile dwc-previewbox' + btnSizeCls + '">' +
     tickerHTML(p, th) +
     '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
     '<div style="pointer-events:none">' + actionsBlock + "</div>" +
     website +
-    about +
     top8 +
     (hidden("links") ? "" : myLinksButtonsHTML(links)) +
     hiddenNote +
@@ -3979,7 +4116,7 @@ function commentCardHTML(c, o) {
     (c.body ? '<p class="dwc-feed-body' + (long ? " dwc-clamped" : "") + '" id="dwc-comment-body-' + c.id + '">' + memeBodyHTML(c.body) + "</p>" +
       (long ? '<button type="button" class="dwc-readmore" onclick="DWC.toggleCommentBody(' + c.id + ', this)">Read more ↓</button>' : "") : "") +
     (o.mediaHTML || "") +
-    (o.gifAsImage ? "" : gifEmbedHTML(c.gif_url, c.gif_label)) +
+    (o.gifAsImage ? "" : gifEmbedHTML(c.gif_url, c.gif_label, isWebsiteView())) +
     '<div class="dwc-feed-actions">' +
     '<button type="button" class="dwc-act dwc-bookmark' + (saved ? " on" : "") + '" onclick="DWC.toggleSave(' + c.id + ', \'comment\', this)" aria-label="Save this comment">' + bookmarkHTML(saved) + "</button>" +
     (o.react ? commentReactionGroupHTML(c, o.react) : "") +
@@ -4948,7 +5085,17 @@ function actionButtonLabel(pb, key, fallback) {
   if (pb && pb.buttons && pb.buttons[key] && pb.buttons[key].label) return pb.buttons[key].label;
   return fallback;
 }
-function actionButtonsHTML(m, preview) {
+// Readable text color for a chosen button background (v3.21): white
+// on dark colors, near-black on light ones (relative luminance).
+function buttonTextFor(hex) {
+  var h = String(hex || "").replace("#", "");
+  if (h.length !== 6) return "#0b0b14";
+  var r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255;
+  if (isNaN(r) || isNaN(g) || isNaN(b)) return "#0b0b14";
+  var lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return lum < 0.5 ? "#ffffff" : "#0b0b14";
+}
+function actionButtonsHTML(m, preview, th) {
   var pb = m.profile_buttons || null;
   var blockStyle = "";
   var blockClass = "dwc-action-buttons";
@@ -4959,28 +5106,48 @@ function actionButtonsHTML(m, preview) {
   var isFriend = !!m.is_friend;
   var isFav = !!m.is_favorite;
   var uname = esc(m.username.replace(/'/g, ""));
+  // v3.21 — which buttons show (Edit Profile > Buttons). buttons_visible
+  // null = all show (the default); an array lists exactly which show,
+  // so a member can show just "Message me" if they want. The
+  // professional-mode Message button is separate and always shows.
+  var th2 = th || parseThemeClient(m.profile_theme);
+  var visSet = th2.buttons_visible;
+  var showBtn = function (k) { return !visSet || visSet.indexOf(k) >= 0; };
+  var anyBtn = false;
   // Preview mode (your own page): buttons are disabled so you can't
   // friend/message yourself — they only show how visitors see them.
   var dis = preview ? " disabled" : "";
-  var html = (preview ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
-    '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
+  var html = (preview ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "");
+  var body = '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
   // Add me / Unfriend
-  var addDef = ACTION_BUTTON_DEFS[0];
-  html += '<button type="button" class="btn small" data-action-btn="add"' + dis + ' onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
-    (isFriend ? addDef.friendIcon : addDef.icon) + " " + esc(actionButtonLabel(pb, "add", isFriend ? addDef.friendLabel : addDef.label)) + "</button>";
+  if (showBtn("add")) {
+    anyBtn = true;
+    var addDef = ACTION_BUTTON_DEFS[0];
+    body += '<button type="button" class="btn small" data-action-btn="add"' + dis + ' onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
+      (isFriend ? addDef.friendIcon : addDef.icon) + " " + esc(actionButtonLabel(pb, "add", isFriend ? addDef.friendLabel : addDef.label)) + "</button>";
+  }
   // Message me
-  html += '<button type="button" class="btn small" data-action-btn="message"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + actionButtonStyle(pb, "message") + ">" +
-    ACTION_BUTTON_DEFS[1].icon + " " + esc(actionButtonLabel(pb, "message", ACTION_BUTTON_DEFS[1].label)) + "</button>";
+  if (showBtn("message")) {
+    anyBtn = true;
+    body += '<button type="button" class="btn small" data-action-btn="message"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + actionButtonStyle(pb, "message") + ">" +
+      ACTION_BUTTON_DEFS[1].icon + " " + esc(actionButtonLabel(pb, "message", ACTION_BUTTON_DEFS[1].label)) + "</button>";
+  }
   // Add to Favorites — star next to the wording: ☆ unfilled/uncolored
   // before, ★ filled gold when already favorited.
-  html += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite"' + dis + ' onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
-    '<span class="dwc-fav-star' + (isFav ? " on" : "") + '">' + (isFav ? ACTION_BUTTON_DEFS[2].favIcon : ACTION_BUTTON_DEFS[2].icon) + "</span> " +
-    esc(actionButtonLabel(pb, "favorite", isFav ? ACTION_BUTTON_DEFS[2].favLabel : ACTION_BUTTON_DEFS[2].label)) + "</button>";
+  if (showBtn("favorite")) {
+    anyBtn = true;
+    body += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite"' + dis + ' onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
+      '<span class="dwc-fav-star' + (isFav ? " on" : "") + '">' + (isFav ? ACTION_BUTTON_DEFS[2].favIcon : ACTION_BUTTON_DEFS[2].icon) + "</span> " +
+      esc(actionButtonLabel(pb, "favorite", isFav ? ACTION_BUTTON_DEFS[2].favLabel : ACTION_BUTTON_DEFS[2].label)) + "</button>";
+  }
   // Add to group
-  html += '<button type="button" class="btn small" data-action-btn="group"' + dis + ' onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
-    ACTION_BUTTON_DEFS[3].icon + " " + esc(actionButtonLabel(pb, "group", ACTION_BUTTON_DEFS[3].label)) + "</button>";
-  html += "</div>";
-  return html;
+  if (showBtn("group")) {
+    anyBtn = true;
+    body += '<button type="button" class="btn small" data-action-btn="group"' + dis + ' onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
+      ACTION_BUTTON_DEFS[3].icon + " " + esc(actionButtonLabel(pb, "group", ACTION_BUTTON_DEFS[3].label)) + "</button>";
+  }
+  if (!anyBtn) return preview ? html + '<p style="color:var(--muted);font-size:13px;margin:0">No action buttons selected — pick some in Edit Profile &gt; Buttons.</p>' : "";
+  return html + body + "</div>";
 }
 // Re-fetch one member and swap just the action-button block (and vanity
 // line) so a toggle updates in place without losing the visitor's scroll.
@@ -4992,9 +5159,10 @@ async function refreshActionButtons(memberId) {
   var box = document.getElementById("dwc-action-buttons");
   if (box) {
     var wrap = document.createElement("div");
-    wrap.innerHTML = actionButtonsHTML(m);
+    wrap.innerHTML = actionButtonsHTML(m, false, parseThemeClient(m.profile_theme));
     var fresh = wrap.firstChild;
-    box.replaceWith(fresh);
+    if (fresh) box.replaceWith(fresh);
+    else box.remove();
   }
   var van = document.getElementById("dwc-vanity");
   if (van) {
@@ -5036,7 +5204,7 @@ function profileVideoHTML(m, th) {
 function profileSideRowHTML(m, th) {
   var showButtons = !th || th.buttons_show !== false;
   var side = (th && th.buttons_side === "right") ? "right" : "left";
-  var buttons = showButtons ? actionButtonsHTML(m, !!m.is_mine) : "";
+  var buttons = showButtons ? actionButtonsHTML(m, !!m.is_mine, th) : "";
   var video = profileVideoHTML(m, th);
   if (!buttons && !video) return "";
   // Button system (v3.12) — the member's own link buttons live right
@@ -5105,9 +5273,24 @@ function profileHeadInnerHTML(m, th) {
 function profileNavRowHTML(m) {
   return '<div class="dwc-actions" style="margin-top:14px">' +
     (m.is_mine
-      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button>'
+      ? '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">Edit profile</button> <button type="button" class="btn ghost small" onclick="DWC.openProfilePhotoUpload()">📷 Add photos</button>'
       : "") +
     '<button type="button" class="btn ghost small" onclick="DWC.go(\'members\')">← All members</button>' +
+    "</div>";
+}
+// v3.21 — Add photos, direct on your own profile. A file picker that
+// uploads straight to the stored profile gallery (no Taffy Phone
+// needed) — up to 5 files at once, each with a short description and a
+// Public / Friends choice, with the candy loader + "Uploaded ✓".
+function profilePhotoUploadHTML() {
+  var count = state.galleryStoredCount == null ? "…" : state.galleryStoredCount;
+  return '<div class="card dwc-photo-upload" id="dwc-photo-upload">' +
+    '<h3 style="margin-top:0">📷 Add photos to your profile</h3>' +
+    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Photos stay on your profile so customers and businesses can browse them — your products, your content. <span id="dwc-photo-upload-count">' + count + ' of 20 photos saved.</span></p>' +
+    '<label class="btn small">Choose photos<input type="file" accept="image/*" multiple hidden onchange="DWC.profilePhotoPicked(this)"></label>' +
+    '<div id="dwc-photo-upload-list"></div>' +
+    '<p><button type="button" class="btn" id="dwc-photo-upload-btn" onclick="DWC.profilePhotoUpload()" disabled>Upload</button> <button type="button" class="btn ghost" onclick="DWC.closeProfilePhotoUpload()">Close</button></p>' +
+    '<p id="dwc-photo-upload-status" style="color:var(--muted);font-size:13px;margin:0"></p>' +
     "</div>";
 }
 // Action buttons for a member page. Website mode shows ONLY "Message me"
@@ -5126,44 +5309,80 @@ function profileActionsHTML(m, websiteMode, th) {
     // v3.20 — the button block brings its own "Preview" line on your
     // own page, so only add one here when the block is off.
     var showBtns = !!(th && th.website_buttons);
-    var out = '<div class="dwc-actions" style="margin-top:14px">' +
+    // Professional mode (2026-11-21) — Message me is the only button by
+    // default; the contact email shows too, but ONLY when the member
+    // opted in (Show my contact email in Edit profile).
+    var contactEmail = (m.show_contact_email && m.contact_email)
+      ? '<p style="margin:10px 0 0">✉️ <a href="mailto:' + esc(m.contact_email) + '">' + esc(m.contact_email) + "</a></p>" : "";
+    // v3.21 — professional-mode button: the member picks the side under
+    // their picture and the color (Edit Profile > Buttons). The color
+    // wins over the per-button custom color here — it IS the pro-mode
+    // pick. Text color flips for readability on dark colors.
+    var proSide = th && th.pro_button_side === "center" ? "text-align:center" : th && th.pro_button_side === "right" ? "text-align:right" : "";
+    var proCol = th && th.pro_button_color ? th.pro_button_color : "";
+    var msgStyle = proCol ? ' style="background:' + esc(proCol) + ';color:' + buttonTextFor(proCol) + '"' : actionButtonStyle(pb, "message");
+    var out = '<div class="dwc-actions" style="margin-top:14px' + (proSide ? ";" + proSide : "") + '">' +
       ((m.is_mine && !showBtns) ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "") +
-      '<button type="button" class="btn"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + actionButtonStyle(pb, "message") + ">💬 " + esc(actionButtonLabel(pb, "message", "Message me")) + "</button>" +
+      '<button type="button" class="btn"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + msgStyle + ">💬 " + esc(actionButtonLabel(pb, "message", "Message me")) + "</button>" +
+      contactEmail +
       "</div>";
-    if (showBtns) out += actionButtonsHTML(m, !!m.is_mine);
+    if (showBtns) out += actionButtonsHTML(m, !!m.is_mine, th);
     return out + profileVideoHTML(m, th);
   }
-  return profileSideRowHTML(m, th) +
+  // v3.21 — the buttons + video + links live in one grouped Connect
+  // card now, instead of a loose floating row, so visitors (and the
+  // owner) can find them at a glance. The vanity URL + group picker
+  // stay outside the card.
+  var row = profileSideRowHTML(m, th);
+  var connect = row ? '<section class="card dwc-connect-card"><h3 style="margin-top:0">💬 Connect</h3>' + row + "</section>" : "";
+  return connect +
     (m.is_mine ? vanityURLHTML(m) : '<div id="dwc-group-picker"></div>' + vanityURLHTML(m));
 }
 // Website-look sections — only the checked fields, in order.
 // v3.10 — relationship also respects "Hide Relationship status".
-// Website-look sections — only the checked fields, in order.
-// v3.10 — relationship also respects "Hide Relationship status".
-// preview=true (live preview only): a filled-in field whose Show box
-// is off renders dimmed with a "Hidden" tag, so the member sees what
-// they typed AND that it won't publish until they tick Show.
+// v3.21 — ONE grouped About card instead of a card per field: bio +
+// occupation up top, then the five personal fields as labeled rows.
+// Every row keeps its own gate (bio/occupation hide with "About";
+// each field with its own Show box). In the edit preview, hidden rows
+// render dimmed so the member sees what they typed AND that it won't
+// publish until they tick Show. preview=true (live preview only).
 function websiteSectionsHTML(m, mth, preview) {
   var show = m.website_show || {};
   var hideRel = !!(mth && (mth.hide_sections || []).indexOf("relationship") >= 0);
-  var out = "";
-  var dimTag = preview ? ' <span style="color:var(--muted);font-size:12px">👁️ Hidden — tick Show to publish</span>' : "";
-  if (show.hobbies && m.hobbies) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">🎯 Hobbies</h3><p style="white-space:pre-wrap">' + esc(m.hobbies) + "</p></section>";
-  else if (preview && m.hobbies && !show.hobbies) out += '<section class="card dwc-website-section dwc-preview-hidden"><h3 style="margin-top:0">🎯 Hobbies' + dimTag + '</h3><p style="white-space:pre-wrap">' + esc(m.hobbies) + "</p></section>";
-  if (show.workplace && m.workplace) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">💼 Where I work</h3><p>' + esc(m.workplace) + "</p></section>";
-  else if (preview && m.workplace && !show.workplace) out += '<section class="card dwc-website-section dwc-preview-hidden"><h3 style="margin-top:0">💼 Where I work' + dimTag + '</h3><p>' + esc(m.workplace) + "</p></section>";
-  if (show.relationship && !hideRel && m.relationship_status) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">💞 Single or in a relationship</h3><p>' + esc(m.relationship_status) + "</p></section>";
-  else if (preview && m.relationship_status && !show.relationship && !hideRel) out += '<section class="card dwc-website-section dwc-preview-hidden"><h3 style="margin-top:0">💞 Single or in a relationship' + dimTag + '</h3><p>' + esc(m.relationship_status) + "</p></section>";
-  if (show.sign && m.birthsign && ZODIAC_SIGNS[m.birthsign]) {
+  var hideAbout = !!(mth && (mth.hide_sections || []).indexOf("about") >= 0);
+  // Professional mode (2026-11-21) is the opposite of MySpace: the clean
+  // website look hides the personal bits. On the live page they don't
+  // render at all; in the edit preview they render dimmed so the member
+  // sees what stays hidden while professional mode is on.
+  var pro = !!(m && m.website_mode);
+  if (pro && !preview) return "";
+  var dimTag = preview ? ' <span style="color:var(--muted);font-size:12px">' + (pro ? "👁️ Hidden in professional mode" : "👁️ Hidden — tick Show to publish") + "</span>" : "";
+  var rows = "";
+  var addRow = function (label, html, live, dimmed) {
+    if (live) rows += '<p style="margin:10px 0 0">' + (label ? "<strong>" + label + "</strong><br>" : "") + html + "</p>";
+    else if (preview && dimmed) rows += '<p style="margin:10px 0 0;opacity:.55">' + (label ? "<strong>" + label + dimTag + "</strong><br>" : dimTag + "<br>") + html + "</p>";
+  };
+  // Bio + occupation — the old standalone About card, folded in here.
+  addRow("", '<span style="white-space:pre-wrap">' + esc(m.bio || "") + "</span>", !hideAbout && !!m.bio && !pro, !!m.bio && (hideAbout || pro));
+  addRow("", "Does: <strong>" + esc(m.occupation || "") + "</strong>", !hideAbout && !!m.occupation && !pro, !!m.occupation && (hideAbout || pro));
+  // Hobbies
+  addRow("🎯 Hobbies", '<span style="white-space:pre-wrap">' + esc(m.hobbies || "") + "</span>", !!(show.hobbies && m.hobbies && !pro), !!(m.hobbies && (!show.hobbies || pro)));
+  // Where I work
+  addRow("💼 Where I work", esc(m.workplace || ""), !!(show.workplace && m.workplace && !pro), !!(m.workplace && (!show.workplace || pro)));
+  // Relationship
+  addRow("💞 Single or in a relationship", esc(m.relationship_status || ""), !!(show.relationship && !hideRel && m.relationship_status && !pro), !!(m.relationship_status && (!show.relationship || pro) && !hideRel));
+  // Sign
+  if (show.sign && m.birthsign && ZODIAC_SIGNS[m.birthsign] && !pro) {
     var z = ZODIAC_SIGNS[m.birthsign];
-    out += '<section class="card dwc-website-section"><h3 style="margin-top:0">✨ Sign</h3><p><span class="dwc-sign">' + z.symbol + " " + esc(z.name) + '</span></p><p style="color:var(--muted)">' + esc(z.blurb) + "</p></section>";
-  } else if (preview && m.birthsign && !show.sign && ZODIAC_SIGNS[m.birthsign]) {
+    addRow("✨ Sign", '<span class="dwc-sign">' + z.symbol + " " + esc(z.name) + '</span><br><span style="color:var(--muted)">' + esc(z.blurb) + "</span>", true, false);
+  } else if (preview && m.birthsign && (!show.sign || pro) && ZODIAC_SIGNS[m.birthsign]) {
     var z2 = ZODIAC_SIGNS[m.birthsign];
-    out += '<section class="card dwc-website-section dwc-preview-hidden"><h3 style="margin-top:0">✨ Sign' + dimTag + '</h3><p><span class="dwc-sign">' + z2.symbol + " " + esc(z2.name) + '</span></p><p style="color:var(--muted)">' + esc(z2.blurb) + "</p></section>";
+    addRow("✨ Sign", '<span class="dwc-sign">' + z2.symbol + " " + esc(z2.name) + '</span><br><span style="color:var(--muted)">' + esc(z2.blurb) + "</span>", false, true);
   }
-  if (show.accomplishments && m.accomplishments) out += '<section class="card dwc-website-section"><h3 style="margin-top:0">🏆 Recent accomplishments</h3><p style="white-space:pre-wrap">' + esc(m.accomplishments) + "</p></section>";
-  else if (preview && m.accomplishments && !show.accomplishments) out += '<section class="card dwc-website-section dwc-preview-hidden"><h3 style="margin-top:0">🏆 Recent accomplishments' + dimTag + '</h3><p style="white-space:pre-wrap">' + esc(m.accomplishments) + "</p></section>";
-  return out;
+  // Recent accomplishments
+  addRow("🏆 Recent accomplishments", '<span style="white-space:pre-wrap">' + esc(m.accomplishments || "") + "</span>", !!(show.accomplishments && m.accomplishments && !pro), !!(m.accomplishments && (!show.accomplishments || pro)));
+  if (!rows) return "";
+  return '<section class="card dwc-about-card"><h3 style="margin-top:0">👤 About</h3>' + rows + "</section>";
 }
 // v3.9 — the "Scrolling ticker or headline" effect: when the member
 // hasn't set their own ticker text, the effect shows their bio line (or
@@ -5181,6 +5400,9 @@ async function viewMember(el, memberId) {
   // take it down first (a gated / missing member still shows the chrome).
   if (typeof document !== "undefined" && document.body) document.body.classList.remove("dwc-website-view");
   el.innerHTML = '<p style="color:var(--muted)">Loading their page…</p>';
+  // Rare Candy loading bar — the member fetch has no progress events,
+  // so the bar runs indeterminate until the page renders.
+  if (window.RCRloader) window.RCRloader.show();
   var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
   var m = data && data.member;
   // Age gate (v3.9): an adult creator's page is 18+ only. Unverified
@@ -5191,10 +5413,12 @@ async function viewMember(el, memberId) {
       '<p>🔒 <strong>Your ID is safe here.</strong> It goes into a private vault for Chris to check, and it is permanently deleted the moment he approves or rejects it. Nothing is stored — no photo, no ID number, no birthdate.</p>' +
       '<p><button type="button" class="btn" onclick="DWC.go(\'rules\')">Verify my age →</button> ' +
       '<button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p></div>';
+    if (window.RCRloader) window.RCRloader.hide();
     return;
   }
   if (!m) {
     el.innerHTML = '<div class="note">That member doesn’t exist.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'members\')">← Back to Members</button></p>';
+    if (window.RCRloader) window.RCRloader.hide();
     return;
   }
   state.viewingMember = m;
@@ -5238,13 +5462,21 @@ async function viewMember(el, memberId) {
   var isBtcTicker = mth.ticker_source === "btc";
   var topBanner = (isWebsite ? websiteBannerHTML(m, mth) : bannerHTML(m)) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
   // LEFT — info.
+  // v3.21 — the Subscribe button can be hidden from Edit Profile >
+  // Buttons ("Which buttons show"). buttons_visible null = all show.
+  var showSubscribe = !mth.buttons_visible || mth.buttons_visible.indexOf("subscribe") >= 0;
   var sellerSection = (((m.seller_types && m.seller_types.length) || (m.seller_tags && m.seller_tags.length) || m.seller_open_to) && !hidden("seller")
     ? '<section class="card dwc-sellercard"><h3 style="margin-top:0">🎨 What I sell</h3>' +
       ((m.seller_types && m.seller_types.length) ? "<p>Sells: <strong>" + esc(m.seller_types.join(", ")) + "</strong></p>" : "") +
       ((m.seller_tags && m.seller_tags.length) ? '<p class="dwc-tags">' + m.seller_tags.map(function (t) { return "<span>#" + esc(t) + "</span>"; }).join(" ") + "</p>" : "") +
       (m.seller_open_to ? "<p>Open to: “" + esc(m.seller_open_to) + "”</p>" : "") +
       ((m.seller_price_min_cents || m.seller_price_max_cents) ? "<p>Price range: <strong>" + money(m.seller_price_min_cents) + " – " + money(m.seller_price_max_cents) + "</strong></p>" : "") +
-      (m.is_mine ? "" : '<p><button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> <button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
+      // Professional mode (2026-11-21) — Message me (in the actions
+      // area above) is the only button by default, so the seller
+      // Subscribe / Message privately buttons stay off here. The shop
+      // info above still shows. v3.21 — the Subscribe button itself
+      // can be hidden from Edit Profile > Buttons ("Which buttons show").
+      ((m.is_mine || isWebsite) ? "" : '<p>' + (showSubscribe ? '<button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> ' : "") + '<button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
       "</section>"
     : "");
   var radioSection = (m.show_vnr_player && !hidden("radio")
@@ -5254,18 +5486,16 @@ async function viewMember(el, memberId) {
       '<audio id="dwc-vnr-audio" controls preload="' + (m.autoplay_vnr ? "auto" : "none") + '"' + (m.autoplay_vnr ? " autoplay" : "") + ' src="' + VNR_STREAM_URL + '">Your browser can’t play the stream here — open it in a new tab: ' + VNR_STREAM_URL + "</audio></div>" +
       '<p style="margin:8px 0 0;font-size:13px"><a href="' + VNR_STREAM_URL + '" target="_blank" rel="noopener">Open the stream in a new tab ↗</a></p></section>'
     : "");
-  var aboutSection = (!hidden("about") ? '<section class="card"><h3 style="margin-top:0">About</h3>' +
-    (m.bio ? '<p style="white-space:pre-wrap">' + esc(m.bio) + "</p>" : "<p style=\"color:var(--muted)\">No bio yet.</p>") +
-    (!hidden("occupation") && m.occupation ? "<p>Does: <strong>" + esc(m.occupation) + "</strong></p>" : "") +
-    "</section>" : "");
-  // v3.20 (corrected 2026-11-20) — the five website sections show
-  // whenever their OWN Show box is ticked, in EITHER layout: MySpace
-  // mode renders them as cards in this left info column, website mode
-  // renders them as the website sections. "Website look" only changes
-  // the LAYOUT — it never hides content the member chose to show.
+  // Professional mode (2026-11-21) is the opposite of MySpace: the five
+  // website sections only render in MySpace mode, whenever their OWN
+  // Show box is ticked. Professional mode hides them outright (see
+  // websiteSectionsHTML) — the clean website look keeps just the
+  // banner, the Message link, the shop, and an opted-in contact email.
+  // v3.21 — the bio + occupation live inside the grouped About card
+  // (websiteSectionsHTML), so there is no separate About card anymore.
   var infoCol =
     websiteSectionsHTML(m, mth) +
-    aboutSection + sellerSection + radioSection;
+    sellerSection + radioSection;
   // MIDDLE — goods on top, then the post feed scrolling endlessly below.
   var mainCol = profileActionsHTML(m, isWebsite, mth) +
     '<section class="card dwc-member-feed"><h3 style="margin-top:0">📝 Posts</h3>' +
@@ -5301,11 +5531,15 @@ async function viewMember(el, memberId) {
   // The only way back — tiny and unobtrusive, on purpose. The owner
   // also gets an Edit link here (their website nav bar is gone).
   var websiteBack = (isWebsite ? '<p class="dwc-website-back"><a href="community.html">🍬 ← Rare Candy Reserve</a>' + (m.is_mine ? ' · <button type="button" class="dwc-linklike" onclick="DWC.editProfile()">Edit profile</button>' : "") + "</p>" : "");
+  // v3.21 — button size: the member's pick from Edit Profile > Buttons.
+  // "" = M, the current size; the class scales every button on the page.
+  var btnSizeCls = mth.button_size ? " dwc-btn-" + mth.button_size : "";
   el.innerHTML =
-    '<div class="dwc-myprofile' + (isWebsite ? " dwc-website" : "") + '">' +
+    '<div class="dwc-myprofile' + (isWebsite ? " dwc-website" : "") + btnSizeCls + '">' +
     (hasCustomPage
       ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth) + listingsSection + websiteBack
       : (picOnTop ? headTop + topBanner : topBanner + headCard) +
+        '<div id="dwc-photo-upload-host"></div>' +
         '<div class="dwc-member-cols' + (tfSideLeft ? " dwc-member-cols-flip" : "") + '">' +
         '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>" +
         '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>" +
@@ -5324,6 +5558,7 @@ async function viewMember(el, memberId) {
   if (!hasCustomPage) loadMemberFeed(m.id);
   if (isWebsite && !hidden("listings")) loadMemberListings(m.id);
   if (!hasCustomPage && !hidden("comments")) loadPageComments(m.id, m.is_mine, m.is_friend);
+  if (window.RCRloader) window.RCRloader.hide();
 }
 
 // ---------- v3.7 page comments ----------
@@ -5343,7 +5578,9 @@ async function loadPageComments(profileId, isMine, isFriend) {
           gifAsImage: true, // page comments show a raw GIF link as an image, as before
           visibilityNote: c.visibility !== "public" ? "· " + (c.visibility === "friends" ? "friends-only" : "private") : "",
           mediaHTML: (c.image_url ? '<p style="margin:4px 0"><img src="' + esc(c.image_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : "") +
-            (c.gif_url ? '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>' : ""),
+            // Professional mode — a GIF on a page comment sits behind a
+            // button instead of auto-showing (see gifEmbedHTML gate).
+            (c.gif_url ? (isWebsiteView() ? '<p style="margin:4px 0"><button type="button" class="btn ghost small" data-gif-src="' + esc(c.gif_url) + '" onclick="DWC.loadGifImg(this)">▶ Load GIF</button></p>' : '<p style="margin:4px 0"><img src="' + esc(c.gif_url) + '" alt="" style="max-width:100%;border-radius:8px"></p>') : ""),
           extraActions: (c.is_mine || isMine || canMod) ? ' <button type="button" class="dwc-linklike" onclick="DWC.deletePageComment(' + c.id + "," + profileId + ')">Delete</button>' : "",
         });
       }).join("")
@@ -5473,7 +5710,10 @@ function renderPicViewer() {
     '<div class="dwc-picviewer-card" role="dialog" aria-label="Picture viewer">' +
     '<button type="button" class="dwc-picviewer-close" onclick="DWC.closePicViewer()" title="Close">✕</button>' +
     '<div class="dwc-picviewer-photo">' + picViewerPhotoHTML(pv) + "</div>" +
-    '<p class="dwc-picviewer-label">' + esc(photo ? (photo.label || "Profile picture") : "") + "</p>" +
+    '<p class="dwc-picviewer-label">' + esc(photo ? (photo.label || "Profile picture") : "") + (state.profile && state.profile.id === pv.memberId && photo && photo.visibility && photo.visibility !== "public" ? " · " + (photo.visibility === "friends" ? "👥 Friends-only" : "🔒 Private") : "") + "</p>" +
+    (state.profile && state.profile.id === pv.memberId && photo && photo.subject && photo.subject.indexOf("gallery:") === 0
+      ? '<p style="margin:0 0 10px"><button type="button" class="btn small" onclick="DWC.picViewerSetAvatar()">🖼️ Set as profile picture</button></p>'
+      : "") +
     '<div class="dwc-picviewer-nav">' +
     '<button type="button" class="btn ghost small" onclick="DWC.picViewerPrev()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>← Prev</button>' +
     '<span>' + (pv.index + 1) + " / " + pv.photos.length + "</span>" +
@@ -5815,7 +6055,7 @@ async function openEphemeralChat(partnerId, partnerUsername, postId) {
 async function viewReports(el) {
   if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
   if (!state.profile.is_operator) {
-    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator’s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p>Flag and report any comment or profile, as well as messages or content you see, if it does not belong — an admin will see it and action will be taken. For further issues unresolved, reach out to <a href="mailto:TheRarecandyreserve@proton.me">TheRarecandyreserve@proton.me</a> or leave a message for the owner of this website or its agents or employees.</p><p style="color:var(--muted)">Only the operator can see the inbox. (If this is your shop, claim the operator role from your profile — first claim wins, so do it before opening the Community.)</p><p><button type="button" class="btn ghost small" onclick="DWC.claimOperator()">Claim operator role</button></p></section>';
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🚩 Reports</h2><p>Reports go straight to the operator’s inbox — Chris reviews every one. To file a report, use the 🚩 Report button on any post, comment, or listing.</p><p>Flag and report any comment or profile, as well as messages or content you see, if it does not belong — an admin will see it and action will be taken.</p><h3 style="margin:18px 0 6px">File a ticket</h3><p style="color:var(--muted)">No post or listing to point at? Harassment in DMs, account help, anything else — write it here and it lands in the same inbox.</p><textarea id="dwc-ticket-text" rows="4" maxlength="1000" placeholder="What happened, or what do you need?"></textarea><p><button type="button" class="btn small" onclick="DWC.fileTicket()">Send ticket</button></p><p>For further issues unresolved, reach out to <a href="mailto:TheRarecandyreserve@proton.me">TheRarecandyreserve@proton.me</a> or leave a message for the owner of this website or its agents or employees.</p><p style="color:var(--muted)">Only the operator can see the inbox.</p></section>';
     return;
   }
   el.innerHTML = '<section aria-label="Reports inbox"><h2 style="margin-top:0">🚩 Reports — operator inbox</h2><p style="color:var(--muted)">Loading…</p></section>';
@@ -6725,9 +6965,9 @@ window.DWC = {
     var photos = [];
     if (m.avatar_url) photos.push({ url: m.avatar_url, subject: "avatar", label: "Profile picture" });
     try {
-      var g = await apiGet("/gallery?profile_id=" + memberId);
+      var g = await apiGet("/gallery?profile_id=" + memberId + "&device_id=" + encodeURIComponent(deviceId()));
       ((g && g.photos) || []).slice(0, 20).forEach(function (p, i) {
-        photos.push({ url: p.url, subject: "gallery:" + p.id, label: p.caption || ("Photo " + (i + 1)) });
+        photos.push({ url: p.url, subject: "gallery:" + p.id, label: p.caption || ("Photo " + (i + 1)), visibility: p.visibility || "public" });
       });
     } catch (e) { /* gallery not there yet — avatar only */ }
     if (!photos.length) { setNotice("No picture to show yet."); return; }
@@ -6750,6 +6990,97 @@ window.DWC = {
     if (!pv) return;
     pv.index = (pv.index + 1) % pv.photos.length;
     renderPicViewer();
+  },
+  // v3.21 — set the gallery photo showing in the viewer as the profile
+  // picture. Same avatar_gallery_id path as the phone gallery, so the
+  // avatar_blob_key is updated and it persists. Re-opens the viewer so
+  // the new profile picture shows first.
+  picViewerSetAvatar: async function () {
+    var pv = state.picViewer;
+    if (!pv || !state.profile || state.profile.id !== pv.memberId) return;
+    var photo = pv.photos[pv.index];
+    if (!photo || !photo.subject || photo.subject.indexOf("gallery:") !== 0) return;
+    var gid = photo.subject.slice("gallery:".length);
+    var data = await apiPost("/profile", { device_id: deviceId(), avatar_gallery_id: gid });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't set that as your profile picture."); return; }
+    var avatarUrl = data.avatar_url || (data.profile && data.profile.avatar_url);
+    if (avatarUrl) {
+      state.profile.avatar_url = avatarUrl;
+      if (state.viewingMember) state.viewingMember.avatar_url = avatarUrl;
+      var av = document.querySelector(".dwc-avatar");
+      if (av && av.tagName === "IMG") av.src = avatarUrl;
+    }
+    setNotice("🖼️ That's your profile picture now.");
+    DWC.openPicViewer(pv.memberId);
+  },
+  // v3.21 — Add photos panel on your own profile (bypasses the Taffy
+  // Phone Gallery; the phone path stays). Up to 5 files at once, each
+  // with a short description + Public / Friends, uploaded straight to
+  // the stored gallery with the candy loader + "Uploaded ✓".
+  openProfilePhotoUpload: function () {
+    var host = $("dwc-photo-upload-host");
+    if (!host) return;
+    host.innerHTML = profilePhotoUploadHTML();
+    DWC.refreshGalleryCount();
+    state.profilePhotoFiles = [];
+    var el = $("dwc-photo-upload");
+    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  },
+  closeProfilePhotoUpload: function () {
+    var host = $("dwc-photo-upload-host");
+    if (host) host.innerHTML = "";
+  },
+  profilePhotoPicked: function (input) {
+    var files = input && input.files ? Array.prototype.slice.call(input.files, 0, 5) : [];
+    state.profilePhotoFiles = files;
+    var list = $("dwc-photo-upload-list");
+    var btn = $("dwc-photo-upload-btn");
+    if (btn) btn.disabled = !files.length;
+    if (list) {
+      list.innerHTML = files.map(function (f, i) {
+        return '<div class="dwc-photo-upload-row"><span>' + esc(f.name || ("Photo " + (i + 1))) + '</span>' +
+          '<input type="text" class="dwc-photo-upload-caption" maxlength="140" placeholder="Short description (140 max)" data-cap="' + i + '">' +
+          '<select class="dwc-photo-upload-vis" data-vis="' + i + '"><option value="public">🌍 Public</option><option value="friends">👥 Friends</option></select></div>';
+      }).join("");
+    }
+    if (input) input.value = "";
+  },
+  profilePhotoUpload: async function () {
+    var files = state.profilePhotoFiles || [];
+    if (!files.length || !state.profile) return;
+    var btn = $("dwc-photo-upload-btn");
+    var status = $("dwc-photo-upload-status");
+    if (btn) btn.disabled = true;
+    var ok = 0, failed = 0;
+    if (window.RCRloader) window.RCRloader.show();
+    for (var k = 0; k < files.length; k++) {
+      var f = files[k];
+      var cap = "";
+      var vis = "public";
+      var capEl = document.querySelector('[data-cap="' + k + '"]');
+      var visEl = document.querySelector('[data-vis="' + k + '"]');
+      if (capEl) cap = capEl.value.slice(0, 140);
+      if (visEl) vis = visEl.value === "friends" ? "friends" : "public";
+      if (status) status.textContent = "Uploading " + (k + 1) + " of " + files.length + "… 🍬";
+      var img = await fileToImage(f, 1500000, { maxDim: 1600 });
+      if (!img || img.error) { failed++; continue; }
+      var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: img.dataBase64, mimeType: img.mimeType }, caption: cap, visibility: vis });
+      if (data && data.ok) ok++; else failed++;
+    }
+    if (window.RCRloader) window.RCRloader.hide();
+    DWC.refreshGalleryCount();
+    if (ok) {
+      var newCount = state.galleryStoredCount == null ? ok : state.galleryStoredCount + ok;
+      var countEl = $("dwc-photo-upload-count");
+      if (countEl) countEl.textContent = newCount + " of 20 photos saved.";
+    }
+    if (status) status.textContent = ok ? "Uploaded ✓ — " + ok + " photo" + (ok === 1 ? "" : "s") + " saved to your profile." + (failed ? " " + failed + " couldn't be read." : "") : "Nothing uploaded — those photos couldn't be read.";
+    if (ok) {
+      state.profilePhotoFiles = [];
+      var list = $("dwc-photo-upload-list");
+      if (list) list.innerHTML = "";
+    }
+    if (btn) btn.disabled = true;
   },
   closePicViewer: function () {
     var host = $("dwc-picviewer");
@@ -6825,6 +7156,9 @@ window.DWC = {
   saveProfile: async function (form) {
     var isNew = !state.profile;
     var fd = new FormData(form);
+    // Rare Candy loading bar — the save (photo shrinking + upload +
+    // POST) has no progress events, so the bar runs indeterminate.
+    if (window.RCRloader) window.RCRloader.show();
     // Avatar: a bad picture must NEVER kill the whole save. If the pic
     // is too big or the wrong type, we save the rest of the profile and
     // tell the member exactly why the picture didn't stick.
@@ -6991,6 +7325,19 @@ window.DWC = {
       // everything else — changing one never resets another.
       var btnSide = String(fd.get("theme_buttons_side") || "");
       if (btnSide === "right") theme.buttons_side = "right";
+      // v3.21 — Buttons group: size, which buttons show, professional
+      // button side + color. Size "" = M (the current size); the which-
+      // show checkboxes only submit when the Buttons section is on the
+      // form, so only set buttons_visible when they are present (same
+      // stale-form guard as display_badges below).
+      var btnSize = String(fd.get("theme_button_size") || "");
+      if (btnSize === "s" || btnSize === "l" || btnSize === "xl") theme.button_size = btnSize;
+      var visChecked = fd.getAll ? fd.getAll("theme_buttons_visible") : [];
+      if (visChecked.length) theme.buttons_visible = visChecked.map(function (k) { return String(k || ""); }).filter(function (k) { return ["add", "message", "favorite", "group", "subscribe"].indexOf(k) >= 0; });
+      var proSide = String(fd.get("theme_pro_button_side") || "");
+      if (proSide === "center" || proSide === "right") theme.pro_button_side = proSide;
+      var proCol = String(fd.get("theme_pro_button_color") || "").trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(proCol)) theme.pro_button_color = proCol;
       theme.buttons_show = !!fd.get("theme_buttons_show");
       // Website look (v3.20) — the Add me / Favorite / Add to group
       // buttons on a professional page are the member's choice.
@@ -7033,6 +7380,11 @@ window.DWC = {
         sign: !!fd.get("website_show_sign"),
         accomplishments: !!fd.get("website_show_accomplishments"),
       };
+      // Professional mode — contact email + its opt-in Show box. The
+      // server stores them in the v39 columns (graceful pending if the
+      // migration hasn't run yet, like the rest of the website look).
+      body.contact_email = String(fd.get("contact_email") || "").trim().slice(0, 120);
+      body.show_contact_email = !!fd.get("show_contact_email");
     }
     // Steady Wave player (v3.1) — opt-in radio on the profile.
     // Edit-only fields (the toggles only render on edit), so only send
@@ -7086,6 +7438,7 @@ window.DWC = {
     var data = await apiPost("/profile", body);
     if (!data || !data.ok) {
       if (isNew) { state.challenge = null; loadChallenge(); }
+      if (window.RCRloader) window.RCRloader.hide();
       return formErr(form, (data && data.error) || "Couldn't save that profile.");
     }
     // The save response may not carry badges / seller flags (the GET
@@ -7136,7 +7489,17 @@ window.DWC = {
       setNotice((isNew ? "Welcome to YourSpace, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote + bannerNote + videoNote);
     }
     render();
+    // Meme drawer (2026-11-21): saving used to land the member on the
+    // memes — the tall edit form collapses on render and the browser
+    // clamps the old scroll position to the bottom of the now-shorter
+    // page, which is the meme stash. Close the drawer if it was open
+    // and put the member back at the top of the feed instead.
+    if (window.__dwcMemeDrawer) window.__dwcMemeDrawer(false);
+    var feedTop = document.getElementById("dwc-app");
+    if (feedTop) feedTop.scrollIntoView({ behavior: "smooth", block: "start" });
+    else if (typeof window !== "undefined") window.scrollTo(0, 0);
     await refreshStats();
+    if (window.RCRloader) window.RCRloader.hide();
     return false;
   },
 
@@ -8257,6 +8620,51 @@ window.DWC = {
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
+  // Button size picker (v3.21) — S / M / L / XL pills in the Buttons
+  // group. Sets the hidden theme_button_size field ("" = M, the
+  // current size). Same pattern as applyButtonsSide.
+  applyButtonSize: function (size) {
+    var v = (size === "s" || size === "l" || size === "xl") ? size : "";
+    var key = v === "" ? "m" : v;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_button_size"]');
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-btnsizebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-btnsizebtn") === key);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Professional-mode button side (v3.21) — Left / Center / Right pills.
+  // Sets the hidden theme_pro_button_side field ("" = left).
+  applyProButtonSide: function (side) {
+    var v = (side === "center" || side === "right") ? side : "";
+    var key = v === "" ? "left" : v;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_pro_button_side"]');
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-prosidebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-prosidebtn") === key);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Professional-mode button color (v3.21) — preset pills or the color
+  // input. Sets the hidden theme_pro_button_color field ("" = default
+  // look, untouched) and syncs the picker + pills.
+  applyProButtonColor: function (color) {
+    var ok = /^#[0-9a-fA-F]{6}$/.test(String(color || "").trim()) ? String(color).trim() : "";
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_pro_button_color"]');
+    if (hidden) hidden.value = ok;
+    var pick = form && form.querySelector("#dwc-pro-color-pick");
+    if (pick && ok) pick.value = ok;
+    document.querySelectorAll("[data-procolorbtn]").forEach(function (b) {
+      b.classList.toggle("active", ok !== "" && b.getAttribute("data-procolorbtn").toLowerCase() === ok.toLowerCase());
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
   // Banner auto-fit (v3.20) — see bannerFit above; the DWC wrapper so
   // the inline onload handler can reach it.
   bannerFit: function (img) { bannerFit(img); },
@@ -8546,6 +8954,15 @@ window.DWC = {
     th.gb_colors = [0, 1, 2].map(function (i) { return hexOk(get("theme_gb_color_" + i)); }).filter(Boolean);
     var btnSide = get("theme_buttons_side");
     th.buttons_side = (btnSide === "right") ? "right" : "";
+    // v3.21 — Buttons group fields, same reads as saveProfile.
+    var btnSize = get("theme_button_size");
+    th.button_size = (btnSize === "s" || btnSize === "l" || btnSize === "xl") ? btnSize : "";
+    var visChecked = fd.getAll ? fd.getAll("theme_buttons_visible") : [];
+    th.buttons_visible = visChecked.length ? visChecked.filter(function (k) { return ["add", "message", "favorite", "group", "subscribe"].indexOf(k) >= 0; }) : null;
+    var proSide = get("theme_pro_button_side");
+    th.pro_button_side = (proSide === "center" || proSide === "right") ? proSide : "";
+    var proCol = (get("theme_pro_button_color") || "").trim();
+    th.pro_button_color = /^#[0-9a-fA-F]{6}$/.test(proCol) ? proCol : "";
     th.buttons_show = !!fd.get("theme_buttons_show");
     // Website look (v3.20) — same field saveProfile reads.
     th.website_buttons = !!fd.get("theme_website_buttons");
@@ -8859,6 +9276,7 @@ window.DWC = {
     if (app === "alerts") loadPhoneAlerts();
     if (app === "notes") loadPhoneNotes();
     if (app === "store" && !state.lucre) loadLucre();
+    if (app === "gallery") DWC.refreshGalleryCount();
     renderPhone();
   },
   // Lucre (v3.11) — weekly check-in from the wallet on the home page.
@@ -9165,7 +9583,7 @@ window.DWC = {
     if (state.phoneGallery.length >= 6) { setNotice("The gallery holds 6 photos at a time — delete one first."); input.value = ""; return; }
     var img = await fileToImage(file, 1500000, { maxDim: 1600 });
     if (!img || img.error) { setNotice((img && img.error) || "That photo couldn't be read."); input.value = ""; return; }
-    var item = { url: "data:" + img.mimeType + ";base64," + img.dataBase64, name: file.name || "photo", timer: null };
+    var item = { url: "data:" + img.mimeType + ";base64," + img.dataBase64, name: file.name || "photo", caption: "", timer: null, visibility: "private", uploading: false };
     item.timer = setTimeout(function () {
       var idx = state.phoneGallery.indexOf(item);
       if (idx >= 0) {
@@ -9177,26 +9595,181 @@ window.DWC = {
     input.value = "";
     renderPhone();
   },
-  phoneGalleryDel: function (i) {
+  // v3.21 — delete a gallery photo. One shared delete path: the ✕
+  // button, the long-hold (mobile), and the drag-to-trash (desktop)
+  // all come here, and all ask first — a gesture never deletes
+  // silently. If the photo was published, the stored copy is deleted
+  // too, and the "N of 20" count refreshes.
+  phoneGalleryDel: async function (i) {
+    DWC.phoneGalleryLongEnd(); // a pending long-hold must not fire after a ✕ tap
     var it = state.phoneGallery[i];
     if (!it) return;
+    if (!window.confirm("Delete this photo?" + (it.publicId ? " It will also be removed from your profile's saved photos." : ""))) return;
     if (it.timer) clearTimeout(it.timer);
-    state.phoneGallery.splice(i, 1);
+    if (it.publicId) {
+      var data = await apiDelete("/gallery?id=" + it.publicId + "&device_id=" + encodeURIComponent(deviceId()));
+      if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't delete that photo."); return; }
+      DWC.refreshGalleryCount();
+    }
+    var idx = state.phoneGallery.indexOf(it);
+    if (idx >= 0) state.phoneGallery.splice(idx, 1);
+    if (state.phoneGalleryView === i) { state.phoneGalleryView = null; state.phone.app = "gallery"; }
+    else if (state.phoneGalleryView != null && state.phoneGalleryView > idx) state.phoneGalleryView--;
     renderPhone();
   },
-  // v3.9 — "Make public": upload a session phone photo to the public
-  // gallery (R2) so it shows in the picture viewer on your page (up to
-  // 20). The session copy still vanishes after 10 minutes — the public
-  // copy stays until you take it down.
-  phoneGalleryPublish: async function (i) {
+  // v3.21 — short description for a photo (140 chars max). Typed in
+  // the detail view; saved with the photo when it is published, and
+  // shown under it in the grid + the picture viewer. Not re-rendered
+  // on every keystroke (that would steal focus) — the count line only.
+  phoneGalleryCaption: function (i, v) {
+    var it = state.phoneGallery[i];
+    if (!it) return;
+    it.caption = String(v || "").slice(0, 140);
+    var c = document.querySelector(".tp-caption-count");
+    if (c) c.textContent = it.caption.length + "/140";
+  },
+  // v3.21 — how many photos are stored on the profile right now.
+  // GET /api/gallery returns total; a change re-renders the gallery
+  // (the key only includes the count while the gallery is open).
+  refreshGalleryCount: async function () {
+    if (!state.profile) { state.galleryStoredCount = null; return; }
+    try {
+      // GET needs profile_id (the owner sees all rows, so total counts
+      // every stored photo — exactly what the 20-photo cap counts).
+      var data = await apiGet("/gallery?profile_id=" + state.profile.id + "&device_id=" + encodeURIComponent(deviceId()));
+      var n = data && data.ok ? data.total : null;
+      if (n == null && data && Array.isArray(data.photos)) n = data.photos.length;
+      if (n != null && n !== state.galleryStoredCount) {
+        state.galleryStoredCount = n;
+        if (state.phone.app === "gallery") renderPhone();
+      }
+    } catch (e) { /* offline — the count line stays on "loading…" */ }
+  },
+  // v3.21 — long-hold on a photo (mobile/touch): hold ~600ms and the
+  // delete confirm comes up. A quick tap or a scroll cancels it.
+  phoneGalleryLongStart: function (i, el) {
+    DWC.phoneGalleryLongEnd();
+    var it = state.phoneGallery[i];
+    if (!it) return;
+    state.phoneGalleryLongTimer = setTimeout(function () {
+      state.phoneGalleryLongFired = true;
+      // Look the photo up by object, not by index — the grid may have
+      // shifted since the hold started (a ✕ tap, a publish finishing).
+      var idx = state.phoneGallery.indexOf(it);
+      if (idx >= 0) DWC.phoneGalleryDel(idx);
+    }, 600);
+  },
+  phoneGalleryLongEnd: function () {
+    if (state.phoneGalleryLongTimer) { clearTimeout(state.phoneGalleryLongTimer); state.phoneGalleryLongTimer = null; }
+    // The tap that ends a fired long-hold must not also open the photo.
+    if (state.phoneGalleryLongFired) {
+      state.phoneGalleryLongFired = false;
+      state.phoneGallerySuppressClick = true;
+      setTimeout(function () { state.phoneGallerySuppressClick = false; }, 50);
+    }
+  },
+  // v3.21 — drag a photo to the trash can (desktop/mouse only; touch
+  // dragging fights with scrolling, so mobile gets the long-hold).
+  phoneGalleryDragStart: function (e, i) {
+    state.phoneGalleryDragIndex = i;
+    ensureTrashCan();
+    var can = $("dwc-trashcan");
+    if (can) can.classList.add("show");
+    if (e && e.dataTransfer) { e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", String(i)); } catch (err) {} }
+  },
+  phoneGalleryDragEnd: function () {
+    state.phoneGalleryDragIndex = null;
+    var can = $("dwc-trashcan");
+    if (can) can.classList.remove("show", "over");
+  },
+  phoneGalleryDropTrash: function () {
+    var i = state.phoneGalleryDragIndex;
+    DWC.phoneGalleryDragEnd();
+    if (i == null) return;
+    DWC.phoneGalleryDel(i);
+  },
+  // v3.21 — set this gallery photo as the profile picture. The photo
+  // is published first if it is still session-only, then the avatar is
+  // pointed at the stored gallery row (avatar_blob_key) via the
+  // profile endpoint — the same place the avatar is saved everywhere
+  // else, so it persists.
+  phoneGallerySetAvatar: async function (i) {
+    var it = state.phoneGallery[i];
+    if (!it || !state.profile || it.uploading) return;
+    if (!it.publicId) {
+      await DWC.phoneGalleryPublish(i, it.visibility === "friends" ? "friends" : "public");
+      it = state.phoneGallery[i];
+      if (!it || !it.publicId) return;
+    }
+    var data = await apiPost("/profile", { device_id: deviceId(), avatar_gallery_id: it.publicId });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't set that as your profile picture."); return; }
+    var avatarUrl = data.avatar_url || (data.profile && data.profile.avatar_url);
+    if (avatarUrl) {
+      state.profile.avatar_url = avatarUrl;
+      var av = document.querySelector(".dwc-avatar");
+      if (av && av.tagName === "IMG") av.src = avatarUrl;
+    }
+    setNotice("🖼️ That's your profile picture now.");
+  },
+  // Gallery visibility (v3.21) — per photo: Private / Public / Friends.
+  // Private is session-only (nothing uploaded). Public / Friends upload
+  // the photo (or update the one already up) and show a clear uploading
+  // state while the file goes up — the candy loader + "Uploading…" text
+  // so you can tell when it finished.
+  phoneGallerySetVisibility: async function (i, vis) {
     var it = state.phoneGallery[i];
     if (!it || !state.profile) return;
+    if (["private", "public", "friends"].indexOf(vis) < 0) vis = "private";
+    if (vis === "private") {
+      if (it.publicId) {
+        var del = await apiDelete("/gallery?id=" + it.publicId + "&device_id=" + encodeURIComponent(deviceId()));
+        if (!del || !del.ok) { setNotice((del && del.error) || "Couldn't take that photo down."); return; }
+        it.publicId = null;
+        DWC.refreshGalleryCount();
+      }
+      it.visibility = "private";
+      setNotice("🔒 Private — only you can see it, here in your session gallery.");
+      renderPhone();
+      return;
+    }
+    if (it.publicId) {
+      it.uploading = true;
+      if (window.RCRloader) window.RCRloader.show();
+      renderPhone();
+      var upd = await apiPut("/gallery", { device_id: deviceId(), id: it.publicId, visibility: vis });
+      it.uploading = false;
+      if (window.RCRloader) window.RCRloader.hide();
+      if (state.phoneGallery.indexOf(it) < 0) return;
+      if (!upd || !upd.ok) { setNotice((upd && upd.error) || "Couldn't change that photo's visibility."); renderPhone(); return; }
+      it.visibility = vis;
+      setNotice(vis === "public" ? "🌍 Public ✓ — visitors can see it on your page." : "👥 Friends-only ✓ — only your friends can see it.");
+      renderPhone();
+      return;
+    }
+    DWC.phoneGalleryPublish(i, vis);
+  },
+  // v3.9 — upload a session phone photo to the gallery (R2) so it shows
+  // in the picture viewer on your page (up to 20). The session copy
+  // still vanishes after 10 minutes — the published copy stays until
+  // you set it back to Private.
+  phoneGalleryPublish: async function (i, vis) {
+    var it = state.phoneGallery[i];
+    if (!it || !state.profile) return;
+    vis = vis === "friends" ? "friends" : "public";
     var m = /^data:([^;]+);base64,(.+)$/.exec(it.url || "");
     if (!m) { setNotice("That photo couldn't be read — add it again."); return; }
-    var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: m[2], mimeType: m[1] }, caption: it.name || "" });
-    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't make that photo public."); return; }
+    it.uploading = true;
+    if (window.RCRloader) window.RCRloader.show();
+    renderPhone();
+    var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: m[2], mimeType: m[1] }, caption: (it.caption || "").slice(0, 140), visibility: vis });
+    it.uploading = false;
+    if (window.RCRloader) window.RCRloader.hide();
+    if (state.phoneGallery.indexOf(it) < 0) return;
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't make that photo public."); renderPhone(); return; }
     it.publicId = data.photo && data.photo.id;
-    setNotice("Public ✓ — visitors can scroll to it from your picture.");
+    it.visibility = (data.photo && data.photo.visibility) || vis;
+    DWC.refreshGalleryCount();
+    setNotice(vis === "public" ? "Uploaded ✓ — Public: visitors can scroll to it from your picture." : "Uploaded ✓ — Friends-only: only your friends can see it.");
     renderPhone();
   },
   phoneGalleryUnpublish: async function (i) {
@@ -9205,12 +9778,18 @@ window.DWC = {
     var data = await apiDelete("/gallery?id=" + it.publicId + "&device_id=" + encodeURIComponent(deviceId()));
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't take that photo down."); return; }
     it.publicId = null;
+    DWC.refreshGalleryCount();
     setNotice("Taken down from your public gallery.");
     renderPhone();
   },
   phoneGalleryOpen: function (i) {
-    var it = state.phoneGallery[i];
-    if (it) DWC.openLightbox(it.url);
+    if (!state.phoneGallery[i]) return;
+    // v3.21 — a tap right after a fired long-hold is the end of the
+    // hold, not a tap to open — ignore it.
+    if (state.phoneGallerySuppressClick) return;
+    state.phone.app = "gallery-photo";
+    state.phoneGalleryView = i;
+    renderPhone();
   },
   phoneNotesInput: function (ta) {
     state.phoneNotes = ta.value;
@@ -9288,12 +9867,45 @@ window.DWC = {
     flash("✅ Saved!");
   },
 
+  // Professional mode — GIF comments sit behind a button (see the
+  // gifEmbedHTML gate and the page-comment GIF gate). Tap loads the GIF
+  // in place of the button; nothing auto-plays on a clean profile.
+  loadGifEmbed: function (btn) {
+    var url = btn.getAttribute("data-gif-url") || "";
+    var label = btn.getAttribute("data-gif-label") || "";
+    if (!url || !btn.parentNode) return;
+    var tmp = document.createElement("div");
+    tmp.innerHTML = gifEmbedHTML(url, label);
+    if (tmp.firstChild) btn.parentNode.replaceChild(tmp.firstChild, btn);
+  },
+  loadGifImg: function (btn) {
+    var url = btn.getAttribute("data-gif-src") || "";
+    if (!url || !btn.parentNode) return;
+    var img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.style.maxWidth = "100%";
+    img.style.borderRadius = "8px";
+    btn.parentNode.replaceChild(img, btn);
+  },
+
   report: async function (type, id) {
     if (!state.profile) { setNotice("Create your account first — reports come from members so they're accountable."); DWC.openSignup(); return; }
     var reason = prompt("What's wrong with this " + type + "? (optional — one line is enough)");
     if (reason === null) return;
     var data = await apiPost("/reports", { device_id: deviceId(), target_type: type, target_id: id, reason: reason || "" });
     if (data && data.ok) setNotice("Reported — it goes straight to the operator's inbox for Chris to review. Thanks.");
+    else if (data && data.error) setNotice(data.error);
+  },
+  // General ticket (v3.21) — a report with no post/comment/listing
+  // attached. Same inbox, same Claim/Release/Resolve actions.
+  fileTicket: async function () {
+    if (!state.profile) { setNotice("Create your account first — reports come from members so they're accountable."); DWC.openSignup(); return; }
+    var box = document.getElementById("dwc-ticket-text");
+    var reason = box ? box.value.trim() : "";
+    if (!reason) { setNotice("Say what happened first — a blank ticket helps nobody."); return; }
+    var data = await apiPost("/reports", { device_id: deviceId(), target_type: "general", target_id: 0, reason: reason });
+    if (data && data.ok) { if (box) box.value = ""; setNotice("Ticket sent — it goes straight to the operator's inbox for Chris to review. Thanks."); }
     else if (data && data.error) setNotice(data.error);
   },
   // Team moderation (v3.18) — claim / release / resolve a report.
@@ -9466,6 +10078,9 @@ window.DWC = {
 // ---------- init ----------
 async function init() {
   if (!$("dwc-app")) return;
+  // Rare Candy loading bar — the boot (profile + stats + first render)
+  // has no progress events, so the bar runs indeterminate.
+  if (window.RCRloader) window.RCRloader.show();
   await refreshProfile();
   await refreshStats();
   if (state.profile) {
@@ -9487,6 +10102,7 @@ async function init() {
   loadPhoneWallpaper();
   renderPhone();
   window.addEventListener("hashchange", function () { render(); });
+  if (window.RCRloader) window.RCRloader.hide();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();

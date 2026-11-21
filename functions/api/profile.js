@@ -6,10 +6,11 @@
 // human-check. No age proof is required to join — only for the 18+ area.
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
-  checkChallenge, putImage, putVideo, fileUrl, nowMs, sanitizeLayoutCss, parseTopFriendIds,
+  checkChallenge, putImage, putVideo, fileUrl, imageUrl, nowMs, sanitizeLayoutCss, parseTopFriendIds,
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
   createNotification, cleanWebsiteShow, RELATIONSHIP_IDS, ZODIAC_IDS,
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
+  isFreeDivider, unlockForDivider,
   badgeListFor, cleanDisplayBadges, adultCreatorIds, awardLucre, LUCRE_AWARDS,
 } from "./_lib.js";
 
@@ -44,11 +45,25 @@ export async function onRequestPost({ env, request }) {
   const fail = (error) => json({ ok: false, error, profile: null });
   const deviceId = String(a.device_id || "");
   if (deviceId.length < 8 || deviceId.length > 128) return fail("Missing device id.");
+  const existing = await profileByDevice(db, deviceId);
+
+  // Set the profile picture from a stored gallery photo (v3.21) — runs
+  // BEFORE the username checks below on purpose: a bare set-avatar
+  // call sends no username, and this branch is avatar-only (only
+  // avatar_blob_key changes), so it must never blank the bio,
+  // occupation, or any other field the full save rewrites.
+  if (a.avatar_gallery_id) {
+    if (!existing) return fail("Create your account first — the profile picture lives on an account.");
+    const row = await db.prepare("SELECT * FROM gallery_photos WHERE id = ? LIMIT 1").bind(Number(a.avatar_gallery_id)).first();
+    if (!row || row.profile_id !== existing.id) return fail("That photo isn't yours.");
+    await db.prepare("UPDATE profiles SET avatar_blob_key = ?, updated_at = ? WHERE id = ?").bind(row.blob_key, nowMs(), existing.id).run();
+    return json({ ok: true, error: null, avatar_url: imageUrl(row.blob_key) });
+  }
+
   const username = String(a.username || "").trim();
   if (username.length < 2 || username.length > 24 || !USERNAME_RE.test(username)) {
     return fail("Username needs 2–24 letters, numbers, _ . or - only.");
   }
-  const existing = await profileByDevice(db, deviceId);
   const clash = await db.prepare("SELECT id FROM profiles WHERE username = ? LIMIT 1").bind(username).first();
   if (clash && (!existing || clash.id !== existing.id)) {
     return fail("That username is already taken — try another one.");
@@ -247,6 +262,18 @@ export async function onRequestPost({ env, request }) {
           themeIn = incoming;
         }
       }
+      // v3.20 — dividers: same locked-pattern as frames. A locked
+      // divider the member hasn't unlocked (Lucre / achievement — no
+      // purchase flow yet) falls back to whatever they already had.
+      if (incoming.divider && !isFreeDivider(incoming.divider)) {
+        const grants = await grantUnlocks(db, existing.id);
+        const need = unlockForDivider(incoming.divider);
+        if (need && !grants.unlocked.includes(need)) {
+          const current = parseTheme(existing.profile_theme);
+          incoming.divider = current.divider || "";
+          themeIn = incoming;
+        }
+      }
       // v3.9 — display badges: enforce the slot rules (adult sellers
       // always show 18+ plus one chosen; regular sellers showing Regular
       // Seller may add one secondary; everyone else shows one). Repairs
@@ -388,6 +415,19 @@ export async function onRequestPost({ env, request }) {
   if (typeof a.website_show === "string" || (a.website_show && typeof a.website_show === "object")) {
     v39Sets.push("website_show = ?");
     v39Vals.push(cleanWebsiteShow(a.website_show));
+  }
+  // Professional mode (2026-11-21) — contact email + its opt-in Show
+  // box. Same v39 tier: if the migration hasn't run yet the edit
+  // retries without them and the client is told via v39_pending.
+  if (typeof a.contact_email === "string") {
+    var ce = str(a.contact_email, 120);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ce)) ce = "";
+    v39Sets.push("contact_email = ?");
+    v39Vals.push(ce);
+  }
+  if (typeof a.show_contact_email === "boolean" || a.show_contact_email === 0 || a.show_contact_email === 1) {
+    v39Sets.push("show_contact_email = ?");
+    v39Vals.push(a.show_contact_email === true || a.show_contact_email === 1 ? 1 : 0);
   }
   let row;
   let v2Pending = false;

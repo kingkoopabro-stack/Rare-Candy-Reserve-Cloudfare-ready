@@ -686,6 +686,11 @@ export function shapeProfile(row) {
     birthsign: row.birthsign ?? "",
     accomplishments: row.accomplishments ?? "",
     website_show: parseWebsiteShow(row.website_show),
+    // Professional mode (2026-11-21) — contact email, shown on the
+    // page only when the member opted in. Columns may not exist yet
+    // (migration pending) — read defensively.
+    contact_email: row.contact_email ?? "",
+    show_contact_email: row.show_contact_email === 1,
     created_at: iso(row.created_at),
   };
 }
@@ -736,6 +741,11 @@ export function shapeMember(row) {
     birthsign: row.birthsign ?? "",
     accomplishments: row.accomplishments ?? "",
     website_show: parseWebsiteShow(row.website_show),
+    // Professional mode (2026-11-21) — contact email, shown on the
+    // page only when the member opted in. Columns may not exist yet
+    // (migration pending) — read defensively.
+    contact_email: row.contact_email ?? "",
+    show_contact_email: row.show_contact_email === 1,
     created_at: iso(row.created_at),
   };
 }
@@ -1565,7 +1575,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1628,6 +1638,18 @@ export function parseTheme(stored) {
   // and whether they show at all (default true — hiding is opt-in).
   out.buttons_side = (String(obj.buttons_side || "") === "right") ? "right" : "";
   out.buttons_show = obj.buttons_show === false ? false : true;
+  // Button size + which buttons show + professional-mode button
+  // (v3.21) — the Buttons group in Edit Profile. Size "" = M, the
+  // current size; "s" is the smallest clearly readable, "xl" decently
+  // large. buttons_visible null = all show; an array lists exactly
+  // which of add/message/favorite/group/subscribe show. pro_button_side
+  // "" = left, "center" / "right" under the picture in professional
+  // mode. pro_button_color any #rrggbb, "" = default.
+  out.button_size = ["s", "l", "xl"].includes(String(obj.button_size || "")) ? String(obj.button_size) : "";
+  const bv = Array.isArray(obj.buttons_visible) ? obj.buttons_visible : null;
+  out.buttons_visible = bv === null ? null : [...new Set(bv.map((k) => String(k || "")))].filter((k) => ["add", "message", "favorite", "group", "subscribe"].includes(k));
+  out.pro_button_side = (String(obj.pro_button_side || "") === "center" || String(obj.pro_button_side || "") === "right") ? String(obj.pro_button_side) : "";
+  out.pro_button_color = hex(obj.pro_button_color);
   // One video per profile (v3.10) — a YouTube link (validated: must
   // carry a real 11-char video id) or an uploaded clip served from R2
   // (/api/files?key=... or https://). The two are exclusive: an upload
@@ -1673,7 +1695,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

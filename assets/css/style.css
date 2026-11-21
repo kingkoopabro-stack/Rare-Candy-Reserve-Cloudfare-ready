@@ -847,9 +847,45 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
 .tp-gallery figure{margin:0;position:relative}
 .tp-gallery img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;cursor:pointer;display:block}
-.tp-gallery figure button{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;cursor:pointer;font-size:11px}
+.tp-gallery figure .tp-gal-del{position:absolute;top:4px;left:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.7);color:#fff;cursor:pointer;font-size:11px;z-index:2}
 .tp-gallery figcaption{font-size:10px;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tp-filebtn{margin-top:6px}
+/* Gallery visibility (v3.21) — chip top-right of the photo, delete ✕
+   top-left, picker under it. Nothing overlaps. */
+.tp-vis-chip{position:absolute;top:4px;right:4px;z-index:2;font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;cursor:pointer;white-space:nowrap}
+.tp-vis-public{background:rgba(34,197,94,.92);color:#fff}
+.tp-vis-friends{background:rgba(124,77,255,.92);color:#fff}
+.tp-vis-private{background:rgba(0,0,0,.65);color:#ddd}
+.tp-visselect{width:100%;margin-top:6px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.5);color:#fff;padding:6px 8px;font-size:12px;font-weight:700}
+.tp-visselect:disabled{opacity:.55}
+.tp-visrow{display:flex;gap:6px;margin-top:10px}
+.tp-visbtn{flex:1;border:1px solid rgba(255,255,255,.25);background:rgba(0,0,0,.35);color:#fff;border-radius:999px;padding:9px 4px;cursor:pointer;font-size:12px;font-weight:700}
+.tp-visbtn.active{background:var(--grad);border-color:transparent;color:#0b0b14}
+.tp-visbtn:disabled{opacity:.5;cursor:wait}
+.tp-visstatus{font-size:12px;font-weight:700;color:var(--cyan);margin:8px 0 0;text-align:center}
+.tp-photoview-head{display:flex;align-items:center;gap:8px;padding:6px 0 10px}
+.tp-photoview-head strong{flex:1;text-align:center;font-size:15px}
+.tp-photoview-head .tp-vis-chip{position:static;flex:0 0 auto;cursor:default}
+.tp-photoview img{width:100%;border-radius:12px;display:block}
+/* Gallery caption (v3.21) — a short description under the photo in the
+   detail view. 140 chars max, same as the stored caption. */
+.tp-caption{width:100%;box-sizing:border-box;margin:8px 0 0;padding:9px 10px;border-radius:10px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-size:13px}
+.tp-caption-count{font-size:11px;color:var(--muted);text-align:right;margin:2px 0 0}
+/* Drag-to-trash (v3.21) — desktop only. The can is a fixed element
+   outside the phone root (renderPhone rewrites the root on every
+   render, so the can must live outside it). Hidden until a drag
+   starts; the .over state lights it up while a photo hovers it. */
+.tp-trashcan{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:400;display:none;align-items:center;gap:10px;padding:12px 20px;border-radius:999px;border:2px dashed var(--line);background:rgba(11,11,20,.92);color:var(--ink);font-weight:800;font-size:15px;pointer-events:none}
+.tp-trashcan.show{display:flex;pointer-events:auto}
+.tp-trashcan.over{border-color:var(--red,#ef4444);background:rgba(239,68,68,.25);box-shadow:0 0 24px rgba(239,68,68,.5)}
+.tp-trashcan .tp-trash-ico{font-size:24px}
+/* Add-photos panel on your own profile (v3.21) — one row per file:
+   filename on top, caption input + visibility select below it. */
+.dwc-photo-upload-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:10px}
+.dwc-photo-upload-row>span{flex:1 1 100%;font-size:13px;overflow-wrap:anywhere}
+.dwc-photo-upload-caption{flex:1 1 200px;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-size:13px}
+.dwc-photo-upload-vis{padding:8px;border-radius:8px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-size:13px}
+.tp-home-top{display:flex;justify-content:flex-end;margin:2px 0 4px}
 .tp-sosview{text-align:center}
 .tp-sos-title{font-size:18px;font-weight:700;margin:14px 0 6px}
 .tp-sosbtn{width:150px;height:150px;border-radius:50%;border:6px solid rgba(255,255,255,.35);background:#e11d48;color:#fff;font-size:34px;font-weight:800;cursor:pointer;margin:14px 0;box-shadow:0 0 40px rgba(225,29,72,.6)}
@@ -914,6 +950,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-bg-swatch{display:inline-block;width:18px;height:18px;border-radius:5px;vertical-align:-3px;border:1px solid rgba(255,255,255,.35)}
 /* Picture viewer — lightbox with the picture large + comments. */
 .dwc-picviewer{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center}
+/* A hidden element stays hidden — no display rule anywhere may
+   un-hide it. (The meme drawer's `hidden` body relies on this.) */
+[hidden]{display:none !important}
 .dwc-picviewer[hidden]{display:none}
 .dwc-picviewer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.8)}
 .dwc-picviewer-card{position:relative;max-width:min(560px,94vw);max-height:92vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center}
@@ -932,11 +971,17 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-action-buttons-image{background-size:cover;background-position:center;background-color:var(--panel2)}
 .dwc-action-buttons-image .btn{background:rgba(11,11,20,.82)}
 .dwc-action-buttons .btn{width:100%}
+/* Profile overlap fix (v3.21) — the 2×2 buttons and the link buttons
+   sit in a narrow cell (46% of the middle column). Let their text wrap
+   inside the cell instead of forcing the block wider than the column
+   and sliding under Top Friends. */
+.dwc-action-buttons .btn{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.3}
+.dwc-links .btn{max-width:100%;white-space:normal;text-align:center;overflow-wrap:anywhere}
 /* v3.10 — buttons + video side row: the 2×2 button block on one side,
    the profile video on the other. "Right" flips them. On phones the
    row stacks — buttons first, video under. An empty cell never takes
    space (buttons hidden → the video takes the whole row). */
-.dwc-side-row{display:flex;gap:14px;align-items:flex-start;margin-top:14px}
+.dwc-side-row{display:flex;gap:14px;align-items:flex-start;margin-top:14px;min-width:0}
 .dwc-side-cell{flex:1 1 0;min-width:0}
 .dwc-side-cell:empty{display:none}
 .dwc-side-buttons{flex:0 0 46%}
@@ -1043,6 +1088,47 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-website-banner-none{min-height:64px;background:linear-gradient(90deg,var(--accent,#00e5ff),transparent);border-radius:10px;}
 .dwc-website-banner-none .dwc-website-banner-name{position:static;padding:12px 16px;}
 
+/* Professional mode (website look, 2026-11-21) — the banner IS the
+   header: full width, edge to edge, at the very top, name overlaid on
+   it like a business website. The 100vw breakout is exact (the
+   -6px profile margin and 18px profile padding cancel out), and the
+   body clip below stops any sub-pixel sideways scroll. A square
+   banner still stretches full width here — bannerFit's "small like a
+   logo" rule never applies in website mode. */
+body.dwc-website-view{overflow-x:hidden;overflow-x:clip}
+.dwc-website .dwc-website-banner{width:100vw;max-width:100vw;margin:0 0 14px calc(50% - 50vw);border-radius:0}
+.dwc-website .dwc-website-banner img{width:100%;height:230px;max-height:230px;max-width:none;border-radius:0;object-fit:cover}
+.dwc-website .dwc-website-banner .dwc-website-banner-name{left:max(16px, calc(50% - 522px));font-size:34px}
+.dwc-website .dwc-website-banner-none{min-height:120px}
+/* "Click to enable" toggles — the enabled state reads by color: a
+   ticked box shows bright, bold, with a green dot; unticked it sits
+   muted grey. Used by the professional-mode box and the buttons box. */
+.dwc-enable-toggle{display:flex;align-items:flex-start;gap:8px;cursor:pointer}
+.dwc-enable-toggle input{accent-color:var(--cyan);flex:none;margin-top:2px}
+.dwc-enable-toggle span{color:var(--muted)}
+.dwc-enable-toggle input:checked + span{color:var(--ink);font-weight:700}
+.dwc-enable-toggle input:checked + span::before{content:"● ";color:var(--green)}
+/* Buttons shown on a professional page — enabled is colored, disabled
+   is muted and greyed out. (The global .btn:disabled opacity already
+   dims them; the grayscale makes "off" unmistakable.) */
+.dwc-website .dwc-actions .btn:disabled{opacity:.4;filter:grayscale(.8)}
+.dwc-website .dwc-action-buttons .btn:disabled{opacity:.4;filter:grayscale(.8)}
+
+/* ---------- Rare Candy loading bar (2026-11-21) ----------
+   A small, short bar for anything loading — page loads, saves,
+   uploads. A piece of rare candy (🍬) beside a slim track that
+   fills with color; the percentage rides at the right. Indeterminate
+   mode (no real progress events) slides the fill instead of faking
+   a stuck percentage. Fixed at the top, never blocks taps. */
+.rcr-loader{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:300;display:none;align-items:center;gap:8px;width:340px;max-width:calc(100vw - 24px);padding:5px 12px;border-radius:999px;background:rgba(11,11,20,.94);border:1px solid var(--line);box-shadow:0 4px 24px rgba(0,0,0,.5);pointer-events:none}
+.rcr-loader.on{display:flex}
+.rcr-loader-candy{font-size:16px;line-height:1;flex:none}
+.rcr-loader-track{flex:1;height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.rcr-loader-fill{height:100%;width:0%;border-radius:999px;background:var(--grad);box-shadow:0 0 10px rgba(0,229,255,.55);transition:width .25s ease}
+.rcr-loader.indet .rcr-loader-fill{width:40% !important;animation:rcrLoaderSlide 1.1s ease-in-out infinite}
+@keyframes rcrLoaderSlide{0%{margin-left:-40%}100%{margin-left:100%}}
+.rcr-loader-pct{font-size:11px;font-weight:800;color:var(--ink);flex:none;min-width:52px;text-align:right}
+
 /* Website-mode chrome fade (v3.20) — the platform chrome fades away so
    a visitor thinks they are on the member's own standalone site. The
    member's banner, colors, fonts, listings, and references carry the
@@ -1132,21 +1218,44 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
   /* Listings + cards: one comfortable column on narrow phones. */
   .grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
   /* Action buttons + forms: full-width, easy to tap. */
-  .dwc-action-buttons { gap: 6px; padding: 8px; }
-  .dwc-action-buttons .btn { padding: 9px 12px; font-size: 14px; }
+  .dwc-action-buttons { gap: 6px; padding: 7px; }
+  .dwc-action-buttons .btn { padding: 8px 11px; font-size: 13px; }
   /* v3.10 — buttons + video stack on phones: buttons first, video under. */
   .dwc-side-row { flex-direction: column; }
   .dwc-side-buttons { flex: 1 1 auto; width: 100%; }
   .dwc-side-video { width: 100%; }
-  .btn { min-height: 42px; }
+  /* Mobile-only slight shrink (2026-11-21): buttons + their containers
+     run ~10% smaller on phones — desktop is untouched. Tap targets stay
+     comfortable (38px min button height, readable text). */
+  .btn { padding: 10px 18px; font-size: 13.5px; min-height: 38px; }
+  .btn.small { padding: 10px 16px; font-size: 13.5px; }
+  .tunein-8bit { padding: 11px 20px; font-size: 14px; }
+  .card { padding: 16px; }
+  .dwc-myprofile { padding: 16px; }
+  .dwc-layoutbox { padding: 14px; }
+  .dwc-profile-card { margin: 14px 0; }
+  .dwc-actions { gap: 6px 12px; }
+  .dwc-unlock-grid .btn { min-height: 58px; }
+  .dwc-feed-menu button { padding: 7px 9px; font-size: 13px; }
   input, select, textarea { font-size: 16px; /* stops iOS zoom on focus */ }
   /* Chat: log first, buddies below (already 1 column at 760px). */
   .dwc-chatlog { max-height: 320px; }
   /* Banner + ticker fit the screen. */
   .dwc-banner img { max-height: 180px; }
+  /* Meme drawer: even when open, it never takes the whole page on a
+     phone — it caps at most of the screen and scrolls inside itself. */
+  .meme-stash.open .dwc-meme-drawer-body{max-height:72vh;overflow-y:auto}
+  /* Professional-mode banner header on phones: shorter, name smaller. */
+  .dwc-website .dwc-website-banner img{height:170px;max-height:170px}
+  .dwc-website .dwc-website-banner .dwc-website-banner-name{font-size:24px;left:16px}
   /* Headlines + posts: no sideways scroll. */
   .card, .dwc-myprofile { overflow-wrap: anywhere; }
   img { max-width: 100%; height: auto; }
+  /* Taffy Phone status bar on phones: shrink the black island, hide the
+     wifi logo so "VNR Wireless" fits, and respect the real notch. */
+  .tp-island{width:64px;height:18px;top:4px}
+  .tp-status .tp-wifi{display:none}
+  .tp-statuswrap{padding-top:env(safe-area-inset-top,0px)}
 }
 
 /* Post-signup unlock card — big simple buttons, stacks on phones. */
@@ -1358,3 +1467,13 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
    under the Prev/Next row. */
 .dwc-picviewer-heart{display:flex;justify-content:center;margin:2px 0 8px;min-height:30px}
 .dwc-picviewer-heart .dwc-act{font-size:15px}
+
+/* ---- Button size (v3.21) — the member's pick in Edit Profile > Buttons ---- */
+/* M is the current size (no rule — the default). S/L/XL scale every button
+   on the member page: the action buttons, the link buttons, and the
+   container buttons. S is the smallest clearly readable size, XL is
+   decently large. Appended last so the member's pick wins over the
+   mobile shrink and the per-button defaults. */
+.dwc-myprofile.dwc-btn-s .btn{font-size:13px;padding:8px 14px}
+.dwc-myprofile.dwc-btn-l .btn{font-size:18px;padding:14px 24px}
+.dwc-myprofile.dwc-btn-xl .btn{font-size:22px;padding:17px 30px}

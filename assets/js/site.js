@@ -1236,3 +1236,58 @@ function initNotifBell() {
   fetchNotifs();
   if (!notifTimer) notifTimer = setInterval(fetchNotifs, 60000);
 }
+
+/* ============================================================
+   Rare Candy loading bar (2026-11-21)
+   Shared component — any loading flow can show it. A small, short
+   bar: a piece of rare candy (🍬) beside a slim track that fills
+   with color, with the percentage at the right.
+   - RCRloader.show() — indeterminate fill (slides; no fake %).
+     Use when the flow has no progress events (every fetch-based
+     flow: saves, uploads, page loads). Delayed 200ms so fast
+     loads never flash the bar. Safe to call repeatedly; hide()
+     only clears it once every show() has been matched.
+   - RCRloader.set(pct) — real percentage (0-100) for flows that
+     DO have progress events. Call show({percent: n}) first, or
+     set() shows the bar immediately at that %.
+   - RCRloader.hide() — done.
+   ============================================================ */
+window.RCRloader = (function () {
+  var el = null, fillEl = null, pctEl = null, timer = null, count = 0;
+  function ensure() {
+    if (el) return;
+    el = document.createElement("div");
+    el.className = "rcr-loader";
+    el.id = "rcr-loader";
+    el.setAttribute("aria-hidden", "true");
+    el.innerHTML = '<span class="rcr-loader-candy">🍬</span><div class="rcr-loader-track"><div class="rcr-loader-fill"></div></div><span class="rcr-loader-pct"></span>';
+    document.body.appendChild(el);
+    fillEl = el.querySelector(".rcr-loader-fill");
+    pctEl = el.querySelector(".rcr-loader-pct");
+  }
+  function show(opts) {
+    opts = opts || {};
+    ensure();
+    count++;
+    if (typeof opts.percent === "number") { set(opts.percent); return; }
+    el.classList.add("indet");
+    pctEl.textContent = "Loading…";
+    clearTimeout(timer);
+    timer = setTimeout(function () { el.classList.add("on"); }, 200);
+  }
+  function set(p) {
+    ensure();
+    p = Math.max(0, Math.min(100, Math.round(p)));
+    el.classList.remove("indet");
+    fillEl.style.width = p + "%";
+    pctEl.textContent = p + "%";
+    el.classList.add("on");
+  }
+  function hide() {
+    count = Math.max(0, count - 1);
+    if (count > 0) return;
+    clearTimeout(timer);
+    if (el) el.classList.remove("on");
+  }
+  return { show: show, set: set, hide: hide };
+})();

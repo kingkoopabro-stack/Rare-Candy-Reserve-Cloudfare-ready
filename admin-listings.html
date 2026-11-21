@@ -71,6 +71,10 @@
       <label for="ed-f-price">Price ($)</label>
       <input id="ed-f-price" type="number" min="0.01" step="0.01" placeholder="20.00" inputmode="decimal">
 
+      <label for="ed-f-shipping">Shipping charge ($) — what the buyer pays for postage</label>
+      <input id="ed-f-shipping" type="number" min="0" step="0.01" placeholder="e.g. 5.00 — blank = no shipping added" inputmode="decimal">
+      <p style="color:var(--muted);font-size:13px;margin:0">Blank means the Stripe link charges the item price only (buyer arranges shipping with you separately). Set 0 for free shipping. The charge is added as its own line on the Stripe link, and Florida tax is collected on it too.</p>
+
       <label for="ed-f-desc">Description — what buyers read</label>
       <textarea id="ed-f-desc" rows="6" placeholder="Tell buyers what it is, what's included, condition — everything they'd want to know."></textarea>
 
@@ -241,6 +245,7 @@ function edRefreshList(){
       if(edited[it.id]) badges.push("✏️ Edited");
       if(it.video) badges.push("🎬 Video");
       if(it.options) badges.push("🔽 Dropdowns");
+      if(typeof it.shipping_charge === "number") badges.push(it.shipping_charge > 0 ? "📦 Ship " + edMoney(it.shipping_charge) : "📦 Free ship");
       return '<div class="card" style="margin-bottom:12px"><div style="display:flex;gap:12px;align-items:center">'
         + thumb
         + '<div style="flex:1;min-width:0"><b>' + edEsc(it.name) + '</b><br><span style="color:var(--muted);font-size:13px">' + edEsc(it.tag || "") + '</span><br><b>' + (it.price != null ? edMoney(it.price) : "No price") + '</b> '
@@ -270,6 +275,7 @@ function edEdit(id){
   document.getElementById("ed-f-id").readOnly = true;
   document.getElementById("ed-f-name").value = base.name || "";
   document.getElementById("ed-f-price").value = (base.price != null ? base.price : "");
+  document.getElementById("ed-f-shipping").value = (base.shipping_charge != null ? base.shipping_charge : "");
   document.getElementById("ed-f-desc").value = base.desc || "";
   document.getElementById("ed-f-stripe").value = base.stripe || "";
   document.getElementById("ed-form-title").textContent = "Edit: " + base.name;
@@ -293,6 +299,7 @@ function edNew(){
   document.getElementById("ed-f-id").readOnly = false;
   document.getElementById("ed-f-name").value = "";
   document.getElementById("ed-f-price").value = "";
+  document.getElementById("ed-f-shipping").value = "";
   document.getElementById("ed-f-desc").value = "";
   document.getElementById("ed-f-stripe").value = "";
   document.getElementById("ed-form-title").textContent = "Add a new listing";
@@ -554,12 +561,13 @@ function edApplySaved(ov){
     base.options = (ov.options && ov.options.length) ? ov.options : null;
     base.video = ov.video || null;
     base.stripe = ov.stripe_link || null;
+    base.shipping_charge = (typeof ov.shipping === "number" ? ov.shipping : null);
   } else {
     CATALOG.push({
       id: ov.id, slug: ov.id, icon: "🛍️", tag: "Shop listing",
       name: ov.name, price: ov.price, desc: ov.description || "",
       imgs: ov.photos || [], options: ov.options || null, video: ov.video || null,
-      stripe: ov.stripe_link || null, ship: "+ shipping (by location)", ebay: null,
+      stripe: ov.stripe_link || null, ship: "+ shipping (by location)", shipping_charge: (typeof ov.shipping === "number" ? ov.shipping : null), ebay: null,
     });
   }
 }
@@ -568,11 +576,14 @@ async function edSave(){
   var id = document.getElementById("ed-f-id").value.trim().toLowerCase();
   var name = document.getElementById("ed-f-name").value.trim();
   var price = parseFloat(document.getElementById("ed-f-price").value);
+  var shipRaw = document.getElementById("ed-f-shipping").value.trim();
+  var shipVal = shipRaw === "" ? null : parseFloat(shipRaw);
   var desc = document.getElementById("ed-f-desc").value;
   var stripe = document.getElementById("ed-f-stripe").value.trim();
   if(!/^[a-z0-9-]{3,60}$/.test(id)){ edMsg("Listing id must be 3–60 characters of lowercase letters, numbers, and dashes."); return; }
   if(name.length < 3){ edMsg("Name must be at least 3 characters."); return; }
   if(!isFinite(price) || price <= 0){ edMsg("Price must be more than $0."); return; }
+  if(shipVal !== null && (!isFinite(shipVal) || shipVal < 0)){ edMsg("Shipping must be $0 or more — or leave it blank for no shipping charge."); return; }
   if(stripe && !/^https:\/\//.test(stripe)){ edMsg("Stripe link must start with https:// — paste the full payment link."); return; }
   var photos = edForm.photos.map(function(p){ return edAbsUrl(String(p || "").trim()); }).filter(Boolean).slice(0, 3);
   for(var i = 0; i < photos.length; i++){
@@ -583,6 +594,7 @@ async function edSave(){
   var res = await edFetch("/api/shop-listings", {
     device_id: edDeviceId, id: id, name: name, price: price, description: desc,
     photos: photos, options: edCollectOptions(), video: video, stripe_link: stripe || null,
+    shipping: shipVal,
   });
   if(!res || !res.ok){ edMsg((res && res.error) || "Couldn't save — try again."); return; }
   edApplySaved(res.listing);

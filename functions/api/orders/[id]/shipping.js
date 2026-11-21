@@ -30,7 +30,7 @@ export async function onRequestPost({ env, request, params }) {
       const fee = Math.round((o.amount_cents * PLATFORM_FEE_PERCENT) / 100);
       await db.prepare(
         "INSERT INTO payout_entries (profile_id, kind, amount_cents, note, status, order_id, created_at) VALUES (?, 'sale_credit', ?, ?, 'available', ?, ?)",
-      ).bind(me.id, o.amount_cents - fee, o.item_title, id, nowMs()).run();
+      ).bind(me.id, o.amount_cents - fee + (o.shipping_cents || 0), o.item_title, id, nowMs()).run();
       // Lucre (v3.11) — 40 each for a completed transaction: the seller
       // and the buyer both did the deal. Once per order (ledger key).
       await awardLucre(db, me.id, LUCRE_AWARDS.transaction, "transaction", "order:" + String(id) + ":seller");

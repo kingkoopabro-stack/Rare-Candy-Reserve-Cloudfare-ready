@@ -4823,6 +4823,7 @@ function orderCardHTML(o, isSeller) {
     (o.image_url ? '<img class="dwc-post-img" src="' + esc(o.image_url) + '" alt="" loading="lazy">' : "") +
     "<h3 style=\"margin:0 0 4px\">" + esc(o.item_title) + "</h3>" +
     '<p style="margin:4px 0"><strong>' + money(o.amount_cents) + "</strong> · " + esc(o.status) + " · " + fmtDate(o.created_at) + "</p>" +
+    ((o.tax_cents || o.shipping_cents) ? '<p style="margin:4px 0;font-size:14px">Item ' + money(o.amount_cents) + (o.shipping_cents ? " · Shipping " + money(o.shipping_cents) : "") + (o.tax_cents ? " · Tax " + money(o.tax_cents) + (o.tax_state ? " (" + esc(o.tax_state) + (o.tax_rate_percent ? " " + o.tax_rate_percent + "%" : "") + ")" : "") : "") + " · <strong>Total " + money(o.total_cents != null ? o.total_cents : (o.amount_cents + (o.tax_cents || 0) + (o.shipping_cents || 0))) + "</strong></p>" : "") +
     '<p style="margin:4px 0;color:var(--muted);font-size:14px">' + (isSeller ? "Buyer: @" + esc(o.buyer_username) : "Seller: @" + esc(o.seller_username)) +
     " · Platform cut: " + money(o.fee_cents) + " · Seller gets: " + money(o.seller_gets_cents) + "</p>" +
     '<p class="dwc-order-steps">' + steps.map(function (st, i) { return '<span class="' + (i <= idx ? "done" : "") + '">' + st + "</span>"; }).join(" → ") + "</p>" +
@@ -4837,6 +4838,7 @@ function orderCardHTML(o, isSeller) {
         '<select name="carrier"><option value="">Carrier…</option>' + CARRIERS.map(function (c) { return '<option' + (o.carrier === c ? " selected" : "") + ">" + esc(c) + "</option>"; }).join("") + "</select>" +
         '<input name="tracking_number" maxlength="60" value="' + esc(o.tracking_number) + '" placeholder="Tracking number">' +
         '<button class="btn small" type="submit">Save shipping</button></form>' +
+        (o.status === "paid" ? '<p style="font-size:14px">🚢 Need a label? <a href="https://www.pirateship.com" target="_blank" rel="noopener">Ship it with Pirate Ship →</a> <span style="color:var(--muted)">free to use, cheapest USPS + discounted UPS rates. Grab the buyer’s address from the PayPal / Stripe payment — the site doesn’t store it — paste it into Pirate Ship, then save the tracking number here.</span></p>' : "") +
         '<p style="font-size:13px;color:var(--muted)">Marking it <strong>Delivered</strong> credits your wallet with ' + money(o.seller_gets_cents) + " — see the Payouts tab. Your buyer sees the tracking number and carrier link on their order the moment you save.</p>") +
     "</article>";
 }

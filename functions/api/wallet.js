@@ -18,10 +18,13 @@ export async function onRequestGet({ env, request }) {
     if (e.kind === "sale_credit") { lifetime += e.amount_cents; if (e.status === "available") balance += e.amount_cents; }
     if (e.kind === "payout_request" && (e.status === "requested" || e.status === "sent")) balance -= e.amount_cents;
   }
-  const { results: sales } = await db.prepare("SELECT amount_cents, status FROM orders WHERE seller_id = ?").bind(me.id).all();
+  const { results: sales } = await db.prepare("SELECT amount_cents, shipping_cents, status FROM orders WHERE seller_id = ?").bind(me.id).all();
   let pending = 0;
   for (const o of (sales || [])) {
-    if (o.status === "paid" || o.status === "shipped") pending += o.amount_cents - Math.round((o.amount_cents * PLATFORM_FEE_PERCENT) / 100);
+    // Fee on item price only; shipping passes through to the seller
+    // (they pay the postage); tax never lands in the wallet — it
+    // belongs to the state and is remitted from Stripe/PayPal.
+    if (o.status === "paid" || o.status === "shipped") pending += o.amount_cents - Math.round((o.amount_cents * PLATFORM_FEE_PERCENT) / 100) + (o.shipping_cents || 0);
   }
   return json({
     ok: true, error: null,

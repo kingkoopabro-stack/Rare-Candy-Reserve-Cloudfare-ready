@@ -337,6 +337,7 @@ function applyShopOverrides(){
       if(ov.options) target.options = ov.options;
       if(ov.video !== undefined) target.video = ov.video || null;
       if(ov.stripe_link !== undefined) target.stripe = ov.stripe_link || null;
+      if(typeof ov.shipping === "number") target.shipping_charge = ov.shipping;
     } else {
       CATALOG.push({
         id: ov.id, slug: ov.id, icon: "🛍️", tag: "Shop listing",
@@ -344,7 +345,7 @@ function applyShopOverrides(){
         desc: ov.description || "",
         imgs: (ov.photos && ov.photos.length ? ov.photos.slice(0, 3) : []),
         options: ov.options || null, video: ov.video || null,
-        stripe: ov.stripe_link || null, ship: "+ shipping (by location)", ebay: null,
+        stripe: ov.stripe_link || null, ship: "+ shipping (by location)", shipping_charge: (typeof ov.shipping === "number" ? ov.shipping : null), ebay: null,
       });
     }
   }
@@ -543,9 +544,16 @@ function buyWithPayPal(id){
     }
   }
   if(price == null) return;
+  // Shipping goes to PayPal as its own line (the `shipping` var) so
+  // the buyer sees item + shipping separately. Tax does NOT go here:
+  // the site doesn't know the buyer's state until PayPal asks for
+  // their address — tax on PayPal orders comes from Chris's own
+  // sales-tax tables in his PayPal Business profile (see patch doc).
+  const ship = (item.shipping_charge != null ? Number(item.shipping_charge) : 0) || 0;
   const f = document.createElement("form");
   f.method = "post"; f.action = "https://www.paypal.com/cgi-bin/webscr"; f.target = "_blank";
   const fields = {cmd:"_xclick", business:PAYPAL_EMAIL, item_name:label, amount:price.toFixed(2), currency_code:"USD", no_shipping:"2"};
+  if(ship > 0) fields.shipping = ship.toFixed(2);
   for(const k in fields){
     const inp = document.createElement("input");
     inp.type = "hidden"; inp.name = k; inp.value = fields[k];
@@ -592,6 +600,7 @@ function renderCart(){
       const pp = document.getElementById("paypalCartBox");
       if(pp){
         if(PAYPAL_EMAIL){
+          const shipTotal = cart.reduce((t, i) => t + (((findItem(i.id) || {}).shipping_charge || 0) * i.qty), 0);
           pp.innerHTML = `<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
             <input type="hidden" name="cmd" value="_xclick">
             <input type="hidden" name="business" value="${PAYPAL_EMAIL}">
@@ -599,6 +608,7 @@ function renderCart(){
             <input type="hidden" name="amount" value="${cartTotal().toFixed(2)}">
             <input type="hidden" name="currency_code" value="USD">
             <input type="hidden" name="no_shipping" value="2">
+            ${shipTotal > 0 ? `<input type="hidden" name="shipping" value="${shipTotal.toFixed(2)}">` : ""}
             <button class="btn" type="submit">Pay $${cartTotal().toFixed(2)} with PayPal →</button>
           </form><p style="font-size:13px;color:var(--muted)">PayPal checkout is automated — PayPal takes the payment and notifies the shop. No invoice needed.</p>`;
         } else {
@@ -922,6 +932,7 @@ function submitQuote(e){
   const email = document.getElementById("qEmail").value.trim();
   const details = document.getElementById("qDetails").value.trim();
   const photos = document.getElementById("qPhotos").value.trim();
+  const miniType = document.getElementById("qMiniType").value;
   let ok = true;
   ok = fieldErr("qName","qNameMsg", !name) && ok;
   const emailBad = !email || !validEmail(email);
@@ -932,7 +943,7 @@ function submitQuote(e){
   ok = fieldErr("qDetails","qDetailsMsg", !details) && ok;
   if(!ok) return false;
   openMailDraft(SHOP_CONTACT_EMAIL, "Custom print quote request — " + name,
-    "Name: " + name + "\nEmail: " + email + "\nProject details: " + details +
+    "Name: " + name + "\nEmail: " + email + "\nMini type: " + miniType + "\nProject details: " + details +
     (photos ? "\nReference pictures: " + photos : "") +
     "\n\n— Sent from the Rare Candy Reserve custom-order form");
   document.getElementById("quoteMsg").textContent =

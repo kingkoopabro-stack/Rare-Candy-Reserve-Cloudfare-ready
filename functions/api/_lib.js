@@ -1807,7 +1807,12 @@ export async function shapeListing(db, row, seller) {
 }
 
 export async function shapeOrder(db, row, profilesById) {
+  // Fee stays on the ITEM PRICE ONLY — never on tax or shipping.
   const fee = Math.round((row.amount_cents * PLATFORM_FEE_PERCENT) / 100);
+  // New columns default to 0 when the migration hasn't run yet, so
+  // old orders shape exactly as before.
+  const tax = row.tax_cents ?? 0;
+  const shipping = row.shipping_cents ?? 0;
   const listing = await db.prepare("SELECT image_blob_key FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first();
   return {
     id: row.id, listing_id: row.listing_id, item_title: row.item_title,
@@ -1815,7 +1820,10 @@ export async function shapeOrder(db, row, profilesById) {
     tracking_number: row.tracking_number ?? "",
     tracking_url: trackingUrl(row.carrier, row.tracking_number),
     tracking_alerts: row.tracking_alerts === 1,
-    fee_cents: fee, seller_gets_cents: row.amount_cents - fee,
+    tax_cents: tax, shipping_cents: shipping,
+    total_cents: row.amount_cents + tax + shipping,
+    tax_state: row.tax_state ?? "", tax_rate_percent: row.tax_rate_percent ?? 0,
+    fee_cents: fee, seller_gets_cents: row.amount_cents - fee + shipping,
     buyer_id: row.buyer_id, buyer_username: profilesById.get(row.buyer_id)?.username ?? "member",
     seller_id: row.seller_id, seller_username: profilesById.get(row.seller_id)?.username ?? "member",
     image_url: imageUrl(listing?.image_blob_key ?? null),

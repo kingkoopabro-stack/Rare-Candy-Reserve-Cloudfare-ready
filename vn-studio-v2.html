@@ -141,7 +141,7 @@ footer{text-align:center;color:var(--muted);font-size:11px;padding:20px 10px 30p
       <option value="dance">Dance Track (Silver Saw)</option>
     </select>
   </div>
-  <p class="small">Beat tracks: Kick/Snare/HiHat/Clap 16-step grid. Melodic tracks: open the Piano Roll to draw a melody — try the Sytrus FM, 3x Osc, Sub Bass or fully-Custom VST. Voice tracks: record, upload an MP3, add Chorus, apply Auto‑Tune, and slice your vocal into a rhythm. Every channel has a filter, a 16-step filter-automation lane, and an A/B pattern you assign per bar in 🧩 Arrangement. Save your whole song as a project file and reload it later in this same DAW.</p>
+  <p class="small">Beat tracks: Kick/Snare/HiHat/Clap 16-step grid. Melodic tracks: open the Piano Roll to draw a melody — try the Sytrus FM, 3x Osc, Sub Bass or fully-Custom VST. Voice tracks: record, upload an MP3, add Chorus, Reverb, Delay, Distortion or Radio filters, apply Auto-Tune, slice your vocal into a rhythm, and chop it into a melody that plays in key with your beat. Export any single take as its own WAV, or the whole mix. Every channel has a filter, a 16-step filter-automation lane, and an A/B pattern you assign per bar in 🧩 Arrangement. Save your whole song as a project file and reload it later in this same DAW.</p>
 </main>
 <footer>Vita Nova Studios V2 — self‑contained, works offline once loaded. 新星</footer>
 
@@ -321,8 +321,26 @@ function makeTrackEl(t){
     ['C Major','A Minor','G Major','E Minor','D Major','Chromatic'].forEach(k=>{ const o=document.createElement('option'); o.value=k; o.textContent=k; keySel.appendChild(o); });
     const atBtn = document.createElement('button'); atBtn.textContent='🎤 Auto‑Tune';
     atBtn.onclick = ()=>{ if(t.buffer){ t.buffer = autoTune(t.buffer, keySel.value); drawWave(t); status('Auto‑tune applied'); } };
-    ctrlRow.appendChild(atBtn); ctrlRow.appendChild(keySel);
+    const atStrength=document.createElement('select'); atStrength.title='Auto-Tune strength — how hard it pulls notes to the scale';
+    [['gentle','Gentle'],['normal','Normal'],['strong','Strong']].forEach(function(pr){ const o=document.createElement('option'); o.value=pr[0]; o.textContent=pr[1]; if(pr[0]==='normal') o.selected=true; atStrength.appendChild(o); });
+    atBtn.onclick=()=>{ if(t.buffer){ t.buffer=autoTune(t.buffer, keySel.value, atStrength.value); drawWave(t); status('Auto-tune applied ('+atStrength.value+')'); } };
+    ctrlRow.appendChild(atBtn); ctrlRow.appendChild(keySel); ctrlRow.appendChild(atStrength);
     el.appendChild(ctrlRow);
+
+    const fxRow=document.createElement('div'); fxRow.className='track-head';
+    const fxLabel=document.createElement('span'); fxLabel.className='small'; fxLabel.textContent='Voice FX:'; fxRow.appendChild(fxLabel);
+    [['reverb','REVERB'],['delay','DELAY'],['distortion','DISTORT'],['telephone','RADIO']].forEach(function(pr){
+      const chip=document.createElement('div'); chip.className='chip'+((t.fx&&t.fx[pr[0]])?' on':''); chip.textContent=pr[1];
+      chip.onclick=()=>{ t.fx[pr[0]]=!t.fx[pr[0]]; chip.classList.toggle('on',t.fx[pr[0]]); fxDirty(t); refreshMonitor(t); };
+      fxRow.appendChild(chip);
+    });
+    const monChip=document.createElement('div'); monChip.className='chip'; monChip.textContent='🎧 Monitor FX';
+    monChip.onclick=()=>toggleMonitor(t, monChip);
+    fxRow.appendChild(monChip);
+    const expSampleBtn=document.createElement('button'); expSampleBtn.textContent='⬇ Export Sample WAV';
+    expSampleBtn.onclick=()=>exportSampleWav(t);
+    fxRow.appendChild(expSampleBtn);
+    el.appendChild(fxRow);
 
     const waverow = document.createElement('div'); waverow.className='waverow';
     const canvas = document.createElement('canvas'); canvas.className='wave'; canvas.width=600; canvas.height=50;
@@ -342,6 +360,17 @@ function makeTrackEl(t){
     const clearSliceBtn=document.createElement('button'); clearSliceBtn.textContent='Clear Slices';
     clearSliceBtn.onclick=()=>{ t.slices=[]; t.sliceSteps=new Array(16).fill(null); drawWave(t); renderSlicePads(t); };
     sliceRow.appendChild(clearSliceBtn);
+    const melDir=document.createElement('select'); melDir.title='Chop to Melody: which way the slices walk up the scale';
+    [['up','Melody: up'],['down','Melody: down'],['updown','Melody: up-down'],['random','Melody: random']].forEach(function(pr){ const o=document.createElement('option'); o.value=pr[0]; o.textContent=pr[1]; melDir.appendChild(o); });
+    melDir.value=t.melodyDir||'up';
+    melDir.onchange=e=>{ t.melodyDir=e.target.value; };
+    sliceRow.appendChild(melDir);
+    const melChip=document.createElement('div'); melChip.className='chip'+(t.melodyOn?' on':''); melChip.textContent='MELODY ON';
+    melChip.onclick=()=>{ t.melodyOn=!t.melodyOn; melChip.classList.toggle('on',t.melodyOn); };
+    sliceRow.appendChild(melChip);
+    const melBtn=document.createElement('button'); melBtn.textContent='🎹 Chop to Melody';
+    melBtn.onclick=()=>{ if(!t.buffer){ status('Record or load audio first'); return; } chopToMelody(t, keySel.value, melDir.value); drawWave(t); renderSlicePads(t); melChip.classList.add('on'); status('Melody built — '+t.melodySteps.filter(function(x){return x!=null;}).length+' steps'); };
+    sliceRow.appendChild(melBtn);
     el.appendChild(sliceRow);
 
     const padWrap=document.createElement('div'); padWrap.id='slicepads-'+t.id; el.appendChild(padWrap);
@@ -380,7 +409,8 @@ function renderSlicePads(t){
 function playSlicePreview(t,i){
   if(!t.buffer) return;
   const start=t.slices[i], end = t.slices[i+1] || t.buffer.duration;
-  const src=ctx.createBufferSource(); src.buffer=t.buffer; src.connect(t.gain);
+  const src=ctx.createBufferSource(); src.buffer=t.buffer;
+  playAudioSrc(t, ctx, src, t.gain);
   src.start(ctx.currentTime,start,Math.max(0.02,end-start));
 }
 
@@ -406,7 +436,9 @@ function addAudioTrack(){
   gain.connect(filter); filter.connect(pan); pan.connect(master);
   const t={id:idSeq++, type:'audio', name:'Voice '+idSeq, buffer:null, gain, pan, filter, filterType:'none', filterFreq:2000,
     autoEnabled:false, autoCutoff:new Array(16).fill(1),
-    muted:false, chorus:false, sliceMode:false, slices:[], sliceSteps:new Array(16).fill(null), _selectedSlice:null, arr:newArr()};
+    muted:false, chorus:false, sliceMode:false, slices:[], sliceSteps:new Array(16).fill(null), _selectedSlice:null, arr:newArr(),
+    fx:{reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5},
+    melodyOn:false, melodySteps:new Array(16).fill(null), melodyDir:'up'};
   tracks.push(t); document.getElementById('tracks').appendChild(makeTrackEl(t));
 }
 document.getElementById('addStep').onclick=addStepTrack;
@@ -673,7 +705,7 @@ function nearestScaleFreq(freq, keyName){
   if(targetMidi-midi>6) targetMidi-=12; if(midi-targetMidi>6) targetMidi+=12;
   return 440*Math.pow(2,(targetMidi-69)/12);
 }
-function autoTune(buffer, key){
+function autoTune(buffer, key, strength){
   const sr=buffer.sampleRate; const winSize=Math.floor(sr*0.09); const hop=Math.floor(winSize/2);
   const chans=buffer.numberOfChannels; const outLen=buffer.length;
   const outBuf=ctx.createBuffer(chans,outLen,sr);
@@ -683,7 +715,9 @@ function autoTune(buffer, key){
     for(let pos=0;pos<inD.length;pos+=hop){
       const seg=inD.slice(pos,pos+winSize); if(seg.length<32) continue;
       const freq=detectPitch(seg,sr); let ratio=1;
-      if(freq>60 && freq<1000){ const target=nearestScaleFreq(freq,key); ratio=target/freq; ratio=Math.max(0.85,Math.min(1.15,ratio)); }
+      if(freq>60 && freq<1000){ const target=nearestScaleFreq(freq,key); ratio=target/freq;
+        const clamp = strength==='gentle' ? [0.94,1.06] : strength==='strong' ? [0.70,1.40] : [0.85,1.15];
+        ratio=Math.max(clamp[0],Math.min(clamp[1],ratio)); }
       const shifted=new Float32Array(winSize);
       for(let i=0;i<winSize;i++){
         const srcIdx=i*ratio; const i0=Math.floor(srcIdx), i1=Math.min(i0+1,seg.length-1); const frac=srcIdx-i0;
@@ -694,6 +728,177 @@ function autoTune(buffer, key){
     for(let i=0;i<outLen;i++) outD[i]*=0.7;
   }
   return outBuf;
+}
+
+// ---- Voice FX chain: reverb / delay / distortion / telephone ----
+// One chain per (audio track, AudioContext). Live playback and the
+// offline export each build their own chain, so the mix you hear is
+// the mix you export. Chorus stays outside the chain (see
+// playAudioSrc) so it still works exactly as before.
+function makeImpulse(c, seconds, decay){
+  const len=Math.max(1, Math.floor(c.sampleRate*seconds));
+  const buf=c.createBuffer(2, len, c.sampleRate);
+  for(let ch=0; ch<2; ch++){
+    const d=buf.getChannelData(ch);
+    for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len, decay);
+  }
+  return buf;
+}
+function makeDistortionCurve(amount){
+  const k=(amount||0.5)*50+1, n=256, curve=new Float32Array(n);
+  for(let i=0;i<n;i++){ const x=i*2/n-1; curve[i]=(3+k)*x*20*(Math.PI/180)/(Math.PI+k*Math.abs(x)); }
+  return curve;
+}
+function buildFxChain(c, t, dest){
+  const input=c.createGain();
+  let node=input;
+  if(t.fx.distortion){
+    const ws=c.createWaveShaper(); ws.curve=makeDistortionCurve(t.fx.distAmount||0.5); ws.oversample='2x';
+    node.connect(ws); node=ws;
+  }
+  if(t.fx.telephone){
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1200; bp.Q.value=1.2;
+    node.connect(bp); node=bp;
+  }
+  const dry=c.createGain(); dry.gain.value=0.85; node.connect(dry); dry.connect(dest);
+  if(t.fx.reverb){
+    const conv=c.createConvolver(); conv.buffer=makeImpulse(c, 2.2, 2.5);
+    const wet=c.createGain(); wet.gain.value=0.4;
+    node.connect(conv); conv.connect(wet); wet.connect(dest);
+  }
+  if(t.fx.delay){
+    const bpm=parseFloat(document.getElementById('bpm').value)||100;
+    const dl=c.createDelay(1); dl.delayTime.value=60/bpm*0.75; // dotted 8th at song BPM
+    const fb=c.createGain(); fb.gain.value=0.35;
+    const wet=c.createGain(); wet.gain.value=0.35;
+    node.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(dest);
+  }
+  return input;
+}
+function fxInput(t, c, dest){
+  if(!t.fx) t.fx={reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5};
+  if(!t._fx || t._fx.c!==c || t._fx.dest!==dest){
+    if(t._fx){ try{ t._fx.input.disconnect(); }catch(e){} }
+    t._fx={ c:c, dest:dest, input:buildFxChain(c, t, dest) };
+  }
+  return t._fx.input;
+}
+function fxDirty(t){ t._fx=null; }
+// Route one audio-track source through FX (+ chorus, if on) to dest.
+function playAudioSrc(t, c, src, dest){
+  if(t.chorus){
+    const ig=c.createGain(); src.connect(ig);
+    addChorus(c, ig, fxInput(t, c, dest));
+  } else {
+    src.connect(fxInput(t, c, dest));
+  }
+}
+// Live FX monitor: hear your mic through the track's FX chain.
+// Headphones only — speakers + live mic = feedback squeal.
+async function toggleMonitor(t, chip){
+  if(t._monitor){
+    t._monitor.stream.getTracks().forEach(function(s){ s.stop(); });
+    try{ t._monitor.src.disconnect(); }catch(e){}
+    t._monitor=null; chip.classList.remove('on'); chip.textContent='🎧 Monitor FX'; status('Monitor off'); return;
+  }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    const src=ctx.createMediaStreamSource(stream);
+    src.connect(fxInput(t, ctx, t.gain));
+    t._monitor={stream:stream, src:src};
+    chip.classList.add('on'); chip.textContent='🎧 Monitoring…';
+    status('Monitoring with FX — wear headphones, or it will squeal');
+  }catch(err){ status('Mic permission denied'); }
+}
+function refreshMonitor(t){
+  if(!t._monitor) return;
+  try{ t._monitor.src.disconnect(); }catch(e){}
+  t._monitor.src.connect(fxInput(t, ctx, t.gain));
+}
+// Export one recorded take (with its FX baked in) as its own WAV.
+async function exportSampleWav(t){
+  if(!t.buffer){ status('Nothing recorded yet — hit Record first'); return; }
+  status('Rendering sample...');
+  const off=new OfflineAudioContext(Math.min(2, t.buffer.numberOfChannels), t.buffer.length, t.buffer.sampleRate);
+  const src=off.createBufferSource(); src.buffer=t.buffer;
+  const out=off.createGain(); out.connect(off.destination);
+  playAudioSrc(t, off, src, out);
+  src.start(0);
+  const rendered=await off.startRendering();
+  const blob=new Blob([bufferToWav(rendered)],{type:'audio/wav'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url;
+  a.download=(t.name||'sample').replace(/[^\w\-]+/g,'-').toLowerCase()+'.wav'; a.click();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 5000);
+  status('Sample exported');
+}
+
+// ---- Chop to Melody: slices become a pitched arpeggio in the song's key ----
+// Algorithm (all plain Web Audio, no libraries):
+//  1. Slices come from the existing autoSlice (energy onsets, 20ms
+//     frames, min 0.12s apart), quantized to the 16-step grid.
+//  2. Base pitch: pitch-detect the loudest slice with the existing
+//     detectPitch (autocorrelation); fall back to C4 (MIDI 60) when
+//     the take is noisy, whispered, or unpitched (drums, shouts).
+//  3. Walk the song's scale: step s plays the slice picked by the
+//     direction pattern (up / down / up-down / random), and its
+//     pitch is the scale degree for that step — the degree climbs
+//     one scale note per full pass through the slices, wrapping
+//     octaves, and follows the direction (down walks down).
+//  4. Repitch by playbackRate = 2^(semitones/12), clamped to
+//     0.5–2.0 (one octave either way). A slice longer than its step
+//     is cut short by the step length, so the melody stays on the
+//     beat even when the original take was rubato.
+//  5. Steps land on the 16th-note grid at the song BPM, so the
+//     melody is in time with the drums and the piano roll.
+function scaleSemitone(sd, deg){
+  // Cumulative semitone of scale degree deg above the root. The
+  // semis[] list is pitch classes (it wraps past 12, e.g. A Minor
+  // [9,11,0,2,4,5,7] means A B C D E F G), so a class below the
+  // root's class sits an octave up: C after B is 12, not 0.
+  const len=sd.semis.length;
+  const idx=((deg%len)+len)%len;
+  const pc=sd.semis[idx];
+  const base=sd.semis[0];
+  return pc + (pc<base?12:0) + 12*Math.floor(deg/len);
+}
+function chopToMelody(t, keyName, dir){
+  if(!t.buffer) return;
+  if(!t.slices || !t.slices.length){ autoSlice(t); }
+  if(!t.slices.length) return;
+  const key=keyName||'C Major';
+  const semis=SCALES[key]||SCALES.Chromatic;
+  const rootMap={'C Major':0,'A Minor':9,'G Major':7,'E Minor':4,'D Major':2,'Chromatic':0};
+  const sd={semis:semis, root:rootMap[key]||0};
+  const sr=t.buffer.sampleRate;
+  let baseMidi=60, bestPeak=0;
+  for(let i=0;i<t.slices.length;i++){
+    const start=Math.floor(t.slices[i]*sr);
+    const seg=t.buffer.getChannelData(0).slice(start, Math.min(t.buffer.length, start+Math.floor(sr*0.09)));
+    let peak=0; for(let j=0;j<seg.length;j++){ const a=Math.abs(seg[j]); if(a>peak) peak=a; }
+    const f=detectPitch(seg, sr);
+    if(f>60 && f<1000 && peak>bestPeak){ bestPeak=peak; baseMidi=Math.round(69+12*Math.log2(f/440)); }
+  }
+  const baseRel=((baseMidi-sd.root)%12+12)%12;
+  let baseDeg=0, bestDist=99;
+  sd.semis.forEach(function(s, idx){ const d=Math.min(Math.abs(baseRel-s), 12-Math.abs(baseRel-s)); if(d<bestDist){ bestDist=d; baseDeg=idx; } });
+  const n=t.slices.length;
+  const order=[];
+  if(dir==='down'){ for(let i=n-1;i>=0;i--) order.push(i); }
+  else if(dir==='updown'){ for(let i=0;i<n;i++) order.push(i); for(let i=n-2;i>0;i--) order.push(i); }
+  else if(dir==='random'){ const idxs=[]; for(let i=0;i<n;i++) idxs.push(i); while(idxs.length) order.push(idxs.splice(Math.floor(Math.random()*idxs.length),1)[0]); }
+  else { for(let i=0;i<n;i++) order.push(i); }
+  const dirSign=(dir==='down')?-1:1;
+  const steps=new Array(16).fill(null);
+  for(let s=0;s<16;s++){
+    const oi=order[s%order.length];
+    const deg=baseDeg + dirSign*Math.floor(s/order.length);
+    const semisFromBase=scaleSemitone(sd,deg)-scaleSemitone(sd,baseDeg);
+    let rate=Math.pow(2, semisFromBase/12);
+    rate=Math.max(0.5, Math.min(2, rate));
+    steps[s]={slice:oi, rate:rate};
+  }
+  t.melodySteps=steps; t.melodyOn=true; t.melodyDir=dir||'up';
 }
 
 // ---- Karplus-Strong plucked string (Guitar) ----
@@ -817,11 +1022,16 @@ function scheduleStep(step, bar, time){
     if(!variant) return;
     if(t.type==='step'){ const patArr = variant==='B' ? t.patternB : t.pattern; if(patArr[step]) playDrum(ctx, t.inst, time, t.gain); }
     else if(t.type==='melodic'){ const rollArr = variant==='B' ? t.rollB : t.roll; if(rollArr[step]!=null) playMelodic(ctx, t.inst, midiToFreq(rollArr[step]), time, t.gain, t.custom); }
-    else if(t.type==='audio' && t.buffer && t.sliceSteps && t.sliceSteps[step]!=null){
-      const i=t.sliceSteps[step]; const start=t.slices[i]; const end=t.slices[i+1]||t.buffer.duration;
-      const src=ctx.createBufferSource(); src.buffer=t.buffer;
-      if(t.chorus){ const ig=ctx.createGain(); src.connect(ig); addChorus(ctx, ig, t.gain); } else { src.connect(t.gain); }
-      src.start(time,start,Math.max(0.02,end-start));
+    else if(t.type==='audio' && t.buffer){
+      let si=null, rate=1;
+      if(t.melodyOn && t.melodySteps && t.melodySteps[step]){ si=t.melodySteps[step].slice; rate=t.melodySteps[step].rate; }
+      else if(t.sliceSteps && t.sliceSteps[step]!=null){ si=t.sliceSteps[step]; }
+      if(si!=null){
+        const start=t.slices[si]; const end=t.slices[si+1]||t.buffer.duration;
+        const src=ctx.createBufferSource(); src.buffer=t.buffer; src.playbackRate.value=rate;
+        playAudioSrc(t, ctx, src, t.gain);
+        src.start(time,start,Math.max(0.02,(end-start)/rate));
+      }
     }
   });
 }
@@ -829,9 +1039,9 @@ function startPlayback(){
   if(playing) return; playing=true; currentStep=0; currentBar=0; ctx.resume();
   document.getElementById('playBtn').textContent='⏸ Pause';
   tracks.forEach(t=>{
-    if(t.type==='audio' && t.buffer && !t.muted && !(t.sliceSteps && t.sliceSteps.some(x=>x!=null))){
+    if(t.type==='audio' && t.buffer && !t.muted && !(t.sliceSteps && t.sliceSteps.some(x=>x!=null)) && !(t.melodyOn && t.melodySteps && t.melodySteps.some(function(x){ return x!=null; }))){
       const src=ctx.createBufferSource(); src.buffer=t.buffer;
-      if(t.chorus){ const ig=ctx.createGain(); src.connect(ig); addChorus(ctx, ig, t.gain); } else { src.connect(t.gain); }
+      playAudioSrc(t, ctx, src, t.gain);
       src.start(ctx.currentTime); t._src=src;
     }
   });
@@ -885,18 +1095,24 @@ async function exportMix(){
         const rollArr=variant==='B'?t.rollB:t.roll;
         for(let s=0;s<16;s++){ if(rollArr[s]!=null) playMelodic(offline, t.inst, midiToFreq(rollArr[s]), L*16*stepDur+s*stepDur, g, t.custom); } }
     } else if(t.type==='audio' && t.buffer){
-      const hasSlices = t.sliceSteps && t.sliceSteps.some(x=>x!=null);
-      const chainDest = t.chorus ? (()=>{ const ig=offline.createGain(); addChorus(offline, ig, g); return ig; })() : g;
-      if(hasSlices){
+      const hasMelody = t.melodyOn && t.melodySteps && t.melodySteps.some(function(x){ return x!=null; });
+      const hasSlices = !hasMelody && t.sliceSteps && t.sliceSteps.some(x=>x!=null);
+      if(hasMelody || hasSlices){
         for(let L=0;L<loops;L++){ if(t.arr && !t.arr[L%t.arr.length]) continue;
           for(let s=0;s<16;s++){
-            const i=t.sliceSteps[s]; if(i==null) continue;
-            const start=t.slices[i]; const end=t.slices[i+1]||t.buffer.duration;
-            const src=offline.createBufferSource(); src.buffer=t.buffer; src.connect(chainDest);
-            src.start(L*16*stepDur+s*stepDur, start, Math.max(0.02,end-start));
+            let si=null, rate=1;
+            if(hasMelody && t.melodySteps[s]){ si=t.melodySteps[s].slice; rate=t.melodySteps[s].rate; }
+            else if(hasSlices){ si=t.sliceSteps[s]; }
+            if(si==null) continue;
+            const start=t.slices[si]; const end=t.slices[si+1]||t.buffer.duration;
+            const src=offline.createBufferSource(); src.buffer=t.buffer; src.playbackRate.value=rate;
+            playAudioSrc(t, offline, src, g);
+            src.start(L*16*stepDur+s*stepDur, start, Math.max(0.02,(end-start)/rate));
           } }
       } else {
-        const src=offline.createBufferSource(); src.buffer=t.buffer; src.connect(chainDest); src.start(0);
+        const src=offline.createBufferSource(); src.buffer=t.buffer;
+        playAudioSrc(t, offline, src, g);
+        src.start(0);
       }
     }
   });
@@ -946,6 +1162,7 @@ function serializeProject(){
       vol:t.gain.gain.value, pan:t.pan.pan.value, filterType:t.filterType, filterFreq:t.filterFreq,
       autoEnabled:!!t.autoEnabled, autoCutoff:t.autoCutoff||null, custom:t.custom||null,
       chorus:!!t.chorus, slices:t.slices||null, sliceSteps:t.sliceSteps||null, arr:t.arr,
+      fx:t.fx||null, melodySteps:t.melodySteps||null, melodyOn:!!t.melodyOn, melodyDir:t.melodyDir||'up',
       bufferB64: t.buffer ? bufToB64Wav(t.buffer) : null
     })),
     pads: pads.map(p=>({ name:p.name, vol:p.vol, bufferB64: p.buffer ? bufToB64Wav(p.buffer) : null }))
@@ -961,6 +1178,8 @@ async function loadProjectData(data){
     if(spec.type==='step'){ addStepTrack(); t=tracks[tracks.length-1]; t.inst=spec.inst||t.inst; t.pattern=spec.pattern||t.pattern; t.patternB=spec.patternB||t.patternB; }
     else if(spec.type==='melodic'){ addMelodicTrack(); t=tracks[tracks.length-1]; t.inst=spec.inst||t.inst; t.roll=spec.roll||t.roll; t.rollB=spec.rollB||t.rollB; t.custom=spec.custom||t.custom; }
     else { addAudioTrack(); t=tracks[tracks.length-1]; t.chorus=!!spec.chorus; t.slices=spec.slices||[]; t.sliceSteps=spec.sliceSteps||new Array(16).fill(null);
+      t.fx=spec.fx||{reverb:false,delay:false,distortion:false,telephone:false,distAmount:0.5};
+      t.melodySteps=spec.melodySteps||new Array(16).fill(null); t.melodyOn=!!spec.melodyOn; t.melodyDir=spec.melodyDir||'up';
       if(spec.bufferB64){ try{ t.buffer=await b64WavToBuffer(spec.bufferB64); }catch(e){} } }
     t.name=spec.name||t.name; t.editingPattern=spec.editingPattern||'A';
     t.gain.gain.value=spec.vol!=null?spec.vol:t.gain.gain.value; t.pan.pan.value=spec.pan||0;

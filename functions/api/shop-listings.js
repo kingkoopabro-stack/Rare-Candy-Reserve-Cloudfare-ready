@@ -28,6 +28,7 @@ function shapeOverride(row) {
     id: row.id, name: row.name, price: row.price, description: row.description ?? "",
     photos: parseJsonArray(row.photos), options: parseJsonArray(row.options),
     video: row.video || null, stripe_link: row.stripe_link || null,
+    shipping: (typeof row.shipping === "number" ? row.shipping : null),
     updated_at: row.updated_at,
   };
 }
@@ -115,22 +116,56 @@ async function stripeCall(env, method, path, params, idemKey) {
   return { ok: true, data };
 }
 
+// Stripe Tax is OFF until Chris turns it on in the Stripe Dashboard
+// (Tax settings + a Florida registration) AND sets STRIPE_TAX_ENABLED=1
+// in Cloudflare. Until then every link is made exactly as before —
+// no tax, no address collection, no behavior change while he is
+// adding links live in the editor.
+function taxEnabled(env) { return String(env.STRIPE_TAX_ENABLED || "") === "1"; }
+
 // Create a Price for the base price, then a Payment Link for it.
+// shippingCents (0 = none) rides as a SECOND line item — a Price
+// named "Shipping" carrying Stripe's shipping tax code — NOT a
+// Shipping Rate object, so this works with the current restricted
+// key (Prices + Payment Links write). A real Shipping Rate would
+// need "Shipping Rates: Write" added to the key (patch doc, option A).
 // Returns { url, linkId } or { error }.
-async function createStripePaymentLink(env, listingId, name, priceCents) {
+async function createStripePaymentLink(env, listingId, name, priceCents, shippingCents) {
+  const ship = Number(shippingCents) > 0 ? Math.round(Number(shippingCents)) : 0;
   const priceRes = await stripeCall(env, "POST", "/prices",
-    { currency: "usd", unit_amount: String(priceCents), "product_data[name]": name },
+    { currency: "usd", unit_amount: String(priceCents), tax_behavior: "exclusive", "product_data[name]": name },
     "rcr-price-" + listingId + "-" + priceCents);
   if (!priceRes.ok) return { error: priceRes.error };
   const priceId = priceRes.data && priceRes.data.id;
   if (!priceId) return { error: "Stripe made a price but didn't return its id." };
-  const linkRes = await stripeCall(env, "POST", "/payment_links",
-    {
-      "line_items[0][price]": priceId, "line_items[0][quantity]": "1",
-      "metadata[listing_id]": listingId, "metadata[auto]": "1",
-      "metadata[base_price_cents]": String(priceCents),
-    },
-    "rcr-link-" + listingId + "-" + priceCents);
+  const linkParams = {
+    "line_items[0][price]": priceId, "line_items[0][quantity]": "1",
+    "metadata[listing_id]": listingId, "metadata[auto]": "1",
+    "metadata[base_price_cents]": String(priceCents),
+  };
+  if (ship > 0) {
+    const shipRes = await stripeCall(env, "POST", "/prices",
+      { currency: "usd", unit_amount: String(ship), tax_behavior: "exclusive", "product_data[name]": "Shipping", "product_data[tax_code]": "txcd_92010001" },
+      "rcr-ship-" + listingId + "-" + ship);
+    if (!shipRes.ok) return { error: shipRes.error };
+    const shipPriceId = shipRes.data && shipRes.data.id;
+    if (!shipPriceId) return { error: "Stripe made a shipping price but didn't return its id." };
+    linkParams["line_items[1][price]"] = shipPriceId;
+    linkParams["line_items[1][quantity]"] = "1";
+    linkParams["metadata[shipping_cents]"] = String(ship);
+  }
+  if (taxEnabled(env)) {
+    // Stripe works the rate out from the buyer's address, so collect
+    // the shipping address — without it there is no destination to
+    // tax. Tax is only charged where we're registered (Florida);
+    // everywhere else it comes back $0.
+    linkParams["automatic_tax[enabled]"] = "true";
+    linkParams["shipping_address_collection[allowed_countries][0]"] = "US";
+  }
+  // Idempotency key keeps the old shape when nothing new applies, so
+  // a link made before this patch retries exactly as before.
+  const linkKey = "rcr-link-" + listingId + "-" + priceCents + (ship > 0 ? "-" + ship : "") + (taxEnabled(env) ? "-tax" : "");
+  const linkRes = await stripeCall(env, "POST", "/payment_links", linkParams, linkKey);
   if (!linkRes.ok) return { error: linkRes.error };
   const url = linkRes.data && linkRes.data.url;
   if (!url) return { error: "Stripe made a link but didn't return its URL." };
@@ -150,7 +185,17 @@ async function findStripePaymentLink(env, url) {
   const res = await stripeCall(env, "GET", "/payment_links?limit=100", null, null);
   if (!res.ok || !res.data || !Array.isArray(res.data.data)) return null;
   const hit = res.data.data.find((l) => l && l.url === url);
-  return hit ? { id: hit.id, metadata: hit.metadata || {} } : null;
+  return hit ? { id: hit.id, metadata: hit.metadata || {}, automatic_tax: hit.automatic_tax || null } : null;
+}
+
+// Turn automatic tax on for an existing auto-made Payment Link (one
+// made before Stripe Tax was switched on). Best-effort: returns true
+// when Stripe accepted it, false otherwise — the save never fails
+// over this.
+async function enableTaxOnLink(env, linkId) {
+  const res = await stripeCall(env, "POST", "/payment_links/" + encodeURIComponent(linkId),
+    { "automatic_tax[enabled]": "true", "shipping_address_collection[allowed_countries][0]": "US" }, null);
+  return res.ok;
 }
 
 // Decide what happens to the Stripe link on a save. `incoming` is the
@@ -159,10 +204,12 @@ async function findStripePaymentLink(env, url) {
 // { link, status, message } — `link` is the final stripe_link value.
 // The caller writes `link` back to the row when it differs from
 // `incoming`. Never throws for Stripe reasons.
-async function autoStripeForSave(env, { id, name, priceCents, incoming, stored }) {
+async function autoStripeForSave(env, { id, name, priceCents, shippingCents, incoming, stored }) {
   const money = fmtMoneyCents(priceCents);
   if (incoming) {
-    if (stored && stored.stripe_link === incoming && Math.round(Number(stored.price) * 100) !== priceCents) {
+    const storedShipCents = (stored && typeof stored.shipping === "number") ? Math.round(stored.shipping * 100) : 0;
+    const shipChanged = stored && storedShipCents !== (Number(shippingCents) || 0);
+    if (stored && stored.stripe_link === incoming && (Math.round(Number(stored.price) * 100) !== priceCents || shipChanged)) {
       // Same link, price changed: only regenerate it if it is one of
       // ours (metadata auto=1). A hand-made Dashboard link stays put.
       if (!env.STRIPE_SECRET_KEY) {
@@ -178,15 +225,27 @@ async function autoStripeForSave(env, { id, name, priceCents, incoming, stored }
       if (priceCents < STRIPE_MIN_CENTS) {
         return { link: incoming, status: "price_too_low", message: "Price changed below Stripe's $0.50 minimum — the old link stays as-is." };
       }
-      const created = await createStripePaymentLink(env, id, name, priceCents);
+      const created = await createStripePaymentLink(env, id, name, priceCents, shippingCents);
       if (created.error) {
         return { link: incoming, status: "error", message: "Stripe said: " + created.error + " The old link stays as-is." };
       }
       await deactivateStripePaymentLink(env, found.id);
-      return { link: created.url, status: "recreated", message: "Price changed — made a new Stripe link for " + money + " and turned the old one off." };
+      return { link: created.url, status: "recreated", message: "Price or shipping changed — made a new Stripe link for " + money + " and turned the old one off." };
     }
     if (!stored || (stored.stripe_link && stored.stripe_link !== incoming)) {
       return { link: incoming, status: "manual", message: "Stripe link saved as pasted — it won't be replaced automatically." };
+    }
+    // Same link, same price, same shipping: keep it — but if Stripe
+    // Tax has just been switched on, flip it on for this auto-made
+    // link too (otherwise links made before tax day would never
+    // collect tax). Only when the flag is on, only for our links.
+    if (taxEnabled(env) && env.STRIPE_SECRET_KEY) {
+      const found = await findStripePaymentLink(env, incoming);
+      if (found && found.metadata && found.metadata.auto === "1" && (!found.automatic_tax || found.automatic_tax.enabled !== true)) {
+        if (await enableTaxOnLink(env, found.id)) {
+          return { link: incoming, status: "kept", message: "Stripe Tax switched on for this link — Florida buyers now pay tax at checkout." };
+        }
+      }
     }
     return { link: incoming, status: "kept", message: "" };
   }
@@ -211,11 +270,11 @@ async function autoStripeForSave(env, { id, name, priceCents, incoming, stored }
   if (!env.STRIPE_SECRET_KEY) {
     return { link: null, status: "not_configured", message: "Stripe isn't connected yet — add STRIPE_SECRET_KEY in the Cloudflare dashboard and save again, or paste a link by hand." };
   }
-  const created = await createStripePaymentLink(env, id, name, priceCents);
+  const created = await createStripePaymentLink(env, id, name, priceCents, shippingCents);
   if (created.error) {
     return { link: null, status: "error", message: "Stripe said: " + created.error };
   }
-  return { link: created.url, status: "created", message: "Stripe link created for " + money + " — buyers can check out with Stripe now." };
+  return { link: created.url, status: "created", message: "Stripe link created for " + money + (Number(shippingCents) > 0 ? " + shipping" : "") + " — buyers can check out with Stripe now." };
 }
 
 // POST action=stripe-create: make a link on demand for an existing
@@ -238,7 +297,7 @@ async function stripeCreateAction(db, env, a) {
   if (!env.STRIPE_SECRET_KEY) {
     return json({ ok: true, listing: shapeOverride(row), stripe_status: "not_configured", stripe_message: "Stripe isn't connected yet — add STRIPE_SECRET_KEY in the Cloudflare dashboard and try again, or paste a link by hand." });
   }
-  const created = await createStripePaymentLink(env, row.id, row.name, priceCents);
+  const created = await createStripePaymentLink(env, row.id, row.name, priceCents, Math.round(Number(row.shipping || 0) * 100));
   if (created.error) {
     return json({ ok: true, listing: shapeOverride(row), stripe_status: "error", stripe_message: "Stripe said: " + created.error });
   }
@@ -284,6 +343,12 @@ export async function onRequestPost({ env, request }) {
     if (!URL_RE.test(v)) return json({ ok: false, error: "Video must be a valid https:// URL." });
     video = v;
   }
+  let shipping = null;
+  if (a.shipping != null && String(a.shipping).trim() !== "") {
+    const s = Number(a.shipping);
+    if (!Number.isFinite(s) || s < 0 || s > 9999) return json({ ok: false, error: "Shipping must be $0 or more (blank = no shipping charge)." });
+    shipping = Math.round(s * 100) / 100;
+  }
   let stripeLink = null;
   if (a.stripe_link != null && String(a.stripe_link).trim() !== "") {
     const s = String(a.stripe_link).trim();
@@ -295,14 +360,14 @@ export async function onRequestPost({ env, request }) {
   // is never touched). The save itself never depends on Stripe.
   const existing = await db.prepare("SELECT * FROM shop_listing_overrides WHERE id = ? LIMIT 1").bind(id).first();
   await db.prepare(
-    `INSERT INTO shop_listing_overrides (id, name, price, description, photos, options, video, stripe_link, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, description=excluded.description, photos=excluded.photos, options=excluded.options, video=excluded.video, stripe_link=excluded.stripe_link, updated_at=excluded.updated_at`,
-  ).bind(id, name, Math.round(price * 100) / 100, description, JSON.stringify(photos), JSON.stringify(options), video, stripeLink, nowMs()).run();
+    `INSERT INTO shop_listing_overrides (id, name, price, description, photos, options, video, stripe_link, shipping, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, description=excluded.description, photos=excluded.photos, options=excluded.options, video=excluded.video, stripe_link=excluded.stripe_link, shipping=excluded.shipping, updated_at=excluded.updated_at`,
+  ).bind(id, name, Math.round(price * 100) / 100, description, JSON.stringify(photos), JSON.stringify(options), video, stripeLink, shipping, nowMs()).run();
   let stripeStatus = "kept", stripeMessage = "";
   try {
     const auto = await autoStripeForSave(env, {
-      id, name, priceCents: Math.round(price * 100), incoming: stripeLink, stored: existing,
+      id, name, priceCents: Math.round(price * 100), shippingCents: Math.round((shipping || 0) * 100), incoming: stripeLink, stored: existing,
     });
     stripeStatus = auto.status;
     stripeMessage = auto.message;

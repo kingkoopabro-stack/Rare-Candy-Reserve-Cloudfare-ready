@@ -800,6 +800,7 @@ function render() {
   renderView();
   renderNotice();
   renderEphWin();
+  maybeApplyBrandDraft();
 }
 
 function renderAccount() {
@@ -6002,6 +6003,31 @@ function renderInbox() {
       "</button>";
   }).join("");
 }
+// Brand-button DM draft (Create page): a visitor taps "build your own
+// brand" and lands on #/chat with a pre-written message to Chris (member 1).
+// The draft stays in sessionStorage until it is actually put in the
+// composer, so a visitor who still needs to sign up gets it after signup.
+function applyPendingIMDraft(id, winEl) {
+  if (!state.pendingIMDraft || state.pendingIMDraft.id !== id) return;
+  var input = winEl.querySelector('input[name="body"]');
+  if (input) {
+    input.value = state.pendingIMDraft.body;
+    input.focus();
+  }
+  try { sessionStorage.removeItem("dwc-brand-draft"); } catch (e) {}
+  state.pendingIMDraft = null;
+}
+function maybeApplyBrandDraft() {
+  if (!state.profile) return;
+  if (!state.route || state.route.name !== "chat") return;
+  var raw = null;
+  try { raw = sessionStorage.getItem("dwc-brand-draft"); } catch (e) { return; }
+  if (!raw) return;
+  var d = null;
+  try { d = JSON.parse(raw); } catch (e) { return; }
+  if (!d || !d.body) return;
+  DWC.openIM(1, "RareCandyReserve", d.body);
+}
 function syncIMShells() {
   var host = $("dwc-imwins");
   if (!host) return;
@@ -6011,7 +6037,8 @@ function syncIMShells() {
     if (!want[w.getAttribute("data-imwin")]) w.remove();
   });
   state.openIMs.forEach(function (im) {
-    if (host.querySelector('[data-imwin="' + im.id + '"]')) return;
+    var existing = host.querySelector('[data-imwin="' + im.id + '"]');
+    if (existing) { applyPendingIMDraft(im.id, existing); return; }
     var div = document.createElement("div");
     div.className = "dwc-imwin";
     div.setAttribute("data-imwin", String(im.id));
@@ -6022,6 +6049,7 @@ function syncIMShells() {
       '<input name="body" required maxlength="500" placeholder="Message @' + esc(im.username) + '…" style="flex:1">' +
       '<button class="btn small" type="submit">Send</button></form>';
     host.appendChild(div);
+    applyPendingIMDraft(im.id, div);
   });
 }
 function renderIMLog(id) {
@@ -9313,9 +9341,10 @@ window.DWC = {
     if (data && data.ok) setNotice("Away message saved.");
     else if (data && data.error) setNotice(data.error);
   },
-  openIM: function (id, username) {
+  openIM: function (id, username, draft) {
     if (!state.profile) { setNotice("Create your account first — IMs are for members."); DWC.openSignup(); return; }
     if (state.profile && id === state.profile.id) return;
+    if (draft) state.pendingIMDraft = { id: id, body: String(draft) };
     if (!state.openIMs.some(function (im) { return im.id === id; })) {
       state.openIMs.push({ id: id, username: username });
       if (state.openIMs.length > 4) state.openIMs.shift();

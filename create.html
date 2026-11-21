@@ -28,20 +28,24 @@
 .learn-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}
 .learn-tab{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px;font-family:inherit}
 .learn-tab:hover{border-color:var(--cyan)}
-.learn-tab.active{background:var(--grad);border-color:transparent;color:#0b0b14;font-weight:800}
+.learn-tab.active{background:var(--tab-accent,var(--grad));border-color:transparent;color:#0b0b14;font-weight:800}
 .learn-panel{display:none}
 .learn-panel.active{display:block}
-.learn-tile{border-radius:16px;padding:26px 20px;text-align:center;background:linear-gradient(135deg,#2a0b3e,#0b2e2a);border:1px solid var(--line);margin-bottom:16px}
+.learn-tile{border-radius:16px;padding:26px 20px;text-align:center;background:linear-gradient(135deg,#2a0b3e,#0b2e2a);border:1px solid var(--tab-accent,var(--line));margin-bottom:16px;box-shadow:0 0 28px color-mix(in srgb, var(--tab-accent,#7c4dff) 22%, transparent)}
 .learn-tile .t-ico{font-size:52px;line-height:1}
-.learn-tile .t-name{font-size:20px;font-weight:800;margin-top:10px}
+.learn-tile .t-name{font-size:20px;font-weight:800;margin-top:10px;color:var(--tab-accent,#fff)}
 .code-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:760px){.code-grid{grid-template-columns:1fr}}
 .code-ed{width:100%;min-height:104px;background:#0a0714;color:#d7f9ff;border:1px solid var(--line);border-radius:10px;padding:10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical;display:block;margin:4px 0 12px}
 .code-preview{width:100%;height:340px;border:1px solid var(--line);border-radius:12px;background:#fff;display:block}
 .code-lab{font-size:13px;color:var(--muted);font-weight:700}
 .lumo-note{border:1px solid rgba(0,229,255,.4);border-radius:12px;padding:14px 16px;background:rgba(0,229,255,.06);margin-top:16px}
-.brand-btn{display:block;text-align:center;margin:28px auto 0;padding:18px 26px;border-radius:16px;background:linear-gradient(90deg,#ff9a00,#ffee00,#39ff88);color:#111;font-weight:800;font-size:18px;text-decoration:none;box-shadow:0 0 28px rgba(255,238,0,.35);max-width:660px;line-height:1.35}
-.brand-btn:hover{filter:brightness(1.08)}
+.brand-btn{display:block;text-align:center;margin:28px auto 0;padding:18px 26px;border-radius:14px;background:#0d0d12;border:1px solid #c9a227;color:#e8c85a;font-weight:700;font-size:18px;text-decoration:none;box-shadow:0 6px 24px rgba(0,0,0,.45);max-width:660px;line-height:1.35;letter-spacing:.02em}
+.brand-btn:hover{border-color:#e8c85a;box-shadow:0 0 24px rgba(201,162,39,.35),0 6px 24px rgba(0,0,0,.45)}
+.btn-code{background:#0a1410;border:1.5px solid #39ff88;color:#39ff88;box-shadow:0 0 16px rgba(57,255,136,.25)}
+.btn-code:hover{background:#39ff88;color:#0b0b14}
+.btn-lumo{background:#1a1030;border:1.5px solid #8b5cf6;color:#c4b5fd;box-shadow:0 0 16px rgba(139,92,246,.3)}
+.btn-lumo:hover{background:#8b5cf6;color:#fff}
 </style>
 </head>
 <body data-page="create">
@@ -114,117 +118,117 @@
       <p class="learn-intro">Wanna create something other than music? We make sure people can learn and access the tools they need to here and create anything their heart desires, and I'm here to make sure you learn how and get better at it. What's to lose besides the short time it takes to pick up a highly beneficial new skill? So let's learn:</p>
       <p style="color:var(--muted);margin-bottom:4px">learn to :)</p>
       <div class="learn-tabs" role="tablist">
-        <button class="learn-tab active" onclick="showLearnTab('code',this)">💻 Code development</button>
-        <button class="learn-tab" onclick="showLearnTab('music',this)">🎛 Music production</button>
-        <button class="learn-tab" onclick="showLearnTab('3d',this)">🧊 3D Model Rendering</button>
-        <button class="learn-tab" onclick="showLearnTab('graphic',this)">🎨 Graphic design</button>
-        <button class="learn-tab" onclick="showLearnTab('writing',this)">✍️ Writing</button>
-        <button class="learn-tab" onclick="showLearnTab('health',this)">❤️ Health</button>
-        <button class="learn-tab" onclick="showLearnTab('mental',this)">🧠 Mental Health</button>
-        <button class="learn-tab" onclick="showLearnTab('investing',this)">📈 Investing</button>
-        <button class="learn-tab" onclick="showLearnTab('game',this)">🎮 Game development</button>
-        <button class="learn-tab" onclick="showLearnTab('video',this)">🎬 Video production</button>
-        <button class="learn-tab" onclick="showLearnTab('web',this)">🌐 Web Design</button>
-        <button class="learn-tab" onclick="showLearnTab('dropship',this)">📦 Drop Shipping</button>
-        <button class="learn-tab" onclick="showLearnTab('resale',this)">🏷️ Resale</button>
-        <button class="learn-tab" onclick="showLearnTab('hort',this)">🌱 Horticulture</button>
-        <button class="learn-tab" onclick="showLearnTab('myco',this)">🍄 Mycology</button>
-        <button class="learn-tab" onclick="showLearnTab('ayur',this)">🪷 Ayurvedic / Alternative Medicine</button>
-        <button class="learn-tab" onclick="showLearnTab('clothing',this)">👕 Clothing line</button>
+        <button class="learn-tab active" style="--tab-accent:#00e5ff" onclick="showLearnTab('code',this)">💻 Code development</button>
+        <button class="learn-tab" style="--tab-accent:#ff2d95" onclick="showLearnTab('music',this)">🎛 Music production</button>
+        <button class="learn-tab" style="--tab-accent:#a78bfa" onclick="showLearnTab('3d',this)">🧊 3D Model Rendering</button>
+        <button class="learn-tab" style="--tab-accent:#ff9a00" onclick="showLearnTab('graphic',this)">🎨 Graphic design</button>
+        <button class="learn-tab" style="--tab-accent:#ffd166" onclick="showLearnTab('writing',this)">✍️ Writing</button>
+        <button class="learn-tab" style="--tab-accent:#ff4d6d" onclick="showLearnTab('health',this)">❤️ Health</button>
+        <button class="learn-tab" style="--tab-accent:#2dd4bf" onclick="showLearnTab('mental',this)">🧠 Mental Health</button>
+        <button class="learn-tab" style="--tab-accent:#39ff88" onclick="showLearnTab('investing',this)">📈 Investing</button>
+        <button class="learn-tab" style="--tab-accent:#b388ff" onclick="showLearnTab('game',this)">🎮 Game development</button>
+        <button class="learn-tab" style="--tab-accent:#ff5a5a" onclick="showLearnTab('video',this)">🎬 Video production</button>
+        <button class="learn-tab" style="--tab-accent:#4d9fff" onclick="showLearnTab('web',this)">🌐 Web Design</button>
+        <button class="learn-tab" style="--tab-accent:#ffb020" onclick="showLearnTab('dropship',this)">📦 Drop Shipping</button>
+        <button class="learn-tab" style="--tab-accent:#e8c85a" onclick="showLearnTab('resale',this)">🏷️ Resale</button>
+        <button class="learn-tab" style="--tab-accent:#7ee081" onclick="showLearnTab('hort',this)">🌱 Horticulture</button>
+        <button class="learn-tab" style="--tab-accent:#d291ff" onclick="showLearnTab('myco',this)">🍄 Mycology</button>
+        <button class="learn-tab" style="--tab-accent:#f7a8c4" onclick="showLearnTab('ayur',this)">🪷 Ayurvedic / Alternative Medicine</button>
+        <button class="learn-tab" style="--tab-accent:#ff8a7a" onclick="showLearnTab('clothing',this)">👕 Clothing line</button>
       </div>
 
-      <div class="learn-panel active" id="learn-code">
+      <div class="learn-panel active" id="learn-code" style="--tab-accent:#00e5ff">
         <div class="learn-tile"><div class="t-ico">💻</div><div class="t-name">Code development</div></div>
         <p style="color:var(--muted)">Learn coding languages by doing — HTML, CSS, and JavaScript, right here. Type code on the left, hit Run, and watch it come alive on the right. Start with the basics and work up to building your own pages, tools, and games. Coders work from home more than almost any other job — freelance work, remote teams, or your own products.</p>
         <div id="code-editor-code"></div>
         <div class="lumo-note">
           <p style="margin-top:0">We don't recommend AI, but if you're just getting into coding and want the basics explained, this is how I originally learned to code. Lumo is made by Proton in Switzerland, and they're focused on security and private data across all their products. I used to use Lumo to code everything — I'd give it files of HTML and other assets I made with Claude, and together we made amazing code.</p>
-          <p style="margin-bottom:0"><a class="btn small" href="https://lumo.proton.me" target="_blank" rel="noopener">Open Lumo by Proton ↗</a></p>
+          <p style="margin-bottom:0"><a class="btn small btn-lumo" href="https://lumo.proton.me" target="_blank" rel="noopener">Open Lumo by Proton ↗</a></p>
         </div>
       </div>
 
-      <div class="learn-panel" id="learn-music">
+      <div class="learn-panel" id="learn-music" style="--tab-accent:#ff2d95">
         <div class="learn-tile"><div class="t-ico">🎛</div><div class="t-name">Music production</div></div>
         <p style="color:var(--muted)">The DAW is right above on this page — VN-StudioV2, free in your browser. Learn beats, recording, mixing, and mastering, then export your tracks as WAV and save projects as .rcr files. Music work is made for working from home: sell beats, mix for artists online, or score games and videos from your own room.</p>
       </div>
 
-      <div class="learn-panel" id="learn-3d">
+      <div class="learn-panel" id="learn-3d" style="--tab-accent:#a78bfa">
         <div class="learn-tile"><div class="t-ico">🧊</div><div class="t-name">3D Model Rendering</div></div>
         <p style="color:var(--muted)">Learn to build and render 3D models with free tools like Blender — characters, props, and scenes for games, prints, and product shots. 3D artists work remotely for games, film, and online shops, and printed models sell from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-graphic">
+      <div class="learn-panel" id="learn-graphic" style="--tab-accent:#ff9a00">
         <div class="learn-tile"><div class="t-ico">🎨</div><div class="t-name">Graphic design</div></div>
         <p style="color:var(--muted)">Learn layout, color, and typography with free tools like GIMP and Krita — logos, posters, merch, and social graphics. Designers are some of the most in-demand remote workers: logos, branding, and merch for clients all over the world, all from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-writing">
+      <div class="learn-panel" id="learn-writing" style="--tab-accent:#ffd166">
         <div class="learn-tile"><div class="t-ico">✍️</div><div class="t-name">Writing</div></div>
         <p style="color:var(--muted)">Learn to write stories, scripts, articles, and copy that people actually want to read — with practice and feedback right here. Writers work from anywhere: freelance articles, scripts, books, and web copy, all from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-health">
+      <div class="learn-panel" id="learn-health" style="--tab-accent:#ff4d6d">
         <div class="learn-tile"><div class="t-ico">❤️</div><div class="t-name">Health</div></div>
         <p style="color:var(--muted)">Learn the basics of looking after your body — food, movement, sleep, and habits that actually stick. Health knowledge turns into coaching, meal planning, and wellness work you can do from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-mental">
+      <div class="learn-panel" id="learn-mental" style="--tab-accent:#2dd4bf">
         <div class="learn-tile"><div class="t-ico">🧠</div><div class="t-name">Mental Health</div></div>
         <p style="color:var(--muted)">Learn how to look after your head — coping skills, routines, and how burnout and stress actually work. This is about getting better and helping others do the same, including peer support and coaching work from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-investing">
+      <div class="learn-panel" id="learn-investing" style="--tab-accent:#39ff88">
         <div class="learn-tile"><div class="t-ico">📈</div><div class="t-name">Investing</div></div>
         <p style="color:var(--muted)">Learn the basics of money — saving, budgeting, and how investing actually works, without the hype or the scams. Financial literacy is a skill you use for life, and it opens the door to bookkeeping and finance work from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-game">
+      <div class="learn-panel" id="learn-game" style="--tab-accent:#b388ff">
         <div class="learn-tile"><div class="t-ico">🎮</div><div class="t-name">Game development</div></div>
         <p style="color:var(--muted)">Learn to build games — code, art, sound, and design — starting with the code editor right here. Games are built by remote teams all over the world, and indie developers ship from home every day.</p>
         <div id="code-editor-game"></div>
       </div>
 
-      <div class="learn-panel" id="learn-video">
+      <div class="learn-panel" id="learn-video" style="--tab-accent:#ff5a5a">
         <div class="learn-tile"><div class="t-ico">🎬</div><div class="t-name">Video production</div></div>
         <p style="color:var(--muted)">Learn to shoot, cut, and finish videos with free tools like DaVinci Resolve — from phone clips to full productions. Video editors are in huge demand and almost all of them work from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-web">
+      <div class="learn-panel" id="learn-web" style="--tab-accent:#4d9fff">
         <div class="learn-tile"><div class="t-ico">🌐</div><div class="t-name">Web Design</div></div>
         <p style="color:var(--muted)">Learn to design and build websites people love to use — layout, color, and the code behind it, with the editor right here on this page. Web designers work remotely for clients everywhere, or build and sell their own sites.</p>
       </div>
 
-      <div class="learn-panel" id="learn-dropship">
+      <div class="learn-panel" id="learn-dropship" style="--tab-accent:#ffb020">
         <div class="learn-tile"><div class="t-ico">📦</div><div class="t-name">Drop Shipping</div></div>
         <p style="color:var(--muted)">Learn how drop shipping actually works — finding products, building a store, and handling orders without holding stock. It's a real way to run a shop from home, and the lessons here cover the honest version, not the hype.</p>
       </div>
 
-      <div class="learn-panel" id="learn-resale">
+      <div class="learn-panel" id="learn-resale" style="--tab-accent:#e8c85a">
         <div class="learn-tile"><div class="t-ico">🏷️</div><div class="t-name">Resale</div></div>
         <p style="color:var(--muted)">Learn to buy, grade, price, and sell collectibles and secondhand goods — the same way Rare Candy Reserve does it. Reselling is one of the most direct ways to make money from home: your own shop, your own hours.</p>
       </div>
 
-      <div class="learn-panel" id="learn-hort">
+      <div class="learn-panel" id="learn-hort" style="--tab-accent:#7ee081">
         <div class="learn-tile"><div class="t-ico">🌱</div><div class="t-name">Horticulture</div></div>
         <p style="color:var(--muted)">Learn to grow plants — from houseplants to a full nursery — with real hands-on guidance. Growers sell plants, seeds, and cuttings online and at markets, all from their own yard.</p>
       </div>
 
-      <div class="learn-panel" id="learn-myco">
+      <div class="learn-panel" id="learn-myco" style="--tab-accent:#d291ff">
         <div class="learn-tile"><div class="t-ico">🍄</div><div class="t-name">Mycology</div></div>
         <p style="color:var(--muted)">Learn to grow mushrooms — identification, sterile technique, and cultivation — safely and step by step. Mycology turns into gourmet and medicinal mushroom sales, kits, and cultures, all from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-ayur">
+      <div class="learn-panel" id="learn-ayur" style="--tab-accent:#f7a8c4">
         <div class="learn-tile"><div class="t-ico">🪷</div><div class="t-name">Ayurvedic / Alternative Medicine</div></div>
         <p style="color:var(--muted)">Learn the basics of Ayurvedic and alternative medicine — herbs, routines, and traditional approaches to feeling better. This is learning for life and for helping others, including wellness and herbal work from home.</p>
       </div>
 
-      <div class="learn-panel" id="learn-clothing">
+      <div class="learn-panel" id="learn-clothing" style="--tab-accent:#ff8a7a">
         <div class="learn-tile"><div class="t-ico">👕</div><div class="t-name">Clothing line</div></div>
         <p style="color:var(--muted)">Learn to design, print, and sell your own clothing line — from the first sketch to a finished shirt people want to wear. Print-on-demand means you can run a clothing brand from home with no stock.</p>
       </div>
 
-      <a class="brand-btn" href="community.html">If you want to learn to build your own brand, you've come to the right place →</a>
+      <a class="brand-btn" href="community.html#/chat" onclick="return brandDM()">If you want to learn to build your own brand, you've come to the right place →</a>
     </div>
     <p style="margin-top:18px"><a class="btn" href="community.html">Make a free profile →</a> <a class="btn ghost" href="music.html">Hear the music →</a></p>
   </section>
@@ -263,7 +267,7 @@ function mountCodeEditor(hostId, prefix){
     +'<span class="code-lab">HTML</span><textarea id="'+prefix+'-html" class="code-ed" spellcheck="false">&lt;h1&gt;Hello, this is my first page!&lt;/h1&gt;\n&lt;p&gt;Change this text, hit Run, and watch it update.&lt;/p&gt;</textarea>'
     +'<span class="code-lab">CSS</span><textarea id="'+prefix+'-css" class="code-ed" spellcheck="false">h1{color:#7c4dff}\np{color:#333;font-size:18px}</textarea>'
     +'<span class="code-lab">JavaScript</span><textarea id="'+prefix+'-js" class="code-ed" spellcheck="false">document.querySelector("p").textContent="You just ran JavaScript!";</textarea>'
-    +'<p style="margin-top:10px"><button class="btn" type="button" onclick="runCode(\''+prefix+'\')">▶ Run my code</button></p></div>'
+    +'<p style="margin-top:10px"><button class="btn btn-code" type="button" onclick="runCode(\''+prefix+'\')">▶ Run my code</button></p></div>'
     +'<div><span class="code-lab">Result</span><iframe id="'+prefix+'-preview" class="code-preview" sandbox="allow-scripts" title="Your code, running"></iframe></div></div>';
   runCode(prefix);
 }
@@ -271,7 +275,16 @@ function runCode(prefix){
   var html=document.getElementById(prefix+'-html').value;
   var css=document.getElementById(prefix+'-css').value;
   var js=document.getElementById(prefix+'-js').value;
-  document.getElementById(prefix+'-preview').srcdoc='<!DOCTYPE html><html><head><style>'+css+'</style></head><body>'+html+'<script>'+js+'<\/script></body></html>';
+  document.getElementById(prefix+'-preview').srcdoc='<!DOCTYPE html><html><head><style>'+css+'</style></head><body>'+html+'<script>
+// Brand button: stash a pre-written DM to Chris (member 1) and let the
+// link take the visitor to #/chat, where community.js opens the IM
+// window with this draft already in the composer (blank to fill in).
+var BRAND_DRAFT = "I'm interested in learning how to make a brand based on the subject of \"___________\". Can you send me your digital ebook on forming your own business with little to no start money? It costs me nothing — once you're able, message me back with a downloadable link to the full guide or quick start based on what I'm working with, so I can learn the basics and jump right in.";
+function brandDM(){
+  try{ sessionStorage.setItem("dwc-brand-draft", JSON.stringify({to:1, username:"RareCandyReserve", body:BRAND_DRAFT})); }catch(e){}
+  return true;
+}
+'+js+'<\/script></body></html>';
 }
 mountCodeEditor('code-editor-code','code');
 mountCodeEditor('code-editor-game','game');

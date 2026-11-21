@@ -1170,6 +1170,22 @@ var LAYOUT_STORE = [
       ".dwc-myprofile a{color:#d4af37;text-shadow:none;}" +
       ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;}"},
   {
+    id: "store:arcade80s", code: "ARCADE85", name: "Retro Arcade '85", tag: "Arcade · 80s · premium", price: 50,
+    desc: "Chris's own page layout, turned all the way up — a truly retro 80s arcade background: neon grid floor, striped sun, INSERT COIN energy. Your page, but arcade. Buying it unlocks the background for your page.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#070714", bg_image_url: "https://rarecandyreserve.org/images/retro-arcade-80s-bg.jpg", text_color: "#e8f6ff", accent_color: "#00e5ff", font: "orbitron", name_font: "pressstart", glow: false, glow_color: "", outline_color: "", button_style: "arcade", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
+    css: ".dwc-myprofile{position:relative;background-image:linear-gradient(rgba(5,5,20,.55),rgba(5,5,20,.78)),url(https://rarecandyreserve.org/images/retro-arcade-80s-bg.jpg);background-size:cover;background-position:center;background-attachment:fixed;}" +
+      ".dwc-myprofile .card{background:rgba(10,10,28,.88);border:2px solid #00e5ff;border-radius:8px;}" +
+      ".dwc-myprofile h2,.dwc-myprofile h3{color:#ffe600;text-shadow:0 0 12px rgba(255,230,0,.7);}" +
+      ".dwc-myprofile p,.dwc-myprofile li{color:#e8f6ff;}" +
+      ".dwc-myprofile .dwc-meta{color:#8ab8d8;}" +
+      ".dwc-myprofile a{color:#00e5ff;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ffe600;box-shadow:0 0 12px rgba(255,230,0,.6);}" +
+      ".dwc-myprofile .btn{background:linear-gradient(90deg,#ff2d95,#ffe600);color:#0a0a12;box-shadow:0 0 12px rgba(255,230,0,.6);}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ffe600;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-mypage-head{border-bottom:3px solid #00e5ff;}"
+  },
+  {
     id: "store:vaporwave-sunset", code: "SUNSET", name: "Vaporwave Sunset", tag: "Sunset · chrome · grid", price: 0,
     desc: "Driving into the sunset — pink sky, chrome letters, neon grid floor. The signature RCR look, turned golden.",
     conflict: "",
@@ -1418,7 +1434,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -2384,9 +2400,12 @@ function profileButtonsRowsHTML(p) {
   var pb = (p && p.profile_buttons) || null;
   var get = function (key) {
     if (pb && pb.buttons && pb.buttons[key]) return pb.buttons[key];
-    return { label: "", bg: "", color: "" };
+    return { label: "", bg: "", color: "", font: "", size: "", radius: "" };
   };
   var labels = { add: "Add me", message: "Message me", favorite: "Add to Favorites", group: "Add to group" };
+  var fontOpts = function (sel) {
+    return THEME_FONTS.map(function (f) { return '<option value="' + esc(f.id) + '"' + ((sel || "") === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("");
+  };
   var rows = "";
   ["add", "message", "favorite", "group"].forEach(function (key) {
     var b = get(key);
@@ -2395,7 +2414,22 @@ function profileButtonsRowsHTML(p) {
       '<label class="dwc-pb-color"><input type="checkbox" name="pb_bg_use_' + key + '" style="width:auto"' + (b.bg ? " checked" : "") + '> BG</label>' +
       '<input type="color" name="pb_bg_' + key + '" value="' + (b.bg || "#141424") + '" style="width:48px;height:34px;padding:2px">' +
       '<label class="dwc-pb-color"><input type="checkbox" name="pb_color_use_' + key + '" style="width:auto"' + (b.color ? " checked" : "") + '> Text</label>' +
-      '<input type="color" name="pb_color_' + key + '" value="' + (b.color || "#f2f2f8") + '" style="width:48px;height:34px;padding:2px"></div>';
+      '<input type="color" name="pb_color_' + key + '" value="' + (b.color || "#f2f2f8") + '" style="width:48px;height:34px;padding:2px">' +
+      // Per-button look (v3.22) — each button's own font, size, and
+      // container shape. Defaults follow the page's button size + style;
+      // anything picked here wins for that button only. The live preview
+      // below the form shows each change as you make it.
+      '<label style="font-size:12px;color:var(--muted)">Font <select name="pb_font_' + key + '">' + fontOpts(b.font) + '</select></label>' +
+      '<label style="font-size:12px;color:var(--muted)">Size <select name="pb_size_' + key + '">' +
+        '<option value=""' + (!(b.size) ? " selected" : "") + '>Default</option>' +
+        '<option value="s"' + (b.size === "s" ? " selected" : "") + '>Small</option>' +
+        '<option value="l"' + (b.size === "l" ? " selected" : "") + '>Large</option>' +
+        '<option value="xl"' + (b.size === "xl" ? " selected" : "") + '>XL</option></select></label>' +
+      '<label style="font-size:12px;color:var(--muted)">Shape <select name="pb_radius_' + key + '">' +
+        '<option value=""' + (!(b.radius) ? " selected" : "") + '>Default</option>' +
+        '<option value="square"' + (b.radius === "square" ? " selected" : "") + '>Square</option>' +
+        '<option value="rounded"' + (b.radius === "rounded" ? " selected" : "") + '>Rounded</option>' +
+        '<option value="pill"' + (b.radius === "pill" ? " selected" : "") + '>Pill</option></select></label></div>';
   });
   return rows;
 }
@@ -2467,10 +2501,32 @@ function profileVideoSectionHTML(p, th) {
   var yt = (th && th.video_url) || "";
   var file = (th && th.video_file_url) || "";
   var has = yt || file;
+  // Video size + centering (v3.22) — the setting sits right next to the
+  // video URL, where the video is set. Size "" = Normal (the current
+  // size, the default); "s" Small, "l" Big, "stretch" Stretch to fit.
+  // The Center button locks the video block in the middle of its spot.
+  var vidSize = (th && th.video_size) || "";
+  var vidSizeKey = vidSize === "" ? "m" : vidSize;
+  var vidAlign = (th && th.video_align) || "";
   return '<div class="dwc-layoutbox" id="dwc-sec-video"><h4 style="margin:0 0 6px">🎬 My video — one video on my page</h4>' +
     "<p style=\"margin:0 0 8px\">One video on your page — your training video, a music video, whatever you like. It sits on the opposite side from your buttons, and it only plays when someone taps it. Paste a YouTube link, or upload a clip — if you upload one, it wins over the link.</p>" +
     '<label>YouTube link — paste a watch, Shorts, or youtu.be link</label>' +
     '<input name="theme_video_url" maxlength="500" value="' + esc(yt) + '" placeholder="https://www.youtube.com/watch?v=…">' +
+    '<label>Video size — how big the video is on your page (Normal is the size it is now)</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (vidSizeKey === "s" ? " active" : "") + '" data-videosizebtn="s" onclick="DWC.applyVideoSize(\'s\')">Small</button>' +
+    '<button type="button" class="dwc-pill' + (vidSizeKey === "m" ? " active" : "") + '" data-videosizebtn="m" onclick="DWC.applyVideoSize(\'m\')">Normal</button>' +
+    '<button type="button" class="dwc-pill' + (vidSizeKey === "l" ? " active" : "") + '" data-videosizebtn="l" onclick="DWC.applyVideoSize(\'l\')">Big</button>' +
+    '<button type="button" class="dwc-pill' + (vidSizeKey === "stretch" ? " active" : "") + '" data-videosizebtn="stretch" onclick="DWC.applyVideoSize(\'stretch\')">Stretch to fit</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_video_size" value="' + esc(vidSize) + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Big takes up most of its container area. Stretch to fit scales the video (and the page link under it) to almost exactly the width of the page, with just a small margin. The size moves the video AND the page link under it together, as one block.</p>' +
+    '<label>Centering — put the video block back in the middle of its spot</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (vidAlign === "center" ? " active" : "") + '" data-videocenterbtn onclick="DWC.applyVideoAlign(\'center\')">🎯 Center video</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_video_align" value="' + esc(vidAlign) + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">The video is centered in its spot by default; Center locks that in, so it stays centered even if a layout you apply would move it. Tap it again to release the lock.</p>' +
     '<label>Or upload a video file (MP4, WebM, or MOV — up to 15 MB, up to 60 seconds)</label>' +
     '<input name="profile_video_file" type="file" accept="video/mp4,video/webm,video/quicktime" onchange="DWC.videoPicked(this)">' +
     '<p id="dwc-video-note" style="margin:4px 0 0;color:var(--muted);font-size:13px">' + (has ? (yt ? "Current video: YouTube — " + esc(yt) : "Current video: uploaded clip") : "No video on your page yet.") + "</p>" +
@@ -2639,6 +2695,26 @@ function profileFormHTML(p) {
     '<input name="banner" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.bannerPicked(this)">' +
     '<div id="dwc-banner-preview" style="margin-top:8px">' + (p && p.banner_url ? '<div class="dwc-banner"><img src="' + esc(p.banner_url) + '" alt="Current banner" onload="DWC.bannerFit(this)"></div>' : "") + '</div>' +
     (p && p.banner_url ? '<label><input type="checkbox" name="remove_banner" style="width:auto"> Remove my current banner</label>' : "") +
+    // Cover photo + name placement (v3.22) — the top picture can be a
+    // tall cover area or just a small picture, and the name can sit
+    // under it (how it is now) or to the left or right of it. Small +
+    // under = exactly the current look. The ticker always stays visible
+    // below the picture — a Big cover never covers it.
+    '<label>Cover photo — how big the top picture is</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + ((th.cover_size || "") !== "big" ? " active" : "") + '" data-coversizebtn="small" onclick="DWC.applyCoverSize(\'small\')">Small picture</button>' +
+    '<button type="button" class="dwc-pill' + ((th.cover_size || "") === "big" ? " active" : "") + '" data-coversizebtn="big" onclick="DWC.applyCoverSize(\'big\')">Big cover photo</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_cover_size" value="' + esc(th.cover_size || "") + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Big makes the top picture a tall cover area taking up almost the whole top of your page — the ticker stays visible below it. Small is the picture how it is now.</p>' +
+    '<label>Name placement — where your name shows, next to the top picture</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + ((th.cover_name || "") === "" ? " active" : "") + '" data-covernamebtn="under" onclick="DWC.applyCoverName(\'under\')">Under the picture</button>' +
+    '<button type="button" class="dwc-pill' + ((th.cover_name || "") === "left" ? " active" : "") + '" data-covernamebtn="left" onclick="DWC.applyCoverName(\'left\')">Left of the picture</button>' +
+    '<button type="button" class="dwc-pill' + ((th.cover_name || "") === "right" ? " active" : "") + '" data-covernamebtn="right" onclick="DWC.applyCoverName(\'right\')">Right of the picture</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_cover_name" value="' + esc(th.cover_name || "") + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Under is how it is now — your name sits below the picture. Left or right puts your name beside it instead. (On the standard look — Website look keeps its own banner header.)</p>' +
     '<label id="dwc-sec-ticker">📜 Ticker — optional scrolling text above your page</label>' +
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page — or pick Bitcoin and it shows the live price instead, updating every minute. Your name stays put — it never scrolls.</p>' +
     '<label>What the ticker shows</label><select name="theme_ticker_source">' +
@@ -2801,7 +2877,7 @@ function profileFormHTML(p) {
       return '<button type="button" class="dwc-swatch" style="background:' + c + '" title="' + c + '" onclick="DWC.setAccent(\'' + c + '\')">&nbsp;</button>';
     }).join("") + "</div>" +
     '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Browse layouts in Taffy’s store →</button></p>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab in Taffy’s Layout Store — 22 free, 5 priced in Lucre, including 3 website templates and 8 new themes. Members publish their own there too, free. Pick a vibe above for a quick look that works right now.</p>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Pre-made layouts you can grab in Taffy’s Layout Store — 22 free, 6 priced in Lucre, including 3 website templates and 8 new themes. Members publish their own there too, free. Pick a vibe above for a quick look that works right now.</p>' +
     '<h4 style="margin:16px 0 6px">🗣️ Tell Taffy what you want — in plain words</h4>' +
     "<p style=\"margin:0 0 8px\">One box, one ask: type what you want for your page — buttons side, button style, ticker, video, what shows and what hides — and I'll set it up. I match words I know (buttons, arcade, insert coin, bitcoin, top friends, links, videos…). Anything I don't get, I'll tell you plainly and set the rest. No AI service involved — I match your words right here, nothing leaves your browser.</p>" +
     '<input id="dwc-builder-prompt" maxlength="500" placeholder="e.g. buttons on the right, arcade buttons, bitcoin ticker, hide everything but my top friends and my videos">' +
@@ -3488,6 +3564,16 @@ function parseThemeClient(stored) {
   out.video_url = extractYouTubeId(vu) ? vu : "";
   var vf = String(obj.video_file_url || "").trim().slice(0, 500);
   out.video_file_url = (/^\/api\/files\?key=/i.test(vf) || /^https:\/\//i.test(vf)) ? vf : "";
+  // Video size + centering + stretch (v3.22) — "" = Normal (current
+  // size, default); "s" Small, "l" Big, "stretch" Stretch to fit.
+  // video_align "" = standard arrangement; "center" locks it centered.
+  out.video_size = ["s", "l", "stretch"].indexOf(String(obj.video_size || "")) >= 0 ? String(obj.video_size) : "";
+  out.video_align = (String(obj.video_align || "") === "center") ? "center" : "";
+  // Cover photo (v3.22) — "" = Small (current look, default); "big" =
+  // tall cover area. Name placement: "" = under it (current look);
+  // "left" / "right" = beside the picture.
+  out.cover_size = (String(obj.cover_size || "") === "big") ? "big" : "";
+  out.cover_name = ["left", "right"].indexOf(String(obj.cover_name || "")) >= 0 ? String(obj.cover_name) : "";
   // Ticker source (v3.10) — "" = the member's own text, "btc" = live
   // Bitcoin price from CoinGecko (free, no key, fetched client-side).
   out.ticker_source = (String(obj.ticker_source || "") === "btc") ? "btc" : "";
@@ -3837,7 +3923,6 @@ function myLinksButtonsHTML(links) {
 // Empty sections are left out entirely so the preview is honest.
 function layoutPreviewInnerHTML(p) {
   var friends = p && p.top_friend_ids ? p.top_friend_ids : [];
-  var links = p && p.my_links ? p.my_links : [];
   var th = parseThemeClient(p && p.profile_theme);
   var hidden = function (k) { return (th.hide_sections || []).indexOf(k) >= 0; };
   var top8 = "";
@@ -3896,7 +3981,6 @@ function layoutPreviewInnerHTML(p) {
     '<div style="pointer-events:none">' + actionsBlock + "</div>" +
     website +
     top8 +
-    (hidden("links") ? "" : myLinksButtonsHTML(links)) +
     hiddenNote +
     "</div>";
 }
@@ -5014,14 +5098,31 @@ function websiteBannerHTML(m, mth) {
   if (!m || !m.banner_url) return '<div class="dwc-banner dwc-website-banner dwc-website-banner-none">' + name + "</div>";
   return '<div class="dwc-banner dwc-website-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)">' + name + "</div>";
 }
-function bannerHTML(m) {
+function bannerHTML(m, th) {
   if (!m || !m.banner_url) return "";
   // Banner auto-fit (v3.20) — the shape decides the size. DWC.bannerFit
   // runs on load (and again after render, for cached images) and tags
   // the wrapper wide or small: a wide/horizontal picture stretches
   // across the top to almost the width of the profile walls; a
   // small/square picture stays centered and small, like a logo.
-  return '<div class="dwc-banner"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)"></div>';
+  // Cover photo (v3.22) — "big" makes the top picture a tall cover
+  // area instead; the ticker below it stays visible. Small is this
+  // auto-fit look.
+  var coverCls = (th && th.cover_size === "big") ? " dwc-banner-cover" : "";
+  return '<div class="dwc-banner' + coverCls + '"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)"></div>';
+}
+// Cover photo + name placement (v3.22) — the top picture with the
+// member's name beside it, when they picked Left / Right. The head card
+// below hides its own name line then, so the name shows exactly once.
+// Under (the default) is just the banner on its own, name below it.
+function coverNameHTML(m) {
+  return '<div class="dwc-cover-name"><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + achBadgeIconsHTML(m.badges) + "</h2></div>";
+}
+function coverBannerHTML(m, th) {
+  if (!m || !m.banner_url) return "";
+  var pos = th && (th.cover_name === "left" || th.cover_name === "right") ? th.cover_name : "";
+  if (!pos) return bannerHTML(m, th);
+  return '<div class="dwc-cover-row dwc-cover-name-' + pos + '">' + coverNameHTML(m) + bannerHTML(m, th) + "</div>";
 }
 // Banner auto-fit (v3.20) — wide (aspect >= 1.6) stretches across the
 // top; anything squarer stays centered and small. Called on the img's
@@ -5079,6 +5180,17 @@ function actionButtonStyle(pb, key) {
   var s = "";
   if (b.bg) s += "background:" + b.bg + ";";
   if (b.color) s += "color:" + b.color + ";";
+  // Per-button look (v3.22) — each button's own font, size, and
+  // container shape, set in Edit Profile > Buttons. The font comes from
+  // the fixed theme-font map (never raw input); size/radius are fixed
+  // choices. Inline styles win over the page button size + style.
+  if (b.font && themeFontCSS(b.font)) s += "font-family:" + themeFontCSS(b.font) + ";";
+  if (b.size === "s") s += "font-size:13px;padding:8px 14px;";
+  else if (b.size === "l") s += "font-size:18px;padding:14px 24px;";
+  else if (b.size === "xl") s += "font-size:20px;padding:16px 26px;";
+  if (b.radius === "square") s += "border-radius:4px;";
+  else if (b.radius === "rounded") s += "border-radius:12px;";
+  else if (b.radius === "pill") s += "border-radius:999px;";
   return s ? ' style="' + s + '"' : "";
 }
 function actionButtonLabel(pb, key, fallback) {
@@ -5175,7 +5287,7 @@ function vanityURLHTML(m) {
   if (!m.page_slug) return '<div id="dwc-vanity"></div>';
   var url = "https://rarecandyreserve.org/community.html#/u/" + encodeURIComponent(m.page_slug);
   return '<div id="dwc-vanity" class="dwc-vanity-url">🔗 My page: <a href="' + esc(url) + '">' + esc(url) + '</a> ' +
-    '<button type="button" class="btn ghost small" onclick="DWC.copyVanityUrl(\'' + esc(m.page_slug.replace(/'/g, "")) + '\')">📋 Copy</button></div>';
+    '<button type="button" class="btn ghost small dwc-copy-icon" title="Copy page link" aria-label="Copy page link" onclick="DWC.copyVanityUrl(\'' + esc(m.page_slug.replace(/'/g, "")) + '\')">📋</button></div>';
 }
 // ---------- v3.10 — one video per profile ----------
 // Click-to-play ONLY — nothing autoplays. A YouTube link shows its
@@ -5183,18 +5295,34 @@ function vanityURLHTML(m) {
 // Tapping swaps the real player in (YouTube privacy-enhanced embed,
 // or the uploaded file with controls). The video always sits on the
 // OPPOSITE side from the member's action buttons.
+// Whether the member has a video on their page (v3.22) — used so the
+// page URL is shown exactly once: under the video when there is one,
+// after the Connect card when there isn't.
+function profileHasVideo(th) {
+  if (!th || (th.hide_sections || []).indexOf("video") >= 0) return false;
+  return !!(extractYouTubeId(th.video_url || "") || th.video_file_url);
+}
 function profileVideoHTML(m, th) {
   if (!th || (th.hide_sections || []).indexOf("video") >= 0) return "";
+  // Video size + centering (v3.22) — the size and the centering apply
+  // to the video AND the page URL under it, as one block: the URL rides
+  // inside the video block, so they scale and center together. Size ""
+  // = Normal (current size, default); "s" Small, "l" Big, "stretch"
+  // Stretch to fit. Center locks the block in the middle of its spot.
+  var sizeCls = th.video_size === "s" ? " dwc-vid-s" : th.video_size === "l" ? " dwc-vid-l" : th.video_size === "stretch" ? " dwc-vid-stretch" : "";
+  var centerCls = th.video_align === "center" ? " dwc-vid-centered" : "";
+  var wrapCls = ' class="dwc-profile-video' + sizeCls + centerCls + '"';
+  var urlLine = vanityURLHTML(m);
   var yt = extractYouTubeId(th.video_url || "");
   if (yt) {
-    return '<div class="dwc-profile-video"><div class="dwc-vid-facade" role="button" tabindex="0" title="Play video" onclick="DWC.playProfileVideo(this,\'yt\',\'' + yt + '\')">' +
+    return '<div' + wrapCls + '><div class="dwc-vid-facade" role="button" tabindex="0" title="Play video" onclick="DWC.playProfileVideo(this,\'yt\',\'' + yt + '\')">' +
       '<img src="https://i.ytimg.com/vi/' + yt + '/hqdefault.jpg" alt="Video thumbnail" loading="lazy">' +
       '<span class="dwc-vid-play">▶</span><span class="dwc-vid-label">▶ Play video</span></div>' +
-      '<p class="dwc-vid-src">Video via YouTube · <a href="https://www.youtube.com/watch?v=' + yt + '" target="_blank" rel="noopener">Watch on YouTube ↗</a></p></div>';
+      '<p class="dwc-vid-src">Video via YouTube · <a href="https://www.youtube.com/watch?v=' + yt + '" target="_blank" rel="noopener">Watch on YouTube ↗</a></p>' + urlLine + '</div>';
   }
   if (th.video_file_url) {
-    return '<div class="dwc-profile-video"><div class="dwc-vid-facade dwc-vid-file" role="button" tabindex="0" title="Play my video" onclick="DWC.playProfileVideo(this,\'file\',\'' + encodeURIComponent(th.video_file_url) + '\')">' +
-      '<span class="dwc-vid-play">▶</span><span class="dwc-vid-label">▶ Play my video</span></div></div>';
+    return '<div' + wrapCls + '><div class="dwc-vid-facade dwc-vid-file" role="button" tabindex="0" title="Play my video" onclick="DWC.playProfileVideo(this,\'file\',\'' + encodeURIComponent(th.video_file_url) + '\')">' +
+      '<span class="dwc-vid-play">▶</span><span class="dwc-vid-label">▶ Play my video</span></div>' + urlLine + '</div>';
   }
   return "";
 }
@@ -5207,15 +5335,19 @@ function profileSideRowHTML(m, th) {
   var buttons = showButtons ? actionButtonsHTML(m, !!m.is_mine, th) : "";
   var video = profileVideoHTML(m, th);
   if (!buttons && !video) return "";
-  // Button system (v3.12) — the member's own link buttons live right
-  // here, under the 2×2 block, instead of in a separate card below.
-  // "Hide My links" in Edit Profile hides them here too.
+  // Links row (v3.22) — the member's links sit up top with the other
+  // top links, in a neat row next to them, instead of stacked under the
+  // 2×2 button block. "Hide My links" hides them here too.
   var linksHidden = !!(th && (th.hide_sections || []).indexOf("links") >= 0);
   var links = linksHidden ? "" : myLinksButtonsHTML(m.my_links);
+  var linksRow = links ? '<div class="dwc-links-row">' + links + "</div>" : "";
+  // Video size (v3.22) — Big gives the video cell most of the row;
+  // Stretch gives it the whole row; Small keeps it narrow.
+  var vidRowCls = (th && th.video_size === "s") ? " dwc-side-vid-s" : (th && th.video_size === "l") ? " dwc-side-vid-l" : (th && th.video_size === "stretch") ? " dwc-side-vid-stretch" : "";
   var cells = side === "right"
-    ? '<div class="dwc-side-cell dwc-side-video">' + video + '</div><div class="dwc-side-cell dwc-side-buttons">' + buttons + links + "</div>"
-    : '<div class="dwc-side-cell dwc-side-buttons">' + buttons + links + '</div><div class="dwc-side-cell dwc-side-video">' + video + "</div>";
-  return '<div class="dwc-side-row dwc-side-' + side + '">' + cells + "</div>";
+    ? '<div class="dwc-side-cell dwc-side-video">' + video + '</div><div class="dwc-side-cell dwc-side-buttons">' + buttons + "</div>"
+    : '<div class="dwc-side-cell dwc-side-buttons">' + buttons + '</div><div class="dwc-side-cell dwc-side-video">' + video + "</div>";
+  return linksRow + '<div class="dwc-side-row dwc-side-' + side + vidRowCls + '">' + cells + "</div>";
 }
 
 // ---------- v3.9 profile customization helpers ----------
@@ -5256,8 +5388,12 @@ function picAvatarHTML(m, th) {
 // v3.10 — the occupation line respects "Hide Occupation" (hide_sections).
 function profileHeadInnerHTML(m, th) {
   var hideOcc = !!(th && (th.hide_sections || []).indexOf("occupation") >= 0);
+  // Cover name placement (v3.22) — when the name sits beside the top
+  // picture, the head card keeps the picture + bio + meta but hides its
+  // own name line, so the name shows exactly once.
+  var nameBeside = !!(m && m.banner_url && th && (th.cover_name === "left" || th.cover_name === "right"));
   return '<div class="dwc-profile-row">' + picAvatarHTML(m, th) +
-    '<div><h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + achBadgeIconsHTML(m.badges) + "</h2>" +
+    '<div>' + (nameBeside ? "" : '<h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + achBadgeIconsHTML(m.badges) + "</h2>") +
     (!hideOcc && m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
     (m.bio ? '<p style="margin:4px 0;white-space:pre-wrap">' + esc(m.bio) + "</p>" : "") +
     '<p class="dwc-meta" style="margin:4px 0">' +
@@ -5335,8 +5471,12 @@ function profileActionsHTML(m, websiteMode, th) {
   // stay outside the card.
   var row = profileSideRowHTML(m, th);
   var connect = row ? '<section class="card dwc-connect-card"><h3 style="margin-top:0">💬 Connect</h3>' + row + "</section>" : "";
+  // v3.22 — the page URL rides under the video when there is one, so
+  // only show it here (after the Connect card) when there is no video.
+  // Either way it shows exactly once.
+  var van = profileHasVideo(th) ? "" : vanityURLHTML(m);
   return connect +
-    (m.is_mine ? vanityURLHTML(m) : '<div id="dwc-group-picker"></div>' + vanityURLHTML(m));
+    (m.is_mine ? van : '<div id="dwc-group-picker"></div>' + van);
 }
 // Website-look sections — only the checked fields, in order.
 // v3.10 — relationship also respects "Hide Relationship status".
@@ -5460,7 +5600,7 @@ async function viewMember(el, memberId) {
   var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
   var headTop = '<section class="dwc-mypage-top">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
   var isBtcTicker = mth.ticker_source === "btc";
-  var topBanner = (isWebsite ? websiteBannerHTML(m, mth) : bannerHTML(m)) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
+  var topBanner = (isWebsite ? websiteBannerHTML(m, mth) : coverBannerHTML(m, mth)) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
   // LEFT — info.
   // v3.21 — the Subscribe button can be hidden from Edit Profile >
   // Buttons ("Which buttons show"). buttons_visible null = all show.
@@ -7346,6 +7486,20 @@ window.DWC = {
       if (extractYouTubeId(vidUrl)) theme.video_url = vidUrl;
       var vidFile = String(fd.get("theme_video_file_url") || "").trim().slice(0, 500);
       if (vidFile) theme.video_file_url = vidFile;
+      // Video size + centering + stretch (v3.22) — Small / Normal / Big /
+      // Stretch to fit; "" = Normal (current size, default). Center locks
+      // the video block in the middle of its spot.
+      var vidSize = String(fd.get("theme_video_size") || "");
+      if (vidSize === "s" || vidSize === "l" || vidSize === "stretch") theme.video_size = vidSize;
+      var vidAlign = String(fd.get("theme_video_align") || "");
+      if (vidAlign === "center") theme.video_align = "center";
+      // Cover photo + name placement (v3.22) — "" = Small + name under
+      // the picture (current look, default); "big" = tall cover area;
+      // "left"/"right" = name beside the picture.
+      var covSize = String(fd.get("theme_cover_size") || "");
+      if (covSize === "big") theme.cover_size = "big";
+      var covName = String(fd.get("theme_cover_name") || "");
+      if (covName === "left" || covName === "right") theme.cover_name = covName;
       var tickSrc = String(fd.get("theme_ticker_source") || "");
       if (tickSrc === "btc") theme.ticker_source = "btc";
       var hideSecs = fd.getAll ? fd.getAll("theme_hide_sections") : [];
@@ -7420,7 +7574,12 @@ window.DWC = {
         var label = String(fd.get("pb_label_" + key) || "").trim().slice(0, 30);
         var bg = fd.get("pb_bg_use_" + key) ? String(fd.get("pb_bg_" + key) || "").trim() : "";
         var color = fd.get("pb_color_use_" + key) ? String(fd.get("pb_color_" + key) || "").trim() : "";
-        if (label || bg || color) pb.buttons[key] = { label: label, bg: bg, color: color };
+        // Per-button look (v3.22) — each button's own font, size, and
+        // container shape. The server allowlists all three.
+        var font = String(fd.get("pb_font_" + key) || "").trim();
+        var size = String(fd.get("pb_size_" + key) || "").trim();
+        var radius = String(fd.get("pb_radius_" + key) || "").trim();
+        if (label || bg || color || font || size || radius) pb.buttons[key] = { label: label, bg: bg, color: color, font: font, size: size, radius: radius };
       });
       body.profile_buttons = JSON.stringify(pb);
     }
@@ -8635,6 +8794,67 @@ window.DWC = {
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
+  // Video size picker (v3.22) — Small / Normal / Big / Stretch to fit
+  // pills next to the video URL. Sets the hidden theme_video_size
+  // field ("" = Normal, the current size). Same pattern as
+  // applyButtonSize; the preview shows the new size right away.
+  applyVideoSize: function (size) {
+    var v = (size === "s" || size === "l" || size === "stretch") ? size : "";
+    var key = v === "" ? "m" : v;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_video_size"]');
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-videosizebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-videosizebtn") === key);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Video Center button (v3.22) — locks the video block in the middle
+  // of its spot (theme_video_align "center"). Tapping it again releases
+  // the lock back to the standard arrangement. The preview shows it.
+  applyVideoAlign: function (align) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_video_align"]');
+    var cur = hidden ? hidden.value : "";
+    var v = (align === "center" && cur !== "center") ? "center" : "";
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-videocenterbtn]").forEach(function (b) {
+      b.classList.toggle("active", v === "center");
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Cover photo size (v3.22) — Small picture / Big cover photo pills
+  // next to the banner settings. Sets theme_cover_size ("" = Small,
+  // the current look; "big" = tall cover area).
+  applyCoverSize: function (size) {
+    var v = (size === "big") ? "big" : "";
+    var key = v === "" ? "small" : "big";
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_cover_size"]');
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-coversizebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-coversizebtn") === key);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Name placement (v3.22) — Under / Left / Right pills next to the
+  // banner settings. Sets theme_cover_name ("" = under the picture,
+  // the current look; "left" / "right" = beside the picture).
+  applyCoverName: function (pos) {
+    var v = (pos === "left" || pos === "right") ? pos : "";
+    var key = v === "" ? "under" : v;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="theme_cover_name"]');
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-covernamebtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-covernamebtn") === key);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
   // Professional-mode button side (v3.21) — Left / Center / Right pills.
   // Sets the hidden theme_pro_button_side field ("" = left).
   applyProButtonSide: function (side) {
@@ -8970,6 +9190,15 @@ window.DWC = {
     var vidUrl = get("theme_video_url").trim().slice(0, 500);
     th.video_url = extractYouTubeId(vidUrl) ? vidUrl : "";
     th.video_file_url = get("theme_video_file_url").trim().slice(0, 500);
+    // Video size + centering + stretch + cover (v3.22) — same fields
+    // saveProfile reads, so the preview and the save can never drift.
+    var vidSize2 = get("theme_video_size");
+    th.video_size = (vidSize2 === "s" || vidSize2 === "l" || vidSize2 === "stretch") ? vidSize2 : "";
+    th.video_align = (get("theme_video_align") === "center") ? "center" : "";
+    var covSize2 = get("theme_cover_size");
+    th.cover_size = (covSize2 === "big") ? "big" : "";
+    var covName2 = get("theme_cover_name");
+    th.cover_name = (covName2 === "left" || covName2 === "right") ? covName2 : "";
     var tickSrc = get("theme_ticker_source");
     th.ticker_source = (tickSrc === "btc") ? "btc" : "";
     th.hide_sections = fd.getAll ? fd.getAll("theme_hide_sections").filter(function (k) { return SECTION_HIDE_IDS.indexOf(k) >= 0; }).slice(0, 10) : [];
@@ -8989,9 +9218,28 @@ window.DWC = {
       var n = parseInt(cb.value, 10);
       if (n > 0 && tfIds.indexOf(n) === -1) tfIds.push(n);
     });
+    // Per-button look (v3.22) — same reads as saveProfile, so the live
+    // preview shows each button's own font / size / shape as the member
+    // changes it. The fake profile carries the parsed object (not the
+    // JSON string), like shapeMember returns on the live page.
+    var pbPrev = { mode: "buttons", image_url: "", buttons: {} };
+    var pbModeEl = form.querySelector('input[name="pb_mode"]:checked');
+    if (pbModeEl && pbModeEl.value === "image") pbPrev.mode = "image";
+    pbPrev.image_url = get("pb_image_url").trim().slice(0, 500);
+    ["add", "message", "favorite", "group"].forEach(function (key) {
+      var pbLabel = get("pb_label_" + key).trim().slice(0, 30);
+      var pbBg = fd.get("pb_bg_use_" + key) ? get("pb_bg_" + key).trim() : "";
+      var pbColor = fd.get("pb_color_use_" + key) ? get("pb_color_" + key).trim() : "";
+      var pbFont = get("pb_font_" + key).trim();
+      var pbSize = get("pb_size_" + key).trim();
+      var pbRadius = get("pb_radius_" + key).trim();
+      if (pbLabel || pbBg || pbColor || pbFont || pbSize || pbRadius) pbPrev.buttons[key] = { label: pbLabel, bg: pbBg, color: pbColor, font: pbFont, size: pbSize, radius: pbRadius };
+    });
     var fake = Object.assign({}, state.profile, {
       is_mine: true,
       profile_theme: JSON.stringify(th),
+      profile_buttons: pbPrev,
+      page_slug: get("page_slug"),
       ticker_text: get("ticker_text"),
       ticker_enabled: !!fd.get("ticker_enabled"),
       ticker_color: get("ticker_color") || state.profile.ticker_color,

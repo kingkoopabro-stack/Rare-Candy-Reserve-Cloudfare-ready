@@ -988,10 +988,29 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-side-video{flex:1 1 0}
 .dwc-side-right .dwc-side-buttons{order:2}
 .dwc-side-right .dwc-side-video{order:1}
+/* v3.22 — video size on the side row: Big gives the video cell most
+   of the row; Stretch gives it the whole row (buttons stay on their
+   own row above); Small keeps it narrow. */
+.dwc-side-row.dwc-side-vid-l .dwc-side-video{flex:2 1 0}
+.dwc-side-row.dwc-side-vid-s .dwc-side-video{flex:0 0 240px}
+.dwc-side-row.dwc-side-vid-stretch{flex-wrap:wrap}
+.dwc-side-row.dwc-side-vid-stretch .dwc-side-video{flex:1 1 100%}
+/* v3.22 — links row: the member's links sit up top with the other top
+   links, in a neat row, instead of stacked under the button block. */
+.dwc-links-row{margin:0 0 10px}
 /* v3.10 — profile video: click-to-play facade, never autoplay. The
    thumbnail (YouTube) or dark tile (uploaded clip) shows a big play
    button; tapping swaps the real player in. */
-.dwc-profile-video{width:100%}
+.dwc-profile-video{width:100%;margin-inline:auto;text-align:center}
+/* v3.22 — video size + centering: the size and the centering apply to
+   the video AND the page URL under it, as one block. Small is a narrow
+   centered block; Big fills its (wider) cell; Stretch scales to almost
+   exactly the page width with a small margin. Center locks the block
+   in the middle of its spot (overrides layout presets that move it). */
+.dwc-profile-video.dwc-vid-s{max-width:240px}
+.dwc-profile-video.dwc-vid-stretch{width:calc(100% - 16px)}
+.dwc-profile-video.dwc-vid-centered{margin-inline:auto!important;text-align:center!important}
+.dwc-profile-video .dwc-vanity-url{text-align:center;font-size:12.5px;margin-top:8px}
 .dwc-vid-facade{position:relative;cursor:pointer;border-radius:10px;overflow:hidden;background:#000;border:1px solid var(--line);aspect-ratio:16/9;display:flex;align-items:center;justify-content:center}
 .dwc-vid-facade img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .dwc-vid-play{position:relative;z-index:1;width:56px;height:56px;border-radius:50%;background:rgba(0,0,0,.65);border:2px solid #fff;color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;padding-left:4px}
@@ -1013,6 +1032,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-fav-star.on{color:var(--amber)}
 .btn.dwc-fav-on{border-color:var(--amber)}
 .dwc-vanity-url{margin-top:10px;font-size:13.5px;color:var(--muted);word-break:break-all}
+/* v3.22 — icon-only copy button for the page URL: small, just the 📋,
+   same copy function. Beats the .btn.small padding by specificity. */
+.btn.small.dwc-copy-icon{padding:2px 7px;min-width:0;line-height:1.4}
 .dwc-vanity-url a{color:var(--cyan)}
 .dwc-group-picker{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .dwc-group-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line)}
@@ -1076,6 +1098,18 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
    bleed); small/square ones stay centered and small, like a logo. */
 .dwc-banner-wide img{width:calc(100% - 24px);height:200px;max-height:200px}
 .dwc-banner-small img{max-width:260px;max-height:260px}
+/* v3.22 — cover photo: Big makes the top picture a tall cover area
+   taking up almost the whole top of the page (the ticker below it
+   stays visible). The cover rule beats the wide/small auto-fit rules
+   by specificity. Name beside the picture: a flex row, name on the
+   left or the right of the picture. */
+.dwc-banner.dwc-banner-cover{height:320px;overflow:hidden}
+.dwc-banner.dwc-banner-cover img{width:100%;height:100%;max-height:none;object-fit:cover}
+.dwc-cover-row{display:flex;gap:14px;align-items:center}
+.dwc-cover-row .dwc-banner{flex:1;min-width:0;margin:0}
+.dwc-cover-name{flex:0 0 auto}
+.dwc-cover-name h2{white-space:nowrap}
+.dwc-cover-name-right{flex-direction:row-reverse}
 /* Professional-mode listings grid on a member page. */
 .dwc-member-listings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:10px}
 
@@ -1224,6 +1258,11 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
   .dwc-side-row { flex-direction: column; }
   .dwc-side-buttons { flex: 1 1 auto; width: 100%; }
   .dwc-side-video { width: 100%; }
+  /* v3.22 — video size rows reset on phones: the row stacks, so the
+     desktop flex widths would size heights instead. */
+  .dwc-side-row.dwc-side-vid-s .dwc-side-video,
+  .dwc-side-row.dwc-side-vid-l .dwc-side-video,
+  .dwc-side-row.dwc-side-vid-stretch .dwc-side-video { flex: 1 1 auto; }
   /* Mobile-only slight shrink (2026-11-21): buttons + their containers
      run ~10% smaller on phones — desktop is untouched. Tap targets stay
      comfortable (38px min button height, readable text). */
@@ -1242,6 +1281,10 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
   .dwc-chatlog { max-height: 320px; }
   /* Banner + ticker fit the screen. */
   .dwc-banner img { max-height: 180px; }
+  /* v3.22 — cover photo on phones: shorter cover, name above the
+     picture instead of beside it. */
+  .dwc-banner.dwc-banner-cover { height: 200px; }
+  .dwc-cover-row { flex-direction: column; align-items: stretch; }
   /* Meme drawer: even when open, it never takes the whole page on a
      phone — it caps at most of the screen and scrolls inside itself. */
   .meme-stash.open .dwc-meme-drawer-body{max-height:72vh;overflow-y:auto}
@@ -1341,12 +1384,21 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
    + gradient border-box). */
 .dwc-feed-card{width:100%;max-width:100%;box-sizing:border-box;border:2px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;padding:14px 16px}
 .dwc-feed-card:hover{box-shadow:0 0 0 1px var(--violet),0 8px 30px rgba(124,77,255,.25)}
-.dwc-feed-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.dwc-feed-who{min-width:0;overflow-wrap:anywhere}
+.dwc-feed-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.dwc-feed-who{min-width:0;flex:1 1 auto;overflow-wrap:normal}
 .dwc-feed-who .dwc-titlelink{color:var(--ink)}
-.dwc-feed-right{display:flex;align-items:center;gap:6px;flex:none}
+.dwc-feed-right{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
 .dwc-feed-when{color:var(--muted);font-size:12.5px;white-space:nowrap}
 .dwc-feed-occ{color:var(--muted);font-size:12.5px}
+/* Username never splits (v3.22) — the name reads as one clean whole in
+   post + comment headers. The old overflow-wrap:anywhere on
+   .dwc-feed-who let "@RareCandyReserve" break into pieces in a narrow
+   column. Now the name never breaks mid-word; when the name + date
+   don't fit side by side, the header wraps and the date drops to its
+   own line below the name, right-aligned. The avatar never squeezes
+   the name column. */
+.dwc-feed-who strong{white-space:nowrap}
+.dwc-comment .dwc-avatar-sm,.dwc-comment-card .dwc-avatar-sm{flex-shrink:0}
 .dwc-feed-typeline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px}
 .dwc-type-label{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0b0b14;background:var(--grad);border-radius:999px;padding:2px 9px}
 .dwc-weird-badge{font-size:12.5px;font-weight:800;color:#0b0b14;background:linear-gradient(90deg,#00e5ff,#39ff88);border-radius:999px;padding:2px 9px}

@@ -1471,6 +1471,7 @@ export const LUCRE_STORE_PRICES = {
   "store:shopfront": 20,
   "store:band-stand": 20,
   "store:portfolio": 20,
+  "store:arcade80s": 50,
 };
 export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
 export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window
@@ -1575,7 +1576,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
+  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1658,6 +1659,19 @@ export function parseTheme(stored) {
   out.video_url = extractYouTubeId(vu) ? vu : "";
   const vf = String(obj.video_file_url || "").trim().slice(0, 500);
   out.video_file_url = (/^\/api\/files\?key=/i.test(vf) || /^https:\/\//i.test(vf)) ? vf : "";
+  // Video size + centering + stretch (v3.22) — Small / Normal / Big /
+  // Stretch to fit. "" = Normal (the current size, the default).
+  // video_align "" = the standard centered arrangement; "center" locks
+  // the video block in the middle of its spot explicitly.
+  out.video_size = ["s", "l", "stretch"].includes(String(obj.video_size || "")) ? String(obj.video_size) : "";
+  out.video_align = (String(obj.video_align || "") === "center") ? "center" : "";
+  // Cover photo (v3.22) — the top picture: "" = Small (the current
+  // look, the default); "big" = a tall cover area (the ticker stays
+  // visible below it). Name placement relative to the picture: "" =
+  // under it (the current look, the default); "left" / "right" = the
+  // name beside the picture.
+  out.cover_size = (String(obj.cover_size || "") === "big") ? "big" : "";
+  out.cover_name = ["left", "right"].includes(String(obj.cover_name || "")) ? String(obj.cover_name) : "";
   // Ticker source (v3.10) — "" = the member's own text, "btc" = live
   // Bitcoin price from CoinGecko (free, no key, fetched client-side).
   out.ticker_source = (String(obj.ticker_source || "") === "btc") ? "btc" : "";
@@ -1695,7 +1709,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button
@@ -1721,8 +1735,15 @@ export function cleanProfileButtons(input) {
     const label = String(b.label || "").replace(/[<>\n\r]/g, "").trim().slice(0, 30);
     const bg = hex(b.bg);
     const color = hex(b.color);
-    if (!label && !bg && !color) continue;
-    out.buttons[key] = { label, bg, color };
+    // Per-button look (v3.22) — each button's own font (any theme font),
+    // size ("" = the page's button size, "s"/"l"/"xl" override it), and
+    // container shape ("" = the page's button style, "square"/"rounded"/
+    // "pill" override it). Only keys the owner actually set are kept.
+    const font = THEME_FONTS.includes(b.font) ? b.font : "";
+    const size = ["s", "l", "xl"].includes(String(b.size || "")) ? String(b.size) : "";
+    const radius = ["square", "rounded", "pill"].includes(String(b.radius || "")) ? String(b.radius) : "";
+    if (!label && !bg && !color && !font && !size && !radius) continue;
+    out.buttons[key] = { label, bg, color, font, size, radius };
   }
   const anyButton = Object.keys(out.buttons).length > 0;
   if (out.mode === "buttons" && !out.image_url && !anyButton) return "";

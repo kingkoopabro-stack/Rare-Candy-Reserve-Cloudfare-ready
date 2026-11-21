@@ -1,7 +1,7 @@
 // POST /api/orders/:id/shipping — updateOrderShipping (seller only).
 // paid -> shipped -> delivered. Shipped requires a tracking number.
 // Marking delivered credits the seller's wallet with their share
-// (price minus the 5% street cut) — once only, guarded by the
+// (price minus the 6% street cut) — once only, guarded by the
 // sale_credit row for that order.
 import {
   json, noDb, getDb, readJson, profileByDevice, CARRIERS,

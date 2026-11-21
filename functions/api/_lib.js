@@ -17,7 +17,7 @@
 //   OPERATOR_DEVICE_ID  (optional) device id of the operator (Chris) —
 //             pins operator rights without a first-run claim.
 
-export const PLATFORM_FEE_PERCENT = 5; // ⚠ UNCONFIRMED by Chris — kept at the artifact's 5%; flag before launch
+export const PLATFORM_FEE_PERCENT = 6; // Set by Chris 2026-11-21 — beats eBay 13.25%, Mercari/Facebook 10%, Etsy ~10% all-in, Whatnot ~11% all-in
 
 export const CATEGORIES = ["General", "News", "Question", "Questions & Help", "Shop Talk", "Music", "Video", "Plants & Garden", "Tech & Builds", "Dank Meme", "Off Topic"];
 

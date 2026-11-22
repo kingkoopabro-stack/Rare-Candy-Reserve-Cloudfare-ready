@@ -30,6 +30,7 @@
 
 var API = "/api";
 var DEVICE_KEY = "dwc-device-id";
+var SAVED_DEVICE_KEY = "dwc-device-id-saved"; // sign-out stash — one-tap sign-back-in on this browser
 var VOTES_KEY = "dwc-my-votes";
 var ADULT_KEY = "dwc-adult-welcomed";
 
@@ -838,10 +839,16 @@ function renderAccount() {
     return;
   }
   if (!state.profile && !state.signupOpen) {
+    var savedId = null;
+    try { savedId = localStorage.getItem(SAVED_DEVICE_KEY); } catch (e) {}
     el.innerHTML =
       '<section class="card" style="text-align:center"><h3 style="margin-top:0">New here?</h3>' +
       '<p style="max-width:520px;margin:0 auto">One free account — buyer and seller in one. Name, username, date of birth, one tiny sum to prove you’re human, agree to the rules below. That’s it — then post, ask, chat, buy, and sell.</p>' +
       '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it’s free</button></p>' +
+      (savedId
+        ? '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.signBackIn()">Sign back in →</button></p><p style="font-size:13px;color:var(--muted);margin:4px 0 0">You signed out on this browser — one tap brings your account back.</p>'
+        : '') +
+      '<p style="margin-top:12px;font-size:13px"><a href="link-device.html">Already have an account? Sign in with a device ID →</a></p>' +
       '<div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div>' +
       '<p style="font-size:13px">Just looking? The chat window works as a guest, too — guests are auto-censored, members aren’t.</p></section>';
     return;
@@ -2644,6 +2651,11 @@ function profileFormHTML(p) {
     (isNew ? "" :
     '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-ticker">Ticker</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Make it yours</a> · <a href="#dwc-sec-taffy">Taffy</a> · <a href="#dwc-sec-badges">Badges</a></p>' +
     '<p id="dwc-unsaved-note" class="dwc-unsaved" hidden>✏️ You have unsaved changes — hit <strong>Save profile</strong> at the bottom to keep them. Nothing saves until you do.</p>') +
+    (isNew ? "" :
+    '<div class="note" style="margin:0 0 12px"><strong>🔑 Your device ID — the key to this account.</strong>' +
+    '<input type="text" readonly value="' + esc(deviceId()) + '" onclick="this.select()" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;margin-top:6px">' +
+    '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.copyDeviceId(this)">📋 Copy my device ID</button></p>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Save this somewhere safe — until real passwords arrive, this is the ONLY way back into your account on another device. Never share it with anyone.</p></div>') +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
     // Basic account: new signups only see the essentials. Everything
@@ -2935,6 +2947,7 @@ function unlockCardHTML() {
     '<button type="button" class="btn" onclick="DWC.go(\'adult\')">🔞 18+ areas<br><span style="font-weight:400;font-size:13px">ID check — only if you want in</span></button>' +
     '</div>' +
     '<p style="margin:10px 0 0;color:var(--muted);font-size:13px">No ID needed to join or sell regular stuff — only for the 18+ areas. No rush on any of it.</p>' +
+    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">🔑 One thing to save: your device ID is the key to this account until passwords arrive — it\'s in Edit profile. Copy it somewhere safe so you can sign back in anywhere.</p>' +
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.dismissUnlock()">I\'ll do this later →</button></p>' +
     '</section>';
 }
@@ -7734,14 +7747,32 @@ window.DWC = {
   // Dismiss the post-signup unlock card.
   dismissUnlock: function () { state.showUnlock = false; render(); },
   signOut: function () {
-    if (!confirm("Sign out of the Community on this device? Your account stays — you can sign back in here any time.")) return;
-    try { localStorage.removeItem(DEVICE_KEY); } catch (e) {}
+    if (!confirm("Sign out on this device? Your account stays — tap \u201cSign back in\u201d here any time to come back to it, and your device ID is in Edit profile if you ever need it on another device.")) return;
+    try {
+      var cur = localStorage.getItem(DEVICE_KEY);
+      if (cur) localStorage.setItem(SAVED_DEVICE_KEY, cur); // stashed so Sign back in restores this account
+      localStorage.removeItem(DEVICE_KEY);
+    } catch (e) {}
     state.profile = null;
     state.editingProfile = false;
     state.signupOpen = false;
     setNotice("Signed out on this device.");
     render();
   },
+  // Sign back in (2026-11-21 fix) — restores the account signed out on
+  // this browser from the stash signOut saved. Until passwords exist,
+  // a device ID is the only credential; link-device.html covers other devices.
+  signBackIn: async function () {
+    var saved = null;
+    try { saved = localStorage.getItem(SAVED_DEVICE_KEY); } catch (e) {}
+    if (!saved) { setNotice("No account was signed out on this browser — create one, or sign in with a device ID."); render(); return; }
+    try { localStorage.setItem(DEVICE_KEY, saved); localStorage.removeItem(SAVED_DEVICE_KEY); } catch (e) {}
+    await refreshProfile();
+    if (state.profile) setNotice("Welcome back, @" + state.profile.username + ".");
+    else setNotice("That saved sign-in didn't match an account any more — sign in with your device ID instead.");
+    render();
+  },
+  copyDeviceId: function (btn) { copyLink(deviceId(), btn); },
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },

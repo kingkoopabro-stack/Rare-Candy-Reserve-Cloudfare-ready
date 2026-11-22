@@ -4677,6 +4677,10 @@ async function viewReceipts(el) {
 function renderComposer(context) {
   var host = $("dwc-composer");
   if (!host) return;
+  // Guests can VIEW the feed, but only members can post. The full
+  // composer used to render usable for guests and die on submit — show
+  // the sign-in prompt instead, same as receipts/orders/payouts.
+  if (!state.profile) { host.innerHTML = needProfileHTML(); return; }
   var isAuth = context === "cardcheck";
   var isOp = state.profile && (state.profile.role === "operator" || state.profile.is_operator);
   // Feed redesign (v3.14) — the composer is COLLAPSED by default: one
@@ -6376,6 +6380,14 @@ function renderPicViewer() {
     (state.profile && state.profile.id === pv.memberId && photo && photo.subject && photo.subject.indexOf("gallery:") === 0
       ? '<p style="margin:0 0 10px"><button type="button" class="btn small" onclick="DWC.picViewerSetAvatar()">🖼️ Set as profile picture</button></p>'
       : "") +
+    (state.profile && photo && photo.subject && photo.subject.indexOf("gallery:") === 0 && (state.profile.id === pv.memberId || state.profile.is_operator)
+      ? '<p style="margin:0 0 10px"><span style="color:var(--muted);font-size:13px">Who can see it: </span>' +
+        ["private", "public", "friends"].map(function (v) {
+          var label = v === "private" ? "🔒 Private" : v === "public" ? "🌍 Public" : "👥 Friends";
+          var cur = (photo.visibility || "public") === v;
+          return '<button type="button" class="btn small" onclick="DWC.picViewerSetVisibility(\'' + v + '\')" title="' + (v === "private" ? "Take it down — only you have it" : v === "public" ? "Everyone can see it" : "Only your friends can see it") + '"' + (cur ? ' aria-pressed="true"' : "") + '>' + label + (cur ? " ✓" : "") + "</button>";
+        }).join(" ") + "</p>"
+      : "") +
     '<div class="dwc-picviewer-nav">' +
     '<button type="button" class="btn ghost small" onclick="DWC.picViewerPrev()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>← Prev</button>' +
     '<span>' + (pv.index + 1) + " / " + pv.photos.length + "</span>" +
@@ -7330,6 +7342,9 @@ async function renderAdultForum() {
 function renderAdultComposer() {
   var host = $("dwc-adult-composer");
   if (!host) return;
+  // Guests can view public stuff, but only members can post — same gate
+  // as the main composer (the 18+ form used to render usable for guests).
+  if (!state.profile) { host.innerHTML = needProfileHTML(); renderCreatorComposer(); return; }
   host.innerHTML =
     '<section class="card" aria-label="New 18+ post"><h3 style="margin-top:0">New post — 18+ forum</h3>' +
     '<form onsubmit="DWC.submitPost(this, \'adult\'); return false;">' +
@@ -7364,6 +7379,8 @@ function renderAdultComposer() {
 function renderCreatorComposer() {
   var host = $("dwc-adult-creator");
   if (!host) return;
+  // Same guest gate as the other composers — only members can sell-post.
+  if (!state.profile) { host.innerHTML = needProfileHTML(); return; }
   host.innerHTML =
     '<section class="card dwc-creatorbox" aria-label="New creator post"><h3 style="margin-top:0">🎨 Creator post — sell your digital content</h3>' +
     '<p style="color:var(--muted)">Selling a digital file? Post it here — 3D models, developer files, designs, art, apps, game assets, photos, videos, audio, custom content, or adult content. Age-verified members only — your post shows in the 18+ forum and its tag pages, with a Creator badge and your price. Payment is arranged privately with the buyer in a private chat.</p>' +
@@ -7868,6 +7885,37 @@ window.DWC = {
     }
     setNotice("🖼️ That's your profile picture now.");
     DWC.openPicViewer(pv.memberId);
+  },
+  // v3.21 — change the visibility of the gallery photo showing in the
+  // viewer. Auto-saves immediately (same as the phone gallery — there
+  // is no Save button): Public / Friends call PUT /api/gallery,
+  // Private deletes the stored photo (Private is not stored server-side)
+  // and the viewer moves to the next photo. Owner or operator only —
+  // the server enforces it; anyone else never sees these buttons.
+  picViewerSetVisibility: async function (vis) {
+    var pv = state.picViewer;
+    if (!pv || !state.profile) return;
+    var photo = pv.photos[pv.index];
+    if (!photo || !photo.subject || photo.subject.indexOf("gallery:") !== 0) return;
+    if (state.profile.id !== pv.memberId && !state.profile.is_operator) return;
+    if (["private", "public", "friends"].indexOf(vis) < 0) return;
+    var gid = photo.subject.slice("gallery:".length);
+    if (vis === "private") {
+      if (!confirm("Take this photo down from your profile? It will be deleted from the gallery.")) return;
+      var del = await apiDelete("/gallery?id=" + encodeURIComponent(gid) + "&device_id=" + encodeURIComponent(deviceId()));
+      if (!del || !del.ok) { setNotice((del && del.error) || "Couldn't take that photo down."); return; }
+      pv.photos.splice(pv.index, 1);
+      if (!pv.photos.length) { setNotice("🔒 Private — photo taken down from your profile."); DWC.closePicViewer(); return; }
+      if (pv.index >= pv.photos.length) pv.index = pv.photos.length - 1;
+      setNotice("🔒 Private — photo taken down from your profile.");
+      renderPicViewer();
+      return;
+    }
+    var upd = await apiPut("/gallery", { device_id: deviceId(), id: Number(gid), visibility: vis });
+    if (!upd || !upd.ok) { setNotice((upd && upd.error) || "Couldn't change that photo's visibility."); return; }
+    photo.visibility = vis;
+    setNotice(vis === "public" ? "🌍 Public ✓ — visitors can see it on your page." : "👥 Friends-only ✓ — only your friends can see it.");
+    renderPicViewer();
   },
   // v3.21 — Add photos panel on your own profile (bypasses the Taffy
   // Phone Gallery; the phone path stays). Up to 5 files at once, each
@@ -8390,6 +8438,9 @@ window.DWC = {
   },
 
   submitPost: async function (form, context) {
+    // Defense in depth — the composer no longer renders for guests, but
+    // never let a guest submit reach the server from any path.
+    if (!state.profile) { setNotice("Create your account first to post."); DWC.openSignup(); return false; }
     var fd = new FormData(form);
     var kind = fd.get("kind") || (context === "cardcheck" ? "card_auth" : "forum");
     var gk = "composer-" + context;
@@ -8448,6 +8499,8 @@ window.DWC = {
   },
 
   submitCreatorPost: async function (form, gk) {
+    // Same guest pre-check as submitPost.
+    if (!state.profile) { setNotice("Create your account first to post."); DWC.openSignup(); return false; }
     var fd = new FormData(form);
     gk = gk || "composer-creator";
     // Cropped photo wins over the raw file input (the cropper already

@@ -758,7 +758,7 @@ function followRowHTML(withExtra){
     ["📝 Lyrics", MUSIC_LINKS.lyrics, false],
     ["📘 Facebook", MUSIC_LINKS.facebook, false],
     ["🗳 Vote for his song", MUSIC_LINKS.vote, true],
-    ["❤️ Donate", "donate.html", true, true],
+    ["❤️ Donate", "about.html#donate", true, true],
   ];
   if(withExtra) links.push(["🔗 HyperFollow", MUSIC_LINKS.hyperfollow, true]);
   return links.map(l => `<a href="${l[1]}"${l[3] ? "" : ' target="_blank" rel="noopener"'}${l[2] ? ' class="hot"' : ""}>${l[0]}</a>`).join("");

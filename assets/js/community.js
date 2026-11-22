@@ -1969,7 +1969,7 @@ function taffyReply(raw) {
     return { text: taffyPick(["Hit Shop in the top nav — that's the Rare Candy Reserve store, cards, handhelds, and all.", "The shop is one tap away — Shop in the top nav takes you to the store. Cards, pins, handhelds, the lot."]), emoji: taffyPickEmoji(["🛍️", "🍬"]), working: false };
   // Donate
   if (has(/\b(donate|donation|donations)\b/))
-    return { text: taffyPick(["Hit Donate in the top nav — it goes to the shop and keeps this place running. Early supporters get first access to new drops.", "Donate in the top nav. It keeps the lights on here, and early supporters get first access to new drops."]), emoji: taffyPickEmoji(["❤️", "🍬"]), working: false };
+    return { text: taffyPick(["Donate lives on the About page now — it goes to the shop and keeps this place running. Early supporters get first access to new drops.", "Donate on the About page. It keeps the lights on here, and early supporters get first access to new drops."]), emoji: taffyPickEmoji(["❤️", "🍬"]), working: false };
   // Layout / theme / customize my page (echoes a color word when they name one)
   if (has(/\blayout|theme|customi[sz]e|my page|profile.*(look|design|color|style)|background|wallpaper\b/)) {
     var cw = taffyColorWord(t);

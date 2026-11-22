@@ -39,6 +39,11 @@ function shapeReceipt(row) {
     other_username: row.other_username ?? "member",
     other_profile_id: row.other_profile_id,
     conversation_id: row.conversation_id ?? null,
+    // Content sale number for this chat, when the sale was a creator
+    // post (null when the chat wasn't about a post, or the sale was
+    // recorded before the CS# log existed).
+    cs_number: row.cs_number ?? null,
+    post_id: row.cs_post_id ?? null,
     created_at: iso(row.created_at),
   };
 }
@@ -51,11 +56,25 @@ export async function onRequestGet({ env, request }) {
   if (!me) return json({ ok: false, error: "Create your account first to see your receipts.", receipts: [] });
   try {
     const { results } = await db.prepare(
-      `SELECT * FROM receipts WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`,
+      `SELECT r.*, cs.cs_number AS cs_number, cs.post_id AS cs_post_id FROM receipts r
+       LEFT JOIN content_sales cs ON cs.conversation_id = r.conversation_id
+       WHERE r.profile_id = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 100`,
     ).bind(me.id).all();
     return json({ receipts: (results || []).map(shapeReceipt) });
   } catch (e) {
-    if (/no such table/i.test(String((e && e.message) || e))) return notSetup();
+    if (/no such table/i.test(String((e && e.message) || e))) {
+      // The content_sales table isn't there yet (migration not run) —
+      // fall back to the plain receipts list instead of breaking.
+      try {
+        const { results } = await db.prepare(
+          `SELECT * FROM receipts WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`,
+        ).bind(me.id).all();
+        return json({ receipts: (results || []).map(shapeReceipt) });
+      } catch (e2) {
+        if (/no such table/i.test(String((e2 && e2.message) || e2))) return notSetup();
+        throw e2;
+      }
+    }
     throw e;
   }
 }
@@ -112,7 +131,50 @@ export async function onRequestPost({ env, request }) {
       ).bind(otherId, convId, me.id, me.username, theirKind, amountCents, note, now),
     ]);
     const receiptId = inserted && inserted[0] && inserted[0].meta ? inserted[0].meta.last_row_id : null;
-    return json({ ok: true, error: null, receipt_id: receiptId, amount_cents: amountCents, amount: money(amountCents), note });
+    // Content sale log (CS#) — only when this chat started from a
+    // creator post: the sale gets a sequential number and a watermark
+    // line for the buyer, so a leaked copy traces back to who bought it.
+    // The buyer is whoever spent; the seller is the other side. The
+    // buyer IP comes from Cloudflare (cf-connecting-ip) and is stored
+    // server-side only — it never leaves the server except to the
+    // operator's CS# lookup. If the content_sales table isn't there yet
+    // (migration not run), the receipt still saves and cs_number comes
+    // back null. If the CS# insert itself fails, the receipt still saves
+    // — a missing number is visible to the operator (numbers skip),
+    // which beats losing the whole receipt to an error.
+    let csNumber = null;
+    let watermarkText = "";
+    if (conv.post_id) {
+      const post = await db.prepare("SELECT id, title FROM posts WHERE id = ? LIMIT 1").bind(conv.post_id).first();
+      const buyerId = role === "buyer" ? me.id : otherId;
+      const buyerName = role === "buyer" ? me.username : otherName;
+      const sellerId = role === "buyer" ? otherId : me.id;
+      const sellerName = role === "buyer" ? otherName : me.username;
+      const buyerIp = request.headers.get("cf-connecting-ip") || "";
+      const itemTitle = (post && post.title) || note;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const mx = await db.prepare("SELECT MAX(cs_number) AS m FROM content_sales").first();
+          const next = (mx && mx.m ? mx.m : 0) + 1;
+          const wm = "RareCandyReserve.org • @" + buyerName + " • CS#" + next + " • redistribution of this is punishable by law";
+          await db.prepare(
+            `INSERT INTO content_sales (cs_number, conversation_id, receipt_id, post_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ).bind(next, convId, receiptId, conv.post_id, buyerId, buyerName, sellerId, sellerName, itemTitle, amountCents, buyerIp, wm, now).run();
+          csNumber = next;
+          watermarkText = wm;
+          break;
+        } catch (e2) {
+          const msg2 = String((e2 && e2.message) || e2);
+          if (/no such table/i.test(msg2)) { csNumber = null; watermarkText = ""; break; }
+          if (/UNIQUE constraint failed/i.test(msg2) && attempt === 0) continue;
+          csNumber = null;
+          watermarkText = "";
+          break;
+        }
+      }
+    }
+    return json({ ok: true, error: null, receipt_id: receiptId, amount_cents: amountCents, amount: money(amountCents), note, cs_number: csNumber, watermark_text: watermarkText });
   } catch (e) {
     if (/no such table/i.test(String((e && e.message) || e))) return notSetup();
     throw e;

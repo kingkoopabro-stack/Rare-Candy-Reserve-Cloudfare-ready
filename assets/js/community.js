@@ -155,6 +155,8 @@ var state = {
   ephInbox: [], // my open ephemeral conversations
   ephTxnMsg: null, // confirmation after a transaction is marked done
   receipts: [], // my receipts (My receipts view)
+  myContentSales: {}, // post_id -> { cs_number, ... } — my CS# purchases (watermark unlock)
+  contentSalesLoadedFor: null,
   findRole: "seller", // "seller" = I'm buying, looking for a seller; "buyer" = I'm selling, looking for a buyer
   findResults: [],
   headlines: [], // top posts by engagement (Headlines view / Street strip)
@@ -4031,13 +4033,31 @@ function postPhotoHTML(p) {
   var mine = state.profile && state.profile.id === p.author_id;
   var locked = !!p.pay_unlock && p.price_cents > 0 && !mine;
   var blurred = !!p.blur_photo && !mine;
+  // Watermarked content: creator posts and pay-to-unlock posts carry the
+  // Rare Candy watermark on view (see watermarkOverlayHTML) — everyone
+  // but the author. The author sees their own work clean.
+  var wm = (p.is_creator || p.pay_unlock) && !mine;
+  // Bought it: the lock is off and the copy carries YOUR watermark.
+  var owned = !mine ? ownedContentSale(p) : null;
+  if (owned) {
+    return '<div class="dwc-photowrap"><img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">' +
+      watermarkOverlayHTML(p, owned, false) +
+      '<div class="dwc-wm-tag">✓ Yours — CS#' + owned.cs_number + " · watermarked to @" + esc(state.profile.username) + "</div></div>";
+  }
   if (locked) {
     return '<div class="dwc-photowrap"><img class="dwc-post-img dwc-img-locked" src="' + esc(p.image_url) + '" alt="Locked preview photo" loading="lazy">' +
-      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div></div>';
+      (wm ? watermarkOverlayHTML(p, null, false) : "") +
+      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div>' +
+      '<div class="dwc-wm-warn">⚖️ Watermarked to the buyer — redistribution of this is punishable by law. Every copy carries the buyer’s name and sale number.</div></div>';
   }
   if (blurred) {
     return '<div class="dwc-photowrap"><img class="dwc-post-img dwc-img-blurred" src="' + esc(p.image_url) + '" alt="Blurred photo — tap to reveal" loading="lazy">' +
+      (wm ? watermarkOverlayHTML(p, null, false) : "") +
       '<button type="button" class="dwc-reveal-btn" onclick="DWC.toggleBlur(this)">👁 Blurred photo — tap to reveal</button></div>';
+  }
+  // Free and visible creator content still carries the generic mark.
+  if (wm) {
+    return '<div class="dwc-photowrap"><img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">' + watermarkOverlayHTML(p, null, false) + "</div>";
   }
   return '<img class="dwc-post-img" src="' + esc(p.image_url) + '" alt="Post photo" loading="lazy">';
 }
@@ -4046,21 +4066,127 @@ function postPhotoHTML(p) {
 // Same locked/blurred rules as photos: pay-locked shows a locked preview
 // (blurred first frame, no controls — the unlock path is the same private
 // chat as photos), blurred shows the video blurred with the same
-// tap-to-reveal button, otherwise a normal <video>.
+// tap-to-reveal button, otherwise a normal <video>. Creator / pay-unlock
+// videos carry the watermark too — and on video it DRIFTS (see
+// .dwc-wm-video in style.css), so it can't be cropped out in one spot.
 function postVideoHTML(p) {
   if (!p.video_url) return "";
   var mine = state.profile && state.profile.id === p.author_id;
   var locked = !!p.pay_unlock && p.price_cents > 0 && !mine;
   var blurred = !!p.blur_photo && !mine;
+  var wm = (p.is_creator || p.pay_unlock) && !mine;
+  var owned = !mine ? ownedContentSale(p) : null;
+  if (owned) {
+    return '<div class="dwc-photowrap"><video class="dwc-post-video" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>' +
+      watermarkOverlayHTML(p, owned, true) +
+      '<div class="dwc-wm-tag">✓ Yours — CS#' + owned.cs_number + " · watermarked to @" + esc(state.profile.username) + "</div></div>";
+  }
   if (locked) {
     return '<div class="dwc-photowrap"><video class="dwc-post-video dwc-img-locked" preload="metadata" playsinline muted src="' + esc(p.video_url) + '"></video>' +
-      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div></div>';
+      (wm ? watermarkOverlayHTML(p, null, true) : "") +
+      '<div class="dwc-photo-overlay"><span>🔒 Locked — Pay to unlock · ' + money(p.price_cents) + '</span></div>' +
+      '<div class="dwc-wm-warn">⚖️ Watermarked to the buyer — redistribution of this is punishable by law. Every copy carries the buyer’s name and sale number.</div></div>';
   }
   if (blurred) {
     return '<div class="dwc-photowrap"><video class="dwc-post-video dwc-img-blurred" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>' +
+      (wm ? watermarkOverlayHTML(p, null, true) : "") +
       '<button type="button" class="dwc-reveal-btn" onclick="DWC.toggleBlur(this)">👁 Blurred video — tap to reveal</button></div>';
   }
+  if (wm) {
+    return '<div class="dwc-photowrap"><video class="dwc-post-video" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>' + watermarkOverlayHTML(p, null, true) + "</div>";
+  }
   return '<video class="dwc-post-video" controls preload="metadata" playsinline src="' + esc(p.video_url) + '"></video>';
+}
+
+// ---------- Content watermark (v1: maximal DOM overlay) ----------
+// The watermark is drawn once on a <canvas> tile — the site's Rare Candy
+// artwork (apple-touch-icon.png, the logo pulled from the .ico — no new
+// image) + "RareCandyReserve.org" + "redistribution of this is
+// punishable by law" + the per-buyer trace line "@buyer • CS#N" when the
+// viewer bought this post. The tile repeats diagonally across the whole
+// picture (the wrapper rotates it; the tile itself is drawn straight),
+// semi-transparent, prominent on purpose — deterrence is the point. It
+// shows in screenshots, which is the main threat. It does NOT survive
+// downloading the raw file: the image URL itself is still fetchable, so
+// this is a display-layer deterrent, not access control. The burned-in
+// (pixels) version is the v2 path — see /api/watermarked.js — which needs
+// the Cloudflare Images binding; this overlay is the layer that works
+// today with no new services.
+var WM_LOGO_URL = "apple-touch-icon.png";
+var wmTileCache = {};
+var wmLogoImg = null;
+var wmLogoLoading = false;
+var wmLogoReady = false;
+function wmEnsureLogo() {
+  if (wmLogoImg || wmLogoLoading) return;
+  wmLogoLoading = true;
+  var img = new Image();
+  img.onload = function () { wmLogoImg = img; wmLogoReady = true; refreshWatermarkTiles(); };
+  img.onerror = function () { wmLogoLoading = false; };
+  img.src = WM_LOGO_URL;
+}
+function watermarkTileDataURL(traceLine) {
+  var key = (traceLine || "generic") + "|" + (wmLogoReady ? "logo" : "text");
+  if (wmTileCache[key]) return wmTileCache[key];
+  var c = document.createElement("canvas");
+  c.width = 480;
+  c.height = 200;
+  var x = c.getContext("2d");
+  x.clearRect(0, 0, 480, 200);
+  var tx = 12;
+  if (wmLogoImg) {
+    x.globalAlpha = 0.95;
+    x.drawImage(wmLogoImg, 12, 58, 84, 84);
+    tx = 108;
+  }
+  x.globalAlpha = 0.92;
+  x.shadowColor = "rgba(0,0,0,0.9)";
+  x.shadowBlur = 6;
+  x.fillStyle = "#ffffff";
+  x.textBaseline = "top";
+  x.font = "900 30px Arial, sans-serif";
+  x.fillText("RareCandyReserve.org", tx, 52);
+  x.font = "700 21px Arial, sans-serif";
+  x.fillText("redistribution of this is", tx, 92);
+  x.fillText("punishable by law", tx, 118);
+  if (traceLine) {
+    x.font = "900 24px Arial, sans-serif";
+    x.fillStyle = "#ffe45e";
+    x.fillText(traceLine, tx, 152);
+  }
+  var url = c.toDataURL("image/png");
+  wmTileCache[key] = url;
+  return url;
+}
+function refreshWatermarkTiles() {
+  var els = document.querySelectorAll("[data-wm-trace]");
+  for (var i = 0; i < els.length; i++) {
+    var t = els[i].getAttribute("data-wm-trace") || "";
+    els[i].style.backgroundImage = "url(" + watermarkTileDataURL(t) + ")";
+  }
+}
+// owned: null (generic mark) or { cs_number } (this viewer's purchase).
+// isVideo: true for video (the tile drifts so it can't be cropped out).
+function watermarkOverlayHTML(p, owned, isVideo) {
+  var trace = "";
+  if (owned && state.profile) trace = "@" + state.profile.username + " • CS#" + owned.cs_number;
+  wmEnsureLogo();
+  return '<div class="dwc-wm' + (isVideo ? " dwc-wm-video" : "") + '" aria-hidden="true">' +
+    '<div class="dwc-wm-tile" data-wm-trace="' + esc(trace) + '" style="background-image:url(' + watermarkTileDataURL(trace) + ')"></div></div>';
+}
+function ownedContentSale(p) {
+  if (!state.profile || !state.myContentSales) return null;
+  return state.myContentSales[p.id] || null;
+}
+async function loadMyContentSales() {
+  if (!state.profile) { state.myContentSales = {}; state.contentSalesLoadedFor = null; return; }
+  if (state.contentSalesLoadedFor === state.profile.id) return;
+  var data = await apiGet("/content-sales?device_id=" + encodeURIComponent(deviceId()));
+  var map = {};
+  var list = (data && data.sales) || [];
+  list.forEach(function (s) { if (s.post_id) map[s.post_id] = s; });
+  state.myContentSales = map;
+  state.contentSalesLoadedFor = state.profile.id;
 }
 
 // Event posts — "📅 Dec 13 · 12–6 PM · [place]" (only the parts given).
@@ -4451,7 +4577,7 @@ async function viewReceipts(el) {
           '<p style="margin:0"><strong style="font-size:19px">' + (spent ? "−" : "+") + esc(r.amount || "") + '</strong> ' +
           '<span class="dwc-receipt-kind">' + (spent ? "💸 Spent" : "💰 Received") + "</span></p>" +
           '<p style="margin:6px 0 0">' + esc(r.note || "") + "</p>" +
-          '<p class="dwc-meta" style="margin:4px 0 0">with @' + esc(r.other_username) + " · " + fmtDate(r.created_at) + "</p>" +
+          '<p class="dwc-meta" style="margin:4px 0 0">with @' + esc(r.other_username) + " · " + fmtDate(r.created_at) + (r.cs_number ? " · CS#" + r.cs_number : "") + "</p>" +
           "</article>";
       }).join("")
     : '<div class="note">No receipts yet — when you mark a transaction done in a private chat, your receipt lands here.</div>';
@@ -4676,7 +4802,7 @@ async function viewThread(el, postId) {
     (p.is_creator ? '<p class="dwc-creator-line"><span class="dwc-creator-badge">🎨 ' + esc(p.content_genre || "Creator content") + "</span> " +
       '<strong style="color:var(--green);font-size:20px">' + (p.price_cents > 0 ? money(p.price_cents) : "Free") + "</strong>" +
       (p.file_url ? ' <span class="dwc-3d-badge">🖨️ 3D print file — ' + esc(p.file_name || "download") + "</span>" : "") + "</p>" +
-      '<p style="color:var(--muted);font-size:14px">' + (p.pay_unlock && p.price_cents > 0 ? 'This post is pay-to-unlock — hit “Pay to unlock” and sort out payment in a private chat. The receipt marked done in that chat is your proof of purchase.' : 'Payment is arranged privately with the seller — hit “Buy / Message seller” and sort it out in a private chat.') + ' No money moves in this app.</p>' : "") +
+      '<p style="color:var(--muted);font-size:14px">' + (p.pay_unlock && p.price_cents > 0 ? 'This post is pay-to-unlock — hit “Pay to unlock” and sort out payment in a private chat. The receipt marked done in that chat is your proof of purchase — your sale is logged with a sale number (CS#) and your copy is watermarked with your username and sale number. Redistribution of this is punishable by law.' : 'Payment is arranged privately with the seller — hit “Buy / Message seller” and sort it out in a private chat.') + ' No money moves in this app.</p>' : "") +
     '<p style="white-space:pre-wrap">' + memeBodyHTML(p.body) + "</p>" +
     youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
@@ -6219,6 +6345,7 @@ function renderEphWin() {
     '<div class="dwc-rowform"><label><input type="radio" name="role" value="buyer" checked style="width:auto"> I bought it (I spent)</label>' +
     '<label><input type="radio" name="role" value="seller" style="width:auto"> I sold it (I received)</label></div>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="color:var(--muted);font-size:13px">⚖️ Marking this done logs the sale with a sale number (CS#) tied to the buyer — the buyer’s copy is watermarked with their username and sale number. Redistribution of bought digital content is punishable by law.</p>' +
     '<p style="margin-top:10px"><button class="btn small" type="submit">Save receipt →</button></p></form>' +
     '<form class="dwc-rowform" onsubmit="DWC.sendEphemeral(this); return false;">' +
     '<input name="body" required maxlength="1000" placeholder="Message @' + esc(e.partner_username) + '…" style="flex:1">' +
@@ -6382,7 +6509,9 @@ async function viewAdmin(el) {
       : "") +
     (isOp
       ? '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
-        '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>'
+        '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>' +
+        '<section class="card"><h2 style="margin-top:0">🔎 Content sales — look up a CS#</h2><p style="color:var(--muted)">A leaked copy carries its sale number. Type it in to see who bought it — buyer, seller, what it was, what they paid, and the buyer IP (operator eyes only — never shared with members; you decide case by case whether their info goes to the person whose content was shared).</p>' +
+        '<form onsubmit="DWC.lookupContentSale(this); return false;"><label>Sale number (CS#)</label><input name="cs" type="number" min="1" required placeholder="e.g. 1"><p class="dwc-form-err" data-err hidden></p><p style="margin-top:10px"><button class="btn small" type="submit">Look up CS# →</button></p></form><div id="dwc-cs-result"></div></section>'
       : "") +
     '<section class="card"><h2 style="margin-top:0">📻 Radio player text</h2><p style="color:var(--muted)">Change the words on the live radio page — they update within 30 seconds. Leave a field blank to leave it as-is.</p>' +
     '<form onsubmit="DWC.saveRadioSettings(this); return false;">' +
@@ -6552,6 +6681,7 @@ function viewRules(el) {
     "<li><strong>No hate speech</strong> in posts, comments, usernames, or profiles. Pages and posts that break this get removed.</li>" +
     "<li><strong>No outside sales.</strong> Deals that start here stay here. On this platform your content and your deals are protected — verified member accounts, recorded orders and tracking, and a report trail. Take a deal off site and you lose all of that protection. Taking a buyer off-platform to dodge the street cut also risks a <strong>permanent ban of the account</strong> (and, on the public site, the IP).</li>" +
     "<li><strong>Stealing content is theft — and it’s expensive.</strong> Anyone who steals a member’s content and redistributes it, in any form, <strong>will be held liable in court for money owed due to damages, and more</strong>. The platform will pursue content thieves. If you didn’t make it or buy the right to share it, don’t post it anywhere.</li>" +
+    "<li><strong>Digital content sales are logged and watermarked.</strong> Every digital sale gets a sale number (CS#1, CS#2, and so on) tied to the buyer, and every copy a buyer sees carries their username and sale number in the watermark — so a leaked copy points straight at who bought it. <strong>Legal action will be taken for redistribution of any property bought digitally on this site.</strong> Your IP address, as well as your information, will be given to the person whose intellectual property you are distributing illegally, so they can determine whether to take legal action or not. We are in no way responsible for any misuse of the tools provided here and are not to be held liable for any choices that others make while using this. This was created to be a safe space for all people, and we want to keep it that way.</li>" +
     "<li><strong>Be honest about condition.</strong> Photos of the actual item, flaws stated up front. The item is the item for sale — extras are courtesies, not the product.</li>" +
     "<li><strong>Chat:</strong> guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</li>" +
     "<li><strong>Payments &amp; shipping:</strong> buyer and seller arrange payment (the seller's payout method is on their profile) and shipping directly. Every purchase lands in the buyer's <strong>My Orders</strong> with the order status; when the seller ships, they add the carrier + tracking number there and the buyer gets their copy of it (plus a link to the carrier's tracking page). Sellers: your wallet balance and payout history live under <strong>Payouts</strong> — money becomes available when an order is marked delivered. Shipping-label creation through Shippo or a similar service is planned and will be labeled clearly when it actually works — it is not live yet.</li></ul>" +
@@ -6837,6 +6967,30 @@ function renderModelMe() {
   adultTabButtons("modelme");
   var p = state.profile;
   host.innerHTML =
+    '<section class="card dwc-model-upload" aria-label="Upload content to sell"><h3 style="margin-top:0">📤 Upload content to sell</h3>' +
+    '<p style="color:var(--muted)">Post your content as a creator post in the 18+ forum — photo, video, or both, with your price. Age-verified members only (the server checks your ID verification on every upload). Your content is watermarked on view — the Rare Candy mark, RareCandyReserve.org, and “redistribution of this is punishable by law” — and when someone buys it, the sale is logged as CS#N with their username in the watermark, so a leaked copy points at the buyer. Blur and pay-to-unlock are off unless you tick them.</p>' +
+    '<form onsubmit="DWC.submitCreatorPost(this, \'composer-modelup\'); return false;">' +
+    '<input type="hidden" name="kind" value="adult">' +
+    '<label>Forum corner (one of the 53 adult categories)</label><select name="category">' + ADULT_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
+    '<label>Content type</label><select name="content_genre">' + CREATOR_GENRES.map(function (g) { return "<option>" + esc(g) + "</option>"; }).join("") + "</select>" +
+    '<label>Title (3–120 characters)</label>' +
+    '<input name="title" required minlength="3" maxlength="120" placeholder="e.g. New set — 20 photos 🔥">' +
+    '<label>Description (up to 4000 characters)</label>' +
+    '<textarea name="body" required maxlength="4000" placeholder="What’s in it, how many photos/minutes, what makes it yours…"></textarea>' +
+    '<label>Your tags (up to 8, comma separated — buyers find you by these)</label>' +
+    '<input name="tags" maxlength="240" placeholder="e.g. cosplay, custom, amateur">' +
+    '<label>Price (USD — 0 = free)</label>' +
+    '<input name="price" type="number" step="1" min="0" max="100000" value="0" required>' +
+    '<label>Photo (JPG, PNG, or WebP — resized automatically to fit; optional)</label>' +
+    '<input name="photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.photoPicked(this, \'composer-modelup\')">' +
+    cropPreviewHTML("composer-modelup") +
+    '<label><input type="checkbox" name="blur_photo" style="width:auto"> 🙈 Blur this photo — viewers see a blurred preview (they can tap to reveal). Off by default; never on unless you tick it.</label>' +
+    '<label><input type="checkbox" name="pay_unlock" style="width:auto"> 🔓 Pay to unlock — set a price above and viewers see a locked preview with a “Pay to unlock” button. Only works with a price above $0. Off by default.</label>' +
+    '<label>Short video clip (MP4, WebM, or MOV, under 15 MB and 60 seconds — optional)</label>' +
+    '<input name="video" type="file" accept="video/mp4,video/webm,video/quicktime" onchange="DWC.videoPicked(this, \'composer-modelup\')">' +
+    videoPreviewHTML("composer-modelup") +
+    '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="margin-top:14px"><button class="btn" type="submit">Upload as a creator post →</button></p></form></section>' +
     '<section class="card"><h3 style="margin-top:0">📸 My Model Listing</h3>' +
     "<p style=\"color:var(--muted)\">Opt in to the model search. Everything on your card is chosen by you — your blurb, your categories, your display picture, and the match details below. Leave anything blank and it simply isn’t shared.</p>" +
     '<form onsubmit="DWC.saveModelProfile(this); return false;">' +
@@ -7776,9 +7930,9 @@ window.DWC = {
     return false;
   },
 
-  submitCreatorPost: async function (form) {
+  submitCreatorPost: async function (form, gk) {
     var fd = new FormData(form);
-    var gk = "composer-creator";
+    gk = gk || "composer-creator";
     // Cropped photo wins over the raw file input (the cropper already
     // validated the source file). No crop? Read the file input as before.
     var photo = cropPick[gk] || null;
@@ -8070,7 +8224,8 @@ window.DWC = {
     var role = fd.get("role") === "seller" ? "seller" : "buyer";
     var data = await apiPost("/receipts", { device_id: deviceId(), conversation_id: e.conversation_id, amount_dollars: amount, note: note, role: role });
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save that receipt.");
-    state.ephTxnMsg = "\u2713 Transaction recorded \u2014 " + (data.amount || "") + " for \u201c" + note + "\u201d. Receipts saved for both of you \u2014 see My receipts.";
+    state.ephTxnMsg = "\u2713 Transaction recorded \u2014 " + (data.amount || "") + " for \u201c" + note + "\u201d. Receipts saved for both of you \u2014 see My receipts." + (data.cs_number ? " Sale number: CS#" + data.cs_number + " \u2014 the buyer's copy is watermarked to them." : "");
+    loadMyContentSales();
     renderEphWin();
     return false;
   },
@@ -8439,6 +8594,26 @@ window.DWC = {
     var data = await apiPost("/radio-settings", { device_id: deviceId(), settings: settings });
     if (!data || !data.ok) { if (msg) msg.textContent = (data && data.error) || "Couldn't save — try again."; return false; }
     if (msg) msg.textContent = "Saved ✓ — the radio page picks it up within 30 seconds.";
+    return false;
+  },
+
+  // Content sale lookup (operator only) — type a CS# from a leaked copy
+  // and see who bought it. The buyer IP shows here and nowhere else.
+  lookupContentSale: async function (form) {
+    var fd = new FormData(form);
+    var cs = parseInt(fd.get("cs"), 10);
+    var host = $("dwc-cs-result");
+    if (!cs) return formErr(form, "Type a sale number.");
+    var data = await apiGet("/content-sales?device_id=" + encodeURIComponent(deviceId()) + "&cs=" + cs);
+    if (!data || !data.ok || !data.sale) { if (host) host.innerHTML = ""; return formErr(form, (data && data.error) || "Couldn't look that up."); }
+    formErr(form, null);
+    var s = data.sale;
+    if (host) host.innerHTML =
+      '<article class="card" style="margin-top:12px"><p style="margin:0"><strong style="font-size:19px">CS#' + s.cs_number + "</strong> · " + esc(s.amount || "") + "</p>" +
+      "<p style=\"margin:6px 0 0\">" + esc(s.item_title || "") + "</p>" +
+      "<p class=\"dwc-meta\" style=\"margin:4px 0 0\">Buyer: @" + esc(s.buyer_username) + " (id " + s.buyer_id + ") · Seller: @" + esc(s.seller_username) + " · " + fmtDate(s.created_at) + "</p>" +
+      "<p class=\"dwc-meta\" style=\"margin:4px 0 0\">Buyer IP: " + esc(s.buyer_ip || "not recorded") + "</p>" +
+      "<p class=\"dwc-meta\" style=\"margin:4px 0 0\">Watermark: " + esc(s.watermark_text || "") + "</p></article>";
     return false;
   },
 
@@ -10394,6 +10569,9 @@ async function init() {
       apiPost("/presence", { device_id: deviceId(), status: state.presence, away_message: state.awayMessage });
     }, 60000);
   }
+  // My CS# purchases — so content I bought renders unlocked, with MY
+  // watermark on it, on first paint (not flashing locked first).
+  if (state.profile) await loadMyContentSales();
   render();
   // Taffy Phone — the green call/text button lives on the page (outside
   // #dwc-app) from the start, so it's always there to open the phone.

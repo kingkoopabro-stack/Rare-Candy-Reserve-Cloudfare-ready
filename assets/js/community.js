@@ -742,6 +742,11 @@ var NAV = [
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
   ["admin", "🛡️ Admin"], ["team", "👥 Team"],
 ];
+// Team check for the client (mirrors isTeamRole in functions/api/_lib.js).
+// The server is the real gate — this only decides what the UI shows.
+function isTeamProfile(p) {
+  return !!(p && (p.role === "operator" || p.role === "admin" || p.role === "mod" || p.is_operator));
+}
 function parseRoute() {
   var h = (location.hash || "").replace(/^#\/?/, "");
   var parts = h.split("/").filter(Boolean);
@@ -794,6 +799,9 @@ function render() {
     return true;
   }).map(function (item) {
     var label = item[1];
+    // Members pill: a regular member opens their friends list, not the
+    // directory — so the button says what it actually opens for them.
+    if (item[0] === "members" && state.profile && !isTeamProfile(state.profile)) label = "👥 My Friends";
     if (item[0] === "reports" && state.stats && state.stats.open_reports > 0) label = "🚩 Reports (" + state.stats.open_reports + ")";
     return '<button type="button" class="dwc-pill' + (active === item[0] ? " active" : "") + (item[0] === "find" ? " dwc-pill-find" : "") + '" onclick="DWC.go(\'' + item[0] + '\')">' + esc(label) + "</button>";
   }).join("") + "</nav>";
@@ -2062,7 +2070,9 @@ function phoneTaffyHTML() {
 }
 async function loadPhoneMsgList() {
   if (!state.profile || state.phoneMsgList) return;
-  var data = await apiGet("/members?limit=60");
+  // Gated by the server (2026-11-21): the team gets all members, a
+  // regular member gets only their own friends as MSG contacts.
+  var data = await apiGet("/members?limit=60&device_id=" + encodeURIComponent(deviceId()));
   var members = (data && data.members) || [];
   var mine = state.profile.id;
   var tops = {};
@@ -2084,7 +2094,7 @@ function phoneMsgHTML() {
     rows += '<p class="tp-note">Loading friends…</p>';
     loadPhoneMsgList();
   } else if (!state.phoneMsgList.length) {
-    rows += '<p class="tp-note">No other members yet — you’re the first one here. Add friends in Edit profile (Top Friends) and they’ll show up here.</p>';
+    rows += '<p class="tp-note">' + (isTeamProfile(state.profile) ? "No other members yet — you’re the first one here." : "No friends yet — visit someone’s page and hit “Add me”, and they’ll show up here.") + '</p>';
   } else {
     rows += state.phoneMsgList.map(function (m) {
       return '<button type="button" class="tp-contact" onclick="DWC.phoneMsgMember(' + m.id + ', \'' + esc(m.username.replace(/'/g, "")) + '\')">' +
@@ -2957,12 +2967,14 @@ function unlockCardHTML() {
 async function loadTopFriendPicker() {
   var host = $("dwc-topfriends-picker");
   if (!host) return;
-  var data = await apiGet("/members?limit=60");
+  // Gated by the server (2026-11-21): the team picks from all members,
+  // a regular member picks Top Friends from their own friends only.
+  var data = await apiGet("/members?limit=60&device_id=" + encodeURIComponent(deviceId()));
   var members = (data && data.members) || [];
   var picked = new Set((state.profile && state.profile.top_friend_ids) || []);
   var mine = state.profile ? state.profile.id : null;
   var others = members.filter(function (m) { return m.id !== mine; });
-  if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">No other members to pick from yet — you’re the first one here.</p>'; return; }
+  if (!others.length) { host.innerHTML = '<p style="color:var(--muted)">' + (isTeamProfile(state.profile) ? "No other members to pick from yet — you’re the first one here." : "No friends to pick from yet — add friends from their member page first, then pick your Top Friends here.") + '</p>'; return; }
   host.innerHTML = '<div class="dwc-checkgrid">' + others.map(function (m) {
     return '<label><input type="checkbox" name="top_friend" value="' + m.id + '" style="width:auto"' + (picked.has(m.id) ? " checked" : "") + ' onchange="DWC.topFriendChanged(this)"> ' + esc(m.id === 1 ? "Chris (Ash)" : "@" + m.username) + "</label>";
   }).join("") + "</div>";
@@ -5357,11 +5369,22 @@ async function viewPayouts(el) {
 
 // ---------- Members ----------
 async function viewMembers(el) {
-  el.innerHTML = '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they’ve set up how they get paid when they sell.</p><p style="color:var(--muted)">Loading members…</p></section>';
-  var data = await apiGet("/members?limit=24");
+  // Members directory, role-gated (2026-11-21): the team sees everyone;
+  // a regular member sees ONLY their own friends list; guests get the
+  // same sign-in prompt as receipts/orders/payouts (needProfileHTML).
+  // The server enforces this on GET /api/members — the client only
+  // labels the view honestly from the returned `scope`.
+  if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
+  var team = isTeamProfile(state.profile);
+  var head = team
+    ? '<h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they’ve set up how they get paid when they sell.</p>'
+    : '<h2 style="margin-top:0">👥 My Friends</h2><p style="color:var(--muted)">Only your friends show here — the full member list is for the team (mods, admins, and Chris). Add friends from their member page (“Add me”) and they’ll show up here.</p>';
+  el.innerHTML = '<section aria-label="Community members">' + head + '<p style="color:var(--muted)">Loading…</p></section>';
+  var data = await apiGet("/members?limit=24&device_id=" + encodeURIComponent(deviceId()));
   var members = (data && data.members) || [];
+  var scope = (data && data.scope) || (team ? "all" : "friends");
   el.innerHTML =
-    '<section aria-label="Community members"><h2 style="margin-top:0">Members</h2><p style="color:var(--muted)">Every member is a buyer <em>and</em> a seller — one account, both hats. “Payout ready” just means they’ve set up how they get paid when they sell.</p>' +
+    '<section aria-label="Community members">' + head +
     (members.length ? '<div class="grid">' + members.map(function (m) {
       return '<article class="card">' +
         (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
@@ -5371,7 +5394,7 @@ async function viewMembers(el) {
         (m.birthday ? "<p>🎂 " + esc(m.birthday) + "</p>" : "") +
         '<p>' + (m.payout_ready ? '<span style="color:var(--green)">✓ Payout ready</span>' : '<span style="color:var(--muted)">Not payout-ready yet</span>') + "</p>" +
         '<p class="dwc-meta">Joined ' + fmtDate(m.created_at) + ' · <a href="#/member/' + m.id + '">View page →</a></p></article>';
-    }).join("") + "</div>" : '<div class="note">No members yet.</div>') + "</section>";
+    }).join("") + "</div>" : (scope === "all" ? '<div class="note">No members yet.</div>' : '<div class="note">No friends yet — visit someone’s page from the street feed or a listing and hit “Add me”.</div>')) + "</section>";
 }
 
 // ---------- Member page (MySpace profile) ----------
@@ -6454,7 +6477,9 @@ async function loadChatAim() {
     if (inboxHost) inboxHost.innerHTML = '<p style="color:var(--muted)">Sign in to send IMs.</p>';
     return;
   }
-  var b = await apiGet("/presence?limit=60");
+  // Buddy list is gated by the server (2026-11-21), same rule as
+  // /api/members: team sees everyone, a regular member sees friends.
+  var b = await apiGet("/presence?limit=60&device_id=" + encodeURIComponent(deviceId()));
   if (b && b.buddies) { state.buddies = b.buddies; renderBuddies(); }
   var ib = await apiGet("/direct-messages?device_id=" + encodeURIComponent(deviceId()) + "&inbox=1");
   if (ib && ib.inbox) { state.inbox = ib.inbox; renderInbox(); }
@@ -7605,7 +7630,7 @@ window.DWC = {
     res.innerHTML = '<p class="dwc-search-hint">Searching…</p>'; res.hidden = false;
     if (!state.searchPosts || !state.searchMembers) {
       var p = apiGet("/posts?sort=new&limit=50&device_id=" + encodeURIComponent(deviceId()));
-      var m = apiGet("/members?limit=60");
+      var m = apiGet("/members?limit=60&device_id=" + encodeURIComponent(deviceId()));
       var both = await Promise.all([p, m]);
       state.searchPosts = (both[0] && both[0].posts) || [];
       state.searchMembers = (both[1] && both[1].members) || [];

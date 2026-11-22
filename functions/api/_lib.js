@@ -1700,6 +1700,20 @@ export const LUCRE_STORE_PRICES = {
   "store:pixel-quest": 20,
   "store:nine-tails-one-heart": 20,
   "store:blue-skies-2005": 20,
+  // Soundscape presets (2026-11-22) — look + sound in one. The four
+  // free presets (rain-window, night-sounds, city-lights, cafe-corner)
+  // are NOT listed here: free layouts skip the /lucre purchase call
+  // entirely (storeApply only buys when price > 0), same as every
+  // other free layout. A 0 here would be falsy in lucre.js.
+  "store:heavy-storm": 20,
+  "store:paris-streets": 20,
+  "store:street-violin": 20,
+  "store:canon-d": 20,
+  "store:fur-elise": 20,
+  // FIX (2026-11-22): Gilded Scarab was priced 50 in the client
+  // catalog but missing from this map — buying it failed live
+  // ("That item isn't for sale with Lucre"). 50 matches the client.
+  "store:gilded-scarab": 50,
 };
 export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
 export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window

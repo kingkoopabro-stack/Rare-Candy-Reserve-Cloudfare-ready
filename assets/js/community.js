@@ -1762,6 +1762,103 @@ var LAYOUT_STORE = [
       ".dwc-myprofile a{color:#d4af37;text-shadow:none;}" +
       ".dwc-myprofile .btn{box-shadow:0 0 14px rgba(212,175,55,.45);}" +
       ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;}"},
+  // ---------- Soundscape presets (2026-11-22) ----------
+  // A preset is a WHOLE page in one tap: the look (colors, fonts,
+  // background, effects, picture position) AND the sound (a soundscape
+  // + a player skin). The theme's soundscape/player_skin win over the
+  // member's saved sound — see storeMergedTheme. Rain on the Window
+  // is the template: rain audio + rain on the window + blue and black.
+  {
+    id: "store:rain-window", code: "RAINFALL", name: "Rain on the Window", tag: "🎵 Soundscape preset · rain", price: 0,
+    desc: "Rain on the window, woods outside, soft rain playing — blue and black, calm as a night in. The whole look and the sound, in one tap.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "#0a0e1a", bg_image_url: "", text_color: "#dfe8ff", accent_color: "#00e5ff", font: "typewriter", name_font: "monoton", glow: true, glow_color: "#00e5ff", outline_color: "", button_style: "neon", button_css: "", effects: ["peaceful-rain"], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "rain", player_skin: "cassette-cyan" },
+    css: ".dwc-myprofile{position:relative;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;border:12px solid rgba(16,24,48,.95);box-shadow:inset 0 0 80px rgba(0,229,255,.14);}" +
+      ".dwc-myprofile .card{background:rgba(10,14,26,.85);border:1px solid #2a3a5f;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}" +
+      ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}"},
+  {
+    id: "store:heavy-storm", code: "STORM", name: "Heavy Storm", tag: "🎵 Soundscape preset · storm", price: 20,
+    desc: "Thunder rolling, rain hammering down — dark purple, lightning on the edge of the screen. Loud weather for loud nights.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "#0b0b16", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#7c4dff", font: "typewriter", name_font: "orbitron", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: ["rainy-city"], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "storm", player_skin: "vinyl" },
+    css: ".dwc-myprofile{position:relative;}" +
+      ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.22),transparent 30%);opacity:0;animation:dwcStormFlash 9s ease-in-out infinite;}" +
+      "@keyframes dwcStormFlash{0%,88%,100%{opacity:0;}90%{opacity:.55;}91%{opacity:.05;}92%{opacity:.35;}}" +
+      ".dwc-myprofile .card{background:rgba(12,12,24,.88);border:1px solid #3a2a6e;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #7c4dff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #7c4dff;}" +
+      ".dwc-myprofile a{color:#b388ff;text-shadow:none;}"},
+  {
+    id: "store:night-sounds", code: "NIGHTFALL", name: "Night Sounds", tag: "🎵 Soundscape preset · night", price: 0,
+    desc: "Crickets and quiet dark — stars drifting past while the night plays. For the ones up late.",
+    conflict: "",
+    theme: { vibe: "midnight", bg_color: "#070714", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#7c4dff", font: "serif", name_font: "cinzel", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: ["starfield-drift"], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "night", player_skin: "" },
+    css: ".dwc-myprofile .card{background:rgba(12,14,28,.88);border:1px solid #2a2a4a;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #7c4dff;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #7c4dff;}" +
+      ".dwc-myprofile a{color:#b388ff;text-shadow:none;}"},
+  {
+    id: "store:city-lights", code: "CITYLIGHTS", name: "City Lights", tag: "🎵 Soundscape preset · city", price: 0,
+    desc: "Traffic, footsteps, life going by — city amber and neon, like standing on the street at night.",
+    conflict: "",
+    theme: { vibe: "neon", bg_color: "#0a0e1a", bg_image_url: "", text_color: "#e8f6ff", accent_color: "#ff9a00", font: "orbitron", name_font: "pressstart", glow: false, glow_color: "", outline_color: "", button_style: "arcade", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "city", player_skin: "cassette-gold" },
+    css: ".dwc-myprofile .card{background:rgba(14,16,28,.88);border:1px solid #3a2f1a;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ff9a00;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;}" +
+      ".dwc-myprofile a{color:#ff9a00;text-shadow:none;}"},
+  {
+    id: "store:cafe-corner", code: "CAFECORNER", name: "Café Corner", tag: "🎵 Soundscape preset · café", price: 0,
+    desc: "Cups clinking, people talking, the hum of a busy café — warm cream and teal, like your favorite corner table.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#fff6e5", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#0e7c7b", font: "rounded", name_font: "playfair", glow: false, glow_color: "", outline_color: "", button_style: "rounded", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "cafe", player_skin: "cassette-pink" },
+    css: ".dwc-myprofile .card{background:#fff;border:2px solid #0e7c7b;border-radius:18px;}" +
+      ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #0e7c7b;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #0e7c7b;}" +
+      ".dwc-myprofile a{color:#0e7c7b;text-shadow:none;}"},
+  {
+    id: "store:paris-streets", code: "PARIS", name: "Paris Streets", tag: "🎵 Soundscape preset · Paris", price: 20,
+    desc: "A Paris street at dusk — footsteps, voices, the city in French. Pink and plum, soft as a love song.",
+    conflict: "",
+    theme: { vibe: "", bg_color: "#1a0f1e", bg_image_url: "", text_color: "#f5e8f0", accent_color: "#ff7eb0", font: "cormorant", name_font: "vibes", glow: false, glow_color: "", outline_color: "", button_style: "rounded", button_css: "", effects: ["sparkle"], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "paris", player_skin: "visualizer" },
+    css: ".dwc-myprofile .card{background:rgba(30,16,32,.88);border:1px solid #5c2a4a;border-radius:12px;}" +
+      ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #ff7eb0;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #ff7eb0;}" +
+      ".dwc-myprofile a{color:#ff7eb0;text-shadow:none;}"},
+  {
+    id: "store:street-violin", code: "VIOLIN", name: "Street Violin", tag: "🎵 Soundscape preset · violin", price: 20,
+    desc: "A violinist playing on the street — black and gold, elegant as a concert hall. For the romantics.",
+    conflict: "",
+    theme: { vibe: "gold", bg_color: "#161210", bg_image_url: "", text_color: "#f5ead6", accent_color: "#d4af37", font: "playfair", name_font: "cinzel", glow: false, glow_color: "", outline_color: "", button_style: "gold", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "violin", player_skin: "vinyl" },
+    css: ".dwc-myprofile .card{outline:1px solid rgba(212,175,55,.55);outline-offset:3px;background:rgba(22,18,16,.9);}" +
+      ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #d4af37;box-shadow:0 0 0 3px #8a0303,0 0 18px rgba(212,175,55,.5);}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #d4af37;}" +
+      ".dwc-myprofile a{color:#d4af37;text-shadow:none;}"},
+  {
+    id: "store:canon-d", code: "CANON", name: "Canon in D", tag: "🎵 Soundscape preset · classical", price: 20,
+    desc: "Pachelbel's Canon in D — full strings, wedding quality. Cream and navy, elegant enough for the big day.",
+    conflict: "",
+    theme: { vibe: "classic", bg_color: "#fdf6ec", bg_image_url: "", text_color: "#3a2a1a", accent_color: "#003399", font: "cormorant", name_font: "cinzel", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "canon", player_skin: "visualizer" },
+    css: ".dwc-myprofile .card{background:#fff;border:1px solid #d8d2c4;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-mypage-head{text-align:center;}" +
+      ".dwc-myprofile .dwc-mypage-head h3{color:#003399;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #003399;}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #003399;}" +
+      ".dwc-myprofile a{color:#003399;text-shadow:none;}"},
+  {
+    id: "store:fur-elise", code: "ELISE", name: "Für Elise", tag: "🎵 Soundscape preset · classical", price: 20,
+    desc: "Beethoven's Für Elise, soft and melancholy — black and violet, made for gothic pages and late nights.",
+    conflict: "",
+    theme: { vibe: "dark", bg_color: "#0a0a12", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#b388ff", font: "cormorant", name_font: "cinzel", glow: false, glow_color: "", outline_color: "", button_style: "ghost", button_css: "", effects: ["sparkle"], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: [], soundscape: "fur-elise", player_skin: "vinyl" },
+    css: ".dwc-myprofile .card{background:rgba(14,12,24,.9);border:1px solid #3a2a55;border-radius:8px;}" +
+      ".dwc-myprofile .dwc-avatar{border:3px solid #b388ff;box-shadow:0 0 16px rgba(179,136,255,.5);}" +
+      ".dwc-myprofile .dwc-topfriend{border:2px solid #b388ff;}" +
+      ".dwc-myprofile a{color:#b388ff;text-shadow:none;}"},
 ];
 
 function storeItemById(id) {
@@ -1790,7 +1887,15 @@ var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_pri
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
-  LAYOUT_STRUCTURAL_FIELDS.forEach(function (k) { if (cur[k] !== undefined) merged[k] = cur[k]; });
+  // Soundscape presets (2026-11-22): a layout that names a sound
+  // speaks for the whole page — look + sound as one. The member's
+  // saved sound only fills in when the layout doesn't name one, so
+  // plain layouts keep the member's sound exactly as before.
+  var AUDIO_FIELDS = ["soundscape", "player_skin", "player_image_url"];
+  LAYOUT_STRUCTURAL_FIELDS.forEach(function (k) {
+    if (AUDIO_FIELDS.indexOf(k) >= 0) { if (merged[k] === undefined && cur[k] !== undefined) merged[k] = cur[k]; }
+    else if (cur[k] !== undefined) merged[k] = cur[k];
+  });
   if (!merged.custom_page_html && cur.custom_page_html) merged.custom_page_html = cur.custom_page_html;
   return merged;
 }
@@ -1802,8 +1907,53 @@ function storeMergedTheme(item) {
 // changes, not by name.
 function storeLayoutGroup(it) {
   if (it.website) return "Website templates — your own standalone site";
+  // Soundscape presets (2026-11-22): a layout whose theme names a
+  // soundscape is a whole page — look + sound in one tap.
+  if (it.theme && it.theme.soundscape) return "🎵 Soundscape presets — look + sound in one";
   if (it.price > 0) return "Lucre layouts — whole page, save up and buy";
   return "Free layouts — whole page";
+}
+// ---------- Build-your-own soundscape preset (2026-11-22) ----------
+// A preset is just a list of picks saved as one — rain, a sound, a
+// player look, fonts, where your picture sits. The mixer starts from
+// the member's current look and only changes the six picks below.
+// "Try it" stages the picks in the form (Save profile keeps them).
+// "Save it" stores the recipe in this browser so it can be re-applied
+// in one tap; sharing it in the store goes through the normal publish
+// flow (save first, then publish from the My Code box — the store
+// publish needs real CSS, so a theme-only mix can't publish direct).
+function mixerHTML(p, th) {
+  th = th || {};
+  var rain = (th.effects || []).indexOf("rainy-city") >= 0 ? "rainy-city" : ((th.effects || []).indexOf("peaceful-rain") >= 0 ? "peaceful-rain" : "");
+  var sound = audioPickValue(th, p);
+  var skin = th.player_skin || "";
+  var font = th.font || "";
+  var nameFont = th.name_font || "";
+  var picPos = th.pic_position === "top" ? "top" : "normal";
+  var opt = function (v, label, cur) { return '<option value="' + esc(v) + '"' + (cur === v ? " selected" : "") + ">" + esc(label) + "</option>"; };
+  return '<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">' +
+    '<h4 style="margin:0 0 6px">🎛️ Build your own soundscape preset</h4>' +
+    "<p style=\"margin:0 0 8px\">Mix your own total look — rain, a sound, a player look, fonts, and where your picture sits — then try it on your page. A preset is just those picks saved as one: the look, the sound, the fonts, the layout, all in one tap. It starts from your look right now, so your background and colors stay put.</p>" +
+    '<label>🌧️ Rain on my page</label><select id="dwc-mixer-rain">' +
+    opt("", "None — no rain", rain) + opt("peaceful-rain", "Peaceful Rain — rain on the window, woods outside", rain) + opt("rainy-city", "Rainy city streets — city rain, dim neon", rain) + "</select>" +
+    '<label>🎵 What plays</label><select id="dwc-mixer-sound">' +
+    opt("", "Nothing — no sound on my page", sound) + opt("radio", "📻 SteadyWave Radio Player — the live station", sound) +
+    SOUNDSCAPES.map(function (sc) { return opt(sc.id, sc.name, sound); }).join("") + "</select>" +
+    '<label>🎛️ How the player looks</label><select id="dwc-mixer-skin">' +
+    PLAYER_SKINS.map(function (sk) { return opt(sk.id, sk.name, skin); }).join("") + "</select>" +
+    '<label>🔤 Page font</label><select id="dwc-mixer-font">' +
+    THEME_FONTS.map(function (f) { return opt(f.id, f.name, font); }).join("") + "</select>" +
+    '<label>✒️ Name font</label><select id="dwc-mixer-namefont">' +
+    THEME_FONTS.map(function (f) { return opt(f.id, f.name, nameFont); }).join("") + "</select>" +
+    '<label>🖼️ Picture position</label><select id="dwc-mixer-picpos">' +
+    opt("normal", "Normal — banner on top, picture below", picPos) + opt("top", "On top — picture first, banner below it", picPos) + "</select>" +
+    '<label>Name your preset</label><input id="dwc-mixer-name" maxlength="40" placeholder="e.g. My rainy night">' +
+    '<p style="margin:10px 0 0"><button type="button" class="btn" onclick="DWC.mixerTry()">Try it on my page →</button> <button type="button" class="btn ghost" onclick="DWC.mixerSave()">Save it as my preset</button></p>' +
+    '<p id="dwc-mixer-note" style="margin:6px 0 0;color:var(--muted);font-size:13px"></p>' +
+    '<div id="dwc-mixer-mine" style="margin-top:10px">' + DWC.mixerMineHTML() + "</div>" +
+    "<p style=\"margin:10px 0 0;color:var(--muted);font-size:13px\">Want it in the Layout Store for everyone? Hit Save profile first, then publish it from the My Code box below with a name — it shows up free, with your name on it. Saved presets above live in this browser only — they stay here until you clear this site's data.</p>" +
+    "<p style=\"margin:8px 0 0;color:var(--muted);font-size:13px\">How does a preset work? It's just a list of picks — rain, a sound file, a player look, fonts, where your picture sits — saved as one, so one tap puts the whole page on. Want to learn how it works? The <a href=\"create.html\">Create page's Code development tab</a> has a code editor where you can change one pick at a time and watch it run, and the <a href=\"create.html\">Web Design tab</a> walks through how pages get their look. Taffy can't write code for you — but the editor and the lessons can teach you to do it yourself.</p>" +
+    "</div>";
 }
 function layoutScrollOptionsHTML(p) {
   var cur = (p && p.layout_preset) || "";
@@ -1816,7 +1966,7 @@ function layoutScrollOptionsHTML(p) {
   out += "</optgroup>";
   var owned = storeOwnedIds();
   var groups = {};
-  var order = ["Free layouts — whole page", "Lucre layouts — whole page", "Website templates — your own standalone site"];
+  var order = ["🎵 Soundscape presets — look + sound in one", "Free layouts — whole page", "Lucre layouts — whole page", "Website templates — your own standalone site"];
   LAYOUT_STORE.forEach(function (it) {
     var g = storeLayoutGroup(it);
     (groups[g] = groups[g] || []).push(it);
@@ -3386,7 +3536,7 @@ function profileFormHTML(p) {
     '<label style="margin-top:14px">🌧️ Atmosphere — rain that layers over any layout (picking rain never changes your layout)</label>' +
     '<select id="dwc-atmosphere" onchange="DWC.atmospherePicked(this)"><option value="">None — no rain</option><option value="peaceful-rain"' + ((th.effects || []).indexOf("peaceful-rain") >= 0 ? " selected" : "") + '>Peaceful Rain — rain on the window, woods outside</option><option value="rainy-city"' + ((th.effects || []).indexOf("rainy-city") >= 0 ? " selected" : "") + '>Rainy city streets — city rain, dim neon</option></select>' +
     '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Rain is an extra layer, not a layout — it stays on when you change layouts, and changing layouts never turns it off.</p>' +
-    '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Open the full Layout Store →</button> <span style="color:var(--muted);font-size:13px">Same layouts, bigger view, on Taffy’s phone.</span></p></div>' +
+    '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Open the full Layout Store →</button> <span style="color:var(--muted);font-size:13px">Same layouts, bigger view, on Taffy’s phone.</span></p>' + mixerHTML(p, th) + '</div>' +
     (isNew ? "" :
     '<h4 id="dwc-sec-badges" style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
     "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
@@ -10293,6 +10443,7 @@ window.DWC = {
       b.classList.toggle("active", b.getAttribute("data-presetbtn") === id);
     });
     DWC.refreshLayoutPreviewSoon();
+    DWC.playerSkinPreviewRefresh();
   },
   // Write a preset's theme fragment into the Edit Profile form fields
   // (look fields only — Top Friends, feed privacy, divider, video, and
@@ -10347,7 +10498,14 @@ window.DWC = {
     setPills("data-picposbtn", th.pic_position || "normal");
     setVal("theme_pic_frame", th.pic_frame || "none");
     setPills("data-picframebtn", th.pic_frame || "none");
+    // Soundscape presets (2026-11-22): a preset that names a sound
+    // brings its sound with it — look + sound as one. Presets that
+    // don't name one leave the member's pick alone.
+    if (th.soundscape !== undefined) setVal("theme_soundscape", th.soundscape);
+    if (th.player_skin !== undefined) setVal("theme_player_skin", th.player_skin);
+    if (th.player_image_url !== undefined) setVal("theme_player_image", th.player_image_url);
     DWC.refreshBgNow();
+    DWC.playerSkinPreviewRefresh();
   },
   // v3.20 — background mutual exclusion: a preset, a custom picture,
   // or None — picking one turns the others OFF, in the form AND in the
@@ -10636,6 +10794,14 @@ window.DWC = {
       // from the form first — staging a layout must never clobber an
       // unsaved pick (Top Friends side, what shows, page sound...).
       var keep = DWC.captureFormStructural(form);
+      // Soundscape presets (2026-11-22): the preset's sound wins —
+      // don't restore the member's old sound over the staged preset.
+      // (restoreFormStructural skips undefined keep values.)
+      if (item.theme) {
+        if (item.theme.soundscape !== undefined) keep.soundscape = undefined;
+        if (item.theme.player_skin !== undefined) keep.player_skin = undefined;
+        if (item.theme.player_image_url !== undefined) keep.player_image_url = undefined;
+      }
       var merged = storeMergedTheme(item);
       if (item.website) {
         merged.custom_page_html = String(merged.custom_page_html || "").split("{{name}}").join(state.profile.username || "Your name");
@@ -10648,6 +10814,7 @@ window.DWC = {
       if (lp) lp.value = item.id;
       if (item.website) DWC.pageModePicked({ value: "website" });
       DWC.refreshLayoutPreview();
+      DWC.playerSkinPreviewRefresh();
     }
     // Fold the scroll back up: reset the dropdown, clear the preview.
     if (sel) sel.value = "";
@@ -10657,6 +10824,86 @@ window.DWC = {
     if (row) row.hidden = true;
     DWC.profileFormDirty();
     setNotice("“" + item.name + "” is staged — hit Save profile to keep it.");
+  },
+  // --- Build-your-own soundscape preset (2026-11-22) ---
+  // The mixer only touches six picks — rain, sound, player look, two
+  // fonts, picture position — everything else on the form stays put.
+  // Saved presets live in localStorage (per browser, up to 10); the
+  // durable/share path is the normal store publish flow.
+  mixerTry: function () {
+    var form = document.querySelector("#dwc-account form");
+    if (!form) return;
+    var get = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
+    var rain = get("dwc-mixer-rain");
+    form.querySelectorAll('input[name="theme_effects"]').forEach(function (cb) {
+      if (cb.value === "peaceful-rain" || cb.value === "rainy-city") cb.checked = cb.value === rain;
+    });
+    var atm = document.getElementById("dwc-atmosphere");
+    if (atm) atm.value = rain;
+    var soundSel = form.querySelector('[name="theme_soundscape"]');
+    if (soundSel) { soundSel.value = get("dwc-mixer-sound"); DWC.audioPicked(soundSel); }
+    var skinSel = form.querySelector('[name="theme_player_skin"]');
+    if (skinSel) { skinSel.value = get("dwc-mixer-skin"); DWC.playerSkinPicked(skinSel); }
+    var fontSel = form.querySelector('[name="theme_font"]');
+    if (fontSel) fontSel.value = get("dwc-mixer-font");
+    var nameFontSel = form.querySelector('[name="theme_name_font"]');
+    if (nameFontSel) nameFontSel.value = get("dwc-mixer-namefont");
+    var picSel = form.querySelector('[name="theme_pic_position"]');
+    if (picSel) { picSel.value = get("dwc-mixer-picpos"); DWC.applyPicPosition(picSel.value); }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+    DWC.playerSkinPreviewRefresh();
+    var note = document.getElementById("dwc-mixer-note");
+    if (note) note.textContent = "Staged — the live preview at the top shows it. Hit Save profile to keep it on your page.";
+  },
+  mixerPicks: function () {
+    var get = function (id) { var el = document.getElementById(id); return el ? el.value : ""; };
+    return { rain: get("dwc-mixer-rain"), sound: get("dwc-mixer-sound"), skin: get("dwc-mixer-skin"), font: get("dwc-mixer-font"), nameFont: get("dwc-mixer-namefont"), picPos: get("dwc-mixer-picpos") };
+  },
+  mixerLoadMine: function () {
+    try { var arr = JSON.parse(localStorage.getItem("dwc-my-presets") || "[]"); return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
+  },
+  mixerSaveMine: function (arr) {
+    try { localStorage.setItem("dwc-my-presets", JSON.stringify(arr)); } catch (e) {}
+  },
+  mixerSave: function () {
+    var nameEl = document.getElementById("dwc-mixer-name");
+    var name = nameEl ? nameEl.value.trim().slice(0, 40) : "";
+    var note = document.getElementById("dwc-mixer-note");
+    if (!name) { if (note) note.textContent = "Give your preset a name first."; return; }
+    var mine = DWC.mixerLoadMine();
+    if (mine.length >= 10) { if (note) note.textContent = "You've got 10 saved already — delete one below before saving another."; return; }
+    var picks = DWC.mixerPicks();
+    picks.name = name;
+    mine.push(picks);
+    DWC.mixerSaveMine(mine);
+    var host = document.getElementById("dwc-mixer-mine");
+    if (host) host.innerHTML = DWC.mixerMineHTML();
+    if (nameEl) nameEl.value = "";
+    if (note) note.textContent = "“" + name + "” is saved in this browser — re-apply it below any time. Hit Save profile to keep it on your page.";
+  },
+  mixerMineHTML: function () {
+    var mine = DWC.mixerLoadMine();
+    if (!mine.length) return '<p style="margin:0;color:var(--muted);font-size:13px">No saved presets yet — mix one above and save it, and it shows up here.</p>';
+    return '<p style="margin:0 0 6px"><strong>My saved presets</strong></p>' + mine.map(function (m, i) {
+      return '<p style="margin:0 0 6px">“' + esc(m.name || ("Preset " + (i + 1))) + '” <button type="button" class="btn small" onclick="DWC.mixerApplySaved(' + i + ')">Apply</button> <button type="button" class="btn ghost small" onclick="DWC.mixerDeleteSaved(' + i + ')">Delete</button></p>';
+    }).join("");
+  },
+  mixerApplySaved: function (i) {
+    var mine = DWC.mixerLoadMine();
+    var m = mine[i];
+    if (!m) return;
+    var set = function (id, v) { var el = document.getElementById(id); if (el) el.value = v || ""; };
+    set("dwc-mixer-rain", m.rain); set("dwc-mixer-sound", m.sound); set("dwc-mixer-skin", m.skin);
+    set("dwc-mixer-font", m.font); set("dwc-mixer-namefont", m.nameFont); set("dwc-mixer-picpos", m.picPos);
+    DWC.mixerTry();
+  },
+  mixerDeleteSaved: function (i) {
+    var mine = DWC.mixerLoadMine();
+    mine.splice(i, 1);
+    DWC.mixerSaveMine(mine);
+    var host = document.getElementById("dwc-mixer-mine");
+    if (host) host.innerHTML = DWC.mixerMineHTML();
   },
   // Write a whole (merged) theme into the form controls, so a staged
   // layout shows up in every picker and in the live preview.

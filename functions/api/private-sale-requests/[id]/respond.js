@@ -12,7 +12,7 @@
 // tell an answered request apart from an open one and hide the
 // Accept/Decline buttons — change that prefix here and in renderIMLog
 // together if it ever changes.
-import { json, noDb, getDb, readJson, profileByDevice, nowMs, sendDM, money } from "../../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, nowMs, sendDM, money } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);

@@ -22,14 +22,21 @@
 // (see _auth.js). Tokens live as SHA-256 hashes only. Nothing here ever
 // returns or logs a password, a token, or a device id except signin's
 // own session key to the member who just proved the password.
-// Reset / verify emails queue through notifications_outbound
-// ("waiting_provider") — the site sends NO email until Chris connects a
-// provider (Resend). The member still gets the in-app notice either way.
+// Reset / verify emails go out through deliverOutbound (_lib.js):
+// when a mail provider is configured (Resend — RESEND_API_KEY in the
+// Cloudflare vars, see _mail.js) they send immediately, inline. Without
+// a provider they queue as "waiting_provider" exactly as before and
+// the manual operator path still works. A recovery code is emailed
+// automatically ONLY to the member's VERIFIED recovery email on file —
+// never to an address the requester merely typed (see request-recovery;
+// that would hand an account to whoever types the victim's name).
+// The member still gets the in-app notice either way.
 // 2FA is a follow-up, deliberately NOT built here.
 import {
   json, noDb, getDb, readJson, profileByDevice, isOperator,
-  createNotification, queueOutbound, nowMs,
+  createNotification, deliverOutbound, nowMs,
 } from "./_lib.js";
+import { mailConfigured, txEmailHtml } from "./_mail.js";
 import {
   hashPassword, verifyPassword, checkPasswordStrength, isValidEmail,
   issueToken, consumeToken, invalidateTokens, checkRateLimit, hasAuthColumns,
@@ -78,6 +85,9 @@ export async function onRequestPost({ env, request }) {
   const a = await readJson(request);
   const action = String(a.action || "");
   const now = nowMs();
+  // Shown only while no mail provider is connected — the setup note is
+  // site-wide (not account-specific), so it leaks nothing.
+  const emailNote = mailConfigured(env) ? "" : EMAIL_NOT_CONNECTED_NOTE;
 
   // Everything below needs the password-auth migration. One clean error
   // instead of a crash, so the site keeps working pre-migration.
@@ -147,16 +157,25 @@ export async function onRequestPost({ env, request }) {
   // --- request-reset (identical reply whether the account exists or not) -----
   if (action === "request-reset") {
     const login = String(a.login || "").trim();
-    if (!login) return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+    if (!login) return json({ ok: true, message: GENERIC_RESET_REPLY + emailNote });
     const rl = await checkRateLimit(db, "reset:" + login.toLowerCase(), 3, 60 * 60 * 1000);
-    if (!rl.allowed) return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+    if (!rl.allowed) return json({ ok: true, message: GENERIC_RESET_REPLY + emailNote });
     const profile = await findByLogin(db, login);
     if (profile && profile.recovery_email_verified === 1 && profile.recovery_email) {
       const token = await issueToken(db, profile.id, "reset", RESET_TOKEN_TTL_MS, "");
       const link = resetLinkFor(request, token);
-      await queueOutbound(db, profile.id, "email", "password_reset",
+      await deliverOutbound(env, db, profile.id, "email", "password_reset",
         "Reset your Rare Candy Reserve password",
-        `Someone asked to reset the password for @${profile.username}. Use this link once within 1 hour — after that it stops working:\n\n${link}\n\nIf that wasn't you, ignore this email. Your old password still works until a reset goes through.`);
+        `Someone asked to reset the password for @${profile.username}. Use this link once within 1 hour — after that it stops working:\n\n${link}\n\nIf that wasn't you, ignore this email. Your old password still works until a reset goes through.`,
+        profile.recovery_email,
+        txEmailHtml({
+          title: "Reset your password",
+          paragraphs: [
+            `Someone asked to reset the password for @${profile.username}.`,
+            "Use the button below once, within 1 hour — after that it stops working. If that wasn't you, ignore this email. Your old password still works until a reset goes through.",
+          ],
+          action: { label: "Reset my password →", url: link },
+        }));
       await createNotification(db, {
         profile_id: profile.id, actor_profile_id: null, kind: "password_reset",
         ref_type: "profile", ref_id: profile.id,
@@ -173,7 +192,7 @@ export async function onRequestPost({ env, request }) {
         link: "#/member/" + profile.id,
       });
     }
-    return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+    return json({ ok: true, message: GENERIC_RESET_REPLY + emailNote });
   }
 
   // --- reset-password (single-use, 1h token) ----------------------------------
@@ -196,9 +215,18 @@ export async function onRequestPost({ env, request }) {
       link: "#/member/" + profile.id,
     });
     if (profile.recovery_email_verified === 1 && profile.recovery_email) {
-      await queueOutbound(db, profile.id, "email", "password_changed",
+      await deliverOutbound(env, db, profile.id, "email", "password_changed",
         "Your Rare Candy Reserve password was changed",
-        `The password for @${profile.username} was just changed. If that was you, nothing to do. If it wasn't, ask Chris for account recovery right away.`);
+        `The password for @${profile.username} was just changed. If that was you, nothing to do. If it wasn't, ask Chris for account recovery right away.`,
+        profile.recovery_email,
+        txEmailHtml({
+          title: "Your password was changed",
+          paragraphs: [
+            `The password for @${profile.username} was just changed.`,
+            "If that was you, nothing to do. If it wasn't, ask Chris for account recovery right away.",
+          ],
+          action: { label: "Forgot-password page →", url: `${new URL(request.url).origin}/forgot-password.html` },
+        }));
     }
     return json({ ok: true, message: "Password reset — sign in with your new password." });
   }
@@ -218,10 +246,19 @@ export async function onRequestPost({ env, request }) {
     await db.prepare("UPDATE profiles SET pending_email = ? WHERE id = ?").bind(email, me.id).run();
     const token = await issueToken(db, me.id, "email_verify", VERIFY_TOKEN_TTL_MS, "");
     const link = verifyLinkFor(request, token);
-    await queueOutbound(db, me.id, "email", "email_verify",
+    await deliverOutbound(env, db, me.id, "email", "email_verify",
       "Verify your Rare Candy Reserve recovery email",
-      `Confirm this email as the recovery address for @${me.username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`);
-    return json({ ok: true, message: "Verification email queued for that address — click the link in it within 24 hours and it becomes your recovery email." + EMAIL_NOT_CONNECTED_NOTE });
+      `Confirm this email as the recovery address for @${me.username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`,
+      email,
+      txEmailHtml({
+        title: "Verify your recovery email",
+        paragraphs: [
+          `Confirm this email as the recovery address for @${me.username} — it lets you reset your password if you forget it.`,
+          "The link works for 24 hours. If you didn't ask for this, ignore it.",
+        ],
+        action: { label: "Verify this email →", url: link },
+      }));
+    return json({ ok: true, message: "Verification email on its way to that address — click the link in it within 24 hours and it becomes your recovery email." + emailNote });
   }
 
   // --- verify-email ------------------------------------------------------------
@@ -244,6 +281,19 @@ export async function onRequestPost({ env, request }) {
   }
 
   // --- request-recovery (public; operator verifies out-of-band) ----------------
+  // AUTOMATED path (2026-11-22): if the member has a VERIFIED recovery
+  // email on file AND a mail provider is configured, the one-time code
+  // is emailed to THAT address right away — no operator step, no wait.
+  // SAFETY — the typed contact is NEVER trusted as the destination:
+  // anyone can type any address into this public form, so a code sent
+  // to a typed address would let an attacker file recovery for
+  // @Victim with contact=attacker@evil.com, get the code, and take the
+  // account. Only the address the member verified while signed in is
+  // trusted. No verified address (or the send fails) → the request
+  // stays "pending" and the operator issues the code by hand, as
+  // before — the manual path is the fallback for DM handles and
+  // phones. The reply stays generic either way (no leak of which
+  // branch ran or which address was used).
   if (action === "request-recovery") {
     const username = String(a.username || "").trim();
     const contact = String(a.contact || "").trim().slice(0, 200);
@@ -252,20 +302,54 @@ export async function onRequestPost({ env, request }) {
     const rl = await checkRateLimit(db, "recovery:" + username.toLowerCase(), 5, 60 * 60 * 1000);
     if (!rl.allowed) return json({ ok: true, message: "Thanks — your request is in. Chris will check it and reach you at the contact you left." });
     const profile = await findByLogin(db, username);
+    let autoSent = false;
     if (profile) {
+      let reqId = null;
       try {
-        await db.prepare(
+        const r = await db.prepare(
           "INSERT INTO recovery_requests (profile_id, username, contact, message, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
         ).bind(profile.id, profile.username, contact, message, now).run();
+        reqId = (r && r.meta && r.meta.last_row_id) || null;
       } catch { /* table not there yet — operator still gets nothing; fail soft */ }
+      const verifiedEmail = profile.recovery_email_verified === 1 ? String(profile.recovery_email || "") : "";
+      if (reqId && verifiedEmail && mailConfigured(env)) {
+        try {
+          await invalidateTokens(db, profile.id, ["recovery"]); // latest code wins
+          const code = await issueToken(db, profile.id, "recovery", RECOVERY_CODE_TTL_MS, String(reqId));
+          const sent = await deliverOutbound(env, db, profile.id, "email", "recovery_code",
+            "Your Rare Candy Reserve recovery code",
+            `Your one-time recovery code for @${profile.username} is:\n\n${code}\n\nType it into the "Got a recovery code from Chris?" box on the forgot-password page, pick a new password, and you're back in. The code works once, for 24 hours — after that it stops working.\n\nIf that wasn't you, ignore this email — your old password still works until a code is used.`,
+            verifiedEmail,
+            txEmailHtml({
+              title: "Your recovery code",
+              paragraphs: [
+                `Your one-time recovery code for @${profile.username} is:`,
+                code,
+                "Type it into the “Got a recovery code from Chris?” box on the forgot-password page, pick a new password, and you're back in. The code works once, for 24 hours — after that it stops working.",
+                "If that wasn't you, ignore this email — your old password still works until a code is used.",
+              ],
+              action: { label: "Use my recovery code →", url: `${new URL(request.url).origin}/forgot-password.html` },
+            }));
+          if (sent.sent) {
+            autoSent = true;
+            try {
+              await db.prepare("UPDATE recovery_requests SET status = 'issued', auto_sent = 1, resolved_at = ? WHERE id = ?").bind(now, reqId).run();
+            } catch { /* auto_sent column not there yet — row still reads 'issued' */ }
+          }
+        } catch { /* send failed — request stays pending, operator issues by hand */ }
+      }
       await createNotification(db, {
         profile_id: 1, actor_profile_id: profile.id, kind: "recovery_request",
         ref_type: "recovery", ref_id: profile.id,
-        text: `@${profile.username} asked for account recovery — check the recovery requests in the Admin panel.`,
+        text: autoSent
+          ? `@${profile.username} asked for account recovery — a one-time code was emailed automatically to their verified recovery address.`
+          : `@${profile.username} asked for account recovery — check the recovery requests in the Admin panel.`,
         link: "#/admin",
       });
     }
-    return json({ ok: true, message: "Thanks — your request is in. Chris will check it and reach you at the contact you left." });
+    return json({ ok: true, message: autoSent
+      ? "Thanks — a one-time code was emailed to the recovery address on your account. Check that inbox and use it on the forgot-password page."
+      : "Thanks — your request is in. Chris will check it and reach you at the contact you left." });
   }
 
   // --- list-recovery (operator only) -------------------------------------------
@@ -275,10 +359,18 @@ export async function onRequestPost({ env, request }) {
     let rows = [];
     try {
       const { results } = await db.prepare(
-        "SELECT id, profile_id, username, contact, message, status, created_at, resolved_at FROM recovery_requests ORDER BY created_at DESC LIMIT 50",
+        "SELECT id, profile_id, username, contact, message, status, auto_sent, created_at, resolved_at FROM recovery_requests ORDER BY created_at DESC LIMIT 50",
       ).all();
       rows = results || [];
-    } catch { rows = []; /* table not there yet */ }
+    } catch {
+      // Pre-migration table shape (no auto_sent column yet).
+      try {
+        const { results } = await db.prepare(
+          "SELECT id, profile_id, username, contact, message, status, created_at, resolved_at FROM recovery_requests ORDER BY created_at DESC LIMIT 50",
+        ).all();
+        rows = results || [];
+      } catch { rows = []; /* table not there yet */ }
+    }
     return json({ ok: true, requests: rows });
   }
 
@@ -293,14 +385,25 @@ export async function onRequestPost({ env, request }) {
       reqRow = await db.prepare("SELECT * FROM recovery_requests WHERE id = ? LIMIT 1").bind(reqId).first();
     } catch { return fail("Recovery requests aren't set up yet — run the password-auth migration first."); }
     if (!reqRow) return fail("That recovery request doesn't exist.");
-    if (reqRow.status !== "pending") return fail("That request was already handled.");
+    // Manual issue is the fallback for requests the site couldn't
+    // auto-send (no verified email, or the send failed) — AND for
+    // requests the site DID auto-send but the member never got (wrong
+    // address on file, spam folder). A request the operator already
+    // handled by hand, or one already used, stays closed.
+    if (reqRow.status !== "pending" && !(reqRow.status === "issued" && reqRow.auto_sent === 1)) return fail("That request was already handled.");
     const profile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(reqRow.profile_id).first();
     if (!profile) return fail("That account doesn't exist any more.");
+    // Latest code wins: any earlier code for this account (including
+    // one the site auto-emailed and the member never used) dies here,
+    // so only the code shown below can work.
+    await invalidateTokens(db, profile.id, ["recovery"]);
     const code = await issueToken(db, profile.id, "recovery", RECOVERY_CODE_TTL_MS, String(reqRow.id));
     await db.prepare("UPDATE recovery_requests SET status = 'issued', resolved_at = ?, resolved_by = ? WHERE id = ?").bind(now, me.id, reqRow.id).run();
     // The code goes to the OPERATOR only, once, in this response — he
-    // sends it to the member privately (DM/text/in person). It is never
-    // emailed by the site and never stored in plaintext.
+    // sends it to the member privately (DM/text/in person). The site
+    // never emails a code the operator issues by hand; the only mail
+    // the site sends goes to the member's VERIFIED recovery email
+    // (see request-recovery). The code is never stored in plaintext.
     return json({ ok: true, code, username: profile.username, message: "Send this code to the member privately — it works once, for 24 hours, then it's dead." });
   }
 

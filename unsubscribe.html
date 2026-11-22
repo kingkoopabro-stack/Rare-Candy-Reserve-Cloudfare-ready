@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unsubscribe — Rare Candy Reserve</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+.linkbox{max-width:560px;margin:40px auto;padding:24px}
+.linkbox input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-size:14px;box-sizing:border-box}
+.warn{border:1px solid rgba(255,45,149,.5);border-radius:12px;padding:12px 14px;background:rgba(255,45,149,.08);font-size:14px}
+</style>
+</head>
+<body data-page="unsubscribe">
+<main class="wrap">
+  <div class="linkbox">
+    <div class="kicker">Rare Candy Reserve · Mailing list</div>
+    <h1>Unsubscribe, <span class="grad-text">no hard feelings.</span></h1>
+    <p style="color:var(--muted)">Every mailing-list email has a one-click unsubscribe link at the bottom — that's the fastest way. Lost it? Type the address here and a fresh one-click link will come to your inbox.</p>
+    <form id="unsubForm" onsubmit="return requestUnsubLink(event)">
+      <label for="email" style="font-size:13px;color:var(--muted);font-weight:700">Your email</label>
+      <input id="email" type="email" placeholder="you@example.com" autocomplete="email" required maxlength="200">
+      <p style="margin-top:14px"><button class="btn" type="submit">Send me the unsubscribe link →</button></p>
+    </form>
+    <p id="unsubMsg" style="color:var(--muted);font-size:14px"></p>
+    <div class="warn">Unsubscribing stops the mailing list only — shop drops and community news. Your account emails (like password resets) aren't marketing, so they aren't affected.</div>
+    <p><a href="index.html">← Back to Rare Candy Reserve</a></p>
+  </div>
+</main>
+<script>
+async function requestUnsubLink(ev){
+  ev.preventDefault();
+  var msg = document.getElementById('unsubMsg');
+  msg.textContent = 'Sending…';
+  try {
+    var res = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'request-unsubscribe',
+        email: document.getElementById('email').value.trim() }) });
+    var data = await res.json().catch(function(){ return null; });
+    msg.textContent = (data && (data.message || data.error)) || 'If that address is on the list, an unsubscribe link is on its way to it.';
+    if (data && data.ok) document.getElementById('unsubForm').reset();
+  } catch (e) { msg.textContent = 'Couldn\u2019t reach the site — check your connection and try again.'; }
+  return false;
+}
+</script>
+</body>
+</html>

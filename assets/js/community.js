@@ -994,7 +994,7 @@ function renderAccount() {
     var p = state.profile;
     el.innerHTML =
       '<section class="card dwc-profile-card"><div class="dwc-profile-row">' +
-      (p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
+      (p.avatar_url ? '<a href="#/member/' + p.id + '"><img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt=""></a>' : '<a href="#/member/' + p.id + '"><span class="dwc-avatar dwc-avatar-none">🍬</span></a>') +
       '<div><h3 style="margin:0">✓ You’re on the street as @' + esc(p.username) + '</h3>' +
       '<p style="margin:4px 0 0">Buyer &amp; seller in one account.' +
       (p.age_verified ? ' <strong style="color:var(--green)">· Age verified ✓</strong>' : "") +
@@ -1019,7 +1019,7 @@ function renderAccount() {
       '<label style="font-size:13px">Username or recovery email</label>' +
       '<input name="login" required autocomplete="username" placeholder="Your username or email" style="width:100%">' +
       '<label style="font-size:13px">Password</label>' +
-      '<input name="password" type="password" required autocomplete="current-password" placeholder="Your password" style="width:100%">' +
+      '<div style="display:flex;gap:6px;align-items:center"><input name="password" type="password" required autocomplete="current-password" placeholder="Your password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
       '<p class="dwc-form-err" data-err hidden></p>' +
       '<p style="margin:10px 0 0;text-align:center"><button class="btn" type="submit">Sign in →</button></p>' +
       '<p style="margin:8px 0 0;font-size:13px;text-align:center"><a href="forgot-password.html">Forgot your password?</a></p></form>' +
@@ -2198,7 +2198,7 @@ function phoneStoreHTML() {
           '<p class="dwc-store-desc">' + esc(x.desc) + '</p>' +
           (x.conflict ? '<p class="dwc-store-conflict">⚠️ ' + esc(x.conflict) + '</p>' : "") +
           '<p class="dwc-store-code">Code: <code>' + esc(x.code || "") + '</code> <button type="button" class="dwc-linklike" onclick="DWC.copyLayoutCode(\'' + x.id + '\')">📋 Copy</button>' +
-          (x.author_name ? ' · by <strong>@' + esc(x.author_name) + '</strong>' : "") +
+          (x.author_name ? (x.author_id ? ' · by <a href="#/member/' + x.author_id + '"><strong>@' + esc(x.author_name) + '</strong></a>' : ' · by <strong>@' + esc(x.author_name) + '</strong>') : "") +
           (x.author_id && state.profile && x.author_id === state.profile.id ? ' · <button type="button" class="dwc-linklike" onclick="DWC.unpublishLayout(\'' + x.id + '\')">Take down</button>' : "") + '</p>' +
           '<p class="dwc-store-btns"><button type="button" class="btn ghost small" onclick="DWC.storePreview(\'' + x.id + '\')">Full preview</button> ' +
           (isCurrent ? '<span class="dwc-store-wearing">✓ Wearing it</span>'
@@ -3224,10 +3224,10 @@ function securitySectionHTML(p) {
     '<p style="margin-top:0;color:var(--muted);font-size:13px">Your password is stored scrambled — nobody at the shop, not even Chris, can see it. At least 8 characters, with a letter and a number.</p>' +
     '<form onsubmit="DWC.savePassword(this); return false;">' +
     (hasPw
-      ? '<label>Current password</label><input name="current_password" type="password" required autocomplete="current-password" placeholder="Your current password">'
+      ? '<label>Current password</label><div style="display:flex;gap:6px;align-items:center"><input name="current_password" type="password" required autocomplete="current-password" placeholder="Your current password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>'
       : '<p style="color:var(--amber);font-size:13px;margin:0 0 8px">No password set yet — set one now so you can sign in on any device.</p>') +
-    '<label>New password</label><input name="new_password" type="password" required minlength="8" autocomplete="new-password" placeholder="New password">' +
-    '<label>New password again</label><input name="new_password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again">' +
+    '<label>New password</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password" type="password" required minlength="8" autocomplete="new-password" placeholder="New password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
+    '<label>New password again</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin:10px 0 0"><button class="btn" type="submit">' + (hasPw ? "Change my password →" : "Set my password →") + '</button></p></form>' +
     '<h4 style="margin:16px 0 6px">📧 Recovery email</h4>' +
@@ -3549,9 +3549,9 @@ function profileFormHTML(p) {
       '<label>Full name (required — one account per person; never shown publicly)</label>' +
       '<input name="full_name" required minlength="2" maxlength="80" placeholder="Your full name">' +
       '<label>Password — at least 8 characters, with a letter and a number (this is how you sign back in anywhere)</label>' +
-      '<input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Pick a password">' +
+      '<div style="display:flex;gap:6px;align-items:center"><input name="password" type="password" required minlength="8" autocomplete="new-password" placeholder="Pick a password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
       '<label>Password again</label>' +
-      '<input name="password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again">' +
+      '<div style="display:flex;gap:6px;align-items:center"><input name="password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
       '<label>Recovery email (optional now — add it so you can reset your password if you forget it)</label>' +
       '<input name="recovery_email" type="email" maxlength="120" placeholder="you@example.com">' +
       '<div id="dwc-challenge" class="dwc-challenge">Loading human check…</div>' +
@@ -4993,7 +4993,8 @@ function postCardHTML(p) {
   var saved = isSavedKey("post-" + p.id);
   return '<article class="card dwc-post dwc-feed-card' + (p.kind === "announcement" ? " dwc-post-announcement" : "") + '" data-post-id="' + p.id + '">' +
     '<div class="dwc-feed-head">' +
-      '<span class="dwc-feed-who">👤 <a href="#/member/' + p.author_id + '" class="dwc-titlelink"><strong>@' + esc(p.author_username) + "</strong></a>" + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? ' <span class="dwc-feed-occ">· ' + esc(p.author_occupation) + "</span>" : "") + "</span>" +
+      (p.author_avatar_url ? '<a href="#/member/' + p.author_id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(p.author_avatar_url) + '" alt=""></a>' : "") +
+      '<span class="dwc-feed-who">' + (p.author_avatar_url ? "" : "👤 ") + '<a href="#/member/' + p.author_id + '" class="dwc-titlelink"><strong>@' + esc(p.author_username) + "</strong></a>" + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? ' <span class="dwc-feed-occ">· ' + esc(p.author_occupation) + "</span>" : "") + "</span>" +
       '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(p.created_at) + "</span>" +
       (canEdit || isAdmin ? '<span class="dwc-feed-menuwrap"><button type="button" class="dwc-feed-dots" onclick="DWC.togglePostMenu(' + p.id + ', this)" aria-label="Post options" aria-haspopup="true">⋯</button>' +
         '<span class="dwc-feed-menu" id="dwc-menu-' + p.id + '" hidden>' +
@@ -5051,9 +5052,9 @@ function commentCardHTML(c, o) {
   var long = (c.body || "").length > 280;
   var saved = isSavedKey("comment-" + c.id);
   return '<div class="dwc-comment dwc-comment-card" data-comment-id="' + c.id + '">' +
-    (c.author_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt="">' : "") +
+    (c.author_avatar_url ? '<a href="#/member/' + c.author_id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.author_avatar_url) + '" alt=""></a>' : "") +
     '<div class="dwc-comment-main">' +
-    '<div class="dwc-feed-head"><span class="dwc-feed-who"><strong>@' + esc(c.author_username) + "</strong>" + achBadgeIconsHTML(c.author_badges) + "</span>" +
+    '<div class="dwc-feed-head"><span class="dwc-feed-who"><a href="#/member/' + c.author_id + '" class="dwc-titlelink"><strong>@' + esc(c.author_username) + "</strong></a>" + achBadgeIconsHTML(c.author_badges) + "</span>" +
     '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(c.created_at) + "</span></span></div>" +
     (o.visibilityNote ? ' <p class="dwc-meta" style="margin:2px 0 0">' + o.visibilityNote + "</p>" : "") +
     (c.body ? '<p class="dwc-feed-body' + (long ? " dwc-clamped" : "") + '" id="dwc-comment-body-' + c.id + '">' + memeBodyHTML(c.body) + "</p>" +
@@ -5084,7 +5085,7 @@ function squadFeedCardHTML(s) {
     : full ? '<span class="dwc-act-count">Full (' + s.member_count + "/" + (s.max_players || 4) + ")</span>"
     : '<a class="btn small" href="nerd.html#groupup">Join group →</a>';
   return '<article class="card dwc-feed-card dwc-squad-card">' +
-    '<div class="dwc-feed-head"><span class="dwc-feed-who">👤 <strong>@' + esc(s.creator_username) + "</strong></span>" +
+    '<div class="dwc-feed-head"><span class="dwc-feed-who">👤 <a href="#/member/' + s.creator_id + '" class="dwc-titlelink"><strong>@' + esc(s.creator_username) + "</strong></a></span>" +
     '<span class="dwc-feed-right"><span class="dwc-feed-when">' + fmtDateTime(s.created_at) + "</span></span></div>" +
     '<div class="dwc-feed-typeline"><span class="dwc-type-label">🎮 Group · ' + esc(s.platform) + " · " + esc(s.playtime) + "</span></div>" +
     '<h3 class="dwc-feed-title" style="margin:6px 0 2px">' + esc(s.game) + "</h3>" +
@@ -5152,7 +5153,7 @@ function listingCardHTML(l) {
     listingShipLine(l) +
     (l.kind === "flea" ? "<p>🔨 " + l.bid_count + " bid" + (l.bid_count === 1 ? "" : "s") + "</p>" : "") +
     (l.kind === "trade" ? "<p>👍 Good " + l.trade_good + " · Fair " + l.trade_fair + " · Bad " + l.trade_bad + "</p>" : "") +
-    '<p class="dwc-meta">by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.is_private ? " · 🔒 Private sale" : "") + "</p>" +
+    '<p class="dwc-meta">' + (l.seller_avatar_url ? '<a href="#/member/' + l.seller_id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(l.seller_avatar_url) + '" alt=""></a> ' : "") + 'by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.is_private ? " · 🔒 Private sale" : "") + "</p>" +
     '<div class="dwc-actions">' +
     '<a class="btn small" href="#/listing/' + l.id + '">View →</a>' +
     ((state.profile && state.profile.id === l.seller_id) ? "" : '<button type="button" class="dwc-linklike" onclick="DWC.messageSellerAboutListing(' + l.seller_id + ', \'' + esc(l.seller_username.replace(/'/g, "")) + "', " + l.id + ')">💬 Message</button>') +
@@ -5303,7 +5304,7 @@ function headlineCardHTML(h) {
     '<div class="dwc-headline-eng">🔥 ' + (h.engagement || 0) + ' · ❤️ ' + (h.score || 0) + ' · 💬 ' + (h.comment_count || 0) + "</div>" +
     '<h3 class="dwc-headline-title" style="margin:8px 0 4px"><a href="#/post/' + h.id + '" class="dwc-titlelink">' + esc(h.title) + "</a></h3>" +
     eventLineHTML(h) +
-    '<p style="margin:4px 0">by <strong>@' + esc(h.author_username) + "</strong>" + achBadgeIconsHTML(h.author_badges) + (h.kind === "adult" ? " · 18+" : h.kind === "event" ? " · 📅 Event" : h.kind === "announcement" ? " · 📢 Announcement" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
+    '<p style="margin:4px 0">by <a href="#/member/' + h.author_id + '" onclick="event.stopPropagation()"><strong>@' + esc(h.author_username) + "</strong></a>" + achBadgeIconsHTML(h.author_badges) + (h.kind === "adult" ? " · 18+" : h.kind === "event" ? " · 📅 Event" : h.kind === "announcement" ? " · 📢 Announcement" : "") + (h.is_creator ? " · 🎨 Creator" : "") + " · " + fmtDate(h.created_at) + "</p>" +
     (h.body ? "<p>" + esc(h.body.length > 140 ? h.body.slice(0, 140) + "…" : h.body) + "</p>" : "") +
     '<p style="margin:8px 0 0"><a href="#/post/' + h.id + '" class="dwc-titlelink">Open post →</a></p>' +
     "</article>";
@@ -5379,7 +5380,7 @@ function renderComposer(context) {
   host.innerHTML =
     '<section class="card dwc-composer" aria-label="New post">' +
     '<div class="dwc-composer-mini" id="dwc-composer-mini"' + (state.composerOpen ? " hidden" : "") + ">" +
-      (state.profile && state.profile.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(state.profile.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      (state.profile ? '<a href="#/member/' + state.profile.id + '">' + (state.profile.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(state.profile.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') + '</a>' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
       '<button type="button" class="dwc-composer-prompt" onclick="DWC.toggleComposer(true)">' + esc(prompt) + "</button>" +
       '<button type="button" class="btn small" onclick="DWC.toggleComposer(true)">Post</button>' +
     "</div>" +
@@ -5500,7 +5501,7 @@ async function showPriceChart(cardName) {
 // ---------- Flea Market / Trade / Auction House ----------
 async function viewMarket(el, kind) {
   var titles = {
-    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell here once their account is set up and their bank is linked (Stripe Connect, one time, in the Payouts tab) — physical items, digital content, or dropship goods. Your profile page is your shop: set a shop name in Edit Profile and your listings show there. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
+    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell here once their account is set up and their bank is linked (Stripe Connect, one time, in the Payouts tab) — physical items, digital content, or dropship goods. Your profile page is your shop: set a shop name in Edit Profile and your listings show there. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells. Proud that rare candy reserve donates a portion automatically from each and every sale to help reduce our carbon footprint and global emissions worldwide! Whether you're buying or selling here, a portion of every sale goes to carbon removal — 0.5% of the revenue on sales paid through Stripe, automatically. <a href=\"https://climate.stripe.com/w4kjw7\" target=\"_blank\" rel=\"noopener\">See our Stripe Climate profile</a>."],
     trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it’s a good trade, a fair one, or a bad deal."],
     flea: ["🔨 Auction House — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online auction house with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
   };
@@ -5614,7 +5615,7 @@ async function viewThread(el, postId) {
     '<p style="white-space:pre-wrap">' + memeBodyHTML(p.body) + "</p>" +
     youtubeEmbedHTML(p.body) +
     (p.kind === "card_auth" ? verificationBadge(p) : "") +
-    '<p class="dwc-meta">by @' + esc(p.author_username) + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDateTime(p.created_at) + "</p>" +
+    '<p class="dwc-meta">' + (p.author_avatar_url ? '<a href="#/member/' + p.author_id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(p.author_avatar_url) + '" alt=""></a> ' : "") + 'by <a href="#/member/' + p.author_id + '" class="dwc-titlelink">@' + esc(p.author_username) + "</a>" + achBadgeIconsHTML(p.author_badges) + (p.author_occupation ? " · " + esc(p.author_occupation) : "") + " · " + fmtDateTime(p.created_at) + "</p>" +
     (p.tags && p.tags.length ? '<p class="dwc-tags">' + p.tags.map(function (t) { return '<a class="dwc-tag-chip" href="#/tag/' + (p.kind === "adult" ? "adult/" : "") + encodeURIComponent(t) + '">#' + esc(t) + "</a>"; }).join(" ") + "</p>" : "") +
     '<div class="dwc-actions dwc-feed-actions">' +
     postReactionGroupHTML(p) +
@@ -5698,7 +5699,7 @@ async function viewListing(el, listingId) {
     '<p style="color:var(--muted);font-size:14px">Platform cut (6%): ' + money(l.fee_cents) + " · Seller gets: " + money(l.seller_gets_cents) + "</p>" +
     listingShipLine(l) +
     (l.kind === "trade" && l.trade_wanted ? "<p><strong>Looking for:</strong> " + esc(l.trade_wanted) + "</p>" : "") +
-    '<p class="dwc-meta">by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.seller_payout_ready ? ' · <span style="color:var(--green)">✓ payout ready</span>' : "") + "</p>" +
+    '<p class="dwc-meta">' + (l.seller_avatar_url ? '<a href="#/member/' + l.seller_id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(l.seller_avatar_url) + '" alt=""></a> ' : "") + 'by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.seller_payout_ready ? ' · <span style="color:var(--green)">✓ payout ready</span>' : "") + "</p>" +
     '<div id="dwc-seller-rating" data-seller="' + l.seller_id + '"></div>' +
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML +
     '<div class="dwc-actions">' +
@@ -5925,7 +5926,7 @@ async function loadSellerReviews(sellerId) {
   host.innerHTML = '<section class="card"><h3 style="margin-top:0">⭐ Reviews on this seller</h3>' +
     '<p style="color:var(--muted);font-size:13px">From buyers, after completed orders — words and stars, public. Hate speech is blocked; plain cursing is fine.</p>' +
     (reviews.length ? reviews.map(function (r) {
-      return '<div style="border-top:1px solid var(--border);padding:8px 0"><p style="margin:0"><strong>' + starsOnly(r.stars) + "</strong> · from @" + esc(r.buyer_username) + ' · <span style="color:var(--muted)">' + fmtDate(r.created_at) + "</span></p>" +
+      return '<div style="border-top:1px solid var(--border);padding:8px 0"><p style="margin:0"><strong>' + starsOnly(r.stars) + "</strong> · from <a href=\"#/member/" + r.buyer_id + '">@' + esc(r.buyer_username) + '</a> · <span style="color:var(--muted)">' + fmtDate(r.created_at) + "</span></p>" +
         (r.body ? "<p style=\"margin:4px 0\">" + esc(r.body) + "</p>" : '<p style="margin:4px 0;color:var(--muted)">No words — stars only.</p>') + "</div>";
     }).join("") : "<p>No reviews yet.</p>") + "</section>";
 }
@@ -6078,7 +6079,7 @@ async function viewMembers(el) {
     '<section aria-label="Community members">' + head +
     (members.length ? '<div class="grid">' + members.map(function (m) {
       return '<article class="card">' +
-        (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
+        (m.avatar_url ? '<a href="#/member/' + m.id + '"><img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt=""></a>' : '<a href="#/member/' + m.id + '"><span class="dwc-avatar dwc-avatar-none">🍬</span></a>') +
         '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a> " + presenceDot(m) + "</h3>" +
         (m.occupation ? "<p>" + esc(m.occupation) + "</p>" : "") +
         (m.bio ? "<p>" + esc(m.bio) + "</p>" : "") +
@@ -7253,7 +7254,7 @@ function renderBuddies() {
     var mine = state.profile && b.id === state.profile.id;
     return '<button type="button" class="dwc-buddy"' + (mine ? " disabled" : ' onclick="DWC.openIM(' + b.id + ', \'' + esc(b.username.replace(/'/g, "")) + '\')"') + ">" +
       presenceDot(b) +
-      (b.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(b.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      (b.avatar_url ? '<a href="#/member/' + b.id + '" onclick="event.stopPropagation()"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(b.avatar_url) + '" alt=""></a>' : '<a href="#/member/' + b.id + '" onclick="event.stopPropagation()"><span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span></a>') +
       '<span class="dwc-buddy-name">@' + esc(b.username) + (mine ? " (you)" : "") + "</span>" +
       (b.presence === "away" && b.away_message ? '<span class="dwc-buddy-away">“' + esc(b.away_message) + "”</span>" : "") +
       "</button>";
@@ -7270,7 +7271,7 @@ function renderInbox() {
   if (!state.inbox.length) { host.innerHTML = '<p style="color:var(--muted)">No IMs yet — click a buddy to say hi.</p>'; return; }
   host.innerHTML = state.inbox.map(function (c) {
     return '<button type="button" class="dwc-buddy" onclick="DWC.openIM(' + c.partner_id + ', \'' + esc(c.partner_username.replace(/'/g, "")) + '\')">' +
-      (c.partner_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      (c.partner_avatar_url ? '<a href="#/member/' + c.partner_id + '" onclick="event.stopPropagation()"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt=""></a>' : '<a href="#/member/' + c.partner_id + '" onclick="event.stopPropagation()"><span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span></a>') +
       '<span class="dwc-buddy-name">@' + esc(c.partner_username) + "</span>" +
       (menuReqOpenFor(c.partner_id) ? '<span class="dwc-req-badge">Request</span>' : "") +
       (c.unread ? '<span class="dwc-unread">' + c.unread + " new</span>" : "") +
@@ -7361,6 +7362,21 @@ function fileToGeneric(file, maxBytes) {
     reader.readAsDataURL(file);
   });
 }
+// DM window header: the partner's picture + name link to their
+// profile (DMs are not live chat — they link). The avatar is
+// best-effort: buddies + inbox carry it; if neither has loaded yet,
+// the name link still works and no avatar shows.
+function imPartnerAvatarUrl(id) {
+  var b = (state.buddies || []).filter(function (x) { return x.id === id; })[0];
+  if (b && b.avatar_url) return b.avatar_url;
+  var c = (state.inbox || []).filter(function (x) { return x.partner_id === id; })[0];
+  if (c && c.partner_avatar_url) return c.partner_avatar_url;
+  return "";
+}
+function imHeadAvatarHTML(id) {
+  var u = imPartnerAvatarUrl(id);
+  return u ? '<a href="#/member/' + id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(u) + '" alt=""></a> ' : "";
+}
 function syncIMShells() {
   var host = $("dwc-imwins");
   if (!host) return;
@@ -7376,7 +7392,7 @@ function syncIMShells() {
     div.className = "dwc-imwin";
     div.setAttribute("data-imwin", String(im.id));
     div.innerHTML =
-      '<div class="dwc-imwin-head"><strong>💬 IM — @' + esc(im.username) + '</strong><button type="button" class="dwc-linklike" onclick="DWC.closeIM(' + im.id + ')">✕ Close</button></div>' +
+      '<div class="dwc-imwin-head">' + imHeadAvatarHTML(im.id) + '<strong>💬 IM — <a href="#/member/' + im.id + '">@' + esc(im.username) + '</a></strong><button type="button" class="dwc-linklike" onclick="DWC.closeIM(' + im.id + ')">✕ Close</button></div>' +
       '<p style="margin:6px 0;font-size:13px;color:var(--muted)">🔒 Private messages auto-delete conversations and files in that message thread after one day.</p>' +
       '<div id="dwc-imabout-' + im.id + '"></div>' +
       '<div id="dwc-impay-' + im.id + '"></div>' +
@@ -7543,7 +7559,7 @@ function renderIMLog(id) {
 function findResultCardHTML(m) {
   var isSeller = state.findRole === "seller";
   return '<article class="card dwc-findcard">' +
-    (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') +
+    (m.avatar_url ? '<a href="#/member/' + m.id + '"><img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt=""></a>' : '<a href="#/member/' + m.id + '"><span class="dwc-avatar dwc-avatar-none">🍬</span></a>') +
     '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a> " + presenceDot(m) + "</h3>" +
     '<p class="dwc-match">✨ Matched ' + m.match_score + " — " +
     (m.matched_types.length ? esc(m.matched_types.join(", ")) : "") +
@@ -7636,7 +7652,7 @@ async function loadEphInbox() {
   if (!inbox.length) { host.innerHTML = '<p style="color:var(--muted)">No private chats open — start one from a creator post or a Find result.</p>'; return; }
   host.innerHTML = inbox.map(function (c) {
     return '<button type="button" class="dwc-buddy" onclick="DWC.openEphemeral(' + c.partner_id + ", '" + esc(c.partner_username.replace(/'/g, "")) + "', " + (c.post_id || "null") + ')">' +
-      (c.partner_avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt="">' : '<span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span>') +
+      (c.partner_avatar_url ? '<a href="#/member/' + c.partner_id + '" onclick="event.stopPropagation()"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(c.partner_avatar_url) + '" alt=""></a>' : '<a href="#/member/' + c.partner_id + '" onclick="event.stopPropagation()"><span class="dwc-avatar dwc-avatar-none dwc-avatar-sm">🍬</span></a>') +
       '<span class="dwc-buddy-name">@' + esc(c.partner_username) + "</span>" +
       '<span class="dwc-buddy-away">🔒 ' + esc((c.last_from_me ? "You: " : "") + (c.last_body || "").slice(0, 60)) + "</span>" +
       "</button>";
@@ -7651,6 +7667,17 @@ async function loadEphInbox() {
 // is private + ephemeral, NOT true end-to-end encryption — there is no
 // client key exchange on this stack. That limit lives in the code
 // comments and the build report, never as a claim in the UI.)
+// Ephemeral window header: same rule as the IM header — the
+// partner's name links to their profile; avatar is best-effort from
+// the ephemeral inbox, which carries it when it has loaded.
+function ephPartnerAvatarUrl(id) {
+  var c = (state.ephInbox || []).filter(function (x) { return x.partner_id === id; })[0];
+  return (c && c.partner_avatar_url) || "";
+}
+function ephHeadAvatarHTML(id) {
+  var u = ephPartnerAvatarUrl(id);
+  return u ? '<a href="#/member/' + id + '"><img class="dwc-avatar dwc-avatar-sm" src="' + esc(u) + '" alt=""></a> ' : "";
+}
 function renderEphWin() {
   var host = $("dwc-ephwins");
   if (!host) return;
@@ -7658,7 +7685,7 @@ function renderEphWin() {
   if (!e) { host.innerHTML = ""; return; }
   host.innerHTML =
     '<div class="dwc-ephwin" role="dialog" aria-label="Private chat">' +
-    '<div class="dwc-ephwin-head"><strong>🔒 Private chat — @' + esc(e.partner_username) + '</strong>' +
+    '<div class="dwc-ephwin-head">' + ephHeadAvatarHTML(e.partner_id) + '<strong>🔒 Private chat — <a href="#/member/' + e.partner_id + '">@' + esc(e.partner_username) + '</a></strong>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.closeEphemeral()">✕ Close &amp; delete</button></div>' +
     '<p class="dwc-eph-note">🔒 <strong>Private chat.</strong> This chat lives only while it’s open — closing it deletes every message for both of you.</p>' +
     '<div class="dwc-ephlog" id="dwc-ephlog">' +
@@ -7835,8 +7862,8 @@ function renderAdminMembers() {
             }
           }
           return '<div class="dwc-admin-row">' +
-            (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
-            '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
+            (m.avatar_url ? '<a href="#/member/' + m.id + '"><img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px"></a>' : '<a href="#/member/' + m.id + '"><span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span></a>') +
+            '<div style="flex:1;min-width:0"><a href="#/member/' + m.id + '"><strong>@' + esc(m.username) + "</strong></a> " + presenceDot(m) + " " + badgeHTML(m) +
             '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + ((m.disputes_filed || 0) ? " · Disputes: " + m.disputes_filed + " filed" + ((m.disputes_false || 0) ? ", " + m.disputes_false + " found false" + ((m.disputes_false || 0) >= 2 ? " — cannot file disputes" : "") : "") : "") + "</div>" +
             (sells.length ? '<div style="font-size:12px">Sells: ' + sells.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
             (wants.length ? '<div style="font-size:12px">Wants: ' + wants.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
@@ -7865,7 +7892,8 @@ async function viewAdmin(el) {
       : "") +
     (isOp
       ? '<section class="card"><h2 style="margin-top:0">📥 Requests to approve or deny</h2><p style="color:var(--muted)">ID verifications live under 🚩 Reports. Page URL appeals show there too.</p><p><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">Open Reports inbox →</button></p></section>' +
-        '<section class="card"><h2 style="margin-top:0">🔑 Account recovery requests</h2><p style="color:var(--muted)">Members locked out of their account ask here. Check who they are however you normally would (DM, text, in person), then issue a one-time code and send it to them privately — it works once, for 24 hours. Never post a code where anyone else can see it.</p><div id="dwc-recovery-requests"><p style="color:var(--muted)">Loading recovery requests…</p></div></section>' +
+        '<section class="card"><h2 style="margin-top:0">🔑 Account recovery requests</h2><p style="color:var(--muted)">Members locked out ask here. If they have a verified recovery email, a one-time code is emailed to it automatically — those requests never show up here. The ones that do need you: check who they are however you normally would (DM, text, in person), then issue a one-time code and send it to them privately — it works once, for 24 hours. Never post a code where anyone else can see it.</p><div id="dwc-recovery-requests"><p style="color:var(--muted)">Loading recovery requests…</p></div></section>' +
+        '<section class="card"><h2 style="margin-top:0">📬 Mail queue</h2><p style="color:var(--muted)">Account emails (password resets, recovery codes, email verification) send right away when email is switched on. Anything that couldn\'t send — or was queued before email was on — waits here. This button sends what\'s still fresh and expires anything past its life (a reset link lives 1 hour, a recovery code 24). Old codes are never blasted.</p><p><button type="button" class="btn small" onclick="DWC.drainMailQueue(this)">Send queued mail now →</button> <span id="dwc-mail-drain-msg" style="font-weight:700"></span></p></section>' +
         '<section class="card"><h2 style="margin-top:0">🛍️ Shop listings</h2><p style="color:var(--muted)">Edit the shop yourself — photos, prices, descriptions, dropdowns, video, and the Stripe link. No code needed.</p><p><a class="btn" href="admin-listings.html">Edit shop listings →</a></p></section>' +
         '<section class="card"><h2 style="margin-top:0">🔎 Content sales — look up a CS#</h2><p style="color:var(--muted)">A leaked copy carries its sale number. Type it in to see who bought it — buyer, seller, what it was, what they paid, and the buyer IP (operator eyes only — never shared with members; you decide case by case whether their info goes to the person whose content was shared).</p>' +
         '<form onsubmit="DWC.lookupContentSale(this); return false;"><label>Sale number (CS#)</label><input name="cs" type="number" min="1" required placeholder="e.g. 1"><p class="dwc-form-err" data-err hidden></p><p style="margin-top:10px"><button class="btn small" type="submit">Look up CS# →</button></p></form><div id="dwc-cs-result"></div></section>'
@@ -7899,12 +7927,15 @@ async function loadRecoveryRequests() {
   if (!host) return;
   var data = await apiPost("/auth", { action: "list-recovery", device_id: deviceId() });
   if (!data || !data.ok) { host.innerHTML = '<p style="color:var(--muted)">' + esc((data && data.error) || "Couldn't load recovery requests.") + "</p>"; return; }
-  var reqs = (data.requests || []).filter(function (r) { return r.status === "pending"; });
+  var reqs = (data.requests || []).filter(function (r) { return r.status === "pending" || (r.status === "issued" && r.auto_sent === 1); });
   if (!reqs.length) { host.innerHTML = '<p style="color:var(--muted)">No pending recovery requests.</p>'; return; }
   host.innerHTML = reqs.map(function (r) {
+    var autoNote = (r.status === "issued" && r.auto_sent === 1)
+      ? '<p style="margin:4px 0;font-size:13px;color:var(--muted)">📧 A code was already emailed automatically to their verified recovery address — only re-issue if they say it never arrived (the old code dies the moment you issue a new one).</p>'
+      : "";
     return '<div class="card" style="margin:8px 0;padding:12px"><p style="margin:0"><strong>@' + esc(r.username) + '</strong> <span style="color:var(--muted);font-size:13px">' + esc(new Date(r.created_at).toLocaleString()) + '</span></p>' +
       '<p style="margin:4px 0;font-size:13px">Reach them: ' + esc(r.contact || "—") + '</p>' +
-      (r.message ? '<p style="margin:4px 0;font-size:13px">“' + esc(r.message) + '”</p>' : "") +
+      (r.message ? '<p style="margin:4px 0;font-size:13px">“' + esc(r.message) + '”</p>' : "") + autoNote +
       '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.issueRecoveryCode(' + r.id + ', this)">Issue a one-time recovery code →</button></p>' +
       '<p class="dwc-recovery-code" style="margin:8px 0 0;font-size:13px"></p></div>';
   }).join("");
@@ -7981,8 +8012,8 @@ async function viewTeam(el) {
     rosterHost.innerHTML = team.length
       ? '<div class="dwc-admin-list">' + team.map(function (t) {
           return '<div class="dwc-admin-row">' +
-            (t.avatar_url ? '<img class="dwc-avatar" src="' + esc(t.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
-            '<div style="flex:1;min-width:0"><strong>@' + esc(t.username) + "</strong> " + presenceDot(t) + " " + badgeHTML(t) +
+            (t.avatar_url ? '<a href="#/member/' + t.id + '"><img class="dwc-avatar" src="' + esc(t.avatar_url) + '" alt="" style="width:36px;height:36px"></a>' : '<a href="#/member/' + t.id + '"><span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span></a>') +
+            '<div style="flex:1;min-width:0"><a href="#/member/' + t.id + '"><strong>@' + esc(t.username) + "</strong></a> " + presenceDot(t) + " " + badgeHTML(t) +
             '<div style="color:var(--muted);font-size:12px">' + (t.presence === "online" ? "🟢 Online" : t.presence === "away" ? "🌙 Away" + (t.away_message ? " — “" + esc(t.away_message) + "”" : "") : "⚫ Offline") + "</div></div></div>";
         }).join("") + "</div>"
       : '<p style="color:var(--muted)">No team members yet.</p>';
@@ -8323,8 +8354,8 @@ async function renderModelSearch() {
 }
 function modelCardHTML(m) {
   return '<article class="card dwc-model">' +
-    (m.display_url ? '<img class="dwc-model-img" src="' + esc(m.display_url) + '" alt="Model display picture" loading="lazy">' : '<span class="dwc-avatar dwc-avatar-none">🌙</span>') +
-    "<h3>@" + esc(m.username) + "</h3>" +
+    (m.display_url ? '<a href="#/member/' + m.id + '"><img class="dwc-model-img" src="' + esc(m.display_url) + '" alt="Model display picture" loading="lazy"></a>' : '<a href="#/member/' + m.id + '"><span class="dwc-avatar dwc-avatar-none">🌙</span></a>') +
+    '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a></h3>" +
     (m.model_bio ? "<p>" + esc(m.model_bio) + "</p>" : "") +
     (m.categories.length ? '<p class="dwc-tags">' + m.categories.map(function (c) { return "<span>#" + esc(c) + "</span>"; }).join(" ") + "</p>" : "") +
     (m.match_count != null ? '<p class="dwc-match">✨ Matched ' + m.match_count + " of your picks</p>" : "") +
@@ -8555,7 +8586,7 @@ window.DWC = {
     }
     if (members.length) {
       html += '<p class="dwc-search-group">People</p><ul class="dwc-search-list">' + members.map(function (m) {
-        return '<li><a href="#/member/' + m.id + '" onclick="DWC.closeSearch()"><strong>@' + esc(m.username) + "</strong><span>" + esc(m.occupation || "") + "</span></a></li>";
+        return '<li><a href="#/member/' + m.id + '" onclick="DWC.closeSearch()">' + (m.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(m.avatar_url) + '" alt="">' : "") + '<strong>@' + esc(m.username) + "</strong><span>" + esc(m.occupation || "") + "</span></a></li>";
       }).join("") + "</ul>";
     }
     res.innerHTML = html || '<p class="dwc-search-hint">Nothing found for “' + esc(q) + '” — try a different word.</p>';
@@ -8759,9 +8790,57 @@ window.DWC = {
     }
     setNotice("Recovery code issued for @" + data.username + " — send it to them privately.");
   },
+  // Mail queue drain (2026-11-22) — operator only. Sends what's still
+  // fresh, expires anything past its life. Never blasts old codes.
+  drainMailQueue: async function (btn) {
+    var msg = $("dwc-mail-drain-msg");
+    if (msg) msg.textContent = "Sending…";
+    if (btn) btn.disabled = true;
+    try {
+      var data = await apiPost("/mail-drain", { device_id: deviceId() });
+      if (msg) msg.textContent = (data && data.ok)
+        ? ("Sent " + (data.sent || 0) + ", " + (data.failed || 0) + " failed, " + (data.expired || 0) + " expired.")
+        : ((data && data.error) || "Couldn't drain the mail queue.");
+    } catch (e) {
+      if (msg) msg.textContent = "Couldn't reach the site — try again.";
+    }
+    if (btn) btn.disabled = false;
+  },
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },
+  // Post photos: tap to enlarge. The shared site lightbox only knows
+  // shop products (openLightbox(id, idx) looks up a catalog item, so a
+  // photo URL silently does nothing there) — posts get their own overlay.
+  // Locked/blurred previews never enlarge: the blur would be one tap
+  // from the raw file.
+  openPostImage: function (url) {
+    var ov = document.getElementById("dwc-post-zoom");
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "dwc-post-zoom";
+      ov.className = "dwc-zoom-overlay";
+      ov.innerHTML = '<img id="dwc-post-zoom-img" src="" alt="Post photo enlarged">';
+      ov.addEventListener("click", function () { ov.classList.remove("open"); });
+      document.body.appendChild(ov);
+    }
+    var img = document.getElementById("dwc-post-zoom-img");
+    if (img) img.src = url;
+    ov.classList.add("open");
+  },
+  // Password eye: tap to show what you typed, tap again to hide it.
+  pwEyeBtn: function () { return '<button type="button" class="btn small" style="flex:none" onclick="DWC.togglePw(this)" title="Show password">👁️</button>'; },
+  togglePw: function (btn) {
+    if (!btn) return;
+    var wrap = btn.parentElement;
+    var input = wrap ? wrap.querySelector("input") : null;
+    if (!input) return;
+    var show = input.type === "password";
+    input.type = show ? "text" : "password";
+    btn.textContent = show ? "🙈" : "👁️";
+    btn.title = show ? "Hide password" : "Show password";
+    input.focus();
+  },
   // v3.9 — picture viewer: avatar first, then the owner's gallery
   // photos the viewer is allowed to see (max 3 — the server filters by
   // visibility + the 18+ gate, so guests only ever get Public pictures).
@@ -14351,6 +14430,18 @@ async function init() {
   loadPhoneWallpaper();
   renderPhone();
   window.addEventListener("hashchange", function () { render(); });
+  // Post photos enlarge on tap (the whole picture fits in the post now,
+  // and a tap opens it full-screen). Locked/blurred previews are exempt —
+  // a tap there stays on reveal/unlock duty, never the raw file.
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    if (!t || !t.classList || !t.classList.contains("dwc-post-img")) return;
+    if (t.classList.contains("dwc-img-locked") || t.classList.contains("dwc-img-blurred")) return;
+    DWC.openPostImage(t.src);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { var ov = document.getElementById("dwc-post-zoom"); if (ov) ov.classList.remove("open"); }
+  });
   if (window.RCRloader) window.RCRloader.hide();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

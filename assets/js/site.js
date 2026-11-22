@@ -464,6 +464,51 @@ function injectChrome(){
     }
   }
 
+  /* Mailing list (2026-11-22) — footer signup, on every page (site.js
+     loads everywhere). Double opt-in: the form only asks for the
+     address; the confirm link in the email does the joining. One-click
+     unsubscribe in every mail. Honeypot field "website" — bots fill it,
+     humans never see it. */
+  if(!document.querySelector(".dwc-mail-list")){
+    var dwcFoot2 = document.querySelector("footer.site .wrap");
+    if(dwcFoot2){
+      var ml = document.createElement("div");
+      ml.className = "dwc-mail-list";
+      ml.innerHTML =
+        '<form class="dwc-mail-form" onsubmit="return rcrSubscribe(event, this)">' +
+        '<label for="dwcMailEmail"><b>📬 Get shop drops + community news by email</b></label>' +
+        '<span class="dwc-mail-row"><input id="dwcMailEmail" type="email" name="email" placeholder="you@example.com" required maxlength="200" autocomplete="email">' +
+        '<input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">' +
+        '<button class="btn" type="submit">Join the list →</button></span>' +
+        '<span class="dwc-mail-msg" role="status"></span>' +
+        '</form>';
+      dwcFoot2.appendChild(ml);
+    }
+  }
+
+}
+
+/* Mailing-list signup (footer + homepage). Posts to /api/subscribe;
+   the reply is shown inline — never a page jump. */
+async function rcrSubscribe(ev, form){
+  ev.preventDefault();
+  var msg = form.querySelector(".dwc-mail-msg");
+  var btn = form.querySelector("button[type=submit]");
+  var email = form.querySelector('input[name=email]').value.trim();
+  var honeypot = form.querySelector('input[name=website]').value.trim();
+  if (msg) msg.textContent = "Sending…";
+  if (btn) btn.disabled = true;
+  try {
+    var res = await fetch("/api/subscribe", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "subscribe", email: email, website: honeypot, source: form.dataset.source || "footer" }) });
+    var data = await res.json().catch(function(){ return null; });
+    if (msg) msg.textContent = (data && (data.message || data.error)) || "Check your inbox — click the confirm link within 24 hours and you're on the list.";
+    if (data && data.ok) form.reset();
+  } catch (e) {
+    if (msg) msg.textContent = "Couldn't reach the site — check your connection and try again.";
+  }
+  if (btn) btn.disabled = false;
+  return false;
 }
 
 /* ---------- cart (localStorage) ---------- */

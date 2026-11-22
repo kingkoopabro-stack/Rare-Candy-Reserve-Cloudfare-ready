@@ -12,8 +12,9 @@ import {
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
   isFreeDivider, unlockForDivider,
   badgeListFor, cleanDisplayBadges, adultCreatorIds, awardLucre, LUCRE_AWARDS,
-  queueOutbound,
+  deliverOutbound,
 } from "./_lib.js";
+import { txEmailHtml } from "./_mail.js";
 import {
   hashPassword, checkPasswordStrength, isValidEmail, issueToken,
   VERIFY_TOKEN_TTL_MS,
@@ -608,9 +609,18 @@ export async function onRequestPost({ env, request }) {
         await db.prepare("UPDATE profiles SET pending_email = ? WHERE id = ?").bind(signupRecoveryEmail, row.id).run();
         const token = await issueToken(db, row.id, "email_verify", VERIFY_TOKEN_TTL_MS, "");
         const link = `${new URL(request.url).origin}/forgot-password.html?verify=${encodeURIComponent(token)}`;
-        await queueOutbound(db, row.id, "email", "email_verify",
+        await deliverOutbound(env, db, row.id, "email", "email_verify",
           "Verify your Rare Candy Reserve recovery email",
-          `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`);
+          `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`,
+          signupRecoveryEmail,
+          txEmailHtml({
+            title: "Verify your recovery email",
+            paragraphs: [
+              `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it.`,
+              "The link works for 24 hours. If you didn't ask for this, ignore it.",
+            ],
+            action: { label: "Verify this email →", url: link },
+          }));
         recoveryEmailPending = true;
       } catch { /* columns/table missing — the member can add it later in Edit profile */ }
     }

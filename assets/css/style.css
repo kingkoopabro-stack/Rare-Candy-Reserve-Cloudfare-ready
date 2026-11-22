@@ -348,6 +348,15 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-18-sign{display:block;font-weight:900;font-size:clamp(46px,9vw,84px);letter-spacing:.08em;line-height:1;color:#fff;text-shadow:0 0 6px #fff,0 0 18px #ff2ea6,0 0 42px #ff2ea6,0 0 80px #ff2ea6;animation:dwcNeonFlicker 4.5s linear infinite}
 .dwc-18-link:hover .dwc-18-sign{text-shadow:0 0 6px #fff,0 0 18px #ff5cb8,0 0 42px #ff5cb8,0 0 80px #ff5cb8}
 .dwc-18-sub{display:block;margin-top:10px;font-weight:800;font-size:clamp(16px,3.4vw,22px);letter-spacing:.06em;color:var(--ink);text-shadow:0 0 12px rgba(0,229,255,.55)}
+/* Mailing list — footer signup (2026-11-22). One line on desktop,
+   stacked on phones. Sits in footer.site .wrap, after the 18+ entry. */
+.dwc-mail-list{margin:22px 0 8px;text-align:center}
+.dwc-mail-form{max-width:560px;margin:0 auto}
+.dwc-mail-form label{display:block;margin-bottom:10px;font-size:15px}
+.dwc-mail-row{display:flex;gap:10px;justify-content:center}
+.dwc-mail-row input[type=email]{flex:1;min-width:0;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:#0a0714;color:var(--ink);font-size:14px;box-sizing:border-box}
+.dwc-mail-msg{display:block;margin-top:10px;font-size:13px;color:var(--muted)}
+@media (max-width:560px){.dwc-mail-row{flex-direction:column}.dwc-mail-row .btn{width:100%}}
 @keyframes dwcNeonFlicker{
   0%,100%{opacity:1}
   3%{opacity:.55}
@@ -396,7 +405,11 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-warn{background:rgba(255,92,122,.1);border:1px solid rgba(255,92,122,.6);border-radius:10px;padding:10px 12px;font-size:14px;color:#ffb3c2}
 .dwc-info{background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.5);border-radius:10px;padding:10px 12px;font-size:14px;color:#9ff3fa}
 .dwc-post{overflow:hidden}
-.dwc-post-img{width:100%;max-height:340px;object-fit:cover;border-radius:12px;margin-bottom:10px}
+.dwc-post-img{width:100%;height:auto;max-height:800px;object-fit:contain;background:#000;border-radius:12px;margin-bottom:10px;cursor:zoom-in}
+.dwc-post-img.dwc-img-locked{cursor:default}
+.dwc-zoom-overlay{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out}
+.dwc-zoom-overlay.open{display:flex}
+.dwc-zoom-overlay img{max-width:92vw;max-height:92vh;border-radius:12px}
 .dwc-titlelink{color:var(--ink);text-decoration:none}
 .dwc-titlelink:hover{color:var(--cyan)}
 .dwc-meta{color:var(--muted);font-size:13px}

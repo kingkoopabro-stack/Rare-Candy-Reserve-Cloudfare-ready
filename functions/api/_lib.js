@@ -1,5 +1,6 @@
 // Shared helpers for the Do Whatever Community Pages Functions.
 // NOT a route (leading underscore) — imported by every functions/api/*.js file.
+import { mailConfigured, sendMail } from "./_mail.js";
 //
 // Bindings expected on the Pages project (set in the Cloudflare dashboard,
 // Production AND Preview):
@@ -275,21 +276,90 @@ export async function notifyMember(db, profileId, actor, kind, text, link, refTy
 }
 
 // queueOutbound records an email or text the site wants to send. The
-// site sends NO email or text today — there is no provider connected
-// yet — so the row waits with status "waiting_provider" and the member
-// still gets the in-app notification above. When Chris connects a
-// provider (Resend for email, Twilio for text), a sender reads this
-// queue and flips rows to "sent". SMS is opt-in only: the caller must
-// check the member's notify_sms flag first — never queue a text to
-// someone who didn't ask for them.
-export async function queueOutbound(db, profileId, channel, kind, subject, body) {
+// row carries the recipient in `to_address` (added by the
+// email-automation migration) so a sender can deliver it later. When
+// the caller wants it sent NOW, use deliverOutbound below instead — it
+// inserts the same row, then sends immediately when a provider is
+// configured and flips the row to "sent" (or "failed", with the error).
+// Without a provider the row waits with status "waiting_provider" and
+// the member still gets the in-app notification. SMS is opt-in only:
+// the caller must check the member's notify_sms flag first — never
+// queue a text to someone who didn't ask for them. Returns the queue
+// row id, or false when the queue table isn't there yet.
+export async function queueOutbound(db, profileId, channel, kind, subject, body, to) {
   if (!db || !profileId) return false;
+  const row = {
+    profile_id: profileId, channel, kind,
+    subject: String(subject || "").slice(0, 200),
+    body: String(body || "").slice(0, 2000),
+    to_address: String(to || "").slice(0, 200),
+  };
+  try {
+    const r = await db.prepare(
+      "INSERT INTO notifications_outbound (profile_id, channel, kind, subject, body, to_address, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 'waiting_provider', ?)",
+    ).bind(row.profile_id, row.channel, row.kind, row.subject, row.body, row.to_address, nowMs()).run();
+    return r.meta.last_row_id;
+  } catch (e) {
+    if (!/no such column|no column named/i.test(String((e && e.message) || e))) return false;
+    // Pre-migration table shape (no to_address column yet) — same row,
+    // minus the recipient.
+    try {
+      const r = await db.prepare(
+        "INSERT INTO notifications_outbound (profile_id, channel, kind, subject, body, status, created_at) VALUES (?, ?, ?, ?, ?, 'waiting_provider', ?)",
+      ).bind(row.profile_id, row.channel, row.kind, row.subject, row.body, nowMs()).run();
+      return r.meta.last_row_id;
+    } catch { return false; /* queue table not there yet — in-app still went out */ }
+  }
+}
+
+// How long a queued message stays sendable, by kind — the same TTLs
+// as the token it carries. Past that the row is dead: the drain marks
+// it "expired" and it is never sent. Old codes must never be blasted.
+export const OUTBOUND_TTL_MS = {
+  password_reset: 60 * 60 * 1000, // 1 hour — the reset link's own TTL
+  email_verify: 24 * 60 * 60 * 1000, // 24 hours — the verify link's TTL
+  password_changed: 24 * 60 * 60 * 1000, // notice only; a day is plenty
+  recovery_code: 24 * 60 * 60 * 1000, // 24 hours — the code's own TTL
+  list_confirm: 24 * 60 * 60 * 1000, // 24 hours — the confirm link's TTL
+};
+
+// Supersede older unsent rows for the same member + kind, so only the
+// freshest link/code can ever go out. Sent rows are history — untouched.
+export async function supersedeOutbound(db, profileId, kind) {
+  if (!db || !profileId || !kind) return;
   try {
     await db.prepare(
-      "INSERT INTO notifications_outbound (profile_id, channel, kind, subject, body, status, created_at) VALUES (?, ?, ?, ?, ?, 'waiting_provider', ?)",
-    ).bind(profileId, channel, kind, String(subject || "").slice(0, 200), String(body || "").slice(0, 2000), nowMs()).run();
-    return true;
-  } catch { return false; /* queue table not there yet — in-app still went out */ }
+      "UPDATE notifications_outbound SET status = 'superseded' WHERE profile_id = ? AND kind = ? AND status = 'waiting_provider'",
+    ).bind(profileId, kind).run();
+  } catch { /* queue table not there yet */ }
+}
+
+// deliverOutbound queues a message AND sends it right away when the
+// mail provider is configured (Resend — see _mail.js). The caller
+// passes the recipient address; the row records it so a later retry
+// (mail-drain) knows where to send. Without a provider the row simply
+// waits as "waiting_provider", exactly like before — the manual path
+// still works. SMS never sends (no provider) and just queues.
+// Returns { sent, id, error? }. Never throws.
+export async function deliverOutbound(env, db, profileId, channel, kind, subject, body, to, html) {
+  if (!db || !profileId) return { sent: false, id: null };
+  await supersedeOutbound(db, profileId, kind);
+  const id = await queueOutbound(db, profileId, channel, kind, subject, body, to);
+  if (!id) return { sent: false, id: null };
+  if (channel !== "email") return { sent: false, id };
+  if (!mailConfigured(env)) return { sent: false, id };
+  const res = await sendMail(env, { to, subject, text: body, html: html || undefined });
+  const now = nowMs();
+  try {
+    if (res.ok) {
+      await db.prepare("UPDATE notifications_outbound SET status = 'sent', sent_at = ? WHERE id = ?").bind(now, id).run();
+      return { sent: true, id };
+    }
+    await db.prepare("UPDATE notifications_outbound SET status = 'failed', error = ? WHERE id = ?").bind(String(res.error || "send failed").slice(0, 300), id).run();
+    return { sent: false, id, error: res.error };
+  } catch {
+    return { sent: !!res.ok, id, error: res.error };
+  }
 }
 
 // Notify one member about a Flea Market event every way they asked for:

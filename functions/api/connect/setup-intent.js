@@ -4,8 +4,8 @@
 // only if the seller accepts — nothing moves on a decline or a
 // counter. The payment method id comes back from Stripe.js after the
 // buyer confirms; the offer endpoint attaches it to the buyer.
-import { json, noDb, getDb, readJson, profileByDevice } from "../../_lib.js";
-import { stripePlatformConfigured, stripePlatformCall } from "../../_stripe.js";
+import { json, noDb, getDb, readJson, profileByDevice } from "../_lib.js";
+import { stripePlatformConfigured, stripePlatformCall } from "../_stripe.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);

@@ -4,7 +4,7 @@
 // form (fee on the item price only, shipping passes through, Lucre for
 // both sides). Already delivered → just stamps the confirmation, no
 // second credit. Paid (not shipped yet) → wait until it ships.
-import { json, noDb, getDb, readJson, profileByDevice, PLATFORM_FEE_PERCENT, nowMs, awardLucre, LUCRE_AWARDS, notifyBuyerSeller } from "../../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, PLATFORM_FEE_PERCENT, nowMs, awardLucre, LUCRE_AWARDS, notifyBuyerSeller } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);

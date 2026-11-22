@@ -6,7 +6,7 @@
 // v3.6: also returns is_friend / is_favorite (for the viewer) and
 // my_groups (the viewer's own groups, with member ids) so the member
 // page can render the action buttons and the Add-to-group picker.
-import { json, noDb, getDb, profileByDevice, shapeMember, parseTopFriendIds, topFriendCards, adultCreatorIds, badgesForProfiles, isOperator } from "../_lib.js";
+import { json, noDb, getDb, profileByDevice, shapeMember, parseTopFriendIds, topFriendCards, adultCreatorIds, badgesForProfiles, isOperator, parseTheme } from "../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
@@ -28,7 +28,10 @@ export async function onRequestGet({ env, request, params }) {
   if (isAdultCreator && !canViewAdult) {
     return json({ member: null, gated: true, gate_reason: "adult_creator", username: row.username });
   }
-  const friends = await topFriendCards(db, parseTopFriendIds(row.top_friends));
+  // Member page layout (v3.20) — Top Friends show only the count the
+  // member picked (3/4/5/8/10, default 8); the page slices to it.
+  const tfCount = parseTheme(row.profile_theme).topfriends_count || 8;
+  const friends = await topFriendCards(db, parseTopFriendIds(row.top_friends).slice(0, tfCount));
   const m = shapeMember(row);
   const badgeMap = await badgesForProfiles(db, [row.id]);
   // v3.6 viewer state — wrapped so a DB that hasn't run the v3.6

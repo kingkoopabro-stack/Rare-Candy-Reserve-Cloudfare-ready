@@ -1026,6 +1026,9 @@
         updateDeck();
         toast(on ? "Auto DJ on — Slabb runs the rundown." : "Auto DJ off — you cue every segment by hand.");
       });
+      bindSwitch("swAutoDuck", function (on) {
+        toast(on ? "Auto-duck on — music dips while you talk." : "Auto-duck off.");
+      });
 
       /* ---------------- Tick loop: clock, progress, meters ---------------- */
       function levelFromAnalyser(an) {

@@ -735,7 +735,8 @@ function fileDownloadUrl(url) {
 // ---------- routing ----------
 var NAV = [
   ["street", "🏠 YourSpace"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
-  ["trade", "⇄ Up for Trade"], ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
+  // ["trade", "⇄ Up for Trade"], // HIDDEN 2026-11-21 — trade system not built yet; re-add this line to bring the button back.
+  ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
   ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
   ["members", "Members"], ["reports", "🚩 Reports"], ["rules", "Rules & After Dark"],
   ["admin", "🛡️ Admin"], ["team", "👥 Team"],
@@ -826,7 +827,7 @@ function renderAccount() {
       (p.age_verified ? ' <strong style="color:var(--green)">· Age verified ✓</strong>' : "") +
       (p.is_operator ? ' <strong style="color:var(--amber)">· Operator</strong>' : "") + "</p>" +
       (p.payout_ready
-        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — your bank is linked, you can list in the Flea Market, Trades, and Auction House.</p>'
+        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — your bank is linked, you can list in the Flea Market and Auction House.</p>'
         : '<p style="margin:4px 0 0">Link your bank in the Payouts tab whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top Friends: ' + p.top_friend_ids.length + "/10 picked</span>" : "") +
@@ -5071,7 +5072,7 @@ async function viewOrders(el) {
     '<section aria-label="My Orders"><h2 style="margin-top:0">📦 My Orders</h2>' +
     "<h3>Buying</h3>" + (b.length ? b.map(orderCardHTML).join("") : '<div class="note">No purchases yet.</div>') +
     "<h3>Selling</h3>" + (s.length ? s.map(function (o) { return orderCardHTML(o, true); }).join("") : '<div class="note">No sales yet.</div>') +
-    "<h3>My listings</h3>" + (ml.length ? '<div class="grid">' + ml.map(listingCardHTML).join("") + "</div>" : '<div class="note">No listings yet — list something in the Flea Market, Trades, or Auction House and it shows up here.</div>') +
+    "<h3>My listings</h3>" + (ml.length ? '<div class="grid">' + ml.map(listingCardHTML).join("") + "</div>" : '<div class="note">No listings yet — list something in the Flea Market or Auction House and it shows up here.</div>') +
     "</section>";
 }
 function orderCardHTML(o, isSeller) {

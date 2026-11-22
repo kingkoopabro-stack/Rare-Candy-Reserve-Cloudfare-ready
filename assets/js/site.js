@@ -637,6 +637,15 @@ function photoHTML(p, idx){
     <div class="sub">${p.name}<br>Drop into Drive folder or send via chat</div>
   </div>`;
 }
+/* ---------- modded handheld piracy notice ---------- */
+// Every electronic modded handheld (Trimui / Anbernic) carries Chris's
+// piracy + no-responsibility lines in its description — render-time, so
+// any future handheld with a HANDHELD tag gets them automatically.
+// The "(we do not condone piracy of any kind)" line already in the
+// descs stays as-is; these two lines are IN ADDITION, verbatim.
+const RCR_PIRACY_NOTE_HTML = '<p class="rcr-piracy-note" style="font-size:13px;color:var(--muted);margin:8px 0 0">⚠️ RCR does NOT promote piracy, remember to only download/use games or movies you own!<br>Rare Candy Reserve and its owners do not hold any responsibility for what you do with the hardware once purchased!</p>';
+function isModdedHandheld(p){ return !!(p && p.tag && /handheld/i.test(p.tag)); }
+function piracyNoteHTML(p){ return isModdedHandheld(p) ? RCR_PIRACY_NOTE_HTML : ""; }
 function productCard(p){
   const photoTotal = (p.imgs && p.imgs.length) || 3;
   const galleryHint = photoTotal > 1
@@ -665,7 +674,7 @@ function productCard(p){
     ${galleryHint}
     ${videoHint}
     <div class="tag" style="margin-top:12px">${p.tag}</div>
-    <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>
+    <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>${piracyNoteHTML(p)}
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
     ${priceLine}
     <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" data-stripe-btn="${p.id}" href="${p.stripe}" target="_blank" rel="noopener"${(p.options && optDefaultTotal(p) !== p.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
@@ -717,7 +726,7 @@ function catalogCard(c){
     ${videoHint}
     <div class="tag" style="margin-top:12px">${c.tag}</div>
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
-    ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p><p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
+    ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p>${piracyNoteHTML(c)}<p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
     ${priceLine}
     <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" data-stripe-btn="${c.id}" href="${c.stripe}" target="_blank" rel="noopener"${(c.options && optDefaultTotal(c) !== c.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
   </div>`;
@@ -842,7 +851,7 @@ function showDetail(id){
       <div>
         <div class="tag">${c.tag}</div>
         <h1 style="font-size:30px">${c.name}</h1>
-        ${c.desc ? `<p style="color:var(--muted)">${c.desc}</p>` : ""}
+        ${c.desc ? `<p style="color:var(--muted)">${c.desc}</p>${piracyNoteHTML(c)}` : ""}
         ${buyHtml}
         ${c.ebay ? `<p><a href="https://www.ebay.com/itm/${c.ebay}" target="_blank" rel="noopener">View this item on eBay ↗</a></p>` : ""}
       </div>

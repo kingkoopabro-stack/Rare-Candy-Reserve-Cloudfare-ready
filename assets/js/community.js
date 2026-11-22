@@ -4411,6 +4411,20 @@ function listingPhotoHTML(l) {
   return '<div class="dwc-listing-photo"><img class="dwc-post-img' + cls + '" src="' + esc(l.image_url) + '" alt="Listing photo" loading="lazy">' +
     watermarkOverlayHTML(null, owned, false) + tag + "</div>";
 }
+// Modded handhelds (Trimui / Anbernic) — Chris's piracy + no-responsibility
+// lines go on every one of these listings, never on anything else.
+// Matched on the title (coded names TSP / AmbyRG / Amby Deck / Amby FLIP /
+// BrickTSP / NDS TSP / TSP SLIDE and the real names Trimui / Anbernic),
+// as whole word tokens — a bare "TSP" only counts as its own token.
+const HANDHELD_PIRACY_HTML = '<p class="dwc-piracy-note" style="font-size:13px;color:var(--muted);margin:8px 0 0">⚠️ RCR does NOT promote piracy, remember to only download/use games or movies you own!<br>Rare Candy Reserve and its owners do not hold any responsibility for what you do with the hardware once purchased!</p>';
+function isModdedHandheldListing(l){
+  var text = ((l && l.title) || "") + " " + ((l && l.category) || "");
+  var tokens = text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return tokens.some(function (t){
+    return t === "trimui" || t === "anbernic" || t === "tsp" || t === "bricktsp" || t === "rg476h" || t.indexOf("amby") === 0;
+  });
+}
+function handheldPiracyHTML(l){ return isModdedHandheldListing(l) ? HANDHELD_PIRACY_HTML : ""; }
 function listingCardHTML(l) {
   var price = l.kind === "flea" ? (l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) : l.price_cents;
   var priceLabel = l.kind === "flea" ? (l.current_bid_cents != null ? "High bid" : "Starting bid") : l.kind === "trade" ? "Trade value" : "Price";
@@ -4419,6 +4433,7 @@ function listingCardHTML(l) {
     '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + listingTypeTag(l) + (l.is_adult ? " · 🔞 18+" : "") + "</div>" +
     '<h3 style="margin:8px 0 4px"><a href="#/listing/' + l.id + '" class="dwc-titlelink">' + esc(l.title) + "</a></h3>" +
     '<p>' + esc(l.description.replace(/<[^>]*>/g, "").slice(0, 200)) + (l.description.length > 200 ? "…" : "") + "</p>" +
+    handheldPiracyHTML(l) +
     '<p><strong style="color:var(--green);font-size:18px">' + priceLabel + ": " + money(price) + "</strong>" +
     ' <span style="color:var(--muted);font-size:13px">· seller gets ' + money(l.seller_gets_cents) + " after the 6% street cut</span></p>" +
     listingShipLine(l) +
@@ -4960,6 +4975,7 @@ async function viewListing(el, listingId) {
     '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + listingTypeTag(l) + (l.is_adult ? " · 🔞 18+" : "") + " · " + esc(l.status) + "</div>" +
     "<h2>" + esc(l.title) + "</h2>" +
     '<div class="dwc-desc">' + l.description + "</div>" +
+    handheldPiracyHTML(l) +
     verificationBadge(l) +
     '<p><strong style="color:var(--green);font-size:20px">' + (l.kind === "flea" ? (l.current_bid_cents != null ? "High bid: " : "Starting bid: ") : l.kind === "trade" ? "Trade value: " : "Price: ") + money(price) + "</strong></p>" +
     '<p style="color:var(--muted);font-size:14px">Platform cut (6%): ' + money(l.fee_cents) + " · Seller gets: " + money(l.seller_gets_cents) + "</p>" +

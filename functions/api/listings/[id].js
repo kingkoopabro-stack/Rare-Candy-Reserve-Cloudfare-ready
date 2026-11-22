@@ -1,7 +1,8 @@
 // GET /api/listings/:id — getListing (permalink target, with fee split).
-// DELETE /api/listings/:id — deleteListing (own listings only; sold ones stay
-// as the receipt on the buyer's order).
-import { json, noDb, getDb, readJson, profileByDevice, shapeListing } from "../_lib.js";
+// DELETE /api/listings/:id — deleteListing (own listings, or any active
+// listing for the operator/admins; sold ones stay as the receipt on the
+// buyer's order).
+import { json, noDb, getDb, readJson, profileByDevice, shapeListing, isOperator, canDeleteContent, roleOf } from "../_lib.js";
 
 async function loadListing(db, id) {
   return await db.prepare(
@@ -11,11 +12,18 @@ async function loadListing(db, id) {
   ).bind(id).first();
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
   if (!db) return noDb();
   const row = await loadListing(db, Number(params.id));
   if (!row) return json({ listing: null });
+  // Adult listings stay hidden unless the caller is age-verified, the
+  // seller, or the operator — same gate as the 18+ forum (posts.js).
+  if (row.is_adult === 1) {
+    const deviceId = new URL(request.url).searchParams.get("device_id") || "";
+    const me = deviceId ? await profileByDevice(db, deviceId) : null;
+    if (!me || (me.id !== row.profile_id && !isOperator(env, me) && me.age_verified !== 1)) return json({ listing: null });
+  }
   return json({
     listing: await shapeListing(db, row, {
       id: row.seller_id, username: row.seller_username, occupation: row.seller_occupation,
@@ -33,7 +41,12 @@ export async function onRequestDelete({ env, request, params }) {
   const id = Number(params.id);
   const l = await db.prepare("SELECT * FROM listings WHERE id = ? LIMIT 1").bind(id).first();
   if (!l) return json({ ok: false, error: "That listing is already gone." });
-  if (l.profile_id !== me.id) return json({ ok: false, error: "You can only close your own listings." });
+  // Team moderation — the operator and admins may remove any active
+  // listing (same rule as deleting other people's posts/comments).
+  // Sold listings stay put for everyone: they're the receipt on the
+  // buyer's order, already hidden from the market.
+  const canRemove = l.profile_id === me.id || canDeleteContent(roleOf(me));
+  if (!canRemove) return json({ ok: false, error: "You can only close your own listings." });
   if (l.status === "sold") return json({ ok: false, error: "Sold listings stay put — they're the receipt on the buyer's order. They're already hidden from the market." });
   await db.batch([
     db.prepare("DELETE FROM bids WHERE listing_id = ?").bind(id),

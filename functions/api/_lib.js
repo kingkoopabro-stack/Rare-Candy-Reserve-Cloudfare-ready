@@ -96,7 +96,7 @@ export const ASH_TRACKS = [
 // Vita Nova Radio — the live Icecast MP3 stream. The only stream URL the
 // site uses; never invent another one.
 export const VNR_STREAM_URL = "https://radio.rarecandyreserve.org/vitanova";
-export const LISTING_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs", "Sealed Product", "Figures & Toys", "Video Games", "Plants", "3D Prints & Custom", "Other Collectibles"];
+export const LISTING_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs", "Sealed Product", "Figures & Toys", "Video Games", "Plants", "3D Prints & Custom", "Digital Content", "Other Collectibles"];
 export const SALE_VENUES = ["eBay", "Mercari", "Facebook Marketplace", "This app", "In person", "Other"];
 export const CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"];
 export const MODEL_EYE_COLORS = ["Brown", "Blue", "Green", "Hazel", "Gray", "Other"];
@@ -710,6 +710,10 @@ export function shapeMember(row) {
     seller_open_to: row.seller_open_to ?? "",
     seller_price_min_cents: row.seller_price_min_cents ?? 0,
     seller_price_max_cents: row.seller_price_max_cents ?? 0,
+    // Member shops — the member's shop/brand name + tagline for their
+    // shop page. Empty until set in Edit Profile > What I sell.
+    shop_name: row.shop_name ?? "",
+    shop_tagline: row.shop_tagline ?? "",
     buyer_types: parsePrefs(row.buyer_types),
     buyer_tags: parsePrefs(row.buyer_tags),
     buyer_budget_max_cents: row.buyer_budget_max_cents ?? 0,
@@ -1788,6 +1792,14 @@ export async function shapeListing(db, row, seller) {
   return {
     id: row.id, title: row.title, description: row.description, price_cents: row.price_cents,
     category: row.category, kind: row.kind,
+    // Member shops — listing type + shipping + adult + seller Stripe link
+    // + handling time. All default to the pre-migration shape when the
+    // member-shops migration hasn't run yet.
+    listing_type: row.listing_type ?? "physical",
+    shipping_cents: row.shipping_cents ?? 0,
+    is_adult: row.is_adult === 1,
+    stripe_link: row.stripe_link ?? "",
+    handling_time: row.handling_time ?? "",
     image_url: imageUrl(row.image_blob_key), image2_url: imageUrl(row.image2_blob_key),
     image3_url: imageUrl(row.image3_blob_key), gif_url: row.gif_url ?? null,
     trade_wanted: row.trade_wanted ?? "", allow_comments: row.allow_comments === 1,
@@ -1813,6 +1825,14 @@ export async function shapeOrder(db, row, profilesById) {
   // old orders shape exactly as before.
   const tax = row.tax_cents ?? 0;
   const shipping = row.shipping_cents ?? 0;
+  // CS# for digital Flea Market buys — the sale number from the
+  // content_sales log (null for physical buys, or when the
+  // content-sales migration hasn't run yet).
+  let csNumber = null;
+  try {
+    const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE listing_id = ? AND buyer_id = ? LIMIT 1").bind(row.listing_id, row.buyer_id).first();
+    csNumber = cs ? cs.cs_number : null;
+  } catch { csNumber = null; }
   const listing = await db.prepare("SELECT image_blob_key FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first();
   return {
     id: row.id, listing_id: row.listing_id, item_title: row.item_title,
@@ -1820,6 +1840,7 @@ export async function shapeOrder(db, row, profilesById) {
     tracking_number: row.tracking_number ?? "",
     tracking_url: trackingUrl(row.carrier, row.tracking_number),
     tracking_alerts: row.tracking_alerts === 1,
+    cs_number: csNumber,
     tax_cents: tax, shipping_cents: shipping,
     total_cents: row.amount_cents + tax + shipping,
     tax_state: row.tax_state ?? "", tax_rate_percent: row.tax_rate_percent ?? 0,

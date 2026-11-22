@@ -19,6 +19,7 @@ function shapeSale(row, full) {
   var s = {
     cs_number: row.cs_number,
     post_id: row.post_id ?? null,
+    listing_id: row.listing_id ?? null,
     conversation_id: row.conversation_id ?? null,
     item_title: row.item_title ?? "",
     buyer_username: row.buyer_username ?? "",

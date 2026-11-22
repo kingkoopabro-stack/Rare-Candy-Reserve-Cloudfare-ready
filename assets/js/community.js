@@ -35,7 +35,7 @@ var ADULT_KEY = "dwc-adult-welcomed";
 
 var CATEGORIES = ["General", "News", "Question", "Questions & Help", "Shop Talk", "Music", "Video", "Plants & Garden", "Tech & Builds", "Dank Meme", "Off Topic"];
 var FLAIRS = ["Question", "Card Check", "Show & Tell", "Price Check", "Help", "Discussion", "Hype", "Warning"];
-var LISTING_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs", "Sealed Product", "Figures & Toys", "Video Games", "Plants", "3D Prints & Custom", "Other Collectibles"];
+var LISTING_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs", "Sealed Product", "Figures & Toys", "Video Games", "Plants", "3D Prints & Custom", "Digital Content", "Other Collectibles"];
 var SALE_VENUES = ["eBay", "Mercari", "Facebook Marketplace", "This app", "In person", "Other"];
 var CARRIERS = ["USPS", "UPS", "FedEx", "DHL", "Other"];
 var ADULT_CATEGORIES = [
@@ -2752,6 +2752,10 @@ function profileFormHTML(p) {
     (isNew ? "" :
     '<div class="dwc-layoutbox" id="dwc-sec-sell"><h4 style="margin:0 0 6px">🎨 What I sell — your creator card</h4>' +
     "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
+    '<label>Shop name — your shop / brand page name (up to 60 characters)</label>' +
+    '<input name="shop_name" maxlength="60" value="' + esc(p ? (p.shop_name || "") : "") + '" placeholder="e.g. Rare Candy Reserve">' +
+    '<label>Shop tagline — one line under your shop name (up to 140 characters)</label>' +
+    '<input name="shop_tagline" maxlength="140" value="' + esc(p ? (p.shop_tagline || "") : "") + '" placeholder="e.g. Cards, customs, and curiosities — shipped with care">' +
     '<label>Content types I sell</label><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
       return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
     }).join("") + "</div>" +
@@ -4178,14 +4182,22 @@ function ownedContentSale(p) {
   if (!state.profile || !state.myContentSales) return null;
   return state.myContentSales[p.id] || null;
 }
+// The buyer's CS# for a Flea Market listing (digital buys) — same
+// content-sales log, keyed by listing_id instead of post_id.
+function ownedListingSale(listingId) {
+  if (!state.profile || !state.myContentSalesByListing) return null;
+  return state.myContentSalesByListing[listingId] || null;
+}
 async function loadMyContentSales() {
-  if (!state.profile) { state.myContentSales = {}; state.contentSalesLoadedFor = null; return; }
+  if (!state.profile) { state.myContentSales = {}; state.myContentSalesByListing = {}; state.contentSalesLoadedFor = null; return; }
   if (state.contentSalesLoadedFor === state.profile.id) return;
   var data = await apiGet("/content-sales?device_id=" + encodeURIComponent(deviceId()));
   var map = {};
+  var byListing = {};
   var list = (data && data.sales) || [];
-  list.forEach(function (s) { if (s.post_id) map[s.post_id] = s; });
+  list.forEach(function (s) { if (s.post_id) map[s.post_id] = s; if (s.listing_id) byListing[s.listing_id] = s; });
   state.myContentSales = map;
+  state.myContentSalesByListing = byListing;
   state.contentSalesLoadedFor = state.profile.id;
 }
 
@@ -4365,16 +4377,44 @@ function squadFeedCardHTML(s) {
 function feedListHTML(items) {
   return '<div class="dwc-feed-list">' + items.join("") + "</div>";
 }
+function listingTypeTag(l) {
+  if (l.kind === "trade") return "";
+  if (l.listing_type === "digital") return " · 💾 Digital";
+  if (l.listing_type === "dropship") return " · 📬 Dropship";
+  return " · 📦 Physical";
+}
+function listingShipLine(l) {
+  if (l.kind === "trade") return "";
+  if (l.listing_type === "digital") return '<p style="color:var(--muted);font-size:13px">💾 Digital — no shipping · watermarked to the buyer · logged as CS#</p>';
+  var ship = l.shipping_cents ? money(l.shipping_cents) + " shipping — buyer pays" : "Shipping arranged with the seller";
+  var handling = (l.listing_type === "dropship" && l.handling_time) ? " · " + esc(l.handling_time) : "";
+  return '<p style="color:var(--muted);font-size:13px">' + (l.listing_type === "dropship" ? "📬 Dropship — " : "📦 ") + ship + handling + "</p>";
+}
+// Digital listings: the photos ARE the product. Non-owners see a
+// blurred preview under the watermark (same as locked creator posts);
+// the buyer sees their own watermark + "Yours" tag; the seller sees
+// the photos clean. Physical/dropship photos show as-is.
+function listingPhotoHTML(l) {
+  if (!l.image_url) return "";
+  if (l.listing_type !== "digital") return '<img class="dwc-post-img" src="' + esc(l.image_url) + '" alt="Listing photo" loading="lazy">';
+  var isMine = state.profile && state.profile.id === l.seller_id;
+  var owned = !isMine ? ownedListingSale(l.id) : null;
+  var cls = (!isMine && !owned) ? " dwc-img-locked" : "";
+  var tag = owned ? '<span class="dwc-wm-tag">✓ Yours — CS#' + owned.cs_number + "</span>" : "";
+  return '<div class="dwc-listing-photo"><img class="dwc-post-img' + cls + '" src="' + esc(l.image_url) + '" alt="Listing photo" loading="lazy">' +
+    watermarkOverlayHTML(null, owned, false) + tag + "</div>";
+}
 function listingCardHTML(l) {
   var price = l.kind === "flea" ? (l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) : l.price_cents;
   var priceLabel = l.kind === "flea" ? (l.current_bid_cents != null ? "High bid" : "Starting bid") : l.kind === "trade" ? "Trade value" : "Price";
   return '<article class="card dwc-listing">' +
-    (l.image_url ? '<img class="dwc-post-img" src="' + esc(l.image_url) + '" alt="Listing photo" loading="lazy">' : "") +
-    '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + "</div>" +
+    listingPhotoHTML(l) +
+    '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + listingTypeTag(l) + (l.is_adult ? " · 🔞 18+" : "") + "</div>" +
     '<h3 style="margin:8px 0 4px"><a href="#/listing/' + l.id + '" class="dwc-titlelink">' + esc(l.title) + "</a></h3>" +
     '<p>' + esc(l.description.replace(/<[^>]*>/g, "").slice(0, 200)) + (l.description.length > 200 ? "…" : "") + "</p>" +
     '<p><strong style="color:var(--green);font-size:18px">' + priceLabel + ": " + money(price) + "</strong>" +
     ' <span style="color:var(--muted);font-size:13px">· seller gets ' + money(l.seller_gets_cents) + " after the 6% street cut</span></p>" +
+    listingShipLine(l) +
     (l.kind === "flea" ? "<p>🔨 " + l.bid_count + " bid" + (l.bid_count === 1 ? "" : "s") + "</p>" : "") +
     (l.kind === "trade" ? "<p>👍 Good " + l.trade_good + " · Fair " + l.trade_fair + " · Bad " + l.trade_bad + "</p>" : "") +
     '<p class="dwc-meta">by @' + esc(l.seller_username) + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDate(l.created_at) + "</p>" +
@@ -4718,7 +4758,7 @@ async function showPriceChart(cardName) {
 // ---------- Flea Market / Trade / Auction House ----------
 async function viewMarket(el, kind) {
   var titles = {
-    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell their own Pokémon cards and collectibles here once their account and payout method are set up. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
+    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell here once their account and payout method are set up — physical items, digital content, or dropship goods. Your profile page is your shop: set a shop name in Edit Profile and your listings show there. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
     trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it’s a good trade, a fair one, or a bad deal."],
     flea: ["🔨 Auction House — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online auction house with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
   };
@@ -4729,7 +4769,7 @@ async function viewMarket(el, kind) {
     '<div id="dwc-listing-form"></div>' +
     '<div id="dwc-market-feed"><p style="color:var(--muted)">Loading listings…</p></div>';
   renderListingForm($("dwc-listing-form"), kind);
-  var data = await apiGet("/listings?kind=" + kind + "&limit=60");
+  var data = await apiGet("/listings?kind=" + kind + "&limit=60&device_id=" + encodeURIComponent(deviceId()));
   var feed = $("dwc-market-feed");
   if (!feed) return;
   var listings = (data && data.listings) || [];
@@ -4752,6 +4792,19 @@ function renderListingForm(host, kind) {
     '<label>Category</label><select name="category">' + LISTING_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>' + (kind === "flea" ? "Starting bid (USD)" : kind === "trade" ? "Trade value (USD — what it’s worth, for the fee split)" : "Price (USD)") + "</label>" +
     '<input name="price" type="number" step="0.01" min="0" required placeholder="e.g. 25.00">' +
+    (kind === "trade" ? "" :
+      '<label>What kind of listing is this?</label><select name="listing_type">' +
+      '<option value="physical">📦 Physical item — I ship it</option>' +
+      '<option value="digital">💾 Digital content — the photos are the product</option>' +
+      '<option value="dropship">📬 Dropship — my supplier ships it, I fulfil the order</option></select>' +
+      '<label>Shipping charge (USD — the buyer pays shipping, never free)</label>' +
+      '<input name="shipping" type="number" step="0.01" min="0" placeholder="e.g. 4.50">' +
+      '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px">Digital content has no shipping — leave it 0. Physical and dropship listings need a shipping charge.</p>' +
+      '<label>Handling time (for dropship — how long before it ships)</label>' +
+      '<input name="handling_time" maxlength="120" placeholder="e.g. ships in 3–5 business days">' +
+      '<label>Your Stripe Payment Link (optional — your own link, buyers pay you directly)</label>' +
+      '<input name="stripe_link" maxlength="500" placeholder="https://buy.stripe.com/…">' +
+      (p && p.age_verified ? '<label><input type="checkbox" name="is_adult" style="width:auto"> 🔞 This is adult (18+) content — only age-verified members will see it</label>' : '<p style="color:var(--muted);font-size:13px">Adult content listings need age verification first — see Rules &amp; After Dark.</p>')) +
     (kind === "trade" ? '<label>What you’re looking for in return</label><input name="trade_wanted" maxlength="500" placeholder="Card(s) you want in return">' : "") +
     '<label>Description &amp; condition (a little formatting is allowed: bold, italic, lists, links)</label>' +
     '<textarea name="description" required maxlength="6000" placeholder="Condition, set, what’s included…"></textarea>' +
@@ -4765,6 +4818,7 @@ function renderListingForm(host, kind) {
     (kind === "trade" ? '<p class="dwc-warn">Trades need a photo AND a completed AI authenticity check on it before they go live — run the check on the cover photo first.</p>' : "") +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runListingCheck(this.form)">🔍 Run AI authenticity check on cover photo</button> <span data-checkresult></span></div>' +
     '<label><input type="checkbox" name="allow_comments" checked style="width:auto"> Allow comments on this listing</label>' +
+    '<p style="color:var(--muted);font-size:13px">6% street cut on the item price only (shown on the listing) · buyer pays shipping · no mystery boxes or repacks without full disclosure · dropship means YOU fulfil the order · PayPal Goods &amp; Services recommended — no escrow, the site never holds money · the operator and admins can remove listings that break the rules.</p>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">List it →</button></p>' +
     "</form></section>";
@@ -4851,7 +4905,7 @@ async function viewThread(el, postId) {
 // ---------- Listing detail ----------
 async function viewListing(el, listingId) {
   el.innerHTML = '<p style="color:var(--muted)">Loading listing…</p>';
-  var data = await apiGet("/listings/" + listingId);
+  var data = await apiGet("/listings/" + listingId + "?device_id=" + encodeURIComponent(deviceId()));
   var l = data && data.listing;
   if (!l) {
     el.innerHTML = '<div class="note">That listing is gone or sold.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'market\')">← Back to the Flea Market</button></p>';
@@ -4861,19 +4915,33 @@ async function viewListing(el, listingId) {
   var comments = await apiGet("/listings/" + listingId + "/comments");
   var list = (comments && comments.comments) || [];
   var isMine = state.profile && state.profile.id === l.seller_id;
+  var isOperator = state.profile && state.profile.is_operator;
+  var isAdmin = state.profile && state.profile.role === "admin";
+  var canMod = isOperator || isAdmin;
   var price = l.kind === "flea" ? (l.current_bid_cents != null ? l.current_bid_cents : l.price_cents) : l.price_cents;
   var imgs = [l.image_url, l.image2_url, l.image3_url].filter(Boolean);
+  // Digital listings: the photos ARE the product — blurred preview under
+  // the watermark for non-owners (no lightbox on the locked preview,
+  // or the blur would be one tap away from the raw file); the buyer sees
+  // their own watermark; the seller sees the photos clean.
+  var isDigital = l.listing_type === "digital";
+  var ownedSale = (!isMine && isDigital) ? ownedListingSale(l.id) : null;
+  var photoCls = (isDigital && !isMine && !ownedSale) ? ' class="dwc-img-locked"' : "";
+  var canLightbox = !(isDigital && !isMine && !ownedSale);
+  var wm = (isDigital && !isMine) ? watermarkOverlayHTML(null, ownedSale, false) : "";
+  var yoursTag = ownedSale ? '<p><span class="dwc-wm-tag" style="position:static">✓ Yours — CS#' + ownedSale.cs_number + " — your copy is watermarked to you.</span></p>" : "";
   el.innerHTML =
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'' + window.__dwcListingKind + '\')">← Back</button></p>' +
     '<article class="card">' +
-    (imgs.length ? '<div class="dwc-photos">' + imgs.map(function (u, i) { return '<img src="' + esc(u) + '" alt="Listing photo ' + (i + 1) + '" loading="lazy" onclick="DWC.openLightbox(\'' + esc(u) + '\')">'; }).join("") + "</div>" : "") +
+    (imgs.length ? '<div class="dwc-photos dwc-listing-photo">' + imgs.map(function (u, i) { return '<img' + photoCls + ' src="' + esc(u) + '" alt="Listing photo ' + (i + 1) + '" loading="lazy"' + (canLightbox ? ' onclick="DWC.openLightbox(\'' + esc(u) + '\')"' : "") + '>'; }).join("") + wm + "</div>" + yoursTag : "") +
     gifEmbedHTML(l.gif_url, "") +
-    '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + " · " + esc(l.status) + "</div>" +
+    '<div class="tag">' + esc(l.category) + " · " + (l.kind === "sale" ? "For sale" : l.kind === "trade" ? "Up for trade" : "🔨 Flea market") + listingTypeTag(l) + (l.is_adult ? " · 🔞 18+" : "") + " · " + esc(l.status) + "</div>" +
     "<h2>" + esc(l.title) + "</h2>" +
     '<div class="dwc-desc">' + l.description + "</div>" +
     verificationBadge(l) +
     '<p><strong style="color:var(--green);font-size:20px">' + (l.kind === "flea" ? (l.current_bid_cents != null ? "High bid: " : "Starting bid: ") : l.kind === "trade" ? "Trade value: " : "Price: ") + money(price) + "</strong></p>" +
-    '<p style="color:var(--muted);font-size:14px">Platform cut (5%): ' + money(l.fee_cents) + " · Seller gets: " + money(l.seller_gets_cents) + "</p>" +
+    '<p style="color:var(--muted);font-size:14px">Platform cut (6%): ' + money(l.fee_cents) + " · Seller gets: " + money(l.seller_gets_cents) + "</p>" +
+    listingShipLine(l) +
     (l.kind === "trade" && l.trade_wanted ? "<p><strong>Looking for:</strong> " + esc(l.trade_wanted) + "</p>" : "") +
     '<p class="dwc-meta">by @' + esc(l.seller_username) + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDate(l.created_at) + (l.seller_payout_ready ? ' · <span style="color:var(--green)">✓ payout ready</span>' : "") + "</p>" +
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML +
@@ -4881,7 +4949,10 @@ async function viewListing(el, listingId) {
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + listingLink(l.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'listing\', ' + l.id + ')">🚩 Report</button>' +
     (isMine && l.status !== "sold" ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteListing(' + l.id + ')">🗑 Close my listing</button>' : "") +
+    (canMod && !isMine && l.status !== "sold" ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteListing(' + l.id + ')">🗑 Remove listing (team)</button>' : "") +
     "</div>" +
+    (l.stripe_link && l.status === "active" && !isMine
+      ? '<p style="margin-top:14px"><a class="btn ghost" href="' + esc(l.stripe_link) + '" target="_blank" rel="noopener">Pay with Stripe →</a> <span style="color:var(--muted);font-size:13px">The seller’s own Stripe link — pay them directly, then tap Buy it so the order is recorded.</span></p>' : "") +
     (l.status === "active" && !isMine && l.kind !== "trade"
       ? '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.buyListing(' + l.id + ')">' + (l.kind === "flea" ? "Complete purchase as high bidder →" : "Buy it →") + "</button> <span style=\"color:var(--muted);font-size:13px\">Payment is arranged directly with the seller — no money moves in this app.</span></p>"
       : "") +
@@ -4948,6 +5019,7 @@ function orderCardHTML(o, isSeller) {
   return '<article class="card dwc-order">' +
     (o.image_url ? '<img class="dwc-post-img" src="' + esc(o.image_url) + '" alt="" loading="lazy">' : "") +
     "<h3 style=\"margin:0 0 4px\">" + esc(o.item_title) + "</h3>" +
+    (o.cs_number ? '<p style="margin:4px 0;font-size:14px">Sale number: <strong>CS#' + o.cs_number + "</strong> · your copy is watermarked to you</p>" : "") +
     '<p style="margin:4px 0"><strong>' + money(o.amount_cents) + "</strong> · " + esc(o.status) + " · " + fmtDate(o.created_at) + "</p>" +
     ((o.tax_cents || o.shipping_cents) ? '<p style="margin:4px 0;font-size:14px">Item ' + money(o.amount_cents) + (o.shipping_cents ? " · Shipping " + money(o.shipping_cents) : "") + (o.tax_cents ? " · Tax " + money(o.tax_cents) + (o.tax_state ? " (" + esc(o.tax_state) + (o.tax_rate_percent ? " " + o.tax_rate_percent + "%" : "") + ")" : "") : "") + " · <strong>Total " + money(o.total_cents != null ? o.total_cents : (o.amount_cents + (o.tax_cents || 0) + (o.shipping_cents || 0))) + "</strong></p>" : "") +
     '<p style="margin:4px 0;color:var(--muted);font-size:14px">' + (isSeller ? "Buyer: @" + esc(o.buyer_username) : "Seller: @" + esc(o.seller_username)) +
@@ -5796,7 +5868,11 @@ async function viewMember(el, memberId) {
   // so the page works as their personal website/shop. Full width below
   // the columns (or below the custom page); hidden when they have no
   // active listings.
-  var listingsSection = (isWebsite && !hidden("listings") ? '<section class="card" id="dwc-member-listings"><h3 style="margin-top:0">🛒 Shop — my listings</h3><div id="dwc-member-listings-list"><p style="color:var(--muted)">Loading listings…</p></div></section>' : "");
+  // Member shops — the member's shop name + tagline head their shop
+  // section; without them it reads "Shop — my listings" as before.
+  var shopTitle = (m.shop_name ? esc(m.shop_name) : "🛒 Shop — my listings");
+  var shopTag = (m.shop_tagline ? '<p style="color:var(--muted);margin:0 0 10px">' + esc(m.shop_tagline) + "</p>" : "");
+  var listingsSection = (isWebsite && !hidden("listings") ? '<section class="card" id="dwc-member-listings"><h3 style="margin-top:0">' + shopTitle + "</h3>" + shopTag + '<div id="dwc-member-listings-list"><p style="color:var(--muted)">Loading listings…</p></div></section>' : "");
   // The only way back — tiny and unobtrusive, on purpose. The owner
   // also gets an Edit link here (their website nav bar is gone).
   var websiteBack = (isWebsite ? '<p class="dwc-website-back"><a href="community.html">🍬 ← Rare Candy Reserve</a>' + (m.is_mine ? ' · <button type="button" class="dwc-linklike" onclick="DWC.editProfile()">Edit profile</button>' : "") + "</p>" : "");
@@ -5930,7 +6006,7 @@ async function loadMemberFeed(memberId) {
 async function loadMemberListings(memberId) {
   var host = $("dwc-member-listings-list");
   if (!host) return;
-  var data = await apiGet("/listings?profile_id=" + memberId + "&limit=12");
+  var data = await apiGet("/listings?profile_id=" + memberId + "&limit=12&device_id=" + encodeURIComponent(deviceId()));
   var items = (data && data.listings) || [];
   if (!items.length) {
     var sec = $("dwc-member-listings");
@@ -6682,6 +6758,7 @@ function viewRules(el) {
     "<li><strong>No outside sales.</strong> Deals that start here stay here. On this platform your content and your deals are protected — verified member accounts, recorded orders and tracking, and a report trail. Take a deal off site and you lose all of that protection. Taking a buyer off-platform to dodge the street cut also risks a <strong>permanent ban of the account</strong> (and, on the public site, the IP).</li>" +
     "<li><strong>Stealing content is theft — and it’s expensive.</strong> Anyone who steals a member’s content and redistributes it, in any form, <strong>will be held liable in court for money owed due to damages, and more</strong>. The platform will pursue content thieves. If you didn’t make it or buy the right to share it, don’t post it anywhere.</li>" +
     "<li><strong>Digital content sales are logged and watermarked.</strong> Every digital sale gets a sale number (CS#1, CS#2, and so on) tied to the buyer, and every copy a buyer sees carries their username and sale number in the watermark — so a leaked copy points straight at who bought it. <strong>Legal action will be taken for redistribution of any property bought digitally on this site.</strong> Your IP address, as well as your information, will be given to the person whose intellectual property you are distributing illegally, so they can determine whether to take legal action or not. We are in no way responsible for any misuse of the tools provided here and are not to be held liable for any choices that others make while using this. This was created to be a safe space for all people, and we want to keep it that way.</li>" +
+    "<li><strong>Selling in the Flea Market — your page is your shop.</strong> Any member with a payout method can list physical items, digital content, or dropship goods. Set a shop name and tagline in Edit Profile &gt; What I sell and your listings show on your page. The 6% street cut is on the item price only — shipping is never free, the buyer always pays it. No mystery boxes or repacks without full disclosure. Dropship means YOU fulfil the order through your supplier and state the handling time. PayPal Goods &amp; Services is recommended — there is no escrow, the site never holds money. Digital sales get a sale number (CS#) and a watermarked copy, same as creator-post sales. Adult listings need age verification, and only age-verified members ever see them. The operator and admins can remove any listing that breaks the rules.</li>" +
     "<li><strong>Be honest about condition.</strong> Photos of the actual item, flaws stated up front. The item is the item for sale — extras are courtesies, not the product.</li>" +
     "<li><strong>Chat:</strong> guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</li>" +
     "<li><strong>Payments &amp; shipping:</strong> buyer and seller arrange payment (the seller's payout method is on their profile) and shipping directly. Every purchase lands in the buyer's <strong>My Orders</strong> with the order status; when the seller ships, they add the carrier + tracking number there and the buyer gets their copy of it (plus a link to the carrier's tracking page). Sellers: your wallet balance and payout history live under <strong>Payouts</strong> — money becomes available when an order is marked delivered. Shipping-label creation through Shippo or a similar service is planned and will be labeled clearly when it actually works — it is not live yet.</li></ul>" +
@@ -7576,6 +7653,8 @@ window.DWC = {
     body.seller_open_to = String(fd.get("seller_open_to") || "").trim();
     body.seller_price_min_cents = toCents(fd.get("seller_price_min"));
     body.seller_price_max_cents = toCents(fd.get("seller_price_max"));
+    body.shop_name = String(fd.get("shop_name") || "").trim();
+    body.shop_tagline = String(fd.get("shop_tagline") || "").trim();
     body.buyer_types = [];
     form.querySelectorAll('input[name="buyer_types"]:checked').forEach(function (cb) { body.buyer_types.push(cb.value); });
     body.buyer_tags = String(fd.get("buyer_tags") || "").split(",").map(function (t) { return t.trim(); }).filter(Boolean);
@@ -8341,6 +8420,11 @@ window.DWC = {
       title: String(fd.get("title") || "").trim(),
       description: String(fd.get("description") || "").trim(),
       price_cents: Math.round(parseFloat(fd.get("price") || "0") * 100),
+      listing_type: String(fd.get("listing_type") || "physical"),
+      shipping_cents: Math.round(parseFloat(fd.get("shipping") || "0") * 100),
+      is_adult: !!fd.get("is_adult"),
+      stripe_link: String(fd.get("stripe_link") || "").trim(),
+      handling_time: String(fd.get("handling_time") || "").trim(),
       trade_wanted: String(fd.get("trade_wanted") || "").trim(),
       allow_comments: !!fd.get("allow_comments"),
       images: photos,
@@ -8481,10 +8565,18 @@ window.DWC = {
   },
   buyListing: async function (listingId) {
     if (!state.profile) { setNotice("Create your account first to buy — orders live on your profile."); DWC.openSignup(); return; }
-    if (!confirm("Complete this purchase? It lands in your My Orders. Payment is arranged directly with the seller — no money moves in this app.")) return;
+    if (!confirm("Complete this purchase? It lands in your My Orders. Payment is arranged directly with the seller (their Stripe link or payout method is on the listing) — no money moves in this app.")) return;
     var data = await apiPost("/listings/" + listingId + "/buy", { device_id: deviceId() });
     if (!data || !data.ok) { setNotice((data && data.error) || "Purchase didn't go through."); return; }
-    setNotice("Order placed — it's in My Orders, and your copy of the tracking number lands there as soon as the seller ships. Payment is arranged directly with the seller.");
+    // Digital buys come back with a CS# — reload my sales so the
+    // watermarked copy shows unlocked right away.
+    if (data.cs_number) {
+      state.contentSalesLoadedFor = null;
+      await loadMyContentSales();
+      setNotice("Order placed — sale number CS#" + data.cs_number + ". Your copy is watermarked to you — find it in My Orders. Payment is arranged directly with the seller.");
+    } else {
+      setNotice("Order placed — it's in My Orders, and your copy of the tracking number lands there as soon as the seller ships. Payment is arranged directly with the seller.");
+    }
     go("orders");
   },
   updateShipping: async function (form, orderId) {

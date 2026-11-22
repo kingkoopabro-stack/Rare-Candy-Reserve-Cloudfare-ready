@@ -137,7 +137,11 @@ export async function onRequestPost({ env, request }) {
     "store:horror-lover", "store:stardust-diner", "store:deep-forest",
     "store:cyber-street", "store:neon-rain", "store:golden-shrine",
     "store:vaporwave-sunset", "store:retro-terminal", "store:candy-pop",
-    "store:midnight-garden"];
+    "store:midnight-garden", "store:arcade80s", "store:shopfront",
+    "store:band-stand", "store:portfolio", "store:neojapan-rain",
+    "store:neojapan-night", "store:brass-knuckles", "store:too-much",
+    "store:cat-faces", "store:burton", "store:christmas-cozy",
+    "store:christmas-lights"];
   const v2Sets = [];
   const v2Vals = [];
   if (Array.isArray(a.top_friends)) {
@@ -192,6 +196,17 @@ export async function onRequestPost({ env, request }) {
   if (typeof a.seller_open_to === "string") {
     v3Sets.push("seller_open_to = ?");
     v3Vals.push(str(a.seller_open_to, 140));
+  }
+  // Member shops — the member's shop/brand name + tagline for their
+  // shop page. Rides the v3 tier, so the graceful retry drops them
+  // with the rest of v3 when the migration hasn't run yet.
+  if (typeof a.shop_name === "string") {
+    v3Sets.push("shop_name = ?");
+    v3Vals.push(str(a.shop_name, 60));
+  }
+  if (typeof a.shop_tagline === "string") {
+    v3Sets.push("shop_tagline = ?");
+    v3Vals.push(str(a.shop_tagline, 140));
   }
   if (Number.isInteger(a.seller_price_min_cents) || Number.isInteger(a.seller_price_max_cents)) {
     const lo = Number.isInteger(a.seller_price_min_cents) ? Math.max(0, Math.min(a.seller_price_min_cents, 10000000)) : 0;

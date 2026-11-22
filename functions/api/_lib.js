@@ -1888,7 +1888,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1947,6 +1947,11 @@ export function parseTheme(stored) {
   // so it wins over a picture or a preset. The form says so when the
   // effect is ticked; this is the backstop for stale or forged saves.
   if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_gif_url = ""; }
+  // Page opacity (2026-11-22) — how see-through the page is over its
+  // background, 0.4–1. "" = solid (the default); anything outside the
+  // range is dropped so a forged value can't hide the page.
+  const po = parseFloat(obj.page_opacity);
+  out.page_opacity = (po >= 0.4 && po <= 1 && po !== 1) ? Math.round(po * 100) / 100 : "";
   // Picture size / position / frame (v3.9) — fixed ids, "" = default.
   out.pic_size = PIC_SIZE_IDS.includes(String(obj.pic_size || "")) ? String(obj.pic_size) : "";
   out.pic_position = PIC_POSITION_IDS.includes(String(obj.pic_position || "")) ? String(obj.pic_position) : "";

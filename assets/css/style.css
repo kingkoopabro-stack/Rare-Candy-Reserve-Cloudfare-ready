@@ -383,11 +383,21 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-stats{text-align:center;color:var(--muted);font-size:14px;margin:14px 0}
 .dwc-stats span{color:var(--pink);font-weight:800}
 .dwc-notice{border:1px solid var(--amber);background:#2b2103;color:#fde68a;border-radius:10px;padding:10px 14px;margin:12px 0;font-size:14px}
-.dwc-pills{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
-/* v3.2 — nav pills are BIG now: readable at a glance, no more tiny buttons. */
-.dwc-pill{border:2px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);border-radius:999px;padding:14px 22px;font-size:17px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em;box-shadow:0 2px 12px rgba(0,0,0,.35)}
+.dwc-pills{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+/* Nav pills — small and neat (2026-11-22): they took three rows before. */
+.dwc-pill{border:2px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);border-radius:999px;padding:9px 15px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em;box-shadow:0 2px 12px rgba(0,0,0,.35)}
 .dwc-pill.active{border-color:var(--pink);background:rgba(255,45,149,.15);color:#ffd7ef}
 .dwc-pill:hover{border-color:var(--cyan);color:#fff;box-shadow:0 0 16px rgba(0,229,255,.45)}
+/* Payouts — compact horizontal rows like feed posts, not tall cards
+   (2026-11-22). One line of facts + the action on the right. */
+.dwc-payout-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+.dwc-payout-row h3{margin:0 0 4px;font-size:16px}
+.dwc-payout-row p{margin:0 0 4px}
+.dwc-payout-row p:last-child{margin-bottom:0}
+.dwc-payout-main{flex:1;min-width:220px}
+.dwc-payout-action{margin-left:auto;flex:none}
+.dwc-payout-row details{margin-top:6px}
+.dwc-payout-row summary{cursor:pointer;color:var(--muted);font-size:13px}
 .dwc-profile-row{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .dwc-profile-card{margin:16px 0}
 .dwc-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--violet)}
@@ -500,6 +510,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-cattile:hover{border-color:var(--pink);color:#fff;background:linear-gradient(90deg,rgba(255,45,149,.35),rgba(124,77,255,.35));box-shadow:0 0 16px rgba(255,45,149,.45);transform:translateY(-1px)}
 .dwc-adultnav{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
 .dwc-checkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px;margin:8px 0;font-size:14px}
+/* Top Friends picker — fixed-width columns, centered, so the picked
+   boxes sit symmetrically like the profile display. */
+#dwc-topfriends-picker .dwc-checkgrid{grid-template-columns:repeat(auto-fill,minmax(150px,150px));justify-content:center}
 .dwc-model-img{width:100%;max-height:300px;object-fit:cover;border-radius:12px;margin-bottom:10px}
 .dwc-model{overflow:hidden}
 .dwc-match{color:var(--green);font-weight:800}
@@ -551,13 +564,23 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-imwin-head{display:flex;justify-content:space-between;align-items:center;gap:10px;background:linear-gradient(90deg,rgba(255,45,149,.35),rgba(0,229,255,.25));padding:10px 14px}
 .dwc-imlog{max-height:260px;overflow-y:auto;padding:12px}
 .dwc-imwin form{padding:0 12px 12px}
-.dwc-top8{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:12px;margin-top:10px}
-.dwc-topfriend{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:12px 6px;font-size:13px;font-weight:700}
+/* Top Friends — ALWAYS centered (2026-11-22): flex wrap with centered
+   rows, so the boxes sit symmetrically on mobile and desktop and the
+   last row is never lopsided. */
+.dwc-top8{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:10px}
+.dwc-topfriend{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;text-decoration:none;color:var(--ink);border:2px solid var(--line);border-radius:12px;padding:12px 6px;font-size:13px;font-weight:700;flex:0 0 110px;width:110px;box-sizing:border-box}
 .dwc-topfriend:hover{border-color:var(--pink)}
 .dwc-topfriend .dwc-avatar{width:64px;height:64px}
 .dwc-topfriend span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .dwc-mypage-head{margin-bottom:16px}
-.dwc-myprofile{border-radius:16px;padding:18px;margin:0 -6px}
+.dwc-myprofile{border-radius:16px;padding:18px;margin:0 -6px;position:relative}
+/* Rain drops (2026-11-22) — individual falling drops, varied length and
+   speed, slight slant. The CSS-only rain is the fallback; this layer is
+   the real thing on the live profile + editor preview. */
+.dwc-rain{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2}
+.dwc-rain i{position:absolute;top:-32px;width:1.5px;border-radius:2px;background:linear-gradient(180deg,transparent,rgba(174,194,255,.8));animation:dwcRainFall linear infinite}
+.dwc-rain-city i{background:linear-gradient(180deg,transparent,rgba(150,200,255,.85))}
+@keyframes dwcRainFall{to{transform:translate(18px,2400px)}}
 
 /* ---------- Creator/Seller area v3 ---------- */
 .dwc-creatorbox{border-color:var(--pink);background:linear-gradient(160deg,rgba(255,45,149,.08),rgba(124,77,255,.06))}
@@ -1109,8 +1132,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-member-feed-list{max-height:720px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
 /* Top Friends: compact tiles in a clearly bordered box. */
 .dwc-topfriends-box{border:2px solid var(--pink,#ff2d95);border-radius:14px}
-.dwc-topfriends-box .dwc-top8{grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
-.dwc-topfriends-box .dwc-topfriend{padding:8px 4px;font-size:12px;gap:4px}
+.dwc-topfriends-box .dwc-top8{gap:8px}
+.dwc-topfriends-box .dwc-topfriend{padding:8px 4px;font-size:12px;gap:4px;flex-basis:84px;width:84px}
 .dwc-topfriends-box .dwc-topfriend .dwc-avatar{width:48px;height:48px}
 /* Page comments in the right column: slightly smaller and tighter,
    but never below 13px and never cramped — readable on any platform. */
@@ -1359,6 +1382,10 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-store-wearing{font-size:13px;color:#39ff88;font-weight:700}
 .dwc-store-preview{margin:0 0 10px;border:1px dashed rgba(255,255,255,.35);border-radius:12px;padding:10px;background:rgba(0,0,0,.25)}
 .dwc-store-preview .dwc-previewbox{margin:0}
+/* Layout Store preview — a full-screen modal over a demo page
+   (2026-11-22), never the member's own page. */
+.dwc-store-preview-modal{position:fixed;inset:0;z-index:80;overflow:auto;background:var(--bg);padding:14px}
+.dwc-store-preview-modal-inner{max-width:720px;margin:0 auto}
 .tp-icon-store{background:linear-gradient(135deg,#ff9a00,#ff2ea6)}
 
 /* ---------- Community feed redesign (v3.14) ---------- */
@@ -1632,7 +1659,13 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-sticky-save-btn{font-size:13px;padding:7px 14px}
 #dwc-sticky-dirty{font-size:13px;color:var(--amber)}
 /* Group headings — one per part of the page the section changes. */
-.dwc-edit-group-h{margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--line);font-size:17px}
+.dwc-edit-group-h{margin:22px 0 8px;padding-top:14px;padding-bottom:6px;border-top:1px solid var(--line);border-bottom:2px solid var(--line);font-size:17px}
+/* Edit Profile — setup fields side by side (2026-11-22): two columns
+   on desktop, one on mobile, so bank account / email / name sit next
+   to each other instead of one long stack. */
+.dwc-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;margin:0 0 4px}
+.dwc-field{min-width:0}
+@media (max-width:640px){.dwc-field-grid{grid-template-columns:1fr}}
 /* Settings search — browser-Find behavior; the hit is outlined, never hidden. */
 .dwc-setting-search{display:flex;gap:8px;align-items:center;margin:0 0 12px}
 .dwc-setting-search input{flex:1;min-width:0}
@@ -1660,25 +1693,39 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-player-btn{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--pink);color:#fff;font-size:18px;cursor:pointer}
 .dwc-player-name{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dwc-player-badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:14px}
-/* Cassette tapes — three colors; the reels spin while it plays. */
-.dwc-cassette{padding:12px}
-.dwc-cassette-pink{background:linear-gradient(135deg,#ff5da2,#ff2d95)}
-.dwc-cassette-cyan{background:linear-gradient(135deg,#22d3ee,#0ea5e9)}
-.dwc-cassette-gold{background:linear-gradient(135deg,#f5d76e,#d4af37)}
-.dwc-cassette-tape{display:flex;align-items:center;gap:10px;flex:1;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.55);border-radius:8px;padding:10px 12px;cursor:pointer;color:#fff;font:inherit}
-.dwc-cassette-reel{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#111;border:3px solid #eee;position:relative}
-.dwc-cassette-reel::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;background:#eee;border-radius:50%}
+/* Cassette — Mixxtape style (2026-11-22): one shape, every color.
+   Proper cassette proportions (100:64), capped small, never stretched.
+   Screen top-right, two reels in the middle, buttons + bottom holes. */
+.dwc-cassette{display:block;padding:12px}
+.dwc-cassette-tape{display:block;width:100%;max-width:320px;margin:0 auto;aspect-ratio:100/64;border:0;border-radius:10px;padding:10px 12px 8px;cursor:pointer;color:#fff;font:inherit;box-shadow:0 4px 14px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.25)}
+span.dwc-cassette-tape{cursor:default}
+.dwc-cassette-black{background:repeating-linear-gradient(45deg,rgba(255,255,255,.06) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(0,0,0,.35) 0 2px,transparent 2px 5px),linear-gradient(135deg,#333338,#0c0c0e)}
+.dwc-cassette-pink{background:repeating-linear-gradient(45deg,rgba(255,255,255,.10) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(0,0,0,.18) 0 2px,transparent 2px 5px),linear-gradient(135deg,#ff5da2,#ff2d95)}
+.dwc-cassette-cyan{background:repeating-linear-gradient(45deg,rgba(255,255,255,.10) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(0,0,0,.18) 0 2px,transparent 2px 5px),linear-gradient(135deg,#22d3ee,#0ea5e9)}
+.dwc-cassette-gold{background:repeating-linear-gradient(45deg,rgba(255,255,255,.12) 0 2px,transparent 2px 5px),repeating-linear-gradient(-45deg,rgba(0,0,0,.16) 0 2px,transparent 2px 5px),linear-gradient(135deg,#f5d76e,#c9962e)}
+.dwc-cassette-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.dwc-cassette-btns{display:flex;gap:5px;flex:none}
+.dwc-cassette-btns i{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:inset 0 -1px 2px rgba(0,0,0,.4)}
+.dwc-cassette-screen{flex:1;min-width:0;background:#0a2a5e;color:#7dd3fc;border-radius:4px;padding:3px 8px;font-family:monospace;font-size:11px;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;box-shadow:inset 0 1px 4px rgba(0,0,0,.6)}
+.dwc-cassette-mid{display:flex;align-items:center;gap:10px}
+.dwc-cassette-reel{flex:0 0 auto;width:38px;height:38px;border-radius:50%;background:repeating-conic-gradient(from 0deg,#eee 0 12deg,#1a1a1a 12deg 60deg);border:3px solid #f2f2f2;position:relative;box-shadow:inset 0 0 0 3px #111}
+.dwc-cassette-reel i{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;background:#f2f2f2;border-radius:50%;box-shadow:0 0 0 2px #111}
 .dwc-playing .dwc-cassette-reel{animation:dwcReel 1.2s linear infinite}
+.dwc-playing .dwc-reel-r{animation-duration:.8s}
 @keyframes dwcReel{to{transform:rotate(360deg)}}
-.dwc-cassette-window{flex:1;background:rgba(255,255,255,.85);border-radius:4px;padding:4px 8px;color:#222;text-align:center}
-.dwc-cassette-label{font-weight:700;font-size:13px}
-/* Vinyl — wooden player, top view; the record spins while it plays. */
+.dwc-cassette-label{flex:1;min-width:0;text-align:center;font-size:10px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwc-cassette-bottom{display:flex;justify-content:center;gap:14px;margin-top:10px}
+.dwc-cassette-bottom i{width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.45);box-shadow:inset 0 1px 2px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.2)}
+/* Vinyl — wooden player, top view; the record spins while it plays.
+   (2026-11-22 touch-up: bigger record, visible grooves, a tonearm with
+   a proper pivot base, centered label.) */
 .dwc-vinyl-wood{background:linear-gradient(135deg,#8b5a2b,#5d3a1a);border-radius:12px;padding:14px;position:relative;flex:1;display:flex;justify-content:center}
-.dwc-vinyl-record{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,#111 0 30%,#222 31% 60%,#111 61%);border:2px solid #000;position:relative;display:flex;align-items:center;justify-content:center}
-.dwc-vinyl-record::after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(255,255,255,.14)}
+.dwc-vinyl-record{width:168px;height:168px;border-radius:50%;background:repeating-radial-gradient(circle at center,#151515 0 2px,#232323 2px 4px);border:2px solid #000;position:relative;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.dwc-vinyl-record::after{content:"";position:absolute;inset:14px;border-radius:50%;border:1px solid rgba(255,255,255,.16)}
 .dwc-vinyl-tag{background:#ff2d95;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dwc-playing .dwc-vinyl-record{animation:dwcReel 3s linear infinite}
-.dwc-vinyl-arm{position:absolute;right:22px;top:14px;width:56px;height:8px;background:#c0c0c0;border-radius:4px;transform:rotate(28deg);transform-origin:right center}
+.dwc-vinyl-arm{position:absolute;right:16px;top:12px;width:64px;height:8px;background:linear-gradient(90deg,#e8e8e8,#9a9a9a);border-radius:4px;transform:rotate(32deg);transform-origin:right center;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+.dwc-vinyl-arm::before{content:"";position:absolute;right:-6px;top:50%;width:16px;height:16px;margin-top:-8px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#e8e8e8,#777);box-shadow:0 1px 3px rgba(0,0,0,.6)}
 /* Visualizer — real waveform bars from the playing audio (Web Audio analyser). */
 .dwc-viz-canvas{width:100%;max-width:320px;height:72px;background:#0a0a12;border-radius:8px;display:block}
 .dwc-viz-static{display:flex;align-items:flex-end;gap:3px;height:72px;padding:6px 8px;background:#0a0a12;border-radius:8px}

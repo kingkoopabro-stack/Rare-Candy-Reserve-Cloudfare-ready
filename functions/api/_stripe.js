@@ -31,7 +31,19 @@ export async function stripePlatformCall(env, method, path, params, idemKey) {
     const headers = { authorization: "Bearer " + key, "content-type": "application/x-www-form-urlencoded" };
     if (idemKey) headers["idempotency-key"] = idemKey;
     const init = { method, headers, signal: AbortSignal.timeout(15000) };
-    if (params) init.body = new URLSearchParams(params);
+    if (params) {
+      // Stripe's form parser turns an `undefined` value into the literal
+      // string "undefined" (URLSearchParams stringifies it) — so an
+      // absent email used to arrive as email=undefined and Stripe
+      // answered "Invalid email address: undefined". Drop undefined /
+      // null params here, centrally, so no caller can send one again
+      // (onboard + offer both pass `email: ... || undefined`).
+      const clean = {};
+      Object.keys(params).forEach(function (k) {
+        if (params[k] !== undefined && params[k] !== null) clean[k] = params[k];
+      });
+      init.body = new URLSearchParams(clean);
+    }
     res = await fetch(STRIPE_API + path, init);
   } catch (e) {
     return { ok: false, error: "Couldn't reach Stripe — nothing was charged. Try again in a bit." };

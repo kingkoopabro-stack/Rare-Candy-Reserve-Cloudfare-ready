@@ -577,6 +577,34 @@ export async function onRequestPost({ env, request }) {
       } else { throw e; }
     }
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(existing.id).first();
+    // v3.23 (2026-11-22) — one email: a new/changed contact_email on an
+    // edit also becomes the pending recovery email, so the single
+    // address is verified for password resets too. No D1 migration:
+    // pending_email / recovery_email / recovery_email_verified already
+    // exist. Skipped when the address is already the verified recovery
+    // one, or already pending — never re-verify an address that
+    // already counts. Same verify link + queue as the signup path below.
+    if (row && typeof ce === "string" && ce && ce !== row.recovery_email && ce !== row.pending_email) {
+      try {
+        await db.prepare("UPDATE profiles SET pending_email = ? WHERE id = ?").bind(ce, row.id).run();
+        const token = await issueToken(db, row.id, "email_verify", VERIFY_TOKEN_TTL_MS, "");
+        const link = `${new URL(request.url).origin}/forgot-password.html?verify=${encodeURIComponent(token)}`;
+        await deliverOutbound(env, db, row.id, "email", "email_verify",
+          "Verify your Rare Candy Reserve recovery email",
+          `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`,
+          ce,
+          txEmailHtml({
+            title: "Verify your recovery email",
+            paragraphs: [
+              `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it.`,
+              "The link works for 24 hours. If you didn't ask for this, ignore it.",
+            ],
+            action: { label: "Verify this email →", url: link },
+          }));
+        row.pending_email = ce;
+        recoveryEmailPending = true;
+      } catch { /* columns/table missing — the member can verify it later in Edit profile */ }
+    }
   } else {
     const r = await db.prepare(
       `INSERT INTO profiles (device_id, username, full_name, birthday, terms_agreed_at, chat_name, occupation, bio, payout_method, payout_handle, avatar_blob_key, top_friends, created_at, updated_at)

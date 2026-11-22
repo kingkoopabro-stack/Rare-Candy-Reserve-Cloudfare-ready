@@ -152,9 +152,10 @@ var SOUNDSCAPES = [
 // animation; image uses the member's own picture/GIF as the player.
 var PLAYER_SKINS = [
   { id: "", name: "Simple player", desc: "A plain play button and the track name." },
-  { id: "cassette-pink", name: "Cassette — pink", desc: "A pink cassette tape. The reels spin while it plays." },
-  { id: "cassette-cyan", name: "Cassette — cyan", desc: "A cyan cassette tape. The reels spin while it plays." },
-  { id: "cassette-gold", name: "Cassette — gold", desc: "A gold cassette tape. The reels spin while it plays." },
+  { id: "cassette-black", name: "Cassette — Mixxtape black", desc: "A black carbon-fiber cassette player, Mixxtape style — screen, two reels, buttons. The reels spin while it plays." },
+  { id: "cassette-pink", name: "Cassette — pink", desc: "The same Mixxtape cassette player in pink. The reels spin while it plays." },
+  { id: "cassette-cyan", name: "Cassette — cyan", desc: "The same Mixxtape cassette player in cyan. The reels spin while it plays." },
+  { id: "cassette-gold", name: "Cassette — gold", desc: "The same Mixxtape cassette player in gold. The reels spin while it plays." },
   { id: "vinyl", name: "Vinyl on wood", desc: "A spinning record on a wooden player, top view." },
   { id: "visualizer", name: "Visualizer", desc: "Bars that move with the sound itself — a real analyser, not a fake animation." },
   { id: "image", name: "My own picture / GIF", desc: "Your picture or GIF is the player — tap it to play or pause." }
@@ -178,8 +179,10 @@ function resolvePlayerImageUrl(str) {
   return "";
 }
 // Player HTML for a soundscape pick. mini=true renders a silent
-// stand-in for the editor's small preview (no audio element, buttons
-// disabled). The live page + big preview get the real player.
+// stand-in (no audio element, buttons disabled) — used only where a
+// player can't be tapped. The editor's preview uses the REAL player
+// (2026-11-22): the old silent stand-in is why tapping play there did
+// nothing at all. The live page + big preview get the real player.
 function soundscapePlayerHTML(th, mini, autoplay) {
   var sc = soundscapeById(th && th.soundscape);
   if (!sc) return "";
@@ -207,18 +210,36 @@ function soundscapePlayerHTML(th, mini, autoplay) {
   }
   if (skin && skin.indexOf("cassette-") === 0) {
     var col = skin.slice("cassette-".length);
+    // Mixxtape-style cassette (2026-11-22): black carbon-fiber tape body,
+    // two reels, small screen, buttons — one shape, every color. Proper
+    // cassette proportions (100:64), capped small, never stretched.
+    var tapeInner =
+      '<span class="dwc-cassette-top">' +
+        '<span class="dwc-cassette-btns"><i></i><i></i><i></i></span>' +
+        '<span class="dwc-cassette-screen">' + name + '</span>' +
+      '</span>' +
+      '<span class="dwc-cassette-mid">' +
+        '<span class="dwc-cassette-reel dwc-reel-l"><i></i></span>' +
+        '<span class="dwc-cassette-label">RARE CANDY RESERVE</span>' +
+        '<span class="dwc-cassette-reel dwc-reel-r"><i></i></span>' +
+      '</span>' +
+      '<span class="dwc-cassette-bottom"><i></i><i></i><i></i><i></i></span>';
     return '<div class="dwc-player dwc-cassette dwc-cassette-' + esc(col) + '">' +
-      (mini ? '<span class="dwc-cassette-tape"><span class="dwc-cassette-reel dwc-reel-l"></span><span class="dwc-cassette-window"><span class="dwc-cassette-label">' + name + '</span></span><span class="dwc-cassette-reel dwc-reel-r"></span></span>'
-            : '<button type="button" class="dwc-cassette-tape" onclick="DWC.toggleSoundscape(\'' + uid + '\', this)" aria-label="Play or pause ' + name + '"><span class="dwc-cassette-reel dwc-reel-l"></span><span class="dwc-cassette-window"><span class="dwc-cassette-label">' + name + '</span></span><span class="dwc-cassette-reel dwc-reel-r"></span></button>') +
+      (mini ? '<span class="dwc-cassette-tape">' + tapeInner + '</span>'
+            : '<button type="button" class="dwc-cassette-tape" onclick="DWC.toggleSoundscape(\'' + uid + '\', this)" aria-label="Play or pause ' + name + '">' + tapeInner + '</button>') +
       audio + "</div>";
   }
   return '<div class="dwc-player dwc-player-simple">' + btn + '<span class="dwc-player-name">' + name + "</span>" + audio + "</div>";
 }
-// Small preview of the selected player look, next to its dropdown in
-// the editor. Uses "rain" as a stand-in when no soundscape is picked.
+// The player preview next to its dropdown in the editor. Uses "rain"
+// as a stand-in when no soundscape is picked. It renders the REAL
+// player (2026-11-22) — the old mini=true stand-in had no <audio>
+// element and a disabled play button, so tapping play did nothing.
+// Same soundscape + skin as the form, so the sample is exactly what
+// visitors will hear.
 function playerSkinPreviewHTML(th) {
   var fake = Object.assign({}, th, { soundscape: (th && th.soundscape) || "rain" });
-  return '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">What it looks like:</p>' + soundscapePlayerHTML(fake, true);
+  return '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Tap play to hear it:</p>' + soundscapePlayerHTML(fake, false);
 }
 // The audio section on a profile page: a soundscape player, or the
 // SteadyWave Radio Player, or nothing. Old profiles with the radio
@@ -916,13 +937,27 @@ function parseRoute() {
   var parts = h.split("/").filter(Boolean);
   if (!parts.length) return { name: "street" };
   var n = parts[0];
+  // Stripe Connect sends the member back to #/payouts?connect=done (or
+  // ?connect=refresh when the link expired). The "?…" is a query on the
+  // hash, not part of the route — strip it, but keep the connect flag
+  // so the Payouts tab can confirm (or re-offer) the link.
+  var q = "";
+  var qi = n.indexOf("?");
+  if (qi >= 0) { q = n.slice(qi + 1); n = n.slice(0, qi); }
   if (n === "post" && parts[1]) return { name: "thread", postId: parts[1] };
   if (n === "listing" && parts[1]) return { name: "listing", listingId: parts[1] };
   if (n === "member" && parts[1]) return { name: "member", memberId: parts[1] };
   if (n === "u" && parts[1]) return { name: "memberSlug", slug: parts[1] };
   if (n === "tag" && parts[1] === "adult" && parts[2]) return { name: "tag", tag: decodeURIComponent(parts[2]), adult: true };
   if (n === "tag" && parts[1]) return { name: "tag", tag: decodeURIComponent(parts[1]), adult: false };
-  if (NAV.some(function (x) { return x[0] === n; })) return { name: n };
+  if (NAV.some(function (x) { return x[0] === n; })) {
+    var r = { name: n };
+    if (q) {
+      var m = /(?:^|&)connect=(done|refresh)(?:&|$)/.exec(q);
+      if (m) r.connect = m[1];
+    }
+    return r;
+  }
   return { name: "street" };
 }
 function go(route) { location.hash = "#/" + route; }
@@ -1212,9 +1247,9 @@ var LAYOUT_STORE = [
     conflict: "Hides your Top Friends and links — those sections won't show while this layout is on.",
     theme: { vibe: "midnight", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: ["top8", "links"] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
-      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 8px,rgba(174,194,255,.34) 8px 9px,transparent 9px 42px),repeating-linear-gradient(105deg,transparent 0 22px,rgba(174,194,255,.18) 22px 23px,transparent 23px 64px);background-size:64px 64px,96px 96px;animation:dwcRain 1.1s linear infinite;}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{letter-spacing:.05em;}" +
-      "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+      "@keyframes dwcRain{from{background-position:0 -64px,0 -96px;}to{background-position:14px 64px,10px 96px;}}"
    +
       ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
       ".dwc-myprofile .dwc-avatar{border:3px solid #00e5ff;}" +
@@ -1342,10 +1377,10 @@ var LAYOUT_STORE = [
     conflict: "Hides your links — that section won't show while this layout is on.",
     theme: { vibe: "neon", bg_color: "", bg_image_url: "", text_color: "", accent_color: "#00e5ff", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "top", pic_frame: "", blood_color: "", hide_sections: ["links"] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;}" +
-      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(0,229,255,.28) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcRain 1.1s linear infinite;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 8px,rgba(0,229,255,.32) 8px 9px,transparent 9px 42px),repeating-linear-gradient(105deg,transparent 0 22px,rgba(0,229,255,.18) 22px 23px,transparent 23px 64px);background-size:64px 64px,96px 96px;animation:dwcRain 1.1s linear infinite;}" +
       ".dwc-myprofile h2{text-transform:uppercase;letter-spacing:.10em;}" +
       ".dwc-myprofile .dwc-avatar{box-shadow:0 0 18px rgba(0,229,255,.8);}" +
-      "@keyframes dwcRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+      "@keyframes dwcRain{from{background-position:0 -64px,0 -96px;}to{background-position:14px 64px,10px 96px;}}"
    +
       ".dwc-myprofile a{color:#00e5ff;text-shadow:none;}" +
       ".dwc-myprofile .dwc-topfriend{border:2px solid #00e5ff;}" +
@@ -1493,11 +1528,11 @@ var LAYOUT_STORE = [
     theme: { vibe: "midnight", bg_color: "#0a0e1a", bg_image_url: "", text_color: "#e8ecf5", accent_color: "#ff9a00", font: "typewriter", name_font: "", glow: false, glow_color: "", outline_color: "", button_style: "neon", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", hide_sections: [] },
     css: ".dwc-myprofile{position:relative;overflow:hidden;background:linear-gradient(180deg,#05070f 0%,#0a0e1a 55%,#131a2e 100%);}" +
       ".dwc-myprofile::before{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 12% 68%,#ffb347,transparent),radial-gradient(2px 2px at 28% 74%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 44% 70%,#ffd166,transparent),radial-gradient(2px 2px at 61% 76%,#ff9a00,transparent),radial-gradient(1.5px 1.5px at 78% 72%,#ff5c8a,transparent),radial-gradient(2px 2px at 90% 78%,#ffb347,transparent),radial-gradient(1.5px 1.5px at 20% 82%,#ffd166,transparent),radial-gradient(2px 2px at 55% 84%,#ff6b9d,transparent),radial-gradient(1.5px 1.5px at 85% 86%,#ff9a00,transparent);animation:dwcSparkleTwinkle 4s ease-in-out infinite;}" +
-      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 36px);background-size:120px 260px;animation:dwcNeoRain 1.1s linear infinite;}" +
+      ".dwc-myprofile::after{content:\"\";position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 8px,rgba(174,194,255,.34) 8px 9px,transparent 9px 42px),repeating-linear-gradient(105deg,transparent 0 22px,rgba(174,194,255,.18) 22px 23px,transparent 23px 64px);background-size:64px 64px,96px 96px;animation:dwcNeoRain 1.1s linear infinite;}" +
       ".dwc-myprofile .card{background:rgba(10,14,26,.82);border:1px solid #2a3a5f;border-radius:12px;}" +
       ".dwc-myprofile h2,.dwc-myprofile h3{color:#ffd166;}" +
       ".dwc-myprofile .dwc-avatar{border:3px solid #ff9a00;box-shadow:0 0 14px rgba(255,154,0,.55);}" +
-      "@keyframes dwcNeoRain{from{background-position:0 -260px;}to{background-position:-60px 0;}}"
+      "@keyframes dwcNeoRain{from{background-position:0 -64px,0 -96px;}to{background-position:14px 64px,10px 96px;}}"
    +
       ".dwc-myprofile a{color:#ff9a00;text-shadow:none;}" +
       ".dwc-myprofile .dwc-topfriend{border:2px solid #ff9a00;}"},
@@ -1883,7 +1918,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "page_opacity"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -2145,21 +2180,48 @@ async function loadUserLayouts() {
     if (state.phone.open && state.phone.app === "store") renderPhone();
   }
 }
+// The Layout Store preview shows a DEMO page, never the member's own
+// (2026-11-22): tapping a layout shows what it looks like on a sample
+// page, so previewing can't touch the member's code or classes.
+// Applying stays a separate, deliberate tap. The demo has a name, bio,
+// links, and Top Friends filled in, so website templates and MySpace
+// layouts both show fairly — and it works for layouts made later too,
+// including the new background sets landing after this batch.
+var STORE_DEMO_PROFILE = {
+  username: "Demo Dan",
+  chat_name: "Demo Dan",
+  occupation: "Collector · Maker · DJ",
+  bio: "This is a sample page — the layout you're previewing, on a demo page. Nothing here is yours, and nothing changes on your page until you hit Apply.",
+  hobbies: "Collecting, 3D printing, making music",
+  workplace: "Rare Candy Reserve",
+  relationship_status: "Single",
+  birthsign: "leo",
+  accomplishments: "Pulled a Charizard. Built the shop. Still here.",
+  website_show: { hobbies: true, workplace: true, relationship: true, sign: true, accomplishments: true },
+  my_links: [{ label: "My shop", url: "https://rarecandyreserve.org", style: "" }, { label: "Instagram", url: "https://instagram.com", style: "" }],
+  top_friend_ids: [1, 2, 3],
+  show_vnr_player: false,
+  ticker_text: "",
+  ticker_enabled: false
+};
 function storePreviewHTML(item) {
-  if (!item || !state.profile) return "";
-  var merged = storeMergedTheme(item);
+  if (!item) return "";
+  // The layout as its author made it — the member's own theme is NOT
+  // merged in here (that merge is for applying, not previewing).
+  var merged = Object.assign({}, item.theme || {});
   // A website template's preview shows the website look (its custom
-  // page is the page) — force website_mode on the fake profile and
-  // fill in the member's name where the template says {{name}}.
+  // page is the page) — force website_mode on the demo profile and
+  // fill in the demo name where the template says {{name}}.
   if (item.website) {
-    merged.custom_page_html = String(merged.custom_page_html || "").split("{{name}}").join(state.profile.username || "Your name");
+    merged.custom_page_html = String(merged.custom_page_html || "").split("{{name}}").join(STORE_DEMO_PROFILE.username);
   }
-  var fake = Object.assign({}, state.profile, { is_mine: true, website_mode: item.website ? true : state.profile.website_mode, profile_theme: JSON.stringify(merged) });
+  var fake = Object.assign({}, STORE_DEMO_PROFILE, { is_mine: false, website_mode: !!item.website, profile_theme: JSON.stringify(merged) });
   var css = scopeStoreCSS(themeCSS(merged)) + scopeStoreCSS(scopeProfileCss(item.css));
   ensureProfileFonts(merged);
   return '<div id="dwc-store-preview" class="dwc-store-preview">' +
     '<style>' + css + '</style>' +
-    '<h4 style="margin:0 0 6px">Preview — your page with “' + esc(item.name) + '”</h4>' +
+    '<h4 style="margin:0 0 6px">Preview — a demo page wearing “' + esc(item.name) + '”</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This is a sample page, not yours — nothing on your page changes until you hit Apply.</p>' +
     layoutPreviewInnerHTML(fake) +
     '</div>';
 }
@@ -2182,12 +2244,12 @@ function phoneStoreHTML() {
     var previewItem = state.storePreview ? storeItemById(state.storePreview) : null;
     body =
       '<p class="tp-note" style="text-align:center;margin:0 0 4px"><strong>' + LUCRE_SYMBOL + ' ' + (balance === null ? "…" : balance) + ' Lucre</strong> · site only currency — not real money, not crypto, can’t cash out.</p>' +
-      '<p class="tp-note" style="text-align:center;margin:0 0 8px">Pre-made layouts, like an old MySpace layout site. Preview one on your page, then apply it — one tap. Got a code from a friend? Paste it below.</p>' +
+      '<p class="tp-note" style="text-align:center;margin:0 0 8px">Pre-made layouts, like an old MySpace layout site. Tap Full preview to see one on a demo page, then apply it — one tap. Got a code from a friend? Paste it below.</p>' +
       '<div class="dwc-store-filters">' + filters + '</div>' +
       '<div class="dwc-store-codebox"><input id="dwc-layout-code" maxlength="20" placeholder="Got a layout code? Paste it here — e.g. RAINY" autocomplete="off">' +
       ' <button type="button" class="btn small" onclick="DWC.applyLayoutCode()">Use this code</button></div>' +
       (currentItem ? '<p class="tp-note" style="text-align:center">You’re wearing <strong>' + esc(currentItem.name) + '</strong> right now. <button type="button" class="dwc-linklike" onclick="DWC.storeRevert()">← Back to my own look</button></p>' : "") +
-      (previewItem ? storePreviewHTML(previewItem) + '<p style="margin:6px 0 10px;text-align:center"><button type="button" class="btn small" onclick="DWC.storeApply(\'' + previewItem.id + '\')">Apply “' + esc(previewItem.name) + '”' + (previewItem.price > 0 && owned.indexOf(previewItem.id) < 0 ? ' · ' + previewItem.price + ' ' + LUCRE_SYMBOL : "") + '</button> <button type="button" class="btn ghost small" onclick="DWC.storePreview(null)">Close preview</button></p>' : "") +
+      (previewItem ? '<div class="dwc-store-preview-modal" role="dialog" aria-label="Layout preview"><div class="dwc-store-preview-modal-inner">' + storePreviewHTML(previewItem) + '<p style="margin:10px 0 4px;text-align:center"><button type="button" class="btn" onclick="DWC.storeApply(\'' + previewItem.id + '\')">Apply “' + esc(previewItem.name) + '”' + (previewItem.price > 0 && owned.indexOf(previewItem.id) < 0 ? ' · ' + previewItem.price + ' ' + LUCRE_SYMBOL : "") + '</button> <button type="button" class="btn ghost" onclick="DWC.storePreview(null)">Close preview</button></p></div></div>' : "") +
       '<div class="dwc-store-list">' + items.map(function (x) {
         var isOwned = x.price === 0 || owned.indexOf(x.id) >= 0;
         var isCurrent = current === x.id;
@@ -3185,9 +3247,7 @@ function websiteFieldsHTML(p) {
     '<input type="checkbox" name="website_mode" hidden' + (p && p.website_mode ? " checked" : "") + '>' +
     '<p id="dwc-page-mode-note" style="margin:4px 0 0;color:var(--muted);font-size:13px">' + (p && p.website_mode ? "Website look is ON — MySpace mode is off. Your personal bits below stay hidden while this is on." : "MySpace look is ON — Website look is off. Everything shows, arranged like a MySpace page.") + '</p>' +
     '<label class="dwc-enable-toggle"><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> <span>Show the Add me / Favorite / Add to group buttons too (otherwise visitors just get the Message link)</span></label>' +
-    '<label>Contact email — the email visitors can reach you at (only shows on your page if you tick Show below)</label>' +
-    '<input type="email" name="contact_email" maxlength="120" value="' + val("contact_email") + '" placeholder="you@example.com">' +
-    '<label class="dwc-enable-toggle"><input type="checkbox" name="show_contact_email" style="width:auto"' + (p && p.show_contact_email ? " checked" : "") + '> <span>Show my contact email on my page</span></label>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your email lives in <strong>Account &amp; payouts</strong> near the top of this page — one address for contact, password resets, and Stripe. Tick Show there and it appears on your page.</p>' +
     '<label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies</label>' +
     '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
     '<label><input type="checkbox" name="website_show_workplace" style="width:auto"' + chk("workplace") + '> Show where I work</label>' +
@@ -3207,38 +3267,48 @@ function websiteFieldsHTML(p) {
     '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Page comments are optional on a professional page too — hide them from “What shows on my page” below if you don\'t want them.</p></div>';
 }
 
-// Password auth (2026-11-22) — the "Password & sign-in" box at the bottom
-// of Edit profile. Separate forms from the profile save: passwords never
-// ride the /api/profile POST. Signed-in members only.
-function securitySectionHTML(p) {
+// Account & payouts (2026-11-22) — ONE email, one place, near the top
+// of Edit profile (right after Name & display). The member's single
+// email is used for contact, password resets, and Stripe onboarding;
+// payout method + handle live here too, so the whole money-and-identity
+// setup is one box. The password change is a button (type=button)
+// inside the profile form — it posts to /auth set-password on its own
+// (savePassword), and the profile save ignores those fields. Password
+// fields here are NOT required: a required field would block the whole
+// profile save when left empty.
+function accountSectionHTML(p) {
   var hasPw = !!(p && p.has_password);
   var rec = (p && p.recovery_email) || "";
   var pend = (p && p.pending_email) || "";
+  var email = (p && p.contact_email) || rec || pend || "";
   var recStatus = (p && p.recovery_email_verified)
     ? '<span style="color:var(--green)">✓ Verified — password resets can reach you there.</span>'
     : pend
-      ? '<span style="color:var(--amber)">Waiting for verification — check that inbox for the link (it may take a while: email sending is still being connected).</span>'
-      : '<span style="color:var(--muted)">No recovery email yet — without one, a forgotten password means asking Chris for recovery.</span>';
-  return '<div class="card" style="margin-top:14px" aria-label="Password and sign-in">' +
-    '<h3 id="dwc-sec-password" style="margin-top:0">🔑 Password &amp; sign-in</h3>' +
-    '<p style="margin-top:0;color:var(--muted);font-size:13px">Your password is stored scrambled — nobody at the shop, not even Chris, can see it. At least 8 characters, with a letter and a number.</p>' +
-    '<form onsubmit="DWC.savePassword(this); return false;">' +
+      ? '<span style="color:var(--amber)">Waiting for verification — check that inbox for the link.</span>'
+      : '<span style="color:var(--muted)">Not verified yet — without a verified email, a forgotten password means asking Chris for recovery.</span>';
+  return '<h3 class="dwc-edit-group-h" id="dwc-sec-account">👤 Account &amp; payouts — your email, password, and how you get paid</h3>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">One email for everything: where people reach you, where password-reset links go, and the email Stripe uses when you link your bank. Your password is stored scrambled — nobody at the shop, not even Chris, can see it. At least 8 characters, with a letter and a number.</p>' +
+    '<div class="dwc-field-grid">' +
+    '<div class="dwc-field"><label>Your email — one address for everything</label>' +
+    '<input id="dwc-account-email" type="email" name="contact_email" maxlength="120" value="' + esc(email) + '" placeholder="you@example.com"></div>' +
+    '<div class="dwc-field"><label>Payout method</label>' +
+    '<input name="payout_method" maxlength="40" value="' + esc((p && p.payout_method) || "") + '" placeholder="e.g. PayPal, Cash App, Chime…"></div>' +
+    '<div class="dwc-field"><label>Payout handle — not an email unless your method uses one</label>' +
+    '<input name="payout_handle" maxlength="80" value="' + esc((p && p.payout_handle) || "") + '" placeholder="Your handle / address on that method"></div>' +
+    '<div class="dwc-field"><label class="dwc-enable-toggle"><input type="checkbox" name="show_contact_email" style="width:auto"' + (p && p.show_contact_email ? " checked" : "") + '> <span>Show my contact email on my page</span></label>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick this and visitors see your email on your page.</p></div>' +
+    '</div>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">' + recStatus + ' <button type="button" class="dwc-linklike" onclick="DWC.verifyAccountEmail(this)">Verify this email</button>' + (pend ? ' · <button type="button" class="dwc-linklike" onclick="DWC.resendVerifyEmail(this)">Resend the verification email</button>' : '') + '</p>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Card sales pay straight to your linked bank (Payouts tab). The method + handle above are for manual payments in private chat only.</p>' +
+    '<div class="dwc-field-grid" style="margin-top:10px">' +
     (hasPw
-      ? '<label>Current password</label><div style="display:flex;gap:6px;align-items:center"><input name="current_password" type="password" required autocomplete="current-password" placeholder="Your current password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>'
-      : '<p style="color:var(--amber);font-size:13px;margin:0 0 8px">No password set yet — set one now so you can sign in on any device.</p>') +
-    '<label>New password</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password" type="password" required minlength="8" autocomplete="new-password" placeholder="New password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
-    '<label>New password again</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
+      ? '<div class="dwc-field"><label>Current password</label><div style="display:flex;gap:6px;align-items:center"><input name="current_password" type="password" autocomplete="current-password" placeholder="Your current password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div></div>'
+      : '<div class="dwc-field"><p style="color:var(--amber);font-size:13px;margin:0">No password set yet — set one now so you can sign in on any device.</p></div>') +
+    '<div class="dwc-field"><label>New password</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password" type="password" minlength="8" autocomplete="new-password" placeholder="New password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div></div>' +
+    '<div class="dwc-field"><label>New password again</label><div style="display:flex;gap:6px;align-items:center"><input name="new_password_confirm" type="password" minlength="8" autocomplete="new-password" placeholder="Same password again" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div></div>' +
+    '</div>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
-    '<p style="margin:10px 0 0"><button class="btn" type="submit">' + (hasPw ? "Change my password →" : "Set my password →") + '</button></p></form>' +
-    '<h4 style="margin:16px 0 6px">📧 Recovery email</h4>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Where password-reset links go. A new address only counts once you click the verification link we send it. ' + recStatus + '</p>' +
-    '<form onsubmit="DWC.saveRecoveryEmail(this); return false;">' +
-    '<label>Recovery email</label><input name="email" type="email" maxlength="120" value="' + esc(pend || rec) + '" placeholder="you@example.com">' +
-    '<p class="dwc-form-err" data-err hidden></p>' +
-    '<p style="margin:10px 0 0"><button class="btn ghost" type="submit">Save recovery email →</button> ' +
-    (pend ? '<button type="button" class="btn ghost small" onclick="DWC.resendVerifyEmail(this)">Resend the verification email</button>' : '') + '</p></form>' +
-    '<p style="margin:12px 0 0;font-size:13px"><a href="forgot-password.html">Forgot your password?</a> · <a href="link-device.html">Locked out? Ask Chris for account recovery →</a></p>' +
-    '</div>';
+    '<p style="margin:10px 0 0"><button type="button" class="btn" onclick="DWC.savePassword(this.form)">' + (hasPw ? "Change my password →" : "Set my password →") + '</button> <span style="color:var(--muted);font-size:13px"><a href="forgot-password.html">Forgot your password?</a> · <a href="link-device.html">Locked out? Ask Chris for account recovery →</a></span></p>';
 }
 
 function profileFormHTML(p) {
@@ -3253,7 +3323,7 @@ function profileFormHTML(p) {
     '<form onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
     (isNew ? "" :
     '<div class="dwc-sticky-save" id="dwc-sticky-save"><span id="dwc-sticky-dirty" hidden>✏️ Unsaved changes</span><button type="submit" class="btn small dwc-sticky-save-btn">Save profile</button></div>' +
-    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-name">Name &amp; display</a> · <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-bg">Background</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-radio">Page sound</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Page look</a> · <a href="#dwc-sec-taffy">Layouts</a> · <a href="#dwc-sec-badges">Badges</a> · <a href="#dwc-sec-password">Password</a></p>' +
+    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-name">Name &amp; display</a> · <a href="#dwc-sec-account">Account &amp; payouts</a> · <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-bg">Background</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-radio">Page sound</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Page look</a> · <a href="#dwc-sec-taffy">Layouts</a> · <a href="#dwc-sec-badges">Badges</a></p>' +
     '<p id="dwc-unsaved-note" class="dwc-unsaved" hidden>✏️ You have unsaved changes — hit <strong>Save profile</strong> (top right, always visible) to keep them. Nothing saves until you do.</p>' +
     '<div class="dwc-setting-search" id="dwc-setting-search"><button type="button" class="dwc-setting-search-btn" onclick="DWC.editorSearchFocus()" aria-label="Search settings">🔍</button><input id="dwc-setting-search-input" type="search" placeholder="Find a setting… (e.g. name color, buttons, ticker)" aria-label="Search settings" oninput="DWC.editorSearch(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();DWC.editorSearchNext();}else if(event.key===\'Escape\'){DWC.editorSearchClear();}"><button type="button" class="btn ghost small" onclick="DWC.editorSearchNext()">Next ↓</button><span id="dwc-setting-search-count" style="color:var(--muted);font-size:12px"></span></div>') +
     '<h3 class="dwc-edit-group-h" style="margin-top:14px">👀 Your page, live — changes show here as you make them</h3>' +
@@ -3261,7 +3331,7 @@ function profileFormHTML(p) {
     '<div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div>" +
     (isNew ? "" :
     '<div class="note" style="margin:0 0 12px"><strong>🔑 Password &amp; recovery</strong>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and set your recovery email in the “Password &amp; sign-in” box at the bottom of this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>' + contentSalesToggleHTML(p)) +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and verify your email in the “Account &amp; payouts” box near the top of this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>' + contentSalesToggleHTML(p)) +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
     // Basic account: new signups only see the essentials. Everything
@@ -3290,6 +3360,7 @@ function profileFormHTML(p) {
 '<label>Outline color — the outline around your glowing text</label>' +
 '<input type="color" name="theme_outline_color" value="' + (th.outline_color || "#000000") + '" style="width:64px;height:40px;padding:2px">' +
 '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only shows when Glow text is ticked above.</p>') +
+    (isNew ? "" : accountSectionHTML(p)) +
     '<label>Birthday — month / day only shows publicly, never the year' + (isNew ? " (required — one account per person)" : "") + "</label>" +
     '<input name="birthday" type="date" value="' + (p && p.birthday ? esc(p.birthday) : "") + '"' + (isNew ? " required" : "") + ">" +
     (isNew ? "" :
@@ -3378,25 +3449,17 @@ function profileFormHTML(p) {
       '<option value="left"' + (th.topfriends_side === "left" ? " selected" : "") + '>Left</option>' +
       "</select>" +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
-      '<p class="dwc-minihead">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') +
+      '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') +
     (isNew ? "" : '<h3 class="dwc-edit-group-h">🔘 Buttons &amp; links — what visitors tap</h3>' + profileButtonsSectionHTML(p)) +
     (isNew ? "" : profileVideoSectionHTML(p, th)) +
     (isNew ? "" : profileHideSectionsHTML(p, th)) +
     (isNew ? "" : pageSlugSectionHTML(p)) +
     (isNew ? "" :
     '<h3 class="dwc-edit-group-h" id="dwc-sec-selling">🛍️ Selling — your shop, your buyers, getting paid</h3>' +
-    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">💰 Getting paid — payout &amp; notifications</h4>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">How buyers pay you in private chat, and how we tell you when something sells. Card sales pay straight to your linked bank (Payouts tab) — this is only for manual payments.</p>' +
-'<label>Payout method (how you want to be paid — needed to sell)</label>' +
-'<input name="payout_method" maxlength="40" value="' + v("payout_method") + '" placeholder="e.g. PayPal, Cash App, Chime…">' +
-'<label>Payout handle</label>' +
-'<input name="payout_handle" maxlength="80" value="' + v("payout_handle") + '" placeholder="Your handle / address on that method">' +
-'<p style="margin:0 0 4px;color:var(--muted);font-size:13px">That method + handle are for manual payments in private chat only — card sales pay straight to your linked bank (Payouts tab).</p>' +
+    '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🔔 Order notifications</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">How we tell you when something sells. Payout method + handle now live in Account &amp; payouts near the top of this page; card sales pay straight to your linked bank (Payouts tab).</p>' +
 '<label>Notifications — orders, offers &amp; shipping</label>' +
 '<label><input type="checkbox" name="notify_email" style="width:auto"' + (p && p.notify_email !== 0 ? " checked" : "") + '> Email me when someone buys, offers, or my order ships (on by default)</label>' +
-'<label><input type="checkbox" name="notify_sms" style="width:auto"' + (p && p.notify_sms === 1 ? " checked" : "") + '> Text me too — opt-in only (texts cost the shop per text, so only turn this on if you want them)</label>' +
-'<label>Mobile number for texts (only used if you tick the box above)</label>' +
-'<input name="sms_number" maxlength="20" value="' + v("sms_number") + '" placeholder="e.g. +1 904-555-0100">' +
     '</div>' +
 '<div class="dwc-layoutbox" id="dwc-sec-sell"><h4 style="margin:0 0 6px">🎨 What I sell — your creator card</h4>' +
     "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
@@ -3471,6 +3534,9 @@ function profileFormHTML(p) {
     '<label>GIF size — how big the moving picture shows (never more than a quarter of the page)</label><select name="theme_bg_gif_size" onchange="DWC.refreshLayoutPreviewSoon()"><option value="small"' + (th.bg_gif_size !== "medium" ? " selected" : "") + '>Small — about a postcard</option><option value="medium"' + (th.bg_gif_size === "medium" ? " selected" : "") + '>Medium — up to a quarter of the page</option></select>' +
     '<p style="margin:4px 0 0"><span id="dwc-gif-note" style="color:var(--muted);font-size:13px"></span> <button type="button" class="btn ghost small" onclick="DWC.clearProfileGif()">Remove GIF</button></p>' +
     profileGifGalleryHTML(th.bg_gif_url || "") +
+    '<label>Page opacity — how see-through your page is over its background</label>' +
+    '<div style="display:flex;gap:10px;align-items:center"><input type="range" name="theme_page_opacity" min="40" max="100" step="5" value="' + Math.round((th.page_opacity || 1) * 100) + '" style="flex:1" oninput="DWC.pageOpacityChanged(this)"><span id="dwc-page-opacity-val" style="min-width:44px;text-align:right;font-weight:700">' + Math.round((th.page_opacity || 1) * 100) + '%</span></div>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">100% is solid. Lower lets the background behind your page show through — but your words fade too, so keep it above 70% to stay readable. The live preview above shows it as you slide.</p>' +
 
     '<h4 style="margin:14px 0 6px">🎨 Page colors — background color</h4>' +
     "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. These sit on top of your preset and your vibe — a pick here wins over the vibe for that one thing. Your custom CSS can still override them with !important.</p>" +
@@ -3561,7 +3627,7 @@ function profileFormHTML(p) {
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">' + (isNew ? "Create my account →" : "Save profile →") + "</button> " +
     '<button type="button" class="btn ghost" onclick="DWC.cancelProfileForm()">Cancel</button></p>' +
-    "</form>" + (isNew ? "" : securitySectionHTML(p)) + "</section>";
+    "</form></section>";
 }
 
 async function loadChallenge() {
@@ -4224,6 +4290,10 @@ function parseThemeClient(stored) {
   // Animated rainbow background (v3.20) — the effect IS the background,
   // so it wins over a picture or a preset. Same rule as the server.
   if (out.effects.indexOf("animated-bg") >= 0) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_gif_url = ""; }
+  // Page opacity (2026-11-22) — how see-through the page is over its
+  // background, 0.4–1. "" = solid (the default). Same rule as the server.
+  var po = parseFloat(obj.page_opacity);
+  out.page_opacity = (po >= 0.4 && po <= 1 && po !== 1) ? Math.round(po * 100) / 100 : "";
   out.pic_size = (obj.pic_size === "bigger" || obj.pic_size === "smaller") ? obj.pic_size : "";
   out.pic_position = (obj.pic_position === "normal" || obj.pic_position === "top") ? obj.pic_position : "";
   var frameIds = PIC_FRAMES.map(function (f) { return f.id; });
@@ -4351,6 +4421,10 @@ function themeCSS(theme) {
     PRESET_BACKGROUNDS.forEach(function (p) { if (p.id === t.bg_preset) preset = p; });
     if (preset && preset.css) css += preset.css;
   }
+  // Page opacity (2026-11-22) — the whole page box goes more or less
+  // see-through over the background behind it. Text fades with it, so
+  // the slider stops at 40%.
+  if (t.page_opacity) css += ".dwc-myprofile{opacity:" + t.page_opacity + ";}";
   if (t.text_color) css += ".dwc-myprofile{color:" + t.text_color + ";}.dwc-myprofile p,.dwc-myprofile li{color:" + t.text_color + ";}";
   if (t.accent_color) css += ".dwc-myprofile a{color:" + t.accent_color + ";}.dwc-myprofile h2,.dwc-myprofile h3{color:" + t.accent_color + ";}.dwc-myprofile .dwc-topfriend{border-color:" + t.accent_color + ";}";
   if (t.font) css += ".dwc-myprofile{font-family:" + themeFontCSS(t.font) + ";}";
@@ -4449,9 +4523,51 @@ var MYSPACE_EFFECTS = {
   // and never replace it (or each other — one rain at a time, picked
   // in the layout picker's Atmosphere dropdown). CSS-only, no video,
   // so they stay light in the preview and the one-box profile.
-  "peaceful-rain": { label: "Peaceful Rain — rain on the window, woods outside", desc: "Slow rain over a misty wooded view. Calm, lofi, made for relaxing. Layers over any layout — it never replaces your look.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 14px,rgba(174,194,255,.30) 14px 15px,transparent 15px 46px),radial-gradient(ellipse at 50% 115%,rgba(110,170,130,.22),transparent 60%),radial-gradient(ellipse at 50% -15%,rgba(200,220,255,.14),transparent 55%);background-size:150px 340px,100% 100%,100% 100%;animation:dwcPeaceRain 2.6s linear infinite;}" + "@keyframes dwcPeaceRain{from{background-position:0 -340px,0 0,0 0;}to{background-position:40px 340px,0 0,0 0;}}" },
-  "rainy-city": { label: "Rainy city streets — city rain, dim neon", desc: "Slow city rain with a dim neon glow at street level. Calm, lofi, made for relaxing. Layers over any layout — it never replaces your look.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(105deg,transparent 0 18px,rgba(150,180,255,.26) 18px 19px,transparent 19px 54px),linear-gradient(180deg,transparent 55%,rgba(0,229,255,.10) 82%,rgba(255,45,149,.12) 100%),radial-gradient(ellipse at 50% -10%,rgba(120,140,200,.14),transparent 55%);background-size:170px 380px,100% 100%,100% 100%;animation:dwcCityRain 3s linear infinite;}" + "@keyframes dwcCityRain{from{background-position:0 -380px,0 0,0 0;}to{background-position:26px 380px,0 0,0 0;}}" }
+  // 2026-11-22 fix: the streaks used to be 340px lines (one tile tall),
+  // so Chris saw horizontal lines, not rain. The tiles are now small
+  // (64px / 96px), so each streak is a short drop, in two layers with
+  // different angles and speeds — and the live profile + editor preview
+  // ALSO get a layer of real individual drops (rainLayerHTML below),
+  // which is what makes it read as rain.
+  "peaceful-rain": { label: "Peaceful Rain — rain on the window, woods outside", desc: "Slow rain over a misty wooded view. Calm, lofi, made for relaxing. Layers over any layout — it never replaces your look.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(115deg,transparent 0 8px,rgba(174,194,255,.38) 8px 9px,transparent 9px 42px),repeating-linear-gradient(105deg,transparent 0 22px,rgba(200,220,255,.22) 22px 23px,transparent 23px 64px),radial-gradient(ellipse at 50% 115%,rgba(110,170,130,.22),transparent 60%),radial-gradient(ellipse at 50% -15%,rgba(200,220,255,.14),transparent 55%);background-size:64px 64px,96px 96px,100% 100%,100% 100%;animation:dwcPeaceRain 2.6s linear infinite;}" + "@keyframes dwcPeaceRain{from{background-position:0 -64px,0 -96px,0 0,0 0;}to{background-position:14px 64px,10px 96px,0 0,0 0;}}" },
+  "rainy-city": { label: "Rainy city streets — city rain, dim neon", desc: "Slow city rain with a dim neon glow at street level. Calm, lofi, made for relaxing. Layers over any layout — it never replaces your look.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::after{content:'';position:absolute;inset:0;pointer-events:none;background-image:repeating-linear-gradient(112deg,transparent 0 10px,rgba(150,180,255,.32) 10px 11px,transparent 11px 48px),repeating-linear-gradient(104deg,transparent 0 26px,rgba(150,180,255,.20) 26px 27px,transparent 27px 72px),linear-gradient(180deg,transparent 55%,rgba(0,229,255,.10) 82%,rgba(255,45,149,.12) 100%),radial-gradient(ellipse at 50% -10%,rgba(120,140,200,.14),transparent 55%);background-size:64px 64px,96px 96px,100% 100%,100% 100%;animation:dwcCityRain 2.2s linear infinite;}" + "@keyframes dwcCityRain{from{background-position:0 -64px,0 -96px,0 0,0 0;}to{background-position:12px 64px,8px 96px,0 0,0 0;}}" }
 };
+
+// Rain drops — real falling drops (2026-11-22). The CSS-only rain above
+// reads as streaks, so the live profile page + the editor preview get
+// this layer too: individual <i> drops, each with its own length,
+// speed, and slight slant, falling through the whole page. Deterministic
+// pseudo-random per index, so a re-render looks the same. Peaceful is
+// slow and soft; City is faster, brighter, and denser — the two rains
+// stay visibly distinct.
+function rainLayerHTML(kind) {
+  var city = kind === "rainy-city";
+  var n = city ? 72 : 56;
+  var out = '<div class="dwc-rain' + (city ? " dwc-rain-city" : "") + '" aria-hidden="true">';
+  for (var i = 0; i < n; i++) {
+    var r1 = Math.abs(Math.sin(i * 127.1 + 311.7) * 43758.5453) % 1;
+    var r2 = Math.abs(Math.sin(i * 269.5 + 183.3) * 28001.8384) % 1;
+    var r3 = Math.abs(Math.sin(i * 419.2 + 71.1) * 16523.9174) % 1;
+    var r4 = Math.abs(Math.sin(i * 97.7 + 501.9) * 31917.1234) % 1;
+    var left = (r1 * 100).toFixed(1);
+    var len = city ? (10 + r2 * 16) : (14 + r2 * 22);
+    var dur = city ? (0.8 + r3 * 0.8) : (1.2 + r3 * 1.2);
+    var delay = (-r4 * dur).toFixed(2);
+    var op = (0.25 + r2 * 0.35).toFixed(2);
+    out += '<i style="left:' + left + '%;height:' + len.toFixed(0) + 'px;animation-duration:' + dur.toFixed(2) + 's;animation-delay:' + delay + 's;opacity:' + op + '"></i>';
+  }
+  return out + "</div>";
+}
+function applyRainLayer(container, effects) {
+  if (!container) return;
+  var kind = null;
+  (effects || []).forEach(function (e) { if (e === "peaceful-rain" || e === "rainy-city") kind = e; });
+  var host = container.querySelector ? (container.querySelector(".dwc-myprofile") || container) : container;
+  var old = host.querySelector ? host.querySelector(".dwc-rain") : null;
+  if (old) old.remove();
+  if (!kind) return;
+  host.insertAdjacentHTML("beforeend", rainLayerHTML(kind));
+}
 // Preset backgrounds (v3.9) — CSS-only picks in Chris's aesthetic. The
 // chosen preset becomes the profile page background (applied in themeCSS,
 // after the plain color/image pickers so it wins). "vaporwave" uses the
@@ -6036,27 +6152,38 @@ async function viewPayouts(el) {
   }
   var conn = await apiGet("/connect/status?device_id=" + encodeURIComponent(deviceId()));
   var connected = conn && conn.ok && conn.charges_enabled && conn.payouts_enabled;
+  // Stripe just sent the member back (?connect=done / ?connect=refresh
+  // on the hash) — say what happened, then clear the flag from the URL
+  // so a refresh doesn't announce it again. The status above is fresh
+  // from Stripe, so "done" + connected really means linked.
+  var connParam = (state.route && state.route.connect) || "";
+  if (connParam === "done" || connParam === "refresh") {
+    if (connParam === "done" && connected) setNotice("Bank linked ✓ — card sales land in your Stripe balance at checkout, then Stripe sends them to your bank (about 2 business days). You're payout-ready.");
+    else if (connParam === "done") setNotice("Stripe sent you back, but the bank isn't linked yet — the onboarding may not have finished. Tap “Link your bank” below to try again.");
+    else setNotice("That bank-link step expired — no worries, tap “Link your bank” below to start it again.");
+    try { history.replaceState(null, "", location.pathname + location.search + "#/payouts"); } catch (e) {}
+  }
   el.innerHTML =
-    '<section aria-label="Payouts and wallet" class="grid gap-3"><div class="card">' +
-    "<h3 style=\"margin-top:0\">Your wallet</h3>" +
-    "<p>Available: <strong style=\"color:var(--green);font-size:20px\">" + money(data.balance_cents) + "</strong></p>" +
-    "<p>Pending (paid/shipped, not yet delivered): <strong>" + money(data.pending_cents) + "</strong> · Lifetime earnings: <strong>" + money(data.lifetime_cents) + "</strong></p>" +
-    (data.payout_method ? "<p>Manual payout method (for private-chat payments): " + esc(data.payout_method) + " · " + esc(data.payout_handle) + " — set it in Edit Profile.</p>" : "<p>You haven't set a manual payout method yet — add one in Edit Profile if you take payments in private chat.</p>") +
-    (data.balance_cents > 0 ? '<p><button type="button" class="btn" onclick="DWC.requestPayout()">Request payout of ' + money(data.balance_cents) + " →</button></p><p style=\"font-size:13px;color:var(--muted)\">The wallet is for older/manual sales only — it’s recorded here and sent to your payout method outside the app. Card sales don’t touch the wallet: the money goes straight to your linked bank.</p>" : "") +
+    '<section aria-label="Payouts and wallet"><h2 style="margin-top:0">💰 Payouts</h2>' +
+    '<div class="dwc-payout-row"><div class="dwc-payout-main"><h3>Your wallet</h3>' +
+    "<p>Available <strong style=\"color:var(--green)\">" + money(data.balance_cents) + "</strong> · Pending <strong>" + money(data.pending_cents) + "</strong> · Lifetime <strong>" + money(data.lifetime_cents) + "</strong></p>" +
+    (data.payout_method ? "<p style=\"color:var(--muted);font-size:13px\">Manual payments: " + esc(data.payout_method) + " · " + esc(data.payout_handle) + " — change it in Edit Profile → Account &amp; payouts.</p>" : "<p style=\"color:var(--muted);font-size:13px\">No manual payout method yet — add one in Edit Profile → Account &amp; payouts if you take payments in private chat.</p>") +
+    (data.balance_cents > 0 ? "<p style=\"color:var(--muted);font-size:13px\">The wallet is for older/manual sales only — card sales go straight to your linked bank.</p>" : "") +
     "</div>" +
-    '<div class="card"><h3 style="margin-top:0">🏦 Your bank — automatic payouts</h3>' +
+    (data.balance_cents > 0 ? '<div class="dwc-payout-action"><button type="button" class="btn" onclick="DWC.requestPayout()">Request payout of ' + money(data.balance_cents) + " →</button></div>" : "") +
+    "</div>" +
+    '<div class="dwc-payout-row"><div class="dwc-payout-main"><h3>🏦 Your bank — automatic payouts</h3>' +
     (connected
-      ? '<p style="color:var(--green)">✓ Bank linked — card sales land in your Stripe balance at checkout, then Stripe sends them to your bank automatically (about 2 business days). You\'re payout-ready.</p>'
-      : '<p>Link your bank once and card sales pay you automatically — no manual sending, no chat. Buyers pay on Stripe Checkout, the money lands in your Stripe balance at checkout, then Stripe sends it to your bank (about 2 business days).</p>' +
-        '<p><button type="button" class="btn" onclick="DWC.linkBank()">Link your bank →</button></p>' +
-        '<p style="font-size:13px;color:var(--muted)">Stripe Connect (Express) — Stripe asks for your identity + bank details once, on Stripe\'s own secure page. The site never sees your bank details.</p>') +
-    "</div>" +
-    '<div class="card"><h3 style="margin-top:0">Payout history</h3>' +
+      ? '<p style="color:var(--green)">✓ Bank linked — card sales land in your Stripe balance at checkout, then Stripe sends them to your bank (about 2 business days).</p>'
+      : '<p style="margin:0 0 8px"><button type="button" class="btn" onclick="DWC.linkBank()">Link your bank →</button></p>' +
+        '<p style="color:var(--muted);font-size:13px">One-time setup — card sales then pay you automatically, no manual sending. Stripe asks for your identity + bank details once, on Stripe\'s own secure page. The site never sees your bank details.</p>') +
+    "</div></div>" +
+    '<div class="dwc-payout-row"><div class="dwc-payout-main"><h3>Payout history</h3>' +
     '<p><button type="button" class="btn ghost small" onclick="DWC.exportPayoutCSV()">⬇ Download CSV</button> <span style="color:var(--muted);font-size:13px">Your orders + payouts as a spreadsheet.</span></p>' +
-    (data.entries.length ? "<ul class=\"dwc-entries\">" + data.entries.map(function (e) {
+    (data.entries.length ? "<details><summary>" + data.entries.length + " entries — show</summary><ul class=\"dwc-entries\">" + data.entries.map(function (e) {
       return "<li><strong>" + money(e.amount_cents) + "</strong> · " + esc(e.kind) + " · " + esc(e.status) + " · " + esc(e.note || "") + " · " + fmtDate(e.created_at) + "</li>";
-    }).join("") + "</ul>" : "<p>No wallet activity yet — it lands here when an order is marked delivered.</p>") +
-    "</div></section>";
+    }).join("") + "</ul></details>" : "<p>No wallet activity yet — it lands here when an order is marked delivered.</p>") +
+    "</div></div></section>";
 }
 
 // ---------- Members ----------
@@ -6902,6 +7029,9 @@ async function viewMember(el, memberId) {
         "</div>" +
         listingsSection + websiteBack) +
     "</div>";
+  // Rain drops on the live page too (the CSS rain alone reads as
+  // streaks — see rainLayerHTML).
+  applyRainLayer(el, mth.effects);
   // Start the Steady Wave stream on the visitor's first tap/click/scroll
   // (browsers block autoplay with sound until a real gesture).
   DWC.armVNRAutoplay();
@@ -8748,14 +8878,32 @@ window.DWC = {
   savePassword: async function (form) {
     var fd = new FormData(form);
     var next = String(fd.get("new_password") || "");
+    if (!next) return formErr(form, "Type a new password first.");
     if (next !== String(fd.get("new_password_confirm") || "")) return formErr(form, "Those two new passwords don't match — type the same one twice.");
     var data = await apiPost("/auth", { action: "set-password", device_id: deviceId(), current_password: String(fd.get("current_password") || ""), new_password: next });
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save that password.");
-    form.reset();
+    // Clear ONLY the password fields — this button lives inside the
+    // profile form now, so form.reset() would wipe the whole editor.
+    ["current_password", "new_password", "new_password_confirm"].forEach(function (n) { var i = form.querySelector('input[name="' + n + '"]'); if (i) i.value = ""; });
     await refreshProfile();
     setNotice(data.message || "Password saved.");
     render();
     return false;
+  },
+  // Verify the one account email (Account & payouts): send the
+  // verification link for the address typed above. The address itself
+  // is saved as the contact email when the member hits Save profile —
+  // and the server also queues it as the pending recovery email on
+  // save, so the two stay the same one email.
+  verifyAccountEmail: async function (btn) {
+    var input = document.getElementById("dwc-account-email");
+    var email = input ? String(input.value || "").trim() : "";
+    if (!email) { setNotice("Type your email above first — that's the address we'll verify."); return; }
+    var data = await apiPost("/auth", { action: "set-recovery-email", device_id: deviceId(), email: email });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't save that email."); return; }
+    await refreshProfile();
+    setNotice((data.message || "Verification email sent — check that inbox for the link.") + " Save your profile below so the email is kept as your contact email too.");
+    render();
   },
   // Set / change the recovery email (verified before it counts).
   saveRecoveryEmail: async function (form) {
@@ -9194,8 +9342,6 @@ window.DWC = {
       payout_method: String(fd.get("payout_method") || "").trim(),
       payout_handle: String(fd.get("payout_handle") || "").trim(),
       notify_email: !!fd.get("notify_email"),
-      notify_sms: !!fd.get("notify_sms"),
-      sms_number: String(fd.get("sms_number") || "").trim(),
       remove_avatar: !!fd.get("remove_avatar"),
       remove_banner: !!fd.get("remove_banner"),
     };
@@ -9324,6 +9470,9 @@ window.DWC = {
       } else if (theme.bg_image_url) {
         theme.bg_preset = "";
       }
+      // Page opacity (2026-11-22) — the slider, 40–100%; 100% = solid.
+      var pageOp = parseInt(String(fd.get("theme_page_opacity") || "100"), 10);
+      if (pageOp >= 40 && pageOp < 100) theme.page_opacity = Math.round(pageOp) / 100;
       // Custom page (v3.20) — sanitized on the way in; the server
       // sanitizes again on save.
       var customPage = String(fd.get("custom_page_html") || "").slice(0, 8000);
@@ -10632,6 +10781,12 @@ window.DWC = {
     DWC.refreshBgNow();
     DWC.refreshLayoutPreviewSoon();
   },
+  // Page opacity slider — show the % and refresh the live preview.
+  pageOpacityChanged: function (input) {
+    var el = document.getElementById("dwc-page-opacity-val");
+    if (el) el.textContent = String(input.value || "100") + "%";
+    DWC.refreshLayoutPreviewSoon();
+  },
   // A picture turns the preset OFF.
   bgImageChanged: function (input) {
     var v = String((input && input.value) || "").trim();
@@ -11590,6 +11745,9 @@ window.DWC = {
     th.effects = fd.getAll ? fd.getAll("theme_effects").filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8) : [];
     var bgPreset = get("theme_bg_preset");
     th.bg_preset = PRESET_BACKGROUNDS.some(function (pr) { return pr.id === bgPreset; }) ? bgPreset : "";
+    // Page opacity (2026-11-22) — the slider, 40–100%; 100% = solid.
+    var pageOp = parseInt(String(get("theme_page_opacity") || "100"), 10);
+    th.page_opacity = (pageOp >= 40 && pageOp < 100) ? Math.round(pageOp) / 100 : "";
     // Same either/or rule as saveProfile, so the live preview and the
     // save can never disagree.
     if (th.effects.indexOf("animated-bg") >= 0) {
@@ -11706,6 +11864,9 @@ window.DWC = {
       top_friend_ids: tfIds
     });
     host.innerHTML = layoutPreviewInnerHTML(fake);
+    // Rain drops on the live preview too (the CSS rain alone reads as
+    // streaks — see rainLayerHTML).
+    applyRainLayer(host, th.effects);
     // Layout CSS first, then the theme — same order as the profile page.
     applyPreviewCSS(get("layout_css"));
     var tst = document.getElementById("dwc-layout-preview-theme");

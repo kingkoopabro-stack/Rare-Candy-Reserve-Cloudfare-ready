@@ -2,10 +2,14 @@
 // paid -> shipped -> delivered. Shipped requires a tracking number.
 // Marking delivered credits the seller's wallet with their share
 // (price minus the 6% street cut) — once only, guarded by the
-// sale_credit row for that order.
+// sale_credit row for that order — BUT ONLY for orders paid outside
+// Stripe Checkout. A Checkout order's money is already in the
+// seller's Stripe balance (destination charge); crediting the wallet
+// too would pay them twice. Lucre (40 each) still awards either way.
 import {
   json, noDb, getDb, readJson, profileByDevice, CARRIERS,
   PLATFORM_FEE_PERCENT, nowMs, awardLucre, LUCRE_AWARDS,
+  notifyBuyerSeller,
 } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
@@ -24,13 +28,25 @@ export async function onRequestPost({ env, request, params }) {
   if (o.seller_id !== me.id) return json({ ok: false, error: "Only the seller updates shipping on an order." });
   await db.prepare("UPDATE orders SET status = ?, carrier = ?, tracking_number = ?, updated_at = ? WHERE id = ?")
     .bind(a.status, carrier.slice(0, 20), String(a.tracking_number || "").trim().slice(0, 60), nowMs(), id).run();
+  if (a.status === "shipped") {
+    // The buyer hears it the moment it ships — in-app, plus email/text
+    // if they asked for them. Tracking is right there in My Orders.
+    const buyerProfile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(o.buyer_id).first();
+    await notifyBuyerSeller(db, buyerProfile, me, "shipping",
+      "📦 Your order \"" + o.item_title + "\" shipped — " + carrier + " tracking " + String(a.tracking_number || "").trim() + ". Follow it in My Orders, and tap \"I got it\" when it lands.",
+      "#/orders", "order", id);
+  }
   if (a.status === "delivered") {
     const existing = await db.prepare("SELECT id FROM payout_entries WHERE order_id = ? AND kind = 'sale_credit' LIMIT 1").bind(id).first();
     if (!existing) {
-      const fee = Math.round((o.amount_cents * PLATFORM_FEE_PERCENT) / 100);
-      await db.prepare(
-        "INSERT INTO payout_entries (profile_id, kind, amount_cents, note, status, order_id, created_at) VALUES (?, 'sale_credit', ?, ?, 'available', ?, ?)",
-      ).bind(me.id, o.amount_cents - fee + (o.shipping_cents || 0), o.item_title, id, nowMs()).run();
+      // Wallet credit only for non-Stripe orders (see header). Stripe
+      // Checkout orders already paid the seller straight to their bank.
+      if (!o.stripe_session_id && !o.stripe_payment_intent_id) {
+        const fee = Math.round((o.amount_cents * PLATFORM_FEE_PERCENT) / 100);
+        await db.prepare(
+          "INSERT INTO payout_entries (profile_id, kind, amount_cents, note, status, order_id, created_at) VALUES (?, 'sale_credit', ?, ?, 'available', ?, ?)",
+        ).bind(me.id, o.amount_cents - fee + (o.shipping_cents || 0), o.item_title, id, nowMs()).run();
+      }
       // Lucre (v3.11) — 40 each for a completed transaction: the seller
       // and the buyer both did the deal. Once per order (ledger key).
       await awardLucre(db, me.id, LUCRE_AWARDS.transaction, "transaction", "order:" + String(id) + ":seller");

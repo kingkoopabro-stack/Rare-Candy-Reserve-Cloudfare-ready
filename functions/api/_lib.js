@@ -230,6 +230,53 @@ export async function notifyTeam(db, actor, text, link, refId) {
   return n;
 }
 
+// notifyMember sends one in-app notification to one member (the bell
+// + the Alerts app). Used for the Flea Market flow: purchase, shipped,
+// offer received / accepted / declined / countered. In-app delivery
+// works today — email and text ride on the outbound queue below.
+export async function notifyMember(db, profileId, actor, kind, text, link, refType, refId) {
+  if (!db || !profileId) return;
+  await createNotification(db, {
+    profile_id: profileId, actor_profile_id: actor ? actor.id : null, kind: String(kind || "order").slice(0, 30),
+    ref_type: refType || null, ref_id: refId || null,
+    text: String(text || "").slice(0, 200), link: link || "#/orders",
+  });
+}
+
+// queueOutbound records an email or text the site wants to send. The
+// site sends NO email or text today — there is no provider connected
+// yet — so the row waits with status "waiting_provider" and the member
+// still gets the in-app notification above. When Chris connects a
+// provider (Resend for email, Twilio for text), a sender reads this
+// queue and flips rows to "sent". SMS is opt-in only: the caller must
+// check the member's notify_sms flag first — never queue a text to
+// someone who didn't ask for them.
+export async function queueOutbound(db, profileId, channel, kind, subject, body) {
+  if (!db || !profileId) return false;
+  try {
+    await db.prepare(
+      "INSERT INTO notifications_outbound (profile_id, channel, kind, subject, body, status, created_at) VALUES (?, ?, ?, ?, ?, 'waiting_provider', ?)",
+    ).bind(profileId, channel, kind, String(subject || "").slice(0, 200), String(body || "").slice(0, 2000), nowMs()).run();
+    return true;
+  } catch { return false; /* queue table not there yet — in-app still went out */ }
+}
+
+// Notify one member about a Flea Market event every way they asked for:
+// in-app always; email when they left notify_email on (the default);
+// text only when they opted in AND left a number. The email/text rows
+// queue for a provider that isn't connected yet — see queueOutbound.
+export async function notifyBuyerSeller(db, profile, actor, kind, text, link, refType, refId) {
+  if (!profile) return;
+  await notifyMember(db, profile.id, actor, kind, text, link, refType, refId);
+  const emailOn = profile.notify_email !== 0;
+  if (emailOn && profile.contact_email) {
+    await queueOutbound(db, profile.id, "email", kind, text, text + (link ? " — see it on the site: " + link : ""));
+  }
+  if (profile.notify_sms === 1 && profile.sms_number) {
+    await queueOutbound(db, profile.id, "sms", kind, "", text);
+  }
+}
+
 export const nowMs = () => Date.now();
 export const iso = (ms) => (ms == null ? null : new Date(ms).toISOString());
 export const money = (cents) => `$${((cents || 0) / 100).toFixed(2)}`;
@@ -245,6 +292,36 @@ export function trackingUrl(carrier, trackingNumber) {
     case "DHL": return `https://www.dhl.com/us-en/home/tracking.html?tracking-id=${enc}`;
     default: return null;
   }
+}
+
+// createContentSale logs a digital sale in the content_sales table and
+// returns { csNumber, watermarkText }. Same log as creator-post sales
+// (receipts.js) and Flea Market digital buys: a sequential CS#, the
+// buyer IP server-side only, and the watermark line for the buyer's
+// copy. Returns { csNumber: null } when the table isn't there yet.
+// When o.digital_asset is true (a private digital sale), the sale
+// record's title carries the " [Digital Asset]" label — the same label
+// goes on the Stripe product name and the receipt.
+export async function createContentSale(db, o) {
+  const buyerIp = o.buyerIp || "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const mx = await db.prepare("SELECT MAX(cs_number) AS m FROM content_sales").first();
+      const next = (mx && mx.m ? mx.m : 0) + 1;
+      const wm = "RareCandyReserve.org • @" + o.buyerUsername + " • CS#" + next + " • redistribution of this is punishable by law";
+      await db.prepare(
+        `INSERT INTO content_sales (cs_number, listing_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(next, o.listingId, o.buyerId, o.buyerUsername, o.sellerId, o.sellerUsername || "", o.digital_asset ? o.itemTitle + " [Digital Asset]" : o.itemTitle, o.amountCents, buyerIp, wm, o.now).run();
+      return { csNumber: next, watermarkText: wm };
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (/no such table/i.test(msg)) return { csNumber: null, watermarkText: "" };
+      if (/UNIQUE constraint failed/i.test(msg) && attempt === 0) continue;
+      return { csNumber: null, watermarkText: "" };
+    }
+  }
+  return { csNumber: null, watermarkText: "" };
 }
 
 // --- Images (R2) ---------------------------------------------------------
@@ -313,6 +390,51 @@ export async function putVideo(env, prefix, deviceId, video, maxBytes = 15000000
   const key = `${prefix}/${deviceId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
   await env.IMAGES.put(key, dec.bytes, { httpMetadata: { contentType: dec.mime } });
   return { ok: true, key };
+}
+
+// --- Chat attachments ----------------------------------------------------
+// A file attached to a private message (or the live chat): images plus a
+// small allowlist of everyday files. PROPOSED CAPS (Chris's call):
+// images 2.5 MB (same as listing photos), other files 10 MB. Stored in
+// the same IMAGES R2 bucket under the given prefix ("dm-attachments/"
+// for DMs, "chat-attachments/" for live chat) — no new bucket, storage
+// stays cheap. Every attachment rides on a message with a 24h expiry
+// (DMs) — the purge deletes the blob with the row.
+export const CHAT_ATTACHMENT_MIMES = [
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "application/pdf", "application/zip", "text/plain",
+  "audio/mpeg", "audio/wav", "audio/ogg",
+  "video/mp4", "video/webm",
+];
+export function decodeAttachment(file, maxBytes) {
+  if (!file || typeof file.dataBase64 !== "string" || !file.mimeType) return { ok: false, error: "No file attached." };
+  if (!CHAT_ATTACHMENT_MIMES.includes(file.mimeType)) return { ok: false, error: "That file type can't be attached — images, PDF, ZIP, text, audio, or short video." };
+  let bytes;
+  try {
+    const bin = atob(file.dataBase64.replace(/\s/g, ""));
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch { return { ok: false, error: "That file couldn't be read — try attaching it again." }; }
+  if (bytes.length > maxBytes) return { ok: false, error: "That file is too big — " + Math.round(maxBytes / 1000000) + " MB max for this kind of file." };
+  if (bytes.length === 0) return { ok: false, error: "That file is empty." };
+  return { ok: true, bytes, mime: file.mimeType };
+}
+export async function putFileAttachment(env, prefix, deviceId, file) {
+  const isImage = typeof file.mimeType === "string" && file.mimeType.startsWith("image/");
+  const maxBytes = isImage ? 2500000 : 10000000;
+  const dec = decodeAttachment(file, maxBytes);
+  if (!dec.ok) return dec;
+  if (!env.IMAGES) return { ok: false, error: "File uploads aren't connected yet — the shop is still setting up file storage." };
+  const key = `${prefix}/${deviceId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  await env.IMAGES.put(key, dec.bytes, { httpMetadata: { contentType: dec.mime } });
+  return { ok: true, key, bytes: dec.bytes.length, mime: dec.mime };
+}
+
+// Delete one R2 blob, best-effort — used by the DM auto-delete purge.
+// A missing blob or missing binding is not an error.
+export async function deleteBlob(env, key) {
+  if (!env || !env.IMAGES || !key) return;
+  try { await env.IMAGES.delete(key); } catch { /* already gone */ }
 }
 
 // --- 3D print files (v3) -------------------------------------------------
@@ -628,6 +750,13 @@ export function shapeProfile(row) {
     chat_name: row.chat_name ?? "", occupation: row.occupation ?? "", bio: row.bio ?? "",
     avatar_url: imageUrl(row.avatar_blob_key),
     payout_method: row.payout_method ?? "", payout_handle: row.payout_handle ?? "",
+    // Flea Market checkout — bank linked via Stripe Connect (this is
+    // what "payout ready" means now), plus notification prefs.
+    payout_ready: row.connect_onboarded === 1,
+    connect_onboarded: row.connect_onboarded === 1,
+    notify_email: row.notify_email == null ? 1 : row.notify_email,
+    notify_sms: row.notify_sms === 1 ? 1 : 0,
+    sms_number: row.sms_number ?? "",
     // MySpace throwback v2 — Top Friends, custom layout, presence.
     top_friend_ids: parseTopFriendIds(row.top_friends),
     layout_css: row.layout_css ?? "", layout_preset: row.layout_preset ?? "",
@@ -701,7 +830,9 @@ export function shapeMember(row) {
     birthday: row.birthday ? row.birthday.slice(5) : null, // month-day only, never the year
     occupation: row.occupation ?? "", bio: row.bio ?? "",
     avatar_url: imageUrl(row.avatar_blob_key),
-    payout_ready: !!(row.payout_method && row.payout_handle),
+    // Payout-ready now means the bank is linked (Stripe Connect) — the
+    // old payout_method/handle labels no longer gate selling.
+    payout_ready: row.connect_onboarded === 1,
     // MySpace throwback v2 — presence for the AIM buddy list.
     presence: presenceOf(row), away_message: row.away_message ?? "",
     // Creator/Seller area (v3) — public seller card + Find results.
@@ -1800,6 +1931,12 @@ export async function shapeListing(db, row, seller) {
     is_adult: row.is_adult === 1,
     stripe_link: row.stripe_link ?? "",
     handling_time: row.handling_time ?? "",
+    // Flea Market checkout — Best Offer flag + the short video clip.
+    allows_offers: (row.allows_offers ?? 1) === 1,
+    video_clip_url: videoUrl(row.video_clip_key),
+    // Private sale — one buyer only, invisible to everyone else.
+    is_private: row.is_private === 1,
+    private_buyer_id: row.private_buyer_id ?? null,
     image_url: imageUrl(row.image_blob_key), image2_url: imageUrl(row.image2_blob_key),
     image3_url: imageUrl(row.image3_blob_key), gif_url: row.gif_url ?? null,
     trade_wanted: row.trade_wanted ?? "", allow_comments: row.allow_comments === 1,
@@ -1807,7 +1944,7 @@ export async function shapeListing(db, row, seller) {
     verification_summary: row.verification_summary ?? "", status: row.status,
     seller_id: seller.id, seller_username: seller.username, seller_occupation: seller.occupation ?? "",
     seller_avatar_url: imageUrl(seller.avatar_blob_key),
-    seller_payout_ready: !!(seller.payout_method && seller.payout_handle),
+    seller_payout_ready: seller.connect_onboarded === 1,
     current_bid_cents: current, bid_count: lb.length,
     trade_good: votes.filter((v) => v.verdict === "good").length,
     trade_fair: votes.filter((v) => v.verdict === "fair").length,
@@ -1833,7 +1970,26 @@ export async function shapeOrder(db, row, profilesById) {
     const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE listing_id = ? AND buyer_id = ? LIMIT 1").bind(row.listing_id, row.buyer_id).first();
     csNumber = cs ? cs.cs_number : null;
   } catch { csNumber = null; }
-  const listing = await db.prepare("SELECT image_blob_key FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first();
+  const listing = await db.prepare("SELECT image_blob_key, listing_type FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first();
+  // Digital Asset label — a digital listing's order shows the tag on
+  // the order card + receipt, same label as the Stripe product and
+  // the CS# sale record.
+  const digitalAsset = !!(listing && listing.listing_type === "digital");
+  // Buyer + seller protection — whether the buyer tapped "I got it",
+  // and whether an open dispute sits on this order (both sides see it
+  // and can add their side from My Orders).
+  let disputeStatus = null;
+  let disputeId = null;
+  try {
+    const d = await db.prepare("SELECT id, status FROM reports WHERE target_type = 'order' AND target_id = ? AND status IN ('open', 'claimed') ORDER BY id DESC LIMIT 1").bind(row.id).first();
+    if (d) { disputeStatus = d.status; disputeId = d.id; }
+  } catch { disputeStatus = null; disputeId = null; }
+  // Seller rating — has this order already been reviewed (one per order)?
+  let reviewed = false;
+  try {
+    const rv = await db.prepare("SELECT id FROM seller_reviews WHERE order_id = ? LIMIT 1").bind(row.id).first();
+    reviewed = !!rv;
+  } catch { reviewed = false; }
   return {
     id: row.id, listing_id: row.listing_id, item_title: row.item_title,
     amount_cents: row.amount_cents, status: row.status, carrier: row.carrier ?? "",
@@ -1841,6 +1997,10 @@ export async function shapeOrder(db, row, profilesById) {
     tracking_url: trackingUrl(row.carrier, row.tracking_number),
     tracking_alerts: row.tracking_alerts === 1,
     cs_number: csNumber,
+    digital_asset: digitalAsset,
+    buyer_confirmed_at: iso(row.buyer_confirmed_at ?? null),
+    dispute_status: disputeStatus, dispute_id: disputeId,
+    reviewed: reviewed,
     tax_cents: tax, shipping_cents: shipping,
     total_cents: row.amount_cents + tax + shipping,
     tax_state: row.tax_state ?? "", tax_rate_percent: row.tax_rate_percent ?? 0,

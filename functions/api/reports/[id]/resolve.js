@@ -8,7 +8,11 @@
 // resolved. Legacy 'reviewed' rows read as resolved; resolving writes
 // 'resolved' from here on. No action in the body = resolve (the old
 // operator inbox button's call keeps working).
-import { json, noDb, getDb, readJson, profileByDevice, roleOf, isTeamRole, notifyTeam, nowMs } from "../../_lib.js";
+// Disputes resolve with an outcome: resolved | refunded | seller_fault
+// | buyer_fault | dismissed, plus a resolution note. buyer_fault (a
+// false claim — it costs the filer dispute rights) is operator-only.
+// Both sides of a dispute get told how it landed.
+import { json, noDb, getDb, readJson, profileByDevice, roleOf, isTeamRole, notifyTeam, createNotification, nowMs } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);
@@ -52,11 +56,46 @@ export async function onRequestPost({ env, request, params }) {
   }
   // resolve
   if (status === "resolved") return json({ ok: false, error: "That report is already resolved." });
-  try {
-    await db.prepare("UPDATE reports SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE id = ?").bind(now, me.id, id).run();
-  } catch {
-    return json({ ok: false, error: "Resolving isn't switched on yet — the shop is still running a quick database update. Try again later." });
+  const isDispute = report.target_type === "order" || report.target_type === "receipt";
+  const OUTCOMES = ["resolved", "refunded", "seller_fault", "buyer_fault", "dismissed"];
+  const outcomeRaw = String(a.outcome || "resolved").toLowerCase();
+  const finalOutcome = isDispute && OUTCOMES.includes(outcomeRaw) ? outcomeRaw : "resolved";
+  if (finalOutcome === "buyer_fault" && meRole !== "operator") {
+    return json({ ok: false, error: "Only the operator can mark a dispute as a false claim — that takes away the member's dispute filing." });
   }
-  await notifyTeam(db, me, `@${me.username} resolved report #${id}`, "#/team", id);
-  return json({ ok: true, error: null, status: "resolved" });
+  const resolutionNote = String(a.resolution_note || "").trim().slice(0, 500);
+  try {
+    await db.prepare("UPDATE reports SET status = 'resolved', resolved_at = ?, resolved_by = ?, outcome = ?, resolution_note = ? WHERE id = ?").bind(now, me.id, finalOutcome, resolutionNote, id).run();
+  } catch (e) {
+    if (/no such column/i.test(String((e && e.message) || e))) {
+      // Protection migration hasn't run yet — resolve the old way so
+      // plain content reports still close instead of breaking.
+      try {
+        await db.prepare("UPDATE reports SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE id = ?").bind(now, me.id, id).run();
+      } catch {
+        return json({ ok: false, error: "Resolving isn't switched on yet — the shop is still running a quick database update. Try again later." });
+      }
+    } else {
+      return json({ ok: false, error: "Resolving isn't switched on yet — the shop is still running a quick database update. Try again later." });
+    }
+  }
+  await notifyTeam(db, me, `@${me.username} resolved report #${id}${isDispute ? " — " + finalOutcome : ""}`, "#/team", id);
+  if (isDispute) {
+    // Tell both sides how it landed — the reporter and the other party
+    // to the deal. The note is the plain-language reason.
+    const parties = new Set([report.reporter_id]);
+    if (report.target_type === "order") {
+      const o = await db.prepare("SELECT buyer_id, seller_id FROM orders WHERE id = ? LIMIT 1").bind(report.target_id).first();
+      if (o) { parties.add(o.buyer_id); parties.add(o.seller_id); }
+    } else {
+      const rc = await db.prepare("SELECT profile_id, other_profile_id FROM receipts WHERE id = ? LIMIT 1").bind(report.target_id).first();
+      if (rc) { parties.add(rc.profile_id); parties.add(rc.other_profile_id); }
+    }
+    const label = report.target_type === "order" ? `Order #${report.target_id}` : `Receipt #${report.target_id}`;
+    for (const pid of parties) {
+      if (!pid || pid === me.id) continue;
+      await createNotification(db, { profile_id: pid, actor_profile_id: me.id, kind: "dispute", ref_type: "report", ref_id: id, text: `Your dispute on ${label} was resolved — ${finalOutcome}${resolutionNote ? ": " + resolutionNote : "."}`, link: "#/orders" });
+    }
+  }
+  return json({ ok: true, error: null, status: "resolved", outcome: finalOutcome });
 }

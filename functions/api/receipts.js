@@ -44,6 +44,9 @@ function shapeReceipt(row) {
     // recorded before the CS# log existed).
     cs_number: row.cs_number ?? null,
     post_id: row.cs_post_id ?? null,
+    // Open dispute on this receipt, if any (protection UI).
+    dispute_status: row.dispute_status ?? null,
+    dispute_id: row.dispute_id ?? null,
     created_at: iso(row.created_at),
   };
 }
@@ -54,28 +57,34 @@ export async function onRequestGet({ env, request }) {
   const q = new URL(request.url).searchParams;
   const me = await profileByDevice(db, q.get("device_id") || "");
   if (!me) return json({ ok: false, error: "Create your account first to see your receipts.", receipts: [] });
+  // Joins are tried widest first and fall back when a table hasn't
+  // landed yet (migration not run) — the receipts list never breaks.
+  const base = (withCs, withDispute) => {
+    const joins = [];
+    if (withCs) joins.push("LEFT JOIN content_sales cs ON cs.conversation_id = r.conversation_id");
+    if (withDispute) joins.push("LEFT JOIN reports d ON d.target_type = 'receipt' AND d.target_id = r.id AND d.status IN ('open', 'claimed')");
+    const cols = ["r.*"];
+    if (withCs) cols.push("cs.cs_number AS cs_number", "cs.post_id AS cs_post_id");
+    if (withDispute) cols.push("d.id AS dispute_id", "d.status AS dispute_status");
+    return `SELECT ${cols.join(", ")} FROM receipts r ${joins.join(" ")} WHERE r.profile_id = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 100`;
+  };
+  const noTable = (e) => /no such table/i.test(String((e && e.message) || e));
+  try {
+    const { results } = await db.prepare(base(true, true)).bind(me.id).all();
+    return json({ receipts: (results || []).map(shapeReceipt) });
+  } catch (e) { if (!noTable(e)) throw e; }
+  try {
+    const { results } = await db.prepare(base(false, true)).bind(me.id).all();
+    return json({ receipts: (results || []).map(shapeReceipt) });
+  } catch (e) { if (!noTable(e)) throw e; }
   try {
     const { results } = await db.prepare(
-      `SELECT r.*, cs.cs_number AS cs_number, cs.post_id AS cs_post_id FROM receipts r
-       LEFT JOIN content_sales cs ON cs.conversation_id = r.conversation_id
-       WHERE r.profile_id = ? ORDER BY r.created_at DESC, r.id DESC LIMIT 100`,
+      `SELECT * FROM receipts WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`,
     ).bind(me.id).all();
     return json({ receipts: (results || []).map(shapeReceipt) });
-  } catch (e) {
-    if (/no such table/i.test(String((e && e.message) || e))) {
-      // The content_sales table isn't there yet (migration not run) —
-      // fall back to the plain receipts list instead of breaking.
-      try {
-        const { results } = await db.prepare(
-          `SELECT * FROM receipts WHERE profile_id = ? ORDER BY created_at DESC, id DESC LIMIT 100`,
-        ).bind(me.id).all();
-        return json({ receipts: (results || []).map(shapeReceipt) });
-      } catch (e2) {
-        if (/no such table/i.test(String((e2 && e2.message) || e2))) return notSetup();
-        throw e2;
-      }
-    }
-    throw e;
+  } catch (e2) {
+    if (noTable(e2)) return notSetup();
+    throw e2;
   }
 }
 

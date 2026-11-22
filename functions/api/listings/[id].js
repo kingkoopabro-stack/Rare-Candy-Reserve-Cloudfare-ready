@@ -7,7 +7,8 @@ import { json, noDb, getDb, readJson, profileByDevice, shapeListing, isOperator,
 async function loadListing(db, id) {
   return await db.prepare(
     `SELECT l.*, s.id AS seller_id, s.username AS seller_username, s.occupation AS seller_occupation,
-            s.avatar_blob_key AS seller_avatar, s.payout_method AS seller_payout_method, s.payout_handle AS seller_payout_handle
+            s.avatar_blob_key AS seller_avatar, s.payout_method AS seller_payout_method, s.payout_handle AS seller_payout_handle,
+            s.connect_onboarded AS seller_connect_onboarded
      FROM listings l JOIN profiles s ON s.id = l.profile_id WHERE l.id = ? LIMIT 1`,
   ).bind(id).first();
 }
@@ -24,10 +25,18 @@ export async function onRequestGet({ env, request, params }) {
     const me = deviceId ? await profileByDevice(db, deviceId) : null;
     if (!me || (me.id !== row.profile_id && !isOperator(env, me) && me.age_verified !== 1)) return json({ listing: null });
   }
+  // Private sale — only the seller, the one buyer, and the operator
+  // can open it. Anyone else gets "gone".
+  if (row.is_private === 1) {
+    const deviceId = new URL(request.url).searchParams.get("device_id") || "";
+    const me = deviceId ? await profileByDevice(db, deviceId) : null;
+    if (!me || (me.id !== row.profile_id && me.id !== row.private_buyer_id && !isOperator(env, me))) return json({ listing: null });
+  }
   return json({
     listing: await shapeListing(db, row, {
       id: row.seller_id, username: row.seller_username, occupation: row.seller_occupation,
       avatar_blob_key: row.seller_avatar, payout_method: row.seller_payout_method, payout_handle: row.seller_payout_handle,
+      connect_onboarded: row.seller_connect_onboarded,
     }),
   });
 }

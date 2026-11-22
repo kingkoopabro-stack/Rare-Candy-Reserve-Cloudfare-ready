@@ -1,6 +1,7 @@
 // POST /api/listings/:id/bid — placeBid. The bid must beat the current
-// high bid (or the starting price). Bids are recorded here — payment and
-// shipping are arranged between buyer and seller; no money moves in this app.
+// high bid (or the starting price). Bids are recorded here — the high
+// bidder completes the purchase through Stripe Checkout (see
+// /api/listings/:id/buy), same as any Flea Market buy.
 import { json, noDb, getDb, readJson, profileByDevice, money } from "../../_lib.js";
 
 export async function onRequestPost({ env, request, params }) {

@@ -61,6 +61,16 @@ export async function onRequestGet({ env, request }) {
       results = q.results;
     }
   }
+  // Dispute record per member — how many disputes they filed, and how
+  // many were found to be false claims. Computed from the reports table;
+  // stays 0 when the protection migration hasn't run yet.
+  let disputeCounts = new Map();
+  try {
+    const { results: dc } = await db.prepare(
+      "SELECT reporter_id, COUNT(*) AS filed, SUM(CASE WHEN outcome = 'buyer_fault' THEN 1 ELSE 0 END) AS false_n FROM reports WHERE target_type IN ('order', 'receipt') GROUP BY reporter_id",
+    ).all();
+    for (const row of (dc || [])) disputeCounts.set(row.reporter_id, { filed: row.filed || 0, false_n: row.false_n || 0 });
+  } catch { disputeCounts = new Map(); }
   return json({
     ok: true,
     members: (results || []).map((r) => ({
@@ -70,6 +80,8 @@ export async function onRequestGet({ env, request }) {
       age_verified: r.age_verified === 1, presence: presenceOf(r),
       seller_types: parsePrefs(r.seller_types),
       buyer_types: parsePrefs(r.buyer_types),
+      disputes_filed: (disputeCounts.get(r.id) || {}).filed || 0,
+      disputes_false: (disputeCounts.get(r.id) || {}).false_n || 0,
       created_at: iso(r.created_at),
     })),
   });

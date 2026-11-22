@@ -803,6 +803,7 @@ function render() {
   renderNotice();
   renderEphWin();
   maybeApplyBrandDraft();
+  maybeApplyPendingIM();
 }
 
 function renderAccount() {
@@ -824,9 +825,9 @@ function renderAccount() {
       '<p style="margin:4px 0 0">Buyer &amp; seller in one account.' +
       (p.age_verified ? ' <strong style="color:var(--green)">· Age verified ✓</strong>' : "") +
       (p.is_operator ? ' <strong style="color:var(--amber)">· Operator</strong>' : "") + "</p>" +
-      (p.payout_method && p.payout_handle
-        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — you can list in the Flea Market, Trades, and Auction House.</p>'
-        : '<p style="margin:4px 0 0">Add a payout method + handle whenever you’re ready to sell — buying and posting never need it.</p>') +
+      (p.payout_ready
+        ? '<p style="margin:4px 0 0;color:var(--green)">✓ Payout ready — your bank is linked, you can list in the Flea Market, Trades, and Auction House.</p>'
+        : '<p style="margin:4px 0 0">Link your bank in the Payouts tab whenever you’re ready to sell — buying and posting never need it.</p>') +
       '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'member/' + p.id + '\')">View my page →</button>' +
       ((p.top_friend_ids && p.top_friend_ids.length) ? ' <span style="color:var(--muted);font-size:13px">🌟 Top Friends: ' + p.top_friend_ids.length + "/10 picked</span>" : "") +
       (p.layout_preset ? ' <span style="color:var(--muted);font-size:13px">· 🎨 layout: ' + esc(storeLayoutName(p.layout_preset)) + "</span>" : "") + "</p>" +
@@ -1940,7 +1941,7 @@ function taffyReply(raw) {
     return { text: taffyPick(["Hit Find (or Find a Seller / Find a Buyer) and tell it what you want or what you sell — it matches you up and you message them privately.", "The Find area is your matchmaker — set what you're after or what you sell, and it shows you the best matches. Message them privately from there."]), emoji: taffyPickEmoji(["🔍", "✨"]), working: false };
   // Payout / get paid
   if (has(/\b(payout|get paid|receive money|how do i get paid|how do i receive)\b/))
-    return { text: taffyPick(["Set your payout method and handle in Edit Profile — that's how sellers get paid. The Community takes 6% once when the sale completes and you're paid.", "Getting paid starts in Edit Profile — put in your payout method and handle. When a sale completes, the buyer pays you, and the Community takes its 6% once."]), emoji: taffyPickEmoji(["💰", "✨"]), working: false };
+    return { text: taffyPick(["Link your bank once in the Payouts tab (Stripe Connect) — that's how sellers get paid now. Buyers pay by card on Stripe Checkout, the money lands in your Stripe balance at checkout, then Stripe sends it to your bank (about 2 business days). The Community takes 6% once when the sale completes.", "Getting paid starts in the Payouts tab — link your bank once with Stripe Connect. When a sale completes, the buyer pays by card, and the money's on its way to your bank (about 2 business days) after the Community takes its 6% once."]), emoji: taffyPickEmoji(["💰", "✨"]), working: false };
   // Fee
   if (has(/\b(fee|fees|1\.5|commission|what do you take|how much does it cost)\b/))
     return { text: taffyPick(["The Community takes 6% once — and only once — when a sale completes and you've been paid. No monthly fee, no listing fee, no cut on the way in.", "Just 6%, once, when the sale is done and you're paid. That's it — no listing fees, no monthly fees."]), emoji: taffyPickEmoji(["💰", "🍬"]), working: false };
@@ -2661,6 +2662,12 @@ function profileFormHTML(p) {
     '<input name="payout_method" maxlength="40" value="' + v("payout_method") + '" placeholder="e.g. PayPal, Cash App, Chime…">' +
     '<label>Payout handle</label>' +
     '<input name="payout_handle" maxlength="80" value="' + v("payout_handle") + '" placeholder="Your handle / address on that method">' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">That method + handle are for manual payments in private chat only — card sales pay straight to your linked bank (Payouts tab).</p>' +
+    '<label>Notifications — orders, offers &amp; shipping</label>' +
+    '<label><input type="checkbox" name="notify_email" style="width:auto"' + (p && p.notify_email !== 0 ? " checked" : "") + '> Email me when someone buys, offers, or my order ships (on by default)</label>' +
+    '<label><input type="checkbox" name="notify_sms" style="width:auto"' + (p && p.notify_sms === 1 ? " checked" : "") + '> Text me too — opt-in only (texts cost the shop per text, so only turn this on if you want them)</label>' +
+    '<label>Mobile number for texts (only used if you tick the box above)</label>' +
+    '<input name="sms_number" maxlength="20" value="' + v("sms_number") + '" placeholder="e.g. +1 904-555-0100">' +
     '<label id="dwc-sec-picture">📸 Profile picture — Shrink my photo for profile size</label>' +
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Pick any JPG, PNG, WebP, or GIF — we shrink it to profile size (512px, same ratio) and convert it to JPEG automatically (a GIF becomes a still image). iPhone HEIC photos can\'t be read by the browser — screenshot the photo and use that. A personal photo is optional; an avatar or none is fine.</p>' +
     '<input name="avatar" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.avatarPicked(this)">' +
@@ -4417,9 +4424,10 @@ function listingCardHTML(l) {
     listingShipLine(l) +
     (l.kind === "flea" ? "<p>🔨 " + l.bid_count + " bid" + (l.bid_count === 1 ? "" : "s") + "</p>" : "") +
     (l.kind === "trade" ? "<p>👍 Good " + l.trade_good + " · Fair " + l.trade_fair + " · Bad " + l.trade_bad + "</p>" : "") +
-    '<p class="dwc-meta">by @' + esc(l.seller_username) + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDate(l.created_at) + "</p>" +
+    '<p class="dwc-meta">by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.is_private ? " · 🔒 Private sale" : "") + "</p>" +
     '<div class="dwc-actions">' +
     '<a class="btn small" href="#/listing/' + l.id + '">View →</a>' +
+    ((state.profile && state.profile.id === l.seller_id) ? "" : '<button type="button" class="dwc-linklike" onclick="DWC.messageSellerAboutListing(' + l.seller_id + ', \'' + esc(l.seller_username.replace(/'/g, "")) + "', " + l.id + ')">💬 Message</button>') +
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + listingLink(l.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'listing\', ' + l.id + ')">🚩 Report</button>' +
     "</div></article>";
@@ -4485,6 +4493,7 @@ async function viewStreet(el) {
     '<section class="dwc-feed-intro" aria-label="Your feed">' +
       '<h2 class="dwc-feed-title" style="margin:0">📰 Your feed</h2>' +
       '<p class="dwc-feed-hint">This is where everyone’s posts live — newest first. Write in the box below and your post shows up right here, at the top of the feed. Tap a tag to see more like it, tap 🔖 to save a post for later.</p>' +
+      '<p class="dwc-feed-hint"><strong>A non-politically-affiliated platform that protects your amendments and your rights.</strong></p>' +
     "</section>" +
     '<div id="dwc-headlines-strip"></div>' +
     '<div id="dwc-composer"></div>' +
@@ -4618,6 +4627,7 @@ async function viewReceipts(el) {
           '<span class="dwc-receipt-kind">' + (spent ? "💸 Spent" : "💰 Received") + "</span></p>" +
           '<p style="margin:6px 0 0">' + esc(r.note || "") + "</p>" +
           '<p class="dwc-meta" style="margin:4px 0 0">with @' + esc(r.other_username) + " · " + fmtDate(r.created_at) + (r.cs_number ? " · CS#" + r.cs_number : "") + "</p>" +
+          disputeBlockHTML("receipt", r.id, r.dispute_status, r.dispute_id) +
           "</article>";
       }).join("")
     : '<div class="note">No receipts yet — when you mark a transaction done in a private chat, your receipt lands here.</div>';
@@ -4758,7 +4768,7 @@ async function showPriceChart(cardName) {
 // ---------- Flea Market / Trade / Auction House ----------
 async function viewMarket(el, kind) {
   var titles = {
-    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell here once their account and payout method are set up — physical items, digital content, or dropship goods. Your profile page is your shop: set a shop name in Edit Profile and your listings show there. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
+    market: ["🛒 Flea Market — sell your cards &amp; collectibles", "List it free. <span class=\"grad-text\">Sell it fair.</span>", "Anyone can sell here once their account is set up and their bank is linked (Stripe Connect, one time, in the Payouts tab) — physical items, digital content, or dropship goods. Your profile page is your shop: set a shop name in Edit Profile and your listings show there. Listing is free — a small fair cut goes to Rare Candy Reserve only when the item sells."],
     trade: ["🔄 Up for Trade", "Offer a trade. <span class=\"grad-text\">Let the community weigh in.</span>", "Every trade listing needs a photo and a check first — the shop verifies no fakes or proxies before a trade goes live. Then members vote whether it’s a good trade, a fair one, or a bad deal."],
     flea: ["🔨 Auction House — simple bidding", "Bid on it. <span class=\"grad-text\">Win it.</span>", "An online auction house with simple bidding — cards, collectibles, and whatever else the community’s selling. Bids must beat the high bid. The high bidder completes the purchase."],
   };
@@ -4784,14 +4794,24 @@ function renderListingForm(host, kind) {
   var kindLabel = kind === "sale" ? "for sale" : kind === "trade" ? "for trade" : "in the auction house";
   host.innerHTML =
     '<section class="card"><div class="tag">List an item ' + kindLabel + '</div><h3 style="margin-top:10px">Put something up ' + kindLabel + "</h3>" +
-    (p ? (p.payout_method && p.payout_handle ? "" : '<p class="dwc-warn">You’re not payout-ready yet — add a payout method + handle in your profile before listing, or the listing will be blocked. You can still fill everything in now.</p>')
-      : "<p>Listing needs an account + payout method — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create your account</button> first.</p>") +
+    (p ? (p.payout_ready ? "" : '<p class="dwc-warn">You’re not payout-ready yet — link your bank once in the Payouts tab (Stripe Connect) before listing, or the listing will be blocked. You can still fill everything in now.</p>')
+      : "<p>Listing needs an account + a linked bank — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create your account</button> first.</p>") +
     '<form onsubmit="DWC.submitListing(this, \'' + kind + '\'); return false;">' +
     '<label>Item title (3–120 characters)</label>' +
     '<input name="title" required minlength="3" maxlength="120" placeholder="What are you selling?">' +
     '<label>Category</label><select name="category">' + LISTING_CATEGORIES.map(function (c) { return "<option>" + esc(c) + "</option>"; }).join("") + "</select>" +
     '<label>' + (kind === "flea" ? "Starting bid (USD)" : kind === "trade" ? "Trade value (USD — what it’s worth, for the fee split)" : "Price (USD)") + "</label>" +
     '<input name="price" type="number" step="0.01" min="0" required placeholder="e.g. 25.00">' +
+    (kind === "trade" ? "" :
+      '<div id="dwc-price-suggest" style="border:1px dashed var(--border);border-radius:8px;padding:10px;margin:8px 0">' +
+      '<p style="margin:0 0 6px;font-size:14px"><strong>💲 Collectible card?</strong> Get a price suggestion (Pokémon first — TCGplayer market price, free source):</p>' +
+      '<div class="dwc-rowform"><input name="ps_name" maxlength="120" placeholder="Card name — e.g. Charizard" style="flex:2">' +
+      '<input name="ps_set" maxlength="120" placeholder="Set — e.g. Base Set" style="flex:1">' +
+      '<input name="ps_number" maxlength="20" placeholder="No. — e.g. 4" style="flex:0 0 90px"></div>' +
+      '<div class="dwc-rowform"><select name="ps_graded" style="flex:1"><option value="">Loose (ungraded)</option><option value="1">Graded</option></select>' +
+      '<input name="ps_grade" maxlength="3" placeholder="Grade — e.g. 10" style="flex:0 0 110px">' +
+      '<button type="button" class="btn ghost small" onclick="DWC.suggestPrice(this.form)">Suggest a price →</button></div>' +
+      '<p data-ps-result style="margin:6px 0 0;font-size:13px;color:var(--muted)"></p></div>') +
     (kind === "trade" ? "" :
       '<label>What kind of listing is this?</label><select name="listing_type">' +
       '<option value="physical">📦 Physical item — I ship it</option>' +
@@ -4802,8 +4822,7 @@ function renderListingForm(host, kind) {
       '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px">Digital content has no shipping — leave it 0. Physical and dropship listings need a shipping charge.</p>' +
       '<label>Handling time (for dropship — how long before it ships)</label>' +
       '<input name="handling_time" maxlength="120" placeholder="e.g. ships in 3–5 business days">' +
-      '<label>Your Stripe Payment Link (optional — your own link, buyers pay you directly)</label>' +
-      '<input name="stripe_link" maxlength="500" placeholder="https://buy.stripe.com/…">' +
+      (kind === "sale" ? '<label><input type="checkbox" name="allows_offers" checked style="width:auto"> Allow offers — buyers can offer less, you accept / decline / counter</label>' : "") +
       (p && p.age_verified ? '<label><input type="checkbox" name="is_adult" style="width:auto"> 🔞 This is adult (18+) content — only age-verified members will see it</label>' : '<p style="color:var(--muted);font-size:13px">Adult content listings need age verification first — see Rules &amp; After Dark.</p>')) +
     (kind === "trade" ? '<label>What you’re looking for in return</label><input name="trade_wanted" maxlength="500" placeholder="Card(s) you want in return">' : "") +
     '<label>Description &amp; condition (a little formatting is allowed: bold, italic, lists, links)</label>' +
@@ -4815,10 +4834,13 @@ function renderListingForm(host, kind) {
     '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingphotonote="2"></p>' +
     '<input name="photo3" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.listingPhotoPicked(this, 3)">' +
     '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingphotonote="3"></p>' +
+    '<label>Short video clip (optional — 30 seconds max, 15 MB max, keeps it light on data)</label>' +
+    '<input name="video_clip" type="file" accept="video/mp4,video/webm" onchange="DWC.listingVideoPicked(this)">' +
+    '<p style="margin:2px 0 6px;color:var(--muted);font-size:12px" data-listingvideonote></p>' +
     (kind === "trade" ? '<p class="dwc-warn">Trades need a photo AND a completed AI authenticity check on it before they go live — run the check on the cover photo first.</p>' : "") +
     '<div class="dwc-checkline"><button type="button" class="btn ghost small" onclick="DWC.runListingCheck(this.form)">🔍 Run AI authenticity check on cover photo</button> <span data-checkresult></span></div>' +
     '<label><input type="checkbox" name="allow_comments" checked style="width:auto"> Allow comments on this listing</label>' +
-    '<p style="color:var(--muted);font-size:13px">6% street cut on the item price only (shown on the listing) · buyer pays shipping · no mystery boxes or repacks without full disclosure · dropship means YOU fulfil the order · PayPal Goods &amp; Services recommended — no escrow, the site never holds money · the operator and admins can remove listings that break the rules.</p>' +
+    '<p style="color:var(--muted);font-size:13px">6% street cut on the item price only (shown on the listing) · buyer pays shipping · no mystery boxes or repacks without full disclosure · dropship means YOU fulfil the order · buyers pay by card on Stripe Checkout — captured at checkout, on its way to your linked bank (about 2 business days) · the operator and admins can remove listings that break the rules.</p>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
     '<p style="margin-top:14px"><button class="btn" type="submit">List it →</button></p>' +
     "</form></section>";
@@ -4943,18 +4965,23 @@ async function viewListing(el, listingId) {
     '<p style="color:var(--muted);font-size:14px">Platform cut (6%): ' + money(l.fee_cents) + " · Seller gets: " + money(l.seller_gets_cents) + "</p>" +
     listingShipLine(l) +
     (l.kind === "trade" && l.trade_wanted ? "<p><strong>Looking for:</strong> " + esc(l.trade_wanted) + "</p>" : "") +
-    '<p class="dwc-meta">by @' + esc(l.seller_username) + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDate(l.created_at) + (l.seller_payout_ready ? ' · <span style="color:var(--green)">✓ payout ready</span>' : "") + "</p>" +
+    '<p class="dwc-meta">by <a href="#/member/' + l.seller_id + '">@' + esc(l.seller_username) + "</a>" + (l.seller_occupation ? " · " + esc(l.seller_occupation) : "") + " · " + fmtDateTime(l.created_at) + (l.seller_payout_ready ? ' · <span style="color:var(--green)">✓ payout ready</span>' : "") + "</p>" +
+    '<div id="dwc-seller-rating" data-seller="' + l.seller_id + '"></div>' +
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML +
     '<div class="dwc-actions">' +
     '<button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + listingLink(l.id) + '\', this)">🔗 Copy link</button>' +
     '<button type="button" class="dwc-linklike" onclick="DWC.report(\'listing\', ' + l.id + ')">🚩 Report</button>' +
+    (isMine ? "" : '<button type="button" class="dwc-linklike" onclick="DWC.messageSellerAboutListing(' + l.seller_id + ', \'' + esc(l.seller_username.replace(/'/g, "")) + "', " + l.id + ')">💬 Message seller</button>') +
     (isMine && l.status !== "sold" ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteListing(' + l.id + ')">🗑 Close my listing</button>' : "") +
     (canMod && !isMine && l.status !== "sold" ? '<button type="button" class="dwc-linklike" onclick="DWC.deleteListing(' + l.id + ')">🗑 Remove listing (team)</button>' : "") +
     "</div>" +
-    (l.stripe_link && l.status === "active" && !isMine
-      ? '<p style="margin-top:14px"><a class="btn ghost" href="' + esc(l.stripe_link) + '" target="_blank" rel="noopener">Pay with Stripe →</a> <span style="color:var(--muted);font-size:13px">The seller’s own Stripe link — pay them directly, then tap Buy it so the order is recorded.</span></p>' : "") +
+    (l.video_clip_url ? '<p><video controls preload="metadata" style="max-width:100%;border-radius:8px" src="' + esc(l.video_clip_url) + '"></video></p>' : "") +
     (l.status === "active" && !isMine && l.kind !== "trade"
-      ? '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.buyListing(' + l.id + ')">' + (l.kind === "flea" ? "Complete purchase as high bidder →" : "Buy it →") + "</button> <span style=\"color:var(--muted);font-size:13px\">Payment is arranged directly with the seller — no money moves in this app.</span></p>"
+      ? '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.buyListing(' + l.id + ')">' + (l.kind === "flea" ? "Complete purchase as high bidder →" : "Buy it →") + "</button> <span style=\"color:var(--muted);font-size:13px\">Pay by card on Stripe's secure checkout — captured at checkout, then on its way to the seller's linked bank (minus the 6% street cut, about 2 business days).</span></p>"
+      : "") +
+    '<div id="dwc-offers"></div>' +
+    (l.status === "active" && l.kind !== "trade"
+      ? '<p style="font-size:13px;color:var(--muted)">🛡️ Buyer &amp; seller protection: the seller ships with tracking, you tap “I got it” when it lands, and if something’s wrong either side can open a dispute from My Orders — Chris mediates, and the record decides. The site never holds money and can’t force a refund — see Rules.</p>'
       : "") +
     (l.status === "active" && l.kind === "trade" && !isMine
       ? '<p style="margin-top:14px">Trade listings aren’t bought — leave a comment below to offer your trade.</p>' : "") +
@@ -4980,6 +5007,8 @@ async function viewListing(el, listingId) {
         '<p class="dwc-form-err" data-err hidden></p>' +
         '<p style="margin-top:14px"><button class="btn" type="submit">Comment →</button></p></form></section>'
       : state.profile ? "" : needProfileHTML());
+  loadSellerRating(l.seller_id);
+  if (l.kind === "sale" && l.status === "active") loadListingOffers(l);
 }
 
 // ---------- Tag page ----------
@@ -4999,6 +5028,22 @@ async function viewTag(el, tag, adult) {
 // ---------- Orders ----------
 async function viewOrders(el) {
   if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
+  // Back from Stripe Checkout — confirm the payment for real (never
+  // trust the URL alone; the server checks the session with Stripe).
+  var hash = location.hash || "";
+  if (/[?&]checkout=success/.test(hash)) {
+    var q = new URLSearchParams(hash.split("?")[1] || "");
+    var sid = q.get("session_id"), oid = q.get("order_id");
+    if (sid && oid) {
+      var c = await apiPost("/checkout/confirm", { device_id: deviceId(), session_id: sid, order_id: Number(oid) });
+      if (c && c.ok) { state.contentSalesLoadedFor = null; await loadMyContentSales(); setNotice("Payment confirmed — the order's paid, the seller's been told, and the money's on its way to their bank."); }
+      else setNotice("Payment couldn't be confirmed: " + ((c && c.error) || "try paying again from My Orders."));
+    }
+    history.replaceState(null, "", location.pathname + location.hash.split("?")[0]);
+  } else if (/[?&]checkout=cancelled/.test(hash)) {
+    setNotice("Checkout cancelled — nothing was charged. The order is still in My Orders if you want to pay.");
+    history.replaceState(null, "", location.pathname + location.hash.split("?")[0]);
+  }
   el.innerHTML = '<section aria-label="My Orders"><h2 style="margin-top:0">📦 My Orders</h2><p style="color:var(--muted)">Loading…</p></section>';
   var buying = await apiGet("/my-orders?device_id=" + encodeURIComponent(deviceId()));
   var selling = await apiGet("/my-sales?device_id=" + encodeURIComponent(deviceId()));
@@ -5020,6 +5065,7 @@ function orderCardHTML(o, isSeller) {
     (o.image_url ? '<img class="dwc-post-img" src="' + esc(o.image_url) + '" alt="" loading="lazy">' : "") +
     "<h3 style=\"margin:0 0 4px\">" + esc(o.item_title) + "</h3>" +
     (o.cs_number ? '<p style="margin:4px 0;font-size:14px">Sale number: <strong>CS#' + o.cs_number + "</strong> · your copy is watermarked to you</p>" : "") +
+    (o.digital_asset ? '<p style="margin:4px 0;font-size:14px">💾 Digital Asset — no shipping, no sales tax; your watermarked copy is yours to keep</p>' : "") +
     '<p style="margin:4px 0"><strong>' + money(o.amount_cents) + "</strong> · " + esc(o.status) + " · " + fmtDate(o.created_at) + "</p>" +
     ((o.tax_cents || o.shipping_cents) ? '<p style="margin:4px 0;font-size:14px">Item ' + money(o.amount_cents) + (o.shipping_cents ? " · Shipping " + money(o.shipping_cents) : "") + (o.tax_cents ? " · Tax " + money(o.tax_cents) + (o.tax_state ? " (" + esc(o.tax_state) + (o.tax_rate_percent ? " " + o.tax_rate_percent + "%" : "") + ")" : "") : "") + " · <strong>Total " + money(o.total_cents != null ? o.total_cents : (o.amount_cents + (o.tax_cents || 0) + (o.shipping_cents || 0))) + "</strong></p>" : "") +
     '<p style="margin:4px 0;color:var(--muted);font-size:14px">' + (isSeller ? "Buyer: @" + esc(o.buyer_username) : "Seller: @" + esc(o.seller_username)) +
@@ -5027,8 +5073,19 @@ function orderCardHTML(o, isSeller) {
     '<p class="dwc-order-steps">' + steps.map(function (st, i) { return '<span class="' + (i <= idx ? "done" : "") + '">' + st + "</span>"; }).join(" → ") + "</p>" +
     (o.carrier || o.tracking_number
       ? '<p>🚚 ' + esc(o.carrier || "—") + ' · Tracking: <button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + esc(o.tracking_number) + '\', this)">' + esc(o.tracking_number) + " 📋</button>" +
-        (o.tracking_url ? ' · <a href="' + esc(o.tracking_url) + '" target="_blank" rel="noopener">Track with carrier ↗</a>' : "") + "</p>"
+        (o.tracking_url ? ' · <a href="' + esc(o.tracking_url) + '" target="_blank" rel="noopener">Track with carrier ↗</a>' : "") +
+        ' · <button type="button" class="dwc-linklike" onclick="DWC.showTracking(' + o.id + ')">Track it →</button></p><div id="dwc-tracking-' + o.id + '"></div>'
       : "") +
+    (o.status === "pending_payment" && !isSeller
+      ? '<p style="margin-top:10px">⏳ Waiting on your card payment — the order isn\'t final until it\'s paid. <button type="button" class="btn small" onclick="DWC.resumeCheckout(' + o.id + ')">Pay by card →</button></p>'
+      : "") +
+    // Buyer + seller protection — confirm receipt, disputes.
+    (o.buyer_confirmed_at ? '<p style="font-size:14px;color:var(--green)">✓ Receipt confirmed ' + fmtDate(o.buyer_confirmed_at) + (isSeller ? " — your buyer confirmed it landed." : " — thanks, the order is complete.") + "</p>" : "") +
+    (!isSeller && o.status === "shipped" && !o.buyer_confirmed_at
+      ? '<p style="margin-top:10px"><button type="button" class="btn" onclick="DWC.confirmReceipt(' + o.id + ')">✓ I got it — it arrived</button> <span style="color:var(--muted);font-size:13px">Tap when it lands — that marks the order delivered, and the money\'s on its way to the seller\'s bank.</span></p>'
+      : "") +
+    reviewBlockHTML(o, isSeller) +
+    disputeBlockHTML("order", o.id, o.dispute_status, o.dispute_id) +
     (!isSeller
       ? '<label class="dwc-alerts"><input type="checkbox" ' + (o.tracking_alerts ? "checked" : "") + ' onchange="DWC.setAlerts(' + o.id + ', this.checked)" style="width:auto"> Email me tracking alerts on this order <span style="color:var(--muted)">(preference saved — alert emails send once the street’s mail connection is live)</span></label>'
       : '<form class="dwc-shipform" onsubmit="DWC.updateShipping(this, ' + o.id + '); return false;">' +
@@ -5037,8 +5094,201 @@ function orderCardHTML(o, isSeller) {
         '<input name="tracking_number" maxlength="60" value="' + esc(o.tracking_number) + '" placeholder="Tracking number">' +
         '<button class="btn small" type="submit">Save shipping</button></form>' +
         (o.status === "paid" ? '<p style="font-size:14px">🚢 Need a label? <a href="https://www.pirateship.com" target="_blank" rel="noopener">Ship it with Pirate Ship →</a> <span style="color:var(--muted)">free to use, cheapest USPS + discounted UPS rates. Grab the buyer’s address from the PayPal / Stripe payment — the site doesn’t store it — paste it into Pirate Ship, then save the tracking number here.</span></p>' : "") +
-        '<p style="font-size:13px;color:var(--muted)">Marking it <strong>Delivered</strong> credits your wallet with ' + money(o.seller_gets_cents) + " — see the Payouts tab. Your buyer sees the tracking number and carrier link on their order the moment you save.</p>") +
+        '<p style="font-size:13px;color:var(--muted)">Marking it <strong>Delivered</strong> tells your buyer it\'s there — for card orders the money\'s already on its way to your bank; older/manual sales credit your wallet (see the Payouts tab). Your buyer sees the tracking number and carrier link on their order the moment you save.</p>') +
     "</article>";
+}
+
+// ---------- Offers (Best Offer style) ----------
+// Load Stripe.js lazily, only when a card is actually being saved
+// with an offer. Returns the Stripe instance, or null when card
+// checkout isn't switched on yet (offers still work cardless —
+// acceptance then sends the buyer a Checkout link to pay).
+async function ensureStripe() {
+  if (window.__dwcStripe) return window.__dwcStripe;
+  var cfg = await apiGet("/config");
+  var pk = cfg && cfg.stripe_publishable_key;
+  if (!pk) return null;
+  if (!window.Stripe) {
+    await new Promise(function (res, rej) {
+      var s = document.createElement("script");
+      s.src = "https://js.stripe.com/v3/";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  window.__dwcStripe = window.Stripe(pk);
+  return window.__dwcStripe;
+}
+async function loadListingOffers(l) {
+  var host = $("dwc-offers");
+  if (!host) return;
+  if (l.kind !== "sale" || l.status !== "active") { host.innerHTML = ""; return; }
+  var isMine = state.profile && state.profile.id === l.seller_id;
+  if (!l.allows_offers && !isMine) { host.innerHTML = ""; return; }
+  var data = await apiGet("/listings/" + l.id + "/offer?device_id=" + encodeURIComponent(deviceId()));
+  var offers = (data && data.offers) || [];
+  var html = "";
+  if (isMine) {
+    html = '<section class="card"><h3 style="margin-top:0">💸 Offers</h3>' +
+      (offers.length ? offers.map(function (o) {
+        return '<div style="border-top:1px solid var(--border);padding:8px 0"><p style="margin:0"><strong>@' + esc(o.buyer_username || "member") + "</strong> offered <strong>" + money(o.amount_cents) + "</strong> · " + esc(o.status) + (o.expires_at ? " · expires " + fmtDate(o.expires_at) : "") + (o.message ? "<br>" + esc(o.message) : "") + "</p>" +
+          (o.status === "open"
+            ? '<p style="margin:6px 0 0"><button type="button" class="btn small" onclick="DWC.respondOffer(' + o.id + ", 'accept')\">Accept — charge their card</button> " +
+              '<button type="button" class="btn ghost small" onclick="DWC.respondOffer(' + o.id + ", 'decline')\">Decline</button> " +
+              '<input id="dwc-counter-' + o.id + '" type="number" step="0.01" min="0.01" placeholder="Counter ($)" style="max-width:140px"> ' +
+              '<button type="button" class="btn ghost small" onclick="DWC.respondOffer(' + o.id + ", 'counter')\">Counter →</button></p>" +
+              '<p style="margin:4px 0 0;font-size:13px;color:var(--muted)">Accepting charges the card they saved with the offer — if they didn\'t save one, they get a Checkout link to pay instead. Declining or countering charges nothing.</p>'
+            : "") + "</div>";
+      }).join("") : "<p>No offers yet.</p>") + "</section>";
+  } else if (state.profile) {
+    var mine = offers.filter(function (o) { return o.buyer_id === state.profile.id; });
+    html = '<section class="card"><h3 style="margin-top:0">💸 Make an offer</h3>' +
+      '<p style="color:var(--muted);font-size:14px">Offer less than the asking price — the seller can accept, decline, or counter. If they accept, your saved card is charged automatically; if they decline or counter, nothing is charged.</p>' +
+      (mine.length ? mine.map(function (o) { return '<p style="margin:4px 0">Your offer: <strong>' + money(o.amount_cents) + "</strong> · " + esc(o.status) + (o.status === "countered" ? " — the seller countered, see your offers in My Orders" : "") + "</p>"; }).join("") : "") +
+      '<form onsubmit="DWC.makeOffer(this, ' + l.id + '); return false;">' +
+      '<label>Your offer ($)</label><input name="amount" type="number" step="0.01" min="0.01" max="' + ((l.price_cents - 1) / 100) + '" required placeholder="Less than ' + money(l.price_cents) + '">' +
+      '<label>Message (optional)</label><input name="message" maxlength="300" placeholder="e.g. can pick up this weekend">' +
+      '<label class="dwc-alerts"><input type="checkbox" id="dwc-offer-save-card" style="width:auto" onchange="DWC.toggleOfferCard(this.checked)"> Save my card with this offer (so the seller can accept and charge it right away)</label>' +
+      '<div id="dwc-offer-card" hidden style="margin:8px 0"></div>' +
+      '<p class="dwc-form-err" data-err hidden></p>' +
+      '<p style="margin-top:10px"><button class="btn" type="submit">Send the offer →</button> <span style="color:var(--muted);font-size:13px">No charge until the seller accepts.</span></p></form></section>';
+  } else {
+    html = '<section class="card"><h3 style="margin-top:0">💸 Make an offer</h3>' + needProfileHTML() + "</section>";
+  }
+  host.innerHTML = html;
+}
+
+// ---------- Seller rating (public reviews) ----------
+// Reviews are PUBLIC — the words and the rating both show on the
+// seller's profile/shop page. The only filter is hate speech, at
+// write time (see the review endpoint).
+function starsHTML(avg, count) {
+  if (!count) return '<span style="color:var(--muted)">No seller reviews yet</span>';
+  var full = Math.round(avg || 0);
+  var stars = "";
+  for (var i = 1; i <= 5; i++) stars += i <= full ? "★" : "☆";
+  return '<span title="' + avg + ' out of 5 from ' + count + ' review' + (count === 1 ? "" : "s") + '">' + stars + " " + avg + " · " + count + " review" + (count === 1 ? "" : "s") + "</span>";
+}
+function starsOnly(n) {
+  var stars = "";
+  for (var i = 1; i <= 5; i++) stars += i <= (n || 0) ? "★" : "☆";
+  return stars;
+}
+async function loadSellerRating(sellerId) {
+  var hosts = document.querySelectorAll('#dwc-seller-rating[data-seller="' + sellerId + '"]');
+  if (!hosts.length) return;
+  var data = await apiGet("/sellers/" + sellerId + "/rating");
+  var html = (data && data.ok) ? '<p style="margin:4px 0;font-size:14px">⭐ Seller rating: ' + starsHTML(data.average_stars, data.review_count) + ' <span style="color:var(--muted)">(reviews show publicly on the seller\'s page — words and stars)</span></p>' : "";
+  hosts.forEach(function (h) { h.innerHTML = html; });
+}
+// The reviews on a seller's page — PUBLIC, words and stars, for
+// anyone to read. No gate: the filter runs at write time.
+async function loadSellerReviews(sellerId) {
+  var host = $("dwc-seller-reviews");
+  if (!host) return;
+  var data = await apiGet("/sellers/" + sellerId + "/reviews?device_id=" + encodeURIComponent(deviceId()));
+  if (!data || !data.ok) return;
+  var reviews = data.reviews || [];
+  host.innerHTML = '<section class="card"><h3 style="margin-top:0">⭐ Reviews on this seller</h3>' +
+    '<p style="color:var(--muted);font-size:13px">From buyers, after completed orders — words and stars, public. Hate speech is blocked; plain cursing is fine.</p>' +
+    (reviews.length ? reviews.map(function (r) {
+      return '<div style="border-top:1px solid var(--border);padding:8px 0"><p style="margin:0"><strong>' + starsOnly(r.stars) + "</strong> · from @" + esc(r.buyer_username) + ' · <span style="color:var(--muted)">' + fmtDate(r.created_at) + "</span></p>" +
+        (r.body ? "<p style=\"margin:4px 0\">" + esc(r.body) + "</p>" : '<p style="margin:4px 0;color:var(--muted)">No words — stars only.</p>') + "</div>";
+    }).join("") : "<p>No reviews yet.</p>") + "</section>";
+}
+// The "Rate this seller" prompt on a completed order — buyer only,
+// delivered + "I got it" tapped, one review per order.
+function reviewBlockHTML(o, isSeller) {
+  if (isSeller) return "";
+  if (o.status !== "delivered" || !o.buyer_confirmed_at) return "";
+  if (o.reviewed) return '<p style="font-size:14px;color:var(--green)">★ You rated this seller — thanks. Your review shows publicly on their page, words and stars.</p>';
+  return '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+    '<p style="margin:0 0 6px"><strong>⭐ Rate this seller</strong> <span style="color:var(--muted);font-size:13px">— public. Your words and stars show on the seller\'s page for anyone to read. Hate speech is blocked; plain cursing is fine.</span></p>' +
+    '<form class="dwc-rowform" onsubmit="DWC.submitReview(this, ' + o.id + '); return false;">' +
+    '<select name="stars" required><option value="">Stars…</option><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>' +
+    '<input name="body" maxlength="500" placeholder="A few words for the seller (optional)" style="flex:1">' +
+    '<button class="btn small" type="submit">Send review →</button></form><p class="dwc-form-err" data-err hidden></p></div>';
+}
+
+// ---------- Buyer + seller protection ----------
+var DISPUTE_REASONS = [
+  { key: "not_received", label: "Not received — it never showed up" },
+  { key: "not_as_described", label: "Not as described — wrong item or condition" },
+  { key: "fake", label: "Fake / counterfeit" },
+  { key: "other", label: "Something else" },
+];
+var DISPUTE_OUTCOMES = [
+  { key: "resolved", label: "Resolved — sorted out" },
+  { key: "refunded", label: "Refunded — seller sent the money back" },
+  { key: "seller_fault", label: "Seller at fault" },
+  { key: "buyer_fault", label: "Buyer at fault — false claim (operator only)" },
+  { key: "dismissed", label: "Dismissed — no fault found" },
+];
+function disputeReasonLabel(key) {
+  for (var i = 0; i < DISPUTE_REASONS.length; i++) if (DISPUTE_REASONS[i].key === key) return DISPUTE_REASONS[i].label;
+  return key || "Dispute";
+}
+// The dispute block on an order or receipt card. No open dispute: a
+// "Something's wrong" button + a form (reason + what happened). Open
+// dispute: its status + a thread the buyer, the seller, and the team
+// can all add to.
+function disputeBlockHTML(kind, refId, status, disputeId) {
+  if (status === "open" || status === "claimed") {
+    return '<div class="dwc-dispute" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">' +
+      '<p style="margin:0"><strong>⚖️ Dispute ' + esc(status) + '</strong> — the team is looking at it. ' +
+      '<button type="button" class="dwc-linklike" onclick="DWC.loadDisputeThread(' + disputeId + ", 'dwc-dispute-thread-" + kind + "-" + refId + '\')">View the dispute →</button></p>' +
+      '<div id="dwc-dispute-thread-' + kind + "-" + refId + '"></div></div>';
+  }
+  return '<div class="dwc-dispute" style="margin-top:10px">' +
+    '<button type="button" id="dwc-dispute-btn-' + kind + "-" + refId + '" class="btn ghost small" onclick="DWC.toggleDisputeForm(\'' + kind + "', " + refId + ')">Something’s wrong — open a dispute</button>' +
+    '<form id="dwc-dispute-form-' + kind + "-" + refId + '" hidden onsubmit="DWC.fileDispute(this, \'' + kind + "', " + refId + '); return false;" style="margin-top:10px">' +
+    '<label>What went wrong?</label><select name="reason">' + DISPUTE_REASONS.map(function (r) { return '<option value="' + r.key + '">' + esc(r.label) + "</option>"; }).join("") + "</select>" +
+    '<label>What happened? (the team reads this — tracking numbers, dates, what was promised vs what arrived)</label><textarea name="detail" required maxlength="1000" placeholder="e.g. Paid on the 3rd, tracking hasn’t moved since the 5th, seller stopped answering…"></textarea>' +
+    '<p class="dwc-form-err" data-err hidden></p>' +
+    '<p style="margin-top:10px"><button class="btn small" type="submit">Open the dispute →</button> <span style="color:var(--muted);font-size:13px">The team mediates — the site never holds money and can’t force a refund.</span></p></form></div>';
+}
+// One dispute's thread, for the buyer, the seller, or the team — the
+// story, the order snapshot, the outcome, and both sides' notes.
+function disputeThreadHTML(r) {
+  var o = r.order || {};
+  var snap = "";
+  if (r.target_type === "order") {
+    snap = '<p style="margin:4px 0;font-size:14px">' + esc(o.item_title || "") + " · " + esc(o.status || "") + " · " + money(o.amount_cents || 0) +
+      (o.tracking_number ? " · Tracking: " + esc(o.tracking_number) : " · No tracking yet") +
+      (o.cs_number ? " · CS#" + o.cs_number : "") + "</p>";
+  } else {
+    snap = '<p style="margin:4px 0;font-size:14px">' + esc(o.note || "") + " · " + money(o.amount_cents || 0) + "</p>";
+  }
+  return '<div style="margin-top:8px"><p style="margin:0"><strong>' + esc(disputeReasonLabel(r.reason)) + '</strong> · reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p>" + snap +
+    (r.detail ? '<p style="margin:4px 0">' + esc(r.detail) + "</p>" : "") +
+    (r.status === "resolved" ? '<p style="margin:4px 0"><strong>Resolved — ' + esc(r.outcome || "resolved") + '</strong>' + (r.resolution_note ? ": " + esc(r.resolution_note) : "") + "</p>" : "") +
+    '<div class="dwc-dispute-notes">' + ((r.notes || []).length ? r.notes.map(function (n) {
+      return '<p style="margin:4px 0;font-size:14px"><strong>@' + esc(n.author_username) + ":</strong> " + esc(n.body) + ' <span style="color:var(--muted)">· ' + fmtDate(n.created_at) + "</span></p>";
+    }).join("") : '<p style="color:var(--muted);font-size:14px">No notes yet — add your side below.</p>') + "</div>" +
+    (r.status !== "resolved" ? '<form class="dwc-rowform" onsubmit="DWC.addDisputeNote(this, ' + r.id + '); return false;"><input name="body" required maxlength="1000" placeholder="Add your side — tracking, dates, what happened…" style="flex:1"><button class="btn small" type="submit">Add note</button></form><p class="dwc-form-err" data-err hidden></p>' : "") +
+    "</div>";
+}
+// The dispute detail on a Team panel report card — the story, the order
+// snapshot, the outcome when resolved, and the notes thread.
+function disputeTeamBlockHTML(r) {
+  var o = r.order || {};
+  var snap = "";
+  if (r.target_type === "order") {
+    snap = "Order · " + esc(o.status || "") + " · " + money(o.amount_cents || 0) +
+      " · Buyer @" + esc(o.buyer_username || "member") + " · Seller @" + esc(o.seller_username || "member") +
+      (o.tracking_number ? " · Tracking: " + esc(o.tracking_number) : " · No tracking yet") +
+      (o.cs_number ? " · CS#" + o.cs_number : "") +
+      (o.buyer_confirmed_at ? " · Buyer confirmed " + fmtDate(o.buyer_confirmed_at) : " · Buyer hasn't confirmed receipt");
+  } else {
+    snap = "Receipt · " + money(o.amount_cents || 0);
+  }
+  return '<p style="margin:4px 0"><strong>' + esc(disputeReasonLabel(r.reason)) + '</strong>' + (r.detail ? " — " + esc(r.detail) : "") + "</p>" +
+    '<p style="margin:4px 0;font-size:14px;color:var(--muted)">' + snap + "</p>" +
+    (r.outcome ? '<p style="margin:4px 0"><strong>Outcome: ' + esc(r.outcome) + '</strong>' + (r.resolution_note ? " — " + esc(r.resolution_note) : "") + "</p>" : "") +
+    '<div class="dwc-dispute-notes">' + ((r.notes || []).map(function (n) {
+      return '<p style="margin:4px 0;font-size:14px"><strong>@' + esc(n.author_username) + ":</strong> " + esc(n.body) + ' <span style="color:var(--muted)">· ' + fmtDate(n.created_at) + "</span></p>";
+    }).join("") || "") + "</div>" +
+    (r.status !== "resolved" ? '<form class="dwc-rowform" onsubmit="DWC.addDisputeNote(this, ' + r.id + '); return false;"><input name="body" required maxlength="1000" placeholder="Add a team note…" style="flex:1"><button class="btn ghost small" type="submit">Add note</button></form>' : "");
 }
 
 // ---------- Payouts ----------
@@ -5050,15 +5300,25 @@ async function viewPayouts(el) {
     el.innerHTML = '<div class="note">' + esc((data && data.error) || "Wallet didn't load.") + "</div>";
     return;
   }
+  var conn = await apiGet("/connect/status?device_id=" + encodeURIComponent(deviceId()));
+  var connected = conn && conn.ok && conn.charges_enabled && conn.payouts_enabled;
   el.innerHTML =
     '<section aria-label="Payouts and wallet" class="grid gap-3"><div class="card">' +
     "<h3 style=\"margin-top:0\">Your wallet</h3>" +
     "<p>Available: <strong style=\"color:var(--green);font-size:20px\">" + money(data.balance_cents) + "</strong></p>" +
     "<p>Pending (paid/shipped, not yet delivered): <strong>" + money(data.pending_cents) + "</strong> · Lifetime earnings: <strong>" + money(data.lifetime_cents) + "</strong></p>" +
-    (data.payout_method ? "<p>Payout method: " + esc(data.payout_method) + " · " + esc(data.payout_handle) + "</p>" : "<p>You haven’t set a payout method yet — add one in your profile.</p>") +
-    (data.balance_cents > 0 ? '<p><button type="button" class="btn" onclick="DWC.requestPayout()">Request payout of ' + money(data.balance_cents) + " →</button></p><p style=\"font-size:13px;color:var(--muted)\">The payout is recorded here and sent to your payout method outside the app — no payment processor is connected yet.</p>" : "") +
+    (data.payout_method ? "<p>Manual payout method (for private-chat payments): " + esc(data.payout_method) + " · " + esc(data.payout_handle) + " — set it in Edit Profile.</p>" : "<p>You haven't set a manual payout method yet — add one in Edit Profile if you take payments in private chat.</p>") +
+    (data.balance_cents > 0 ? '<p><button type="button" class="btn" onclick="DWC.requestPayout()">Request payout of ' + money(data.balance_cents) + " →</button></p><p style=\"font-size:13px;color:var(--muted)\">The wallet is for older/manual sales only — it’s recorded here and sent to your payout method outside the app. Card sales don’t touch the wallet: the money goes straight to your linked bank.</p>" : "") +
+    "</div>" +
+    '<div class="card"><h3 style="margin-top:0">🏦 Your bank — automatic payouts</h3>' +
+    (connected
+      ? '<p style="color:var(--green)">✓ Bank linked — card sales land in your Stripe balance at checkout, then Stripe sends them to your bank automatically (about 2 business days). You\'re payout-ready.</p>'
+      : '<p>Link your bank once and card sales pay you automatically — no manual sending, no chat. Buyers pay on Stripe Checkout, the money lands in your Stripe balance at checkout, then Stripe sends it to your bank (about 2 business days).</p>' +
+        '<p><button type="button" class="btn" onclick="DWC.linkBank()">Link your bank →</button></p>' +
+        '<p style="font-size:13px;color:var(--muted)">Stripe Connect (Express) — Stripe asks for your identity + bank details once, on Stripe\'s own secure page. The site never sees your bank details.</p>') +
     "</div>" +
     '<div class="card"><h3 style="margin-top:0">Payout history</h3>' +
+    '<p><button type="button" class="btn ghost small" onclick="DWC.exportPayoutCSV()">⬇ Download CSV</button> <span style="color:var(--muted);font-size:13px">Your orders + payouts as a spreadsheet.</span></p>' +
     (data.entries.length ? "<ul class=\"dwc-entries\">" + data.entries.map(function (e) {
       return "<li><strong>" + money(e.amount_cents) + "</strong> · " + esc(e.kind) + " · " + esc(e.status) + " · " + esc(e.note || "") + " · " + fmtDate(e.created_at) + "</li>";
     }).join("") + "</ul>" : "<p>No wallet activity yet — it lands here when an order is marked delivered.</p>") +
@@ -5885,6 +6145,8 @@ async function viewMember(el, memberId) {
       ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth) + listingsSection + websiteBack
       : (picOnTop ? headTop + topBanner : topBanner + headCard) +
         '<div id="dwc-photo-upload-host"></div>' +
+        '<div id="dwc-seller-rating" data-seller="' + m.id + '"></div>' +
+        '<div id="dwc-seller-reviews"></div>' +
         '<div class="dwc-member-cols' + (tfSideLeft ? " dwc-member-cols-flip" : "") + '">' +
         '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>" +
         '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>" +
@@ -5903,6 +6165,8 @@ async function viewMember(el, memberId) {
   if (!hasCustomPage) loadMemberFeed(m.id);
   if (isWebsite && !hidden("listings")) loadMemberListings(m.id);
   if (!hasCustomPage && !hidden("comments")) loadPageComments(m.id, m.is_mine, m.is_friend);
+  loadSellerRating(m.id);
+  loadSellerReviews(m.id);
   if (window.RCRloader) window.RCRloader.hide();
 }
 
@@ -6129,8 +6393,10 @@ async function viewChat(el) {
     '<div><div id="dwc-chat-log" class="dwc-chatlog"><p style="color:var(--muted)">Loading chat…</p></div>' +
     '<form class="dwc-rowform" onsubmit="DWC.sendChat(this); return false;">' +
     (state.profile ? "" : '<input name="guest_name" maxlength="24" placeholder="Guest name (optional)" style="max-width:160px">') +
-    '<input name="body" required maxlength="500" placeholder="Say something…" style="flex:1">' +
+    '<input name="body" maxlength="500" placeholder="Say something…" style="flex:1">' +
+    (state.profile ? '<label title="Attach a file (images up to 2.5 MB, other files up to 10 MB)" style="cursor:pointer">📎<input name="attachment" type="file" style="display:none" onchange="DWC.chatAttachmentPicked(this)"></label>' : "") +
     '<button class="btn" type="submit">Send</button></form>' +
+    '<p style="font-size:12px;color:var(--muted)" data-chatattachnote></p>' +
     '<p class="dwc-form-err" data-err hidden></p></div>' +
     "</div>" +
     '<div id="dwc-imwins"></div>' +
@@ -6146,7 +6412,7 @@ async function loadChatAim() {
     var msgs = (data && data.messages) || [];
     log.innerHTML = msgs.length
       ? msgs.map(function (m) {
-          return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+          return '<div class="dwc-chatmsg"><strong>' + esc(m.author_name) + "</strong>" + achBadgeIconsHTML(m.author_badges) + (m.is_member ? "" : ' <span class="dwc-guest">guest</span>') + ': <span>' + esc(m.body || "") + "</span>" + attachmentHTML(m.attachment) + ' <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
         }).join("")
       : "<p>No messages yet — say hi.</p>";
     log.scrollTop = log.scrollHeight;
@@ -6168,6 +6434,7 @@ async function loadChatAim() {
     if (conv && conv.messages) {
       state.imCache[im.id] = conv.messages;
       renderIMLog(im.id);
+      renderIMExtras(im.id, conv);
     }
   }
 }
@@ -6221,6 +6488,22 @@ function applyPendingIMDraft(id, winEl) {
   try { sessionStorage.removeItem("dwc-brand-draft"); } catch (e) {}
   state.pendingIMDraft = null;
 }
+// Pending DM from a listing (guest flow): a visitor tapped the
+// message icon on a listing before signing up. The DM waits in
+// sessionStorage and opens once they're signed in — same pattern as
+// the brand-button draft.
+function maybeApplyPendingIM() {
+  if (!state.route || state.route.name !== "chat") return;
+  var raw = null;
+  try { raw = sessionStorage.getItem("dwc-pending-im"); } catch (e) { return; }
+  if (!raw) return;
+  var d = null;
+  try { d = JSON.parse(raw); } catch (e) { return; }
+  if (!d || !d.sellerId) return;
+  if (!state.profile) return; // still a guest — wait for signup
+  try { sessionStorage.removeItem("dwc-pending-im"); } catch (e) {}
+  DWC.messageSellerAboutListing(d.sellerId, d.username || "member", d.listingId);
+}
 function maybeApplyBrandDraft() {
   if (!state.route || state.route.name !== "chat") return;
   var raw = null;
@@ -6252,6 +6535,28 @@ function maybeApplyBrandDraft() {
   }
   DWC.openIM(1, "RareCandyReserve", d.body);
 }
+// Attachment rendering for chat messages (DMs + live chat) — images
+// show inline, other files show as a download link.
+function attachmentHTML(a) {
+  if (!a || !a.url) return "";
+  if (a.is_image) return '<br><a href="' + esc(a.url) + '" target="_blank" rel="noopener"><img src="' + esc(a.url) + '" alt="' + esc(a.name || "image") + '" style="max-width:220px;border-radius:8px;margin-top:4px"></a>';
+  return '<br><a href="' + esc(a.url) + '" target="_blank" rel="noopener" download="' + esc(a.name || "file") + '">📎 ' + esc(a.name || "file") + "</a>";
+}
+// Generic file reader for chat attachments — images go through the
+// resizer (2.5 MB); other files cap at 10 MB, read raw.
+function fileToGeneric(file, maxBytes) {
+  return new Promise(function (resolve) {
+    if (!file) return resolve(null);
+    if (file.size > (maxBytes || 10000000)) return resolve({ error: "That file is too large — keep files under 10 MB (images under 2.5 MB)." });
+    var reader = new FileReader();
+    reader.onload = function () {
+      var parts = String(reader.result || "").split(",");
+      resolve({ dataBase64: parts[1] || "", mimeType: file.type || "application/octet-stream", fileName: file.name || "file" });
+    };
+    reader.onerror = function () { resolve({ error: "That file couldn't be read — try again." }); };
+    reader.readAsDataURL(file);
+  });
+}
 function syncIMShells() {
   var host = $("dwc-imwins");
   if (!host) return;
@@ -6268,13 +6573,59 @@ function syncIMShells() {
     div.setAttribute("data-imwin", String(im.id));
     div.innerHTML =
       '<div class="dwc-imwin-head"><strong>💬 IM — @' + esc(im.username) + '</strong><button type="button" class="dwc-linklike" onclick="DWC.closeIM(' + im.id + ')">✕ Close</button></div>' +
+      '<p style="margin:6px 0;font-size:13px;color:var(--muted)">🔒 Private messages auto-delete conversations and files in that message thread after one day.</p>' +
+      '<div id="dwc-imabout-' + im.id + '"></div>' +
+      '<div id="dwc-impay-' + im.id + '"></div>' +
       '<div class="dwc-imlog" id="dwc-imlog-' + im.id + '"><p style="color:var(--muted)">Loading…</p></div>' +
       '<form class="dwc-rowform" onsubmit="DWC.sendIM(this, ' + im.id + '); return false;">' +
-      '<input name="body" required maxlength="500" placeholder="Message @' + esc(im.username) + '…" style="flex:1">' +
-      '<button class="btn small" type="submit">Send</button></form>';
+      '<input name="body" maxlength="500" placeholder="Message @' + esc(im.username) + '…" style="flex:1">' +
+      '<label title="Attach a file (images up to 2.5 MB, other files up to 10 MB)" style="cursor:pointer">📎<input name="attachment" type="file" style="display:none" onchange="DWC.imAttachmentPicked(this, ' + im.id + ')"></label>' +
+      '<button class="btn small" type="submit">Send</button></form>' +
+      '<p style="font-size:12px;color:var(--muted)" data-imattachnote="' + im.id + '"></p>' +
+      '<details style="margin-top:6px"><summary style="cursor:pointer">🛒 Start a private sale with @' + esc(im.username) + '</summary><div id="dwc-imsale-' + im.id + '"></div></details>';
     host.appendChild(div);
     applyPendingIMDraft(im.id, div);
+    renderIMExtras(im.id);
   });
+}
+// The extras above the IM log: the attached listing (when the DM
+// started from one), the other person's manual payment buttons, and
+// the private-sale form. Refilled whenever the conversation loads.
+function renderIMExtras(id, conv) {
+  var about = $("dwc-imabout-" + id);
+  var pay = $("dwc-impay-" + id);
+  var sale = $("dwc-imsale-" + id);
+  if (!about && !pay && !sale) return;
+  var listing = state.imListing && state.imListing[id];
+  var pm = conv ? conv.with_payout_method : (state.imPayout && state.imPayout[id] && state.imPayout[id].method);
+  var ph = conv ? conv.with_payout_handle : (state.imPayout && state.imPayout[id] && state.imPayout[id].handle);
+  if (conv && (pm || ph)) state.imPayout = state.imPayout || {}, state.imPayout[id] = { method: pm || "", handle: ph || "" };
+  if (about) about.innerHTML = listing ? '<p style="margin:4px 0;font-size:13px">🛒 About this listing: <a href="#/listing/' + listing.id + '">' + esc(listing.title) + "</a> · " + money(listing.price_cents) + "</p>" : "";
+  if (pay) {
+    if (!pm || !ph) { pay.innerHTML = ""; }
+    else {
+      var label = pm.charAt(0).toUpperCase() + pm.slice(1);
+      var link = null;
+      if (/cash ?app/i.test(pm)) link = "https://cash.app/$" + encodeURIComponent(ph.replace(/^\$/, ""));
+      else if (/venmo/i.test(pm)) link = "https://venmo.com/u/" + encodeURIComponent(ph.replace(/^@/, ""));
+      else if (/paypal/i.test(pm)) link = "https://paypal.me/" + encodeURIComponent(ph.replace(/^@/, ""));
+      var partner = state.openIMs.filter(function (x) { return x.id === id; })[0];
+      pay.innerHTML = '<p style="margin:4px 0;font-size:13px">💸 Pay @' + esc(partner ? partner.username : "") + ' manually: ' +
+        (link ? '<a class="btn ghost small" href="' + esc(link) + '" target="_blank" rel="noopener">Pay with ' + esc(label) + ' →</a> <span style="color:var(--muted)">(' + esc(ph) + ")</span>" : '<span>' + esc(label) + ": " + esc(ph) + ' — copy it into the app</span> <button type="button" class="dwc-linklike" onclick="DWC.copyLink(\'' + esc(ph) + '\', this)">📋 Copy</button>') +
+        ' <span style="color:var(--muted)">Manual, between you two — never through Stripe.</span></p>';
+    }
+  }
+  if (sale) {
+    sale.innerHTML = '<form onsubmit="DWC.startPrivateSale(this, ' + id + '); return false;" style="margin-top:8px">' +
+      '<p style="margin:0 0 6px;font-size:13px;color:var(--muted)">Agree on a price in chat, pick physical or digital, and the buyer pays on Stripe Checkout — same as the Flea Market. ' + (listing ? "The item auto-fills from the listing you're messaging about." : "No listing attached — type the item in.") + "</p>" +
+      '<label>Item</label><input name="title" required maxlength="120" placeholder="What are you selling?" value="' + (listing ? esc(listing.title) : "") + '">' +
+      '<label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required placeholder="e.g. 25.00" value="' + (listing ? (listing.price_cents / 100).toFixed(2) : "") + '">' +
+      '<label>Physical or digital?</label><select name="listing_type"><option value="physical">📦 Physical — I ship it</option><option value="digital">💾 Digital Asset — the file is the product</option></select>' +
+      '<label>Shipping (USD — physical only, buyer pays)</label><input name="shipping" type="number" step="0.01" min="0" placeholder="e.g. 4.50">' +
+      '<label>Description</label><textarea name="description" maxlength="2000" placeholder="Condition, what\'s included…">' + (listing ? esc(listing.description || "") : "") + "</textarea>" +
+      '<p class="dwc-form-err" data-err hidden></p>' +
+      '<p style="margin-top:8px"><button class="btn small" type="submit">Set up the private sale →</button></p></form>';
+  }
 }
 function renderIMLog(id) {
   var log = $("dwc-imlog-" + id);
@@ -6282,7 +6633,7 @@ function renderIMLog(id) {
   var msgs = state.imCache[id] || [];
   log.innerHTML = msgs.length
     ? msgs.map(function (m) {
-        return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body) + '</span> <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body || "") + "</span>" + attachmentHTML(m.attachment) + ' <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
       }).join("")
     : "<p>No messages yet — say hi.</p>";
   log.scrollTop = log.scrollHeight;
@@ -6557,7 +6908,7 @@ function renderAdminMembers() {
           return '<div class="dwc-admin-row">' +
             (m.avatar_url ? '<img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px">' : '<span class="dwc-avatar dwc-avatar-none" style="width:36px;height:36px;font-size:18px">🍬</span>') +
             '<div style="flex:1;min-width:0"><strong>@' + esc(m.username) + "</strong> " + presenceDot(m) + " " + badgeHTML(m) +
-            '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + "</div>" +
+            '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + ((m.disputes_filed || 0) ? " · Disputes: " + m.disputes_filed + " filed" + ((m.disputes_false || 0) ? ", " + m.disputes_false + " found false" + ((m.disputes_false || 0) >= 2 ? " — cannot file disputes" : "") : "") : "") + "</div>" +
             (sells.length ? '<div style="font-size:12px">Sells: ' + sells.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
             (wants.length ? '<div style="font-size:12px">Wants: ' + wants.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
             "</div>" + controls +
@@ -6699,8 +7050,15 @@ async function loadTeamReports() {
   var list = (data && data.reports) || [];
   var role = myTeamRole();
   var open = list.filter(function (r) { return r.status === "open" || r.status === "claimed"; });
-  if (!list.length) { host.innerHTML = '<p style="color:var(--muted)">No reports — nothing to review.</p>'; return; }
-  host.innerHTML = (open.length ? open.map(function (r) {
+  // Buyer + seller protection — shipped 14+ days ago and the buyer
+  // still hasn't tapped "I got it". The team nudges the buyer by DM,
+  // or closes it if the tracking already shows delivered.
+  var waiting = (data && data.waiting_on_buyer) || [];
+  var waitingHTML = waiting.length ? '<section class="card" style="margin-bottom:10px"><h3 style="margin-top:0">⏳ Shipped 14+ days, buyer hasn’t confirmed receipt</h3><p style="color:var(--muted);font-size:14px">The buyer has 14 days to tap “I got it” after shipping. These are past that — nudge the buyer by DM, or close it yourself if the tracking shows delivered.</p>' + waiting.map(function (w) {
+    return '<p style="margin:6px 0;font-size:14px"><strong>Order #' + w.order_id + '</strong> — ' + esc(w.item_title) + " · " + money(w.amount_cents) + " · Buyer @" + esc(w.buyer_username) + " · Seller @" + esc(w.seller_username) + (w.tracking_number ? " · Tracking: " + esc(w.tracking_number) : " · No tracking") + " · " + w.days_waiting + " days waiting</p>";
+  }).join("") + "</section>" : "";
+  if (!list.length) { host.innerHTML = waitingHTML + '<p style="color:var(--muted)">No reports — nothing to review.</p>'; return; }
+  host.innerHTML = waitingHTML + (open.length ? open.map(function (r) {
     var mine = r.assignee_id && state.profile && r.assignee_id === state.profile.id;
     var silenceRow = "";
     if (r.target_author_id && state.profile && r.target_author_id !== state.profile.id) {
@@ -6710,11 +7068,13 @@ async function loadTeamReports() {
     return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-' + esc(r.status) + '">' + esc(r.status) + "</span>" +
       (r.assignee_username ? ' · Handling: <strong>@' + esc(r.assignee_username) + "</strong>" : "") + "</p>" +
       '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p>" +
-      (r.reason ? '<p style="margin:4px 0">Reason: ' + esc(r.reason) + "</p>" : "") +
+      ((r.target_type === "order" || r.target_type === "receipt") ? disputeTeamBlockHTML(r) : (r.reason ? '<p style="margin:4px 0">Reason: ' + esc(r.reason) + "</p>" : "")) +
       '<p style="margin:8px 0 0">' +
       (r.status === "open" ? '<button type="button" class="btn small" onclick="DWC.reportAction(' + r.id + ", 'claim')\">I'll take care of that</button> " : "") +
       (r.status === "claimed" && (mine || role === "operator") ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'release')\">Put it back</button> " : "") +
-      (r.status !== "resolved" ? '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'resolve')\">Resolve</button>" : "") +
+      (r.status !== "resolved" ? ((r.target_type === "order" || r.target_type === "receipt")
+        ? '<span style="display:inline-flex;gap:6px;flex-wrap:wrap;align-items:center"><select id="dwc-dispute-outcome-' + r.id + '">' + DISPUTE_OUTCOMES.map(function (o) { return '<option value="' + o.key + '">' + esc(o.label) + "</option>"; }).join("") + '</select><input id="dwc-dispute-note-' + r.id + '" maxlength="500" placeholder="What was decided (both sides see this)" style="min-width:200px"><button type="button" class="btn small" onclick="DWC.resolveDispute(' + r.id + ')">Resolve dispute</button></span>'
+        : '<button type="button" class="btn ghost small" onclick="DWC.reportAction(' + r.id + ", 'resolve')\">Resolve</button>") : "") +
       "</p>" + silenceRow + "</article>";
   }).join("") : '<p style="color:var(--muted)">All caught up — nothing open.</p>') +
     (list.some(function (r) { return r.status === "resolved"; })
@@ -6722,7 +7082,8 @@ async function loadTeamReports() {
         list.filter(function (r) { return r.status === "resolved"; }).map(function (r) {
           return '<article class="card dwc-report"><p style="margin:0"><strong>' + esc(r.target_label) + '</strong> · <span class="dwc-status-resolved">resolved</span>' +
             (r.assignee_username ? ' · Handled by <strong>@' + esc(r.assignee_username) + "</strong>" : "") + "</p>" +
-            '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p></article>";
+            '<p style="margin:4px 0">Reported by @' + esc(r.reporter_username) + " · " + fmtDate(r.created_at) + "</p>" +
+            (r.outcome ? '<p style="margin:4px 0">Outcome: <strong>' + esc(r.outcome) + '</strong>' + (r.resolution_note ? " — " + esc(r.resolution_note) : "") + "</p>" : "") + "</article>";
         }).join("") + "</details>"
       : "");
 }
@@ -6758,10 +7119,11 @@ function viewRules(el) {
     "<li><strong>No outside sales.</strong> Deals that start here stay here. On this platform your content and your deals are protected — verified member accounts, recorded orders and tracking, and a report trail. Take a deal off site and you lose all of that protection. Taking a buyer off-platform to dodge the street cut also risks a <strong>permanent ban of the account</strong> (and, on the public site, the IP).</li>" +
     "<li><strong>Stealing content is theft — and it’s expensive.</strong> Anyone who steals a member’s content and redistributes it, in any form, <strong>will be held liable in court for money owed due to damages, and more</strong>. The platform will pursue content thieves. If you didn’t make it or buy the right to share it, don’t post it anywhere.</li>" +
     "<li><strong>Digital content sales are logged and watermarked.</strong> Every digital sale gets a sale number (CS#1, CS#2, and so on) tied to the buyer, and every copy a buyer sees carries their username and sale number in the watermark — so a leaked copy points straight at who bought it. <strong>Legal action will be taken for redistribution of any property bought digitally on this site.</strong> Your IP address, as well as your information, will be given to the person whose intellectual property you are distributing illegally, so they can determine whether to take legal action or not. We are in no way responsible for any misuse of the tools provided here and are not to be held liable for any choices that others make while using this. This was created to be a safe space for all people, and we want to keep it that way.</li>" +
-    "<li><strong>Selling in the Flea Market — your page is your shop.</strong> Any member with a payout method can list physical items, digital content, or dropship goods. Set a shop name and tagline in Edit Profile &gt; What I sell and your listings show on your page. The 6% street cut is on the item price only — shipping is never free, the buyer always pays it. No mystery boxes or repacks without full disclosure. Dropship means YOU fulfil the order through your supplier and state the handling time. PayPal Goods &amp; Services is recommended — there is no escrow, the site never holds money. Digital sales get a sale number (CS#) and a watermarked copy, same as creator-post sales. Adult listings need age verification, and only age-verified members ever see them. The operator and admins can remove any listing that breaks the rules.</li>" +
+    "<li><strong>Selling in the Flea Market — your page is your shop.</strong> Any member with a linked bank (Stripe Connect, one time, in the Payouts tab) can list physical items, digital content, or dropship goods. Set a shop name and tagline in Edit Profile &gt; What I sell and your listings show on your page. The 6% street cut is on the item price only — shipping is never free, the buyer always pays it. No mystery boxes or repacks without full disclosure. Dropship means YOU fulfil the order through your supplier and state the handling time. Buyers pay by card on Stripe Checkout — captured at checkout, on its way to your linked bank (about 2 business days). Listings can allow offers: a buyer offers less, you accept, decline, or counter — accept and their saved card is charged automatically; decline or counter and nothing is charged. Private sales in DMs run through the same Stripe system, and Chris gets told about every one. Digital sales get a sale number (CS#) and a watermarked copy, same as creator-post sales. Adult listings need age verification, and only age-verified members ever see them. The operator and admins can remove any listing that breaks the rules.</li>" +
+    "<li><strong>Buyer &amp; seller protection — both sides, human-run.</strong> Every order is a deal between two members, and the record is the protection. <strong>Buyers:</strong> the seller ships with a tracking number, you tap “I got it” when it lands, and if it never shows up, shows up wrong, or turns out fake, open a dispute from My Orders — tell the team what happened and add your side, and Chris mediates it himself, a real person — no AI verdicts, ever. <strong>Sellers:</strong> tracking is your proof — add the carrier and tracking number when you ship, keep a photo of what you packed, and answer the dispute with your side. <strong>What the site does:</strong> freeze the deal while it’s looked at, weigh the tracking, the photos, and both sides’ words, then call it — resolved, refund given by the seller, seller at fault (listing removed, warning, silence, or ban), or buyer at fault. <strong>What the site does NOT do:</strong> hold anyone’s money (there is no escrow), force a refund, or reverse a payment — a refund is the seller sending it back through the same way they were paid, and the team records whether it happened. <strong>Timelines:</strong> confirm receipt within 14 days of shipping; if one side goes quiet for 7 days after that, Chris can close it. <strong>False claims cost you:</strong> a dispute the team finds to be a false claim is a warning; two of them and you can’t file disputes any more. Deals made off the site don’t count — no record, no mediation.</li>" +
     "<li><strong>Be honest about condition.</strong> Photos of the actual item, flaws stated up front. The item is the item for sale — extras are courtesies, not the product.</li>" +
     "<li><strong>Chat:</strong> guests are auto-censored, always. Members chat under their own name uncensored — and own what they say.</li>" +
-    "<li><strong>Payments &amp; shipping:</strong> buyer and seller arrange payment (the seller's payout method is on their profile) and shipping directly. Every purchase lands in the buyer's <strong>My Orders</strong> with the order status; when the seller ships, they add the carrier + tracking number there and the buyer gets their copy of it (plus a link to the carrier's tracking page). Sellers: your wallet balance and payout history live under <strong>Payouts</strong> — money becomes available when an order is marked delivered. Shipping-label creation through Shippo or a similar service is planned and will be labeled clearly when it actually works — it is not live yet.</li></ul>" +
+    "<li><strong>Payments &amp; shipping:</strong> buyers pay by card on Stripe Checkout — the payment is captured at checkout, lands in the seller’s Stripe balance right away, then Stripe sends it to the seller’s linked bank automatically (about 2 business days). Every purchase lands in the buyer’s <strong>My Orders</strong> with the order status; when the seller ships, they add the carrier + tracking number there and the buyer can follow the whole timeline from My Orders (plus a link to the carrier’s tracking page). Sellers: your payout history lives under <strong>Payouts</strong>, and you can download it as a CSV. The wallet balance there is for older/manual sales only — card sales never touch it. Shipping-label creation through Shippo or a similar service is planned and will be labeled clearly when it actually works — it is not live yet.</li></ul>" +
     OFFSITE_ADVISORY_HTML + THEFT_NOTICE_HTML + "</section>" +
     '<section class="card"><h2 style="margin-top:0">🌙 Adult content &amp; the 18+ area — how age verification works</h2>' +
     "<p>The deal is simple: <strong>you can sell any content, adult or otherwise, if you prove your age.</strong> Adult discussion lives in the <strong>🌙 After Dark 18+</strong> forum inside this app, and adult selling lives in the After Dark market — entering any 18+ area asks for age verification first. Everything else on the street never asks.</p>" +
@@ -7614,6 +7976,9 @@ window.DWC = {
       birthday: fd.get("birthday") || null,
       payout_method: String(fd.get("payout_method") || "").trim(),
       payout_handle: String(fd.get("payout_handle") || "").trim(),
+      notify_email: !!fd.get("notify_email"),
+      notify_sms: !!fd.get("notify_sms"),
+      sms_number: String(fd.get("sms_number") || "").trim(),
       remove_avatar: !!fd.get("remove_avatar"),
       remove_banner: !!fd.get("remove_banner"),
     };
@@ -8397,6 +8762,21 @@ window.DWC = {
     }
   },
 
+  // Listing video clip — 30 seconds max, 15 MB max (listings are
+  // shorter than post clips, which allow 60s). Checked at pick time
+  // so the seller knows before submitting; the server re-checks.
+  listingVideoPicked: async function (input) {
+    var file = input && input.files && input.files[0];
+    var form = input && input.form;
+    var note = form && form.querySelector("[data-listingvideonote]");
+    if (!file) { if (note) note.textContent = ""; return; }
+    if (file.size > 15000000) { if (note) { note.textContent = "“" + file.name + "” is too large — keep clips under 15 MB."; note.style.color = "var(--amber)"; } input.value = ""; return; }
+    if (note) { note.textContent = "Checking “" + file.name + "”…"; note.style.color = "var(--muted)"; }
+    var dur = await videoDuration(file);
+    if (dur != null && dur > 30) { if (note) { note.textContent = "“" + file.name + "” is " + Math.round(dur) + "s — keep clips to 30 seconds or less."; note.style.color = "var(--amber)"; } input.value = ""; return; }
+    if (note) { note.textContent = "✓ “" + file.name + "” good to go" + (dur != null ? " — " + Math.round(dur) + "s" : ""); note.style.color = "var(--green)"; }
+  },
+
   submitListing: async function (form, kind) {
     var fd = new FormData(form);
     var photos = [];
@@ -8413,6 +8793,17 @@ window.DWC = {
         photos.push({ dataBase64: img.dataBase64, mimeType: img.mimeType });
       }
     }
+    // Optional short video clip — 30s / 15 MB, checked at pick time
+    // and again here; the server caps it too.
+    var video = null;
+    var vf = fd.get("video_clip");
+    if (vf && vf.size) {
+      var dur = await videoDuration(vf);
+      if (dur != null && dur > 30) return formErr(form, "That clip is " + Math.round(dur) + "s — keep clips to 30 seconds or less.");
+      var vid = await fileToVideo(vf, 15000000);
+      if (vid.error) return formErr(form, vid.error);
+      video = { dataBase64: vid.dataBase64, mimeType: vid.mimeType, fileName: vid.fileName };
+    }
     var check = state.listingCheck;
     var body = {
       device_id: deviceId(), kind: kind,
@@ -8423,11 +8814,12 @@ window.DWC = {
       listing_type: String(fd.get("listing_type") || "physical"),
       shipping_cents: Math.round(parseFloat(fd.get("shipping") || "0") * 100),
       is_adult: !!fd.get("is_adult"),
-      stripe_link: String(fd.get("stripe_link") || "").trim(),
+      allows_offers: kind === "sale" ? !!fd.get("allows_offers") : false,
       handling_time: String(fd.get("handling_time") || "").trim(),
       trade_wanted: String(fd.get("trade_wanted") || "").trim(),
       allow_comments: !!fd.get("allow_comments"),
       images: photos,
+      video_clip: video,
       verification_status: check ? check.status : "not_checked",
       verification_summary: check ? (check.summary || "") : "",
     };
@@ -8439,6 +8831,27 @@ window.DWC = {
     go("listing/" + data.listing_id);
     await refreshStats();
     return false;
+  },
+
+  // Price suggestion for collectible cards — TCGplayer market price
+  // via TCGdex (free, no key). Graded cards get the raw price + a
+  // note, never a made-up graded number. Fills the price field.
+  suggestPrice: async function (form) {
+    var fd = new FormData(form);
+    var out = form.querySelector("[data-ps-result]");
+    var name = String(fd.get("ps_name") || "").trim();
+    if (!name) { if (out) out.textContent = "Enter the card name first."; return; }
+    if (out) out.textContent = "Looking it up…";
+    var q = "/price-suggest?name=" + encodeURIComponent(name) +
+      "&set=" + encodeURIComponent(String(fd.get("ps_set") || "").trim()) +
+      "&number=" + encodeURIComponent(String(fd.get("ps_number") || "").trim()) +
+      "&graded=" + (fd.get("ps_graded") ? "1" : "") +
+      "&grade=" + encodeURIComponent(String(fd.get("ps_grade") || "").trim());
+    var data = await apiGet(q);
+    if (!data || !data.ok) { if (out) out.textContent = (data && data.error) || "Couldn't look that card up."; return; }
+    var priceInput = form.querySelector('input[name="price"]');
+    if (data.price_cents != null && priceInput) priceInput.value = (data.price_cents / 100).toFixed(2);
+    if (out) out.textContent = data.note || ("Suggested: " + money(data.price_cents || 0) + " — " + (data.source || "TCGplayer market"));
   },
 
   // Reactions (v3.15) — heart + sad + confused on a post. One reaction
@@ -8565,18 +8978,11 @@ window.DWC = {
   },
   buyListing: async function (listingId) {
     if (!state.profile) { setNotice("Create your account first to buy — orders live on your profile."); DWC.openSignup(); return; }
-    if (!confirm("Complete this purchase? It lands in your My Orders. Payment is arranged directly with the seller (their Stripe link or payout method is on the listing) — no money moves in this app.")) return;
+    if (!confirm("Pay by card on Stripe's secure checkout? The payment is captured at checkout, then on its way to the seller's linked bank (minus the 6% street cut, about 2 business days).")) return;
     var data = await apiPost("/listings/" + listingId + "/buy", { device_id: deviceId() });
     if (!data || !data.ok) { setNotice((data && data.error) || "Purchase didn't go through."); return; }
-    // Digital buys come back with a CS# — reload my sales so the
-    // watermarked copy shows unlocked right away.
-    if (data.cs_number) {
-      state.contentSalesLoadedFor = null;
-      await loadMyContentSales();
-      setNotice("Order placed — sale number CS#" + data.cs_number + ". Your copy is watermarked to you — find it in My Orders. Payment is arranged directly with the seller.");
-    } else {
-      setNotice("Order placed — it's in My Orders, and your copy of the tracking number lands there as soon as the seller ships. Payment is arranged directly with the seller.");
-    }
+    if (data.checkout_url) { location.href = data.checkout_url; return; }
+    setNotice("Order placed — it's in My Orders.");
     go("orders");
   },
   updateShipping: async function (form, orderId) {
@@ -8586,7 +8992,7 @@ window.DWC = {
       carrier: fd.get("carrier") || "", tracking_number: String(fd.get("tracking_number") || "").trim(),
     });
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't save shipping."); return false; }
-    setNotice(fd.get("status") === "delivered" ? "Marked delivered — your wallet is credited (see Payouts)." : "Shipping saved — your buyer can see it now.");
+    setNotice(fd.get("status") === "delivered" ? "Marked delivered — your buyer can confirm it now. Card orders are already on their way to your bank; older/manual sales credit your wallet (see Payouts)." : "Shipping saved — your buyer can see it now.");
     renderView();
     return false;
   },
@@ -8600,19 +9006,79 @@ window.DWC = {
     if (data && data.ok) { setNotice("Payout requested: " + money(data.amount_cents) + " — it goes to your payout method outside the app."); renderView(); }
     else if (data && data.error) setNotice(data.error);
   },
+  // Link your bank — Stripe Connect Express onboarding on Stripe's
+  // own page. Returns to the Payouts tab when done.
+  linkBank: async function () {
+    var data = await apiPost("/connect/onboard", { device_id: deviceId() });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't start the bank link."); return; }
+    if (data.url) location.href = data.url;
+    else setNotice("Bank link started — check back in a moment.");
+  },
+  // Payout history export — orders + wallet entries as a CSV download,
+  // built client-side from the same data the Payouts tab shows.
+  exportPayoutCSV: async function () {
+    var w = await apiGet("/wallet?device_id=" + encodeURIComponent(deviceId()));
+    var selling = await apiGet("/my-sales?device_id=" + encodeURIComponent(deviceId()));
+    var buying = await apiGet("/my-orders?device_id=" + encodeURIComponent(deviceId()));
+    function csvCell(v) { var s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+    var rows = [["date", "type", "item", "other_party", "amount_usd", "fee_usd", "seller_gets_usd", "status"]];
+    ((selling && selling.orders) || []).forEach(function (o) {
+      rows.push([fmtDate(o.created_at), "sale", o.item_title, "@" + o.buyer_username, (o.amount_cents / 100).toFixed(2), ((o.fee_cents || 0) / 100).toFixed(2), ((o.seller_gets_cents || 0) / 100).toFixed(2), o.status]);
+    });
+    ((buying && buying.orders) || []).forEach(function (o) {
+      rows.push([fmtDate(o.created_at), "purchase", o.item_title, "@" + o.seller_username, (o.amount_cents / 100).toFixed(2), "", "", o.status]);
+    });
+    ((w && w.entries) || []).forEach(function (e) {
+      rows.push([fmtDate(e.created_at), "wallet_" + e.kind, e.note || "", "", (e.amount_cents / 100).toFixed(2), "", "", e.status]);
+    });
+    var csv = rows.map(function (r) { return r.map(csvCell).join(","); }).join("\n");
+    var blob = new Blob([csv], { type: "text/csv" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "rare-candy-reserve-payouts.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    setNotice("Payout history downloaded as a CSV.");
+  },
   sendChat: async function (form) {
     var fd = new FormData(form);
     var err = form.parentElement.querySelector("[data-err]");
+    var att = state.chatAttach || null;
+    var bodyText = String(fd.get("body") || "").trim();
+    if (!bodyText && !att) { if (err) { err.hidden = false; err.textContent = "Say something or attach a file."; } return false; }
     var data = await apiPost("/chat", {
       device_id: state.profile ? deviceId() : "",
       guest_name: String(fd.get("guest_name") || "").trim(),
-      body: String(fd.get("body") || "").trim(),
+      body: bodyText,
+      attachment: att || undefined,
     });
     if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send that."; } return false; }
     form.reset();
+    state.chatAttach = null;
+    var note = form.parentElement.querySelector("[data-chatattachnote]");
+    if (note) note.textContent = "";
     if (data.censored) setNotice("Sent — guests are auto-censored, so a word in your message was starred out.");
     await loadChatAim();
     return false;
+  },
+  // Live-chat file picker — same caps as DMs (images 2.5 MB, other
+  // files 10 MB). Held until Send is tapped.
+  chatAttachmentPicked: async function (input) {
+    var file = input && input.files && input.files[0];
+    var form = input && input.form;
+    var note = form && form.parentElement.querySelector("[data-chatattachnote]");
+    state.chatAttach = null;
+    if (!file) { if (note) note.textContent = ""; return; }
+    if (note) { note.textContent = "Reading “" + file.name + "”…"; note.style.color = "var(--muted)"; }
+    var att = /^image\//.test(file.type || "")
+      ? await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.75 })
+      : await fileToGeneric(file, 10000000);
+    if (!att) { if (note) note.textContent = ""; return; }
+    if (att.error) { if (note) { note.textContent = "“" + file.name + "” — " + att.error; note.style.color = "var(--amber)"; } input.value = ""; return; }
+    state.chatAttach = { dataBase64: att.dataBase64, mimeType: att.mimeType, fileName: file.name };
+    if (note) { note.textContent = "✓ “" + file.name + "” attached — send it with your message."; note.style.color = "var(--green)"; }
   },
 
   // v3.7 page comments — post + delete.
@@ -9655,16 +10121,87 @@ window.DWC = {
   sendIM: async function (form, toId) {
     var fd = new FormData(form);
     var body = String(fd.get("body") || "").trim();
-    if (!body) return false;
-    var data = await apiPost("/direct-messages", { device_id: deviceId(), to: toId, body: body });
+    var att = (state.imAttach && state.imAttach[toId]) || null;
+    if (!body && !att) return false;
+    var data = await apiPost("/direct-messages", { device_id: deviceId(), to: toId, body: body, attachment: att || undefined });
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't send that IM."); return false; }
     form.reset();
+    if (state.imAttach) delete state.imAttach[toId];
+    var note = form.parentElement.querySelector('[data-imattachnote="' + toId + '"]');
+    if (note) note.textContent = "";
     var conv = await apiGet("/direct-messages?device_id=" + encodeURIComponent(deviceId()) + "&with=" + toId);
     if (conv && conv.messages) {
       state.imCache[toId] = conv.messages;
       renderIMLog(toId);
     }
     return false;
+  },
+  // Pick a file to attach to a DM — images through the resizer (2.5 MB),
+  // other files raw up to 10 MB. Held until Send is tapped.
+  imAttachmentPicked: async function (input, toId) {
+    var file = input && input.files && input.files[0];
+    var form = input && input.form;
+    var note = form && form.parentElement.querySelector('[data-imattachnote="' + toId + '"]');
+    state.imAttach = state.imAttach || {};
+    delete state.imAttach[toId];
+    if (!file) { if (note) note.textContent = ""; return; }
+    if (note) { note.textContent = "Reading “" + file.name + "”…"; note.style.color = "var(--muted)"; }
+    var att = /^image\//.test(file.type || "")
+      ? await fileToImage(file, 2500000, { maxDim: 1600, minQuality: 0.75 })
+      : await fileToGeneric(file, 10000000);
+    if (!att) { if (note) note.textContent = ""; return; }
+    if (att.error) { if (note) { note.textContent = "“" + file.name + "” — " + att.error; note.style.color = "var(--amber)"; } input.value = ""; return; }
+    state.imAttach[toId] = { dataBase64: att.dataBase64, mimeType: att.mimeType, fileName: file.name };
+    if (note) { note.textContent = "✓ “" + file.name + "” attached — send it with your message. It auto-deletes with the thread after one day."; note.style.color = "var(--green)"; }
+  },
+  // Start a private sale from a DM — same Stripe system as the Flea
+  // Market. Physical or digital is picked here, before payment. When
+  // the DM started from a listing, the item auto-fills from it
+  // (title, price, photo); with no listing attached the seller types
+  // it in. The buyer gets the link in this chat and pays on Checkout.
+  startPrivateSale: async function (form, partnerId) {
+    var fd = new FormData(form);
+    var err = form.querySelector("[data-err]");
+    var listing = state.imListing && state.imListing[partnerId];
+    var body = {
+      device_id: deviceId(), kind: "sale",
+      category: listing ? listing.category : "Other Collectibles",
+      title: String(fd.get("title") || "").trim(),
+      description: String(fd.get("description") || "").trim(),
+      price_cents: Math.round(parseFloat(fd.get("price") || "0") * 100),
+      listing_type: String(fd.get("listing_type") || "physical"),
+      shipping_cents: Math.round(parseFloat(fd.get("shipping") || "0") * 100),
+      private_buyer_id: partnerId,
+      source_listing_id: listing ? listing.id : undefined,
+      allow_comments: false,
+      images: [],
+    };
+    var data = await apiPost("/listings", body);
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't set up the sale."; } return false; }
+    var link = location.origin + "/community.html#/listing/" + data.listing_id;
+    await apiPost("/direct-messages", { device_id: deviceId(), to: partnerId, body: "Private sale ready: " + link + " — pay by card on Stripe Checkout there. " + (body.listing_type === "digital" ? "Digital Asset — no shipping." : "Physical — I'll ship it with tracking.") });
+    setNotice("Private sale set up — the buyer got the link in this chat. They pay on Stripe Checkout.");
+    await loadChatAim();
+    return false;
+  },
+  // Message icon on a listing — opens a private DM to that seller
+  // (never the public live chat), carrying the listing along so the
+  // DM shows what it's about and a private sale can auto-fill from it.
+  // Guests get the signup notice with the DM waiting, like the
+  // brand-button draft.
+  messageSellerAboutListing: async function (sellerId, sellerUsername, listingId) {
+    if (!state.profile) {
+      try { sessionStorage.setItem("dwc-pending-im", JSON.stringify({ sellerId: sellerId, username: sellerUsername, listingId: listingId })); } catch (e) {}
+      setNotice("That opens a private message to @" + sellerUsername + " — create your free profile and the DM will be waiting for you.");
+      DWC.openSignup();
+      return;
+    }
+    if (state.profile.id === sellerId) { setNotice("That's your own listing."); return; }
+    var data = await apiGet("/listings/" + listingId + "?device_id=" + encodeURIComponent(deviceId()));
+    var l = data && data.listing;
+    state.imListing = state.imListing || {};
+    if (l) state.imListing[sellerId] = { id: l.id, title: l.title, price_cents: l.price_cents, description: l.description || "", category: l.category || "Other Collectibles" };
+    DWC.openIM(sellerId, sellerUsername);
   },
   imMember: function (id, username) {
     DWC.openIM(id, username);
@@ -10484,6 +11021,162 @@ window.DWC = {
     } else if (data && data.error) setNotice(data.error);
   },
   resolveReport: async function (id) { return DWC.reportAction(id, "resolve"); },
+  // Buyer + seller protection — confirm receipt, file a dispute, add a
+  // note to one, resolve one (team). The server enforces every gate;
+  // a real person (Chris) decides every dispute — no AI verdicts.
+  confirmReceipt: async function (orderId) {
+    if (!confirm("Got it — the item arrived as expected? That marks the order delivered, and the money's on its way to the seller's bank.")) return;
+    var data = await apiPost("/orders/" + orderId + "/confirm", { device_id: deviceId() });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't confirm receipt."); return; }
+    setNotice("Confirmed — thanks! The order is complete. You can rate the seller below.");
+    renderView();
+  },
+  // Resume a payment that never finished — a fresh Checkout Session
+  // for the same order (same amount, new session). Nothing is charged
+  // until the card goes through on Stripe.
+  resumeCheckout: async function (orderId) {
+    var data = await apiPost("/orders/" + orderId + "/checkout", { device_id: deviceId() });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't start checkout."); return; }
+    if (data.checkout_url) location.href = data.checkout_url;
+  },
+  // Tracking view — the order's timeline (placed → paid → shipped →
+  // delivered → confirmed) + carrier link. Live carrier status lives
+  // on the carrier's page; the site doesn't have a carrier API yet.
+  showTracking: async function (orderId) {
+    var host = document.getElementById("dwc-tracking-" + orderId);
+    if (!host) return;
+    if (host.dataset.loaded) { host.innerHTML = ""; delete host.dataset.loaded; return; }
+    host.innerHTML = '<p style="color:var(--muted)">Loading tracking…</p>';
+    var data = await apiGet("/orders/" + orderId + "/tracking?device_id=" + encodeURIComponent(deviceId()));
+    if (!data || !data.ok) { host.innerHTML = '<div class="note">' + esc((data && data.error) || "Couldn't load tracking.") + "</div>"; return; }
+    var t = data.tracking || {};
+    host.dataset.loaded = "1";
+    host.innerHTML = '<div style="margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:8px">' +
+      '<p style="margin:0"><strong>🚚 ' + esc(t.carrier || "—") + "</strong> · " + esc(t.tracking_number || "no tracking number yet") +
+      (t.tracking_url ? ' · <a href="' + esc(t.tracking_url) + '" target="_blank" rel="noopener">Track with the carrier ↗</a>' : "") + "</p>" +
+      '<p style="margin:6px 0 0" class="dwc-order-steps">' + (t.timeline || []).map(function (s) { return '<span class="' + (s.done ? "done" : "") + '">' + esc(s.label) + "</span>"; }).join(" → ") + "</p>" +
+      '<p style="margin:6px 0 0;font-size:13px;color:var(--muted)">Live status (where the parcel is right now) lives on the carrier\'s page — the site shows the timeline from the order itself. Carrier API tracking is a follow-up.</p></div>';
+  },
+  // Seller rating — public review (stars + a few words). The server
+  // refuses hate-speech wording plainly; everything accepted shows
+  // publicly on the seller's page.
+  submitReview: async function (form, orderId) {
+    var fd = new FormData(form);
+    var err = form.parentElement.querySelector("[data-err]");
+    var data = await apiPost("/orders/" + orderId + "/review", {
+      device_id: deviceId(), stars: Number(fd.get("stars") || 0), body: String(fd.get("body") || "").trim(),
+    });
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send the review."; } return false; }
+    setNotice("Review sent — thanks. It shows publicly on the seller's page, words and stars.");
+    renderView();
+    return false;
+  },
+  // Offer card box — mounts the Stripe card element when the buyer
+  // ticks "save my card". If Stripe isn't switched on, the box stays
+  // hidden and the offer goes in cardless.
+  toggleOfferCard: async function (checked) {
+    var box = $("dwc-offer-card");
+    if (!box) return;
+    box.hidden = !checked;
+    if (!checked) return;
+    var stripe = await ensureStripe();
+    if (!stripe) { box.innerHTML = '<p style="color:var(--muted);font-size:13px">Card saving isn\'t switched on yet — your offer will go in without a card, and if the seller accepts you\'ll get a Checkout link to pay.</p>'; return; }
+    // The card element outlives the listing page (renderView rebuilds
+    // the DOM) — if it was mounted to a box that's gone, unmount and
+    // mount it into this box instead of creating a second one.
+    if (window.__dwcCardEl) {
+      if (window.__dwcCardBox !== box) {
+        try { window.__dwcCardEl.unmount(); } catch (e) {}
+        window.__dwcCardEl.mount(box);
+        window.__dwcCardBox = box;
+      }
+      return;
+    }
+    window.__dwcCardEl = stripe.elements().create("card");
+    window.__dwcCardEl.mount(box);
+    window.__dwcCardBox = box;
+  },
+  makeOffer: async function (form, listingId) {
+    var fd = new FormData(form);
+    var err = form.querySelector("[data-err]");
+    var amount = Math.round(parseFloat(fd.get("amount") || "0") * 100);
+    if (!amount || amount <= 0) { if (err) { err.hidden = false; err.textContent = "Enter an offer amount."; } return false; }
+    var pmId = null;
+    var saveCard = document.getElementById("dwc-offer-save-card");
+    if (saveCard && saveCard.checked && window.__dwcCardEl) {
+      var stripe = await ensureStripe();
+      var si = await apiPost("/connect/setup-intent", { device_id: deviceId() });
+      if (!si || !si.ok || !si.client_secret) { if (err) { err.hidden = false; err.textContent = "Couldn't start the card setup — send the offer without a card, or try again."; } return false; }
+      var conf = await stripe.confirmCardSetup(si.client_secret, { payment_method: { card: window.__dwcCardEl } });
+      if (conf.error) { if (err) { err.hidden = false; err.textContent = conf.error.message || "Card didn't save."; } return false; }
+      pmId = conf.setupIntent && conf.setupIntent.payment_method;
+    }
+    var data = await apiPost("/listings/" + listingId + "/offer", {
+      device_id: deviceId(), amount_cents: amount, message: String(fd.get("message") || "").trim(),
+      payment_method_id: pmId || undefined,
+    });
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send the offer."; } return false; }
+    setNotice(pmId ? "Offer sent — the seller's been told. If they accept, your card is charged automatically." : "Offer sent — the seller's been told. If they accept, you'll get a Checkout link to pay.");
+    renderView();
+    return false;
+  },
+  respondOffer: async function (offerId, action) {
+    var counter = null;
+    if (action === "counter") {
+      var inp = document.getElementById("dwc-counter-" + offerId);
+      counter = inp ? Math.round(parseFloat(inp.value || "0") * 100) : 0;
+      if (!counter || counter <= 0) { setNotice("Enter a counter amount first."); return; }
+    }
+    var data = await apiPost("/offers/" + offerId + "/respond", { device_id: deviceId(), action: action, counter_amount_cents: counter || undefined });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't answer the offer."); return; }
+    setNotice(action === "accept" ? "Offer accepted — the buyer has been told" + (data.checkout_url ? ", and they have a Checkout link to pay." : " and their card was charged.") : action === "decline" ? "Offer declined — nothing was charged." : "Counter sent — the buyer has been told.");
+    renderView();
+  },
+  toggleDisputeForm: function (kind, refId) {
+    var f = document.getElementById("dwc-dispute-form-" + kind + "-" + refId);
+    var b = document.getElementById("dwc-dispute-btn-" + kind + "-" + refId);
+    if (!f) return;
+    f.hidden = !f.hidden;
+    if (b) b.textContent = f.hidden ? "Something’s wrong — open a dispute" : "Close — never mind";
+  },
+  fileDispute: async function (form, kind, refId) {
+    var fd = new FormData(form);
+    var err = form.querySelector("[data-err]");
+    var data = await apiPost("/reports", { device_id: deviceId(), target_type: kind, target_id: refId, reason: fd.get("reason"), detail: String(fd.get("detail") || "").trim() });
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't open the dispute."; } return false; }
+    if (data.already_open) { setNotice("You already have an open dispute on this one — the team is looking at it."); renderView(); return false; }
+    setNotice("Dispute opened — Chris mediates it himself, and the other side has been told. You can add your side to the thread from My Orders." + (data.warning ? " " + data.warning : ""));
+    renderView();
+    return false;
+  },
+  loadDisputeThread: async function (disputeId, hostId) {
+    var host = document.getElementById(hostId);
+    if (!host) return;
+    if (host.dataset.loaded) { host.innerHTML = ""; delete host.dataset.loaded; return; }
+    host.innerHTML = '<p style="color:var(--muted)">Loading the dispute…</p>';
+    var data = await apiGet("/reports/" + disputeId + "?device_id=" + encodeURIComponent(deviceId()));
+    if (!data || !data.ok || !data.report) { host.innerHTML = '<div class="note">' + esc((data && data.error) || "Couldn't load it.") + "</div>"; return; }
+    host.dataset.loaded = "1";
+    host.innerHTML = disputeThreadHTML(data.report);
+  },
+  addDisputeNote: async function (form, reportId) {
+    var fd = new FormData(form);
+    var data = await apiPost("/reports/" + reportId + "/note", { device_id: deviceId(), body: String(fd.get("body") || "").trim() });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't add the note."); return false; }
+    setNotice("Note added.");
+    renderView();
+    return false;
+  },
+  resolveDispute: async function (reportId) {
+    var sel = document.getElementById("dwc-dispute-outcome-" + reportId);
+    var note = document.getElementById("dwc-dispute-note-" + reportId);
+    var outcome = sel ? sel.value : "resolved";
+    var resolutionNote = note ? note.value.trim() : "";
+    var data = await apiPost("/reports/" + reportId + "/resolve", { device_id: deviceId(), action: "resolve", outcome: outcome, resolution_note: resolutionNote });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't resolve it."); return; }
+    setNotice("Dispute resolved — " + (data.outcome || "resolved") + ". Both sides have been told.");
+    renderView();
+  },
   // Team moderation (v3.18) — silence a member for a duration picked
   // from the dropdown. selectId defaults to the Admin panel row's
   // select; report cards pass their own select id. The server caps the

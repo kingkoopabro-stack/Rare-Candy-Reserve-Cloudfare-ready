@@ -1,16 +1,22 @@
-// POST /api/listings/:id/buy — buyListing. Records a purchase of a sale
-// listing (or a flea listing by its high bidder) as an order in the buyer's
-// My Orders, and marks the listing sold. Payment itself is arranged
-// directly between buyer and seller — no money moves in this app.
-// Digital listings also get a CS# in the content-sales log (same as
-// private-chat content sales) so the buyer's copy is watermarked to them.
-import { json, noDb, getDb, readJson, profileByDevice, nowMs } from "../../_lib.js";
+// POST /api/listings/:id/buy — start a Flea Market purchase. The buyer
+// taps Buy → an order is recorded as pending_payment → a Stripe
+// Checkout Session is created (destination charge: the money lands in
+// the seller's Connect account, minus the 6% platform cut) → the
+// buyer pays on Stripe's hosted checkout screen. NOTHING is charged
+// here, and the listing is NOT marked sold until the payment is
+// confirmed (see /api/checkout/confirm). No private-chat payments —
+// the card goes on Stripe, the seller gets paid automatically to the
+// bank they linked. PayPal is not part of this flow: it cannot be
+// split into a Connect payout, so Flea Market buys are card-only.
+// (The operator's own catalog keeps its PayPal + Stripe links.)
+import { json, noDb, getDb, readJson, profileByDevice, nowMs, imageUrl } from "../../_lib.js";
+import { stripePlatformConfigured, createCheckoutSession } from "../../_stripe.js";
 
 export async function onRequestPost({ env, request, params }) {
   const db = getDb(env);
   if (!db) return noDb();
   const a = await readJson(request);
-  const fail = (error) => json({ ok: false, error, order_id: null });
+  const fail = (error) => json({ ok: false, error, order_id: null, checkout_url: null });
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return fail("Create your profile first to buy — orders live on your profile.");
   const id = Number(params.id);
@@ -29,54 +35,50 @@ export async function onRequestPost({ env, request, params }) {
     }
     amount = top;
   }
+  // The seller must have linked their bank (Connect) before anyone can
+  // buy — otherwise the money has nowhere automatic to go.
+  const seller = await db.prepare("SELECT id, username, connect_account_id, connect_onboarded FROM profiles WHERE id = ? LIMIT 1").bind(l.profile_id).first();
+  if (!seller || !seller.connect_account_id) {
+    return fail("This seller hasn't linked their bank yet, so checkout can't run — the sale waits until they do (one-time setup in Payouts). Nothing was charged.");
+  }
+  if (!stripePlatformConfigured(env)) {
+    return fail("Card checkout isn't switched on yet — the shop is still setting it up. Nothing was charged.");
+  }
   const listingType = l.listing_type ?? "physical";
   const shipCents = listingType === "digital" ? 0 : Math.round(Number(l.shipping_cents) || 0);
   const now = nowMs();
   let r;
   try {
     r = await db.prepare(
-      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, shipping_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'paid', ?, ?)",
+      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, shipping_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
     ).bind(id, me.id, l.profile_id, l.title, amount, shipCents, now, now).run();
   } catch (e) {
     // The tax migration hasn't run yet (no shipping_cents on orders) —
     // save without it; the read side defaults shipping to 0.
     if (!/no such column|no column named/i.test(String((e && e.message) || e))) throw e;
     r = await db.prepare(
-      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'paid', ?, ?)",
+      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
     ).bind(id, me.id, l.profile_id, l.title, amount, now, now).run();
   }
-  await db.prepare("UPDATE listings SET status = 'sold', updated_at = ? WHERE id = ?").bind(now, id).run();
-  // CS# for digital listings — same log as private-chat content sales
-  // (receipts.js): a sequential number, the buyer IP server-side only,
-  // and the watermark line for the buyer's copy. Physical buys stay on
-  // the orders table only. If the content-sales table isn't there yet
-  // the order still saves and cs_number comes back null.
-  let csNumber = null;
-  let watermarkText = "";
-  if (listingType === "digital") {
-    const seller = await db.prepare("SELECT id, username FROM profiles WHERE id = ? LIMIT 1").bind(l.profile_id).first();
-    const buyerIp = request.headers.get("cf-connecting-ip") || "";
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const mx = await db.prepare("SELECT MAX(cs_number) AS m FROM content_sales").first();
-        const next = (mx && mx.m ? mx.m : 0) + 1;
-        const wm = "RareCandyReserve.org • @" + me.username + " • CS#" + next + " • redistribution of this is punishable by law";
-        await db.prepare(
-          `INSERT INTO content_sales (cs_number, listing_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        ).bind(next, id, me.id, me.username, l.profile_id, (seller && seller.username) || "", l.title, amount, buyerIp, wm, now).run();
-        csNumber = next;
-        watermarkText = wm;
-        break;
-      } catch (e2) {
-        const msg2 = String((e2 && e2.message) || e2);
-        if (/no such table/i.test(msg2)) { csNumber = null; watermarkText = ""; break; }
-        if (/UNIQUE constraint failed/i.test(msg2) && attempt === 0) continue;
-        csNumber = null;
-        watermarkText = "";
-        break;
-      }
-    }
+  const orderId = r.meta.last_row_id;
+  const origin = new URL(request.url).origin;
+  const isDigital = listingType === "digital";
+  const checkout = await createCheckoutSession(env, {
+    orderId, listingId: id, itemName: l.title + " — Rare Candy Reserve",
+    amountCents: amount, shippingCents: shipCents,
+    destinationAccount: seller.connect_account_id,
+    digitalAsset: isDigital,
+    imageUrl: l.image_blob_key ? origin + imageUrl(l.image_blob_key) : null,
+    successUrl: origin + "/community.html#/orders?checkout=success&session_id={CHECKOUT_SESSION_ID}&order_id=" + orderId,
+    cancelUrl: origin + "/community.html#/listing/" + id + "?checkout=cancelled",
+  });
+  if (checkout.error) {
+    // The order stays pending_payment — the buyer can retry from
+    // My Orders, and the seller sees it as unpaid, never as sold.
+    return json({ ok: false, error: checkout.error, order_id: orderId, checkout_url: null });
   }
-  return json({ ok: true, error: null, order_id: r.meta.last_row_id, cs_number: csNumber, watermark_text: watermarkText });
+  try {
+    await db.prepare("UPDATE orders SET stripe_session_id = ? WHERE id = ?").bind(checkout.sessionId, orderId).run();
+  } catch { /* stripe_session_id column not there yet — confirm still works off the session id */ }
+  return json({ ok: true, error: null, order_id: orderId, checkout_url: checkout.url, amount_cents: amount, shipping_cents: shipCents });
 }

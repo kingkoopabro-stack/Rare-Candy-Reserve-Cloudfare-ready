@@ -56,8 +56,19 @@ export async function onRequestPost({ env, request }) {
     if (!existing) return fail("Create your account first — the profile picture lives on an account.");
     const row = await db.prepare("SELECT * FROM gallery_photos WHERE id = ? LIMIT 1").bind(Number(a.avatar_gallery_id)).first();
     if (!row || row.profile_id !== existing.id) return fail("That photo isn't yours.");
+    // The profile picture can only be Friends or Members (2026-11-21)
+    // — a Public or Private photo picked as the pfp becomes Members
+    // (the account-only level), so the rule holds the moment it becomes
+    // the avatar. The client tells the member it changed.
+    let coerced = false;
+    if (row.visibility === "public" || row.visibility === "private") {
+      try {
+        await db.prepare("UPDATE gallery_photos SET visibility = 'members' WHERE id = ?").bind(row.id).run();
+        coerced = true;
+      } catch { /* visibility column not there yet — avatar still sets */ }
+    }
     await db.prepare("UPDATE profiles SET avatar_blob_key = ?, updated_at = ? WHERE id = ?").bind(row.blob_key, nowMs(), existing.id).run();
-    return json({ ok: true, error: null, avatar_url: imageUrl(row.blob_key) });
+    return json({ ok: true, error: null, avatar_url: imageUrl(row.blob_key), avatar_visibility: coerced ? "members" : (row.visibility || "public"), visibility_coerced: coerced });
   }
 
   const username = String(a.username || "").trim();

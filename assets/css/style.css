@@ -377,6 +377,13 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-profile-card{margin:16px 0}
 .dwc-avatar{width:56px;height:56px;border-radius:50%;object-fit:cover;border:2px solid var(--violet)}
 .dwc-avatar-none{display:inline-flex;align-items:center;justify-content:center;font-size:26px;background:var(--panel2)}
+/* No profile picture (2026-11-21) — the VNR logo fills the avatar slot
+   (whole logo visible, black back), with "Upload a new pfp" under it
+   for the owner. */
+.dwc-avatar-logo{object-fit:contain;background:#000}
+.dwc-gb-screen .dwc-avatar-logo{object-fit:contain;background:#000}
+.dwc-avatar-slot{display:inline-flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 auto}
+.dwc-avatar-placeholder-note{font-size:12px;color:var(--muted);text-align:center;max-width:150px;line-height:1.3}
 .dwc-avatar-sm{width:36px;height:36px}
 .dwc-challenge{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0;font-weight:800}
 .dwc-form-err{color:#ff8fb8;font-weight:700;font-size:14px}

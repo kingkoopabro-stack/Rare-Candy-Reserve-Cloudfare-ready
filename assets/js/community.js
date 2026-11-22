@@ -2131,7 +2131,7 @@ function phoneGalleryHTML() {
       }).join("") + "</div>"
     : '<p class="tp-note">No photos here yet — add one below.</p>';
   var storedLine = state.profile
-    ? '<p class="tp-note" id="dwc-gallery-stored-count">' + (state.galleryStoredCount == null ? "Your saved photos: loading…" : state.galleryStoredCount + " of 20 photos saved on your profile") + "</p>"
+    ? '<p class="tp-note" id="dwc-gallery-stored-count">' + (state.galleryStoredCount == null ? "Your saved photos: loading…" : state.galleryStoredCount + " of 3 photos saved on your profile") + "</p>"
     : "";
   return phoneTopbarHTML("Gallery") + '<div class="tp-appview">' +
     '<p class="tp-note">Session gallery — photos live here for 10 minutes, then they’re gone. Nothing is uploaded to the site until you pick Public or Friends on a photo. Tap a photo to see it big and pick who can see it. Long-hold a photo to delete it; on a computer, drag one to the trash can.</p>' +
@@ -4017,7 +4017,7 @@ function layoutPreviewInnerHTML(p) {
   }
   return '<div class="dwc-myprofile dwc-previewbox' + btnSizeCls + '">' +
     tickerHTML(p, th) +
-    '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<span class="dwc-avatar dwc-avatar-none">🍬</span>') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
+    '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<img class="dwc-avatar dwc-avatar-logo" src="images/vnr-steady-wave-logo.jpg" alt="Vita Nova Records — upload a new profile picture" style="width:64px;height:64px">') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
     '<div style="pointer-events:none">' + actionsBlock + "</div>" +
     website +
     top8 +
@@ -5879,28 +5879,36 @@ function gbFrameColors(th) {
 // picture-size pick, and clickable to open the picture viewer (large +
 // comments + heart). GB/GBA frames render a handheld around the
 // picture instead of a round ring.
+// No profile picture (never set, or the pfp photo was deleted): the
+// VNR logo fills the avatar slot, and the owner sees "Upload a new
+// pfp" under it. No photo is ever auto-promoted to pfp — the member
+// picks another uploaded picture and sets it as their pfp.
+function avatarSlotHTML(inner, m) {
+  if (!m || m.avatar_url || !m.is_mine) return inner;
+  return '<span class="dwc-avatar-slot">' + inner + '<span class="dwc-avatar-placeholder-note">Upload a new pfp</span></span>';
+}
 function picAvatarHTML(m, th) {
   var frame = (th && th.pic_frame) || "none";
   var big = !th || th.pic_size !== "smaller";
   var sizeCls = big ? " dwc-avatar-big" : "";
   var img = m.avatar_url
     ? '<img class="dwc-avatar' + sizeCls + '" src="' + esc(m.avatar_url) + '" alt="">'
-    : '<span class="dwc-avatar dwc-avatar-none' + sizeCls + '">🍬</span>';
+    : '<img class="dwc-avatar dwc-avatar-logo' + sizeCls + '" src="images/vnr-steady-wave-logo.jpg" alt="Vita Nova Records — upload a new profile picture">';
   var style = "";
   if (frame === "blood" && th && th.blood_color) style = ' style="--blood:' + esc(th.blood_color) + '"';
   if (frame === "gb" || frame === "gba") {
     var cols = gbFrameColors(th);
     style = ' style="--gb-c1:' + cols[0] + ';--gb-c2:' + cols[1] + ';--gb-c3:' + cols[2] + '"';
-    return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' +
+    return avatarSlotHTML('<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' +
       '<span class="dwc-gb-screen">' + img + '</span>' +
       '<span class="dwc-gb-label">' + (frame === "gba" ? "GAME BOY ADVANCE" : "GAME BOY") + '</span>' +
       '<span class="dwc-gb-dpad"></span>' +
       '<span class="dwc-gb-startselect"><i></i><i></i></span>' +
       '<span class="dwc-gb-ab"><i></i><i></i></span>' +
       '<span class="dwc-gb-speaker"><i></i><i></i><i></i><i></i><i></i><i></i></span>' +
-      "</span>";
+      "</span>", m);
   }
-  return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' + img + "</span>";
+  return avatarSlotHTML('<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + ' role="button" tabindex="0" title="Tap to enlarge + comment" onclick="DWC.openPicViewer(' + m.id + ')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();DWC.openPicViewer(' + m.id + ')}">' + img + "</span>", m);
 }
 // The picture + name + bio block (no card wrapper — the caller wraps it).
 // v3.10 — the occupation line respects "Hide Occupation" (hide_sections).
@@ -5934,13 +5942,14 @@ function profileNavRowHTML(m) {
 }
 // v3.21 — Add photos, direct on your own profile. A file picker that
 // uploads straight to the stored profile gallery (no Taffy Phone
-// needed) — up to 5 files at once, each with a short description and a
-// Public / Friends choice, with the candy loader + "Uploaded ✓".
+// needed) — 3 photos total on a profile for now, so the picker only
+// takes as many as you have room for, each with a short description
+// and a Public / Members / Friends / Private choice, with the candy loader + "Uploaded ✓".
 function profilePhotoUploadHTML() {
   var count = state.galleryStoredCount == null ? "…" : state.galleryStoredCount;
   return '<div class="card dwc-photo-upload" id="dwc-photo-upload">' +
     '<h3 style="margin-top:0">📷 Add photos to your profile</h3>' +
-    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Photos stay on your profile so customers and businesses can browse them — your products, your content. <span id="dwc-photo-upload-count">' + count + ' of 20 photos saved.</span></p>' +
+    '<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Photos stay on your profile so customers and businesses can browse them — your products, your content. <span id="dwc-photo-upload-count">' + count + ' of 3 photos saved.</span></p>' +
     '<label class="btn small">Choose photos<input type="file" accept="image/*" multiple hidden onchange="DWC.profilePhotoPicked(this)"></label>' +
     '<div id="dwc-photo-upload-list"></div>' +
     '<p><button type="button" class="btn" id="dwc-photo-upload-btn" onclick="DWC.profilePhotoUpload()" disabled>Upload</button> <button type="button" class="btn ghost" onclick="DWC.closeProfilePhotoUpload()">Close</button></p>' +
@@ -6341,7 +6350,7 @@ async function loadMemberListings(memberId) {
 // ---------- v3.9 picture viewer (lightbox + comments + heart) ----------
 // Opened by tapping a profile picture. Shows the picture large in the
 // owner's frame, with Prev/Next through their public phone pictures
-// (avatar first, then up to 20 public gallery photos), a heart button
+// (avatar first, then up to 3 public gallery photos), a heart button
 // under it (v3.16 — heart or nothing, no sad/confused), and a comment
 // thread under that (the profile-comments API, subject = the picture).
 function picViewerPhotoHTML(pv) {
@@ -6366,28 +6375,64 @@ function picViewerPhotoHTML(pv) {
   }
   return '<span class="dwc-picwrap dwc-picframe-' + frame + '"' + style + '>' + img + "</span>";
 }
+// Picture visibility (2026-11-21) — four levels per photo:
+//   public  — anyone, including guests.
+//   friends — friends only.
+//   members — signed-in members only.
+//   private — the owner (+ Chris, the operator) only.
+// The profile picture follows its role: whichever photo is the pfp can
+// only be Friends or Members — the viewer offers only those two for it.
+// Guests CAN open the viewer — the server only hands them Public
+// pictures, so there is nothing to hide client-side (sign-out closes
+// the viewer, so a signed-out session never keeps a member-only view).
+var PIC_VIS_OPTS = [
+  ["public", "🌍 Public", "Everyone can see it"],
+  ["friends", "👥 Friends", "Only your friends can see it"],
+  ["members", "👥 Members", "Only signed-in members can see it"],
+  ["private", "🔒 Private", "Only you (and Chris) can see it"],
+];
 function renderPicViewer() {
   var pv = state.picViewer;
   var host = $("dwc-picviewer");
   if (!pv || !host) return;
   var photo = pv.photos[pv.index];
+  if (!photo) { host.innerHTML = ""; return; }
+  var isOwnerOrOp = !!(state.profile && (state.profile.id === pv.memberId || state.profile.is_operator));
+  var isGalleryPhoto = !!(photo.subject && photo.subject.indexOf("gallery:") === 0);
+  // Visibility label for the owner/operator (visitors never see it).
+  var visLabel = "";
+  if (isOwnerOrOp && isGalleryPhoto) {
+    var vv = photo.visibility || "public";
+    visLabel = vv === "friends" ? " · 👥 Friends-only" : vv === "members" ? " · 👥 Members-only" : vv === "private" ? " · 🔒 Private (only you)" : "";
+  }
+  // Who-can-see-it row: the pfp photo offers Friends/Members only.
+  var visRow = "";
+  if (state.profile && isGalleryPhoto && isOwnerOrOp) {
+    var opts = photo.isAvatar ? PIC_VIS_OPTS.slice(1, 3) : PIC_VIS_OPTS;
+    visRow = '<p style="margin:0 0 10px"><span style="color:var(--muted);font-size:13px">Who can see it: </span>' +
+      opts.map(function (o) {
+        var cur = (photo.visibility || "public") === o[0];
+        return '<button type="button" class="btn small" onclick="DWC.picViewerSetVisibility(\'' + o[0] + '\')" title="' + o[2] + '"' + (cur ? ' aria-pressed="true"' : "") + '>' + o[1] + (cur ? " ✓" : "") + "</button>";
+      }).join(" ") + ' <button type="button" class="btn small" onclick="DWC.picViewerDeletePhoto()" title="Take this photo down from your profile">🗑️ Delete</button></p>' +
+      (photo.isAvatar ? '<p style="margin:0 0 10px;color:var(--muted);font-size:13px">Your profile picture can only be Friends or Members — never Public, never Private.</p>' : "");
+  }
+  // Caption / description edit (owner/operator, gallery photos only).
+  var capRow = "";
+  if (state.profile && isGalleryPhoto && isOwnerOrOp) {
+    capRow = '<p style="margin:0 0 10px"><label style="color:var(--muted);font-size:13px">Description: </label>' +
+      '<input id="dwc-picviewer-caption" type="text" maxlength="140" value="' + esc(photo.caption || "") + '" placeholder="A sentence or two about this picture" style="min-width:200px;max-width:100%">' +
+      ' <button type="button" class="btn small" onclick="DWC.picViewerSaveCaption()">Save description</button></p>';
+  }
   host.innerHTML =
     '<div class="dwc-picviewer-backdrop" onclick="DWC.closePicViewer()"></div>' +
     '<div class="dwc-picviewer-card" role="dialog" aria-label="Picture viewer">' +
     '<button type="button" class="dwc-picviewer-close" onclick="DWC.closePicViewer()" title="Close">✕</button>' +
     '<div class="dwc-picviewer-photo">' + picViewerPhotoHTML(pv) + "</div>" +
-    '<p class="dwc-picviewer-label">' + esc(photo ? (photo.label || "Profile picture") : "") + (state.profile && state.profile.id === pv.memberId && photo && photo.visibility && photo.visibility !== "public" ? " · " + (photo.visibility === "friends" ? "👥 Friends-only" : "🔒 Private") : "") + "</p>" +
-    (state.profile && state.profile.id === pv.memberId && photo && photo.subject && photo.subject.indexOf("gallery:") === 0
+    '<p class="dwc-picviewer-label">' + esc(photo.label || "Profile picture") + visLabel + "</p>" +
+    (state.profile && state.profile.id === pv.memberId && isGalleryPhoto
       ? '<p style="margin:0 0 10px"><button type="button" class="btn small" onclick="DWC.picViewerSetAvatar()">🖼️ Set as profile picture</button></p>'
       : "") +
-    (state.profile && photo && photo.subject && photo.subject.indexOf("gallery:") === 0 && (state.profile.id === pv.memberId || state.profile.is_operator)
-      ? '<p style="margin:0 0 10px"><span style="color:var(--muted);font-size:13px">Who can see it: </span>' +
-        ["private", "public", "friends"].map(function (v) {
-          var label = v === "private" ? "🔒 Private" : v === "public" ? "🌍 Public" : "👥 Friends";
-          var cur = (photo.visibility || "public") === v;
-          return '<button type="button" class="btn small" onclick="DWC.picViewerSetVisibility(\'' + v + '\')" title="' + (v === "private" ? "Take it down — only you have it" : v === "public" ? "Everyone can see it" : "Only your friends can see it") + '"' + (cur ? ' aria-pressed="true"' : "") + '>' + label + (cur ? " ✓" : "") + "</button>";
-        }).join(" ") + "</p>"
-      : "") +
+    visRow + capRow +
     '<div class="dwc-picviewer-nav">' +
     '<button type="button" class="btn ghost small" onclick="DWC.picViewerPrev()" ' + (pv.photos.length <= 1 ? "disabled" : "") + '>← Prev</button>' +
     '<span>' + (pv.index + 1) + " / " + pv.photos.length + "</span>" +
@@ -6502,6 +6547,12 @@ async function loadChatAim() {
       state.imCache[im.id] = conv.messages;
       renderIMLog(im.id);
       renderIMExtras(im.id, conv);
+    } else {
+      // A failed fetch used to leave the log on "Loading…" forever with
+      // no sign anything went wrong. Say so out loud — the 15-second
+      // timer retries on its own.
+      var logEl = $("dwc-imlog-" + im.id);
+      if (logEl && logEl.innerHTML.indexOf("Loading") !== -1) logEl.innerHTML = "<p style=\"color:var(--amber)\">Couldn't load this chat yet — it retries automatically. If it stays like this, the shop may still be running a database update.</p>";
     }
   }
 }
@@ -6649,7 +6700,8 @@ function syncIMShells() {
       '<label title="Attach a file (images up to 2.5 MB, other files up to 10 MB)" style="cursor:pointer">📎<input name="attachment" type="file" style="display:none" onchange="DWC.imAttachmentPicked(this, ' + im.id + ')"></label>' +
       '<button class="btn small" type="submit">Send</button></form>' +
       '<p style="font-size:12px;color:var(--muted)" data-imattachnote="' + im.id + '"></p>' +
-      '<details style="margin-top:6px"><summary style="cursor:pointer">🛒 Start a private sale with @' + esc(im.username) + '</summary><div id="dwc-imsale-' + im.id + '"></div></details>';
+      '<p style="margin-top:6px"><button type="button" class="btn ghost small" data-imsalebtn="' + im.id + '" onclick="DWC.toggleIMSale(' + im.id + ')">🛒 Start a private sale</button></p>' +
+      '<div id="dwc-imsale-' + im.id + '" hidden></div>';
     host.appendChild(div);
     applyPendingIMDraft(im.id, div);
     renderIMExtras(im.id);
@@ -6683,24 +6735,102 @@ function renderIMExtras(id, conv) {
     }
   }
   if (sale) {
-    sale.innerHTML = '<form onsubmit="DWC.startPrivateSale(this, ' + id + '); return false;" style="margin-top:8px">' +
-      '<p style="margin:0 0 6px;font-size:13px;color:var(--muted)">Agree on a price in chat, pick physical or digital, and the buyer pays on Stripe Checkout — same as the Flea Market. ' + (listing ? "The item auto-fills from the listing you're messaging about." : "No listing attached — type the item in.") + "</p>" +
-      '<label>Item</label><input name="title" required maxlength="120" placeholder="What are you selling?" value="' + (listing ? esc(listing.title) : "") + '">' +
-      '<label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required placeholder="e.g. 25.00" value="' + (listing ? (listing.price_cents / 100).toFixed(2) : "") + '">' +
-      '<label>Physical or digital?</label><select name="listing_type"><option value="physical">📦 Physical — I ship it</option><option value="digital">💾 Digital Asset — the file is the product</option></select>' +
-      '<label>Shipping (USD — physical only, buyer pays)</label><input name="shipping" type="number" step="0.01" min="0" placeholder="e.g. 4.50">' +
-      '<label>Description</label><textarea name="description" maxlength="2000" placeholder="Condition, what\'s included…">' + (listing ? esc(listing.description || "") : "") + "</textarea>" +
-      '<p class="dwc-form-err" data-err hidden></p>' +
-      '<p style="margin-top:8px"><button class="btn small" type="submit">Set up the private sale →</button></p></form>';
+    // Build once per listing context. renderIMExtras runs on every
+    // 15-second refresh — rebuilding the form each time used to wipe
+    // anything typed into it. Same listing → leave it alone.
+    var listId = listing ? String(listing.id) : "";
+    if (!sale.querySelector("form") || sale.dataset.builtFor !== listId) {
+      var partner = state.openIMs.filter(function (x) { return x.id === id; })[0];
+      var pname = partner ? partner.username : "";
+      sale.innerHTML = '<form onsubmit="DWC.startPrivateSale(this, ' + id + '); return false;" style="margin-top:8px">' +
+        '<p style="margin:0 0 6px;font-size:13px">Which way is this going?</p>' +
+        '<label style="display:block;font-size:14px"><input type="radio" name="direction" value="sell" checked onchange="DWC.imSaleDirection(this.form, this.value)"> I\'m selling to @' + esc(pname) + '</label>' +
+        '<label style="display:block;font-size:14px"><input type="radio" name="direction" value="buy" onchange="DWC.imSaleDirection(this.form, this.value)"> I\'m buying from @' + esc(pname) + '</label>' +
+        '<div data-sell>' +
+        '<p style="margin:6px 0;font-size:13px;color:var(--muted)">Agree on a price in chat, pick physical or digital, and the buyer pays on Stripe Checkout — same as the Flea Market. ' + (listing ? "The item auto-fills from the listing you're messaging about." : "No listing attached — type the item in.") + "</p>" +
+        '<label>Item</label><input name="title" required maxlength="120" placeholder="What are you selling?" value="' + (listing ? esc(listing.title) : "") + '">' +
+        '<label>Price (USD)</label><input name="price" type="number" step="0.01" min="0.01" required placeholder="e.g. 25.00" value="' + (listing ? (listing.price_cents / 100).toFixed(2) : "") + '">' +
+        '<label>Physical or digital?</label><select name="listing_type"><option value="physical">📦 Physical — I ship it</option><option value="digital">💾 Digital Asset — the file is the product</option></select>' +
+        '<label>Shipping (USD — physical only, buyer pays)</label><input name="shipping" type="number" step="0.01" min="0" placeholder="e.g. 4.50">' +
+        '<label>Description</label><textarea name="description" maxlength="2000" placeholder="Condition, what\'s included…">' + (listing ? esc(listing.description || "") : "") + "</textarea>" +
+        '<p class="dwc-form-err" data-err hidden></p>' +
+        '<p style="margin-top:8px"><button class="btn small" type="submit" data-submit>Set up the private sale →</button></p></div>' +
+        '<div data-buy hidden>' +
+        '<p style="margin:6px 0;font-size:13px;color:var(--muted)">Send @' + esc(pname) + ' a buy request — the item + what you\'ll pay. They pick physical or digital + shipping when they accept. Nothing is charged until they set the sale up and you pay on Stripe Checkout. They\'ll need a linked bank (Stripe Connect, Payouts tab) to accept.</p>' +
+        '<label>Item</label><input name="buy_title" required maxlength="120" placeholder="What do you want to buy?" value="' + (listing ? esc(listing.title) : "") + '">' +
+        '<label>Your offer (USD)</label><input name="buy_price" type="number" step="0.01" min="0.01" required placeholder="e.g. 25.00" value="' + (listing ? (listing.price_cents / 100).toFixed(2) : "") + '">' +
+        '<p class="dwc-form-err" data-err-buy hidden></p>' +
+        '<p style="margin-top:8px"><button class="btn small" type="submit" data-submit-buy>Send buy request →</button></p></div>' +
+        '</form>';
+      sale.dataset.builtFor = listId;
+      var builtForm = sale.querySelector("form");
+      if (builtForm) setSaleDirection(builtForm, "sell");
+    }
+  }
+}
+// Buy requests in DMs — the message body IS the request record's
+// surface (the durable row lives in private_sale_requests). Format,
+// written by POST /api/private-sale-requests and read here — change
+// one and change the other:
+//   🛒 Buy request #12: I want to buy "TITLE" — offering $25.00. ...
+// Returns { id, title, priceCents } or null when the body isn't one.
+var BUY_REQ_RE = /^🛒 Buy request #(\d+): I want to buy "((?:[^"\\]|\\.)*)" — offering \$([0-9]+\.[0-9]{2})/;
+var BUY_REQ_DONE_RE = /^[✓✗] Buy request #(\d+)/;
+function parseBuyRequest(body) {
+  var m = String(body || "").match(BUY_REQ_RE);
+  if (!m) return null;
+  var cents = Math.round(parseFloat(m[3]) * 100);
+  if (!cents || cents <= 0) return null;
+  return { id: Number(m[1]), title: m[2], priceCents: cents };
+}
+// The Accept/Decline buttons under a buy-request message. Only the
+// recipient (the seller) gets them, only while the request is still
+// open: answered requests show their ✓/✗ follow-up DM in the same
+// thread (resolved), and ones already answered this session are in
+// state.buyReqHandled. The title/price are NOT embedded here — the
+// click handler re-reads them from the cached message, so a quote in
+// an item name can never break the button.
+function buyRequestActionHTML(m, partnerId, resolved, handled) {
+  if (!m || m.from_me) return "";
+  var parsed = parseBuyRequest(m.body);
+  if (!parsed) return "";
+  if (resolved[String(parsed.id)]) return "";
+  if (handled && handled[partnerId + ":" + m.id]) return "";
+  return '<p style="margin:2px 0 8px"><button class="btn small" type="button" onclick="DWC.acceptBuyRequest(' + partnerId + ', ' + m.id + ')">✓ Accept — set up the sale</button> ' +
+    '<button class="btn ghost small" type="button" onclick="DWC.declineBuyRequest(' + partnerId + ', ' + m.id + ')">Decline</button></p>';
+}
+// Show the sell half of the private-sale form or the buy half.
+// Hidden fields are disabled so they can't block submit (required)
+// and their values aren't sent.
+function setSaleDirection(form, dir) {
+  if (!form) return;
+  dir = dir === "buy" ? "buy" : "sell";
+  var sell = form.querySelector("[data-sell]");
+  var buy = form.querySelector("[data-buy]");
+  if (sell) {
+    sell.hidden = dir !== "sell";
+    sell.querySelectorAll("input, select, textarea").forEach(function (el) { el.disabled = dir !== "sell"; });
+  }
+  if (buy) {
+    buy.hidden = dir !== "buy";
+    buy.querySelectorAll("input, select, textarea").forEach(function (el) { el.disabled = dir !== "buy"; });
   }
 }
 function renderIMLog(id) {
   var log = $("dwc-imlog-" + id);
   if (!log) return;
   var msgs = state.imCache[id] || [];
+  // Buy requests already answered in this thread (their ✓/✗ follow-up
+  // DM names the request id) don't show Accept/Decline again.
+  var resolved = {};
+  msgs.forEach(function (m) {
+    var r = String(m.body || "").match(BUY_REQ_DONE_RE);
+    if (r) resolved[r[1]] = true;
+  });
   log.innerHTML = msgs.length
     ? msgs.map(function (m) {
-        return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body || "") + "</span>" + attachmentHTML(m.attachment) + ' <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>";
+        return '<div class="dwc-chatmsg"><strong>' + esc(m.from_me ? "You" : m.sender_username) + '</strong>: <span>' + esc(m.body || "") + "</span>" + attachmentHTML(m.attachment) + ' <span class="dwc-meta">' + fmtDate(m.created_at) + "</span></div>" +
+          buyRequestActionHTML(m, id, resolved, state.buyReqHandled);
       }).join("")
     : "<p>No messages yet — say hi.</p>";
   log.scrollTop = log.scrollHeight;
@@ -7796,6 +7926,7 @@ window.DWC = {
       localStorage.removeItem(DEVICE_KEY);
     } catch (e) {}
     state.profile = null;
+    DWC.closePicViewer(); // members-only pictures: never leave the viewer open for a guest
     state.editingProfile = false;
     state.signupOpen = false;
     setNotice("Signed out on this device.");
@@ -7818,8 +7949,9 @@ window.DWC = {
   cancelProfileForm: function () { state.editingProfile = false; state.signupOpen = false; renderAccount(); },
   copyLink: copyLink,
   openLightbox: function (url) { if (typeof openLightbox === "function") openLightbox(url); else window.open(url, "_blank"); },
-  // v3.9 — picture viewer: avatar first, then the owner's public
-  // gallery photos (max 20). The host div is created once on the body.
+  // v3.9 — picture viewer: avatar first, then the owner's gallery
+  // photos the viewer is allowed to see (max 3 — the server filters by
+  // visibility + the 18+ gate, so guests only ever get Public pictures).
   openPicViewer: async function (memberId) {
     var host = $("dwc-picviewer");
     if (!host) {
@@ -7830,17 +7962,19 @@ window.DWC = {
       document.body.appendChild(host);
     }
     var m = state.viewingMember && state.viewingMember.id === memberId ? state.viewingMember : null;
+    var gated = false;
     if (!m) {
       var data = await apiGet("/members/" + memberId + "?device_id=" + encodeURIComponent(deviceId()));
       m = data && data.member;
+      gated = !!(data && data.gated);
     }
-    if (!m) { setNotice("That member doesn't exist."); return; }
+    if (!m) { setNotice(gated ? "🔞 That page is 18+ — sign in and verify your age to see their pictures." : "That member doesn't exist."); return; }
     var photos = [];
     if (m.avatar_url) photos.push({ url: m.avatar_url, subject: "avatar", label: "Profile picture" });
     try {
       var g = await apiGet("/gallery?profile_id=" + memberId + "&device_id=" + encodeURIComponent(deviceId()));
-      ((g && g.photos) || []).slice(0, 20).forEach(function (p, i) {
-        photos.push({ url: p.url, subject: "gallery:" + p.id, label: p.caption || ("Photo " + (i + 1)), visibility: p.visibility || "public" });
+      ((g && g.photos) || []).slice(0, 3).forEach(function (p, i) {
+        photos.push({ url: p.url, subject: "gallery:" + p.id, label: p.caption || ("Photo " + (i + 1)), caption: p.caption || "", fallbackLabel: "Photo " + (i + 1), visibility: p.visibility || "public", isAvatar: !!p.is_avatar });
       });
     } catch (e) { /* gallery not there yet — avatar only */ }
     if (!photos.length) { setNotice("No picture to show yet."); return; }
@@ -7883,44 +8017,95 @@ window.DWC = {
       var av = document.querySelector(".dwc-avatar");
       if (av && av.tagName === "IMG") av.src = avatarUrl;
     }
-    setNotice("🖼️ That's your profile picture now.");
+    setNotice(data.visibility_coerced ? "🖼️ That's your profile picture now. Its visibility is Members now — a profile picture can only be Friends or Members." : "🖼️ That's your profile picture now.");
     DWC.openPicViewer(pv.memberId);
   },
   // v3.21 — change the visibility of the gallery photo showing in the
   // viewer. Auto-saves immediately (same as the phone gallery — there
-  // is no Save button): Public / Friends call PUT /api/gallery,
-  // Private deletes the stored photo (Private is not stored server-side)
-  // and the viewer moves to the next photo. Owner or operator only —
-  // the server enforces it; anyone else never sees these buttons.
+  // is no Save button): Public / Friends / Members / Private call PUT
+  // /api/gallery. Owner or operator only — the server enforces it;
+  // anyone else never sees these buttons. The profile picture can only
+  // be Friends or Members (the buttons don't offer the other two, and
+  // the server refuses them too). Delete stays separate.
   picViewerSetVisibility: async function (vis) {
     var pv = state.picViewer;
     if (!pv || !state.profile) return;
     var photo = pv.photos[pv.index];
     if (!photo || !photo.subject || photo.subject.indexOf("gallery:") !== 0) return;
     if (state.profile.id !== pv.memberId && !state.profile.is_operator) return;
-    if (["private", "public", "friends"].indexOf(vis) < 0) return;
+    if (["public", "friends", "members", "private"].indexOf(vis) < 0) return;
+    if (photo.isAvatar && (vis === "public" || vis === "private")) return;
     var gid = photo.subject.slice("gallery:".length);
-    if (vis === "private") {
-      if (!confirm("Take this photo down from your profile? It will be deleted from the gallery.")) return;
-      var del = await apiDelete("/gallery?id=" + encodeURIComponent(gid) + "&device_id=" + encodeURIComponent(deviceId()));
-      if (!del || !del.ok) { setNotice((del && del.error) || "Couldn't take that photo down."); return; }
-      pv.photos.splice(pv.index, 1);
-      if (!pv.photos.length) { setNotice("🔒 Private — photo taken down from your profile."); DWC.closePicViewer(); return; }
-      if (pv.index >= pv.photos.length) pv.index = pv.photos.length - 1;
-      setNotice("🔒 Private — photo taken down from your profile.");
-      renderPicViewer();
-      return;
-    }
     var upd = await apiPut("/gallery", { device_id: deviceId(), id: Number(gid), visibility: vis });
     if (!upd || !upd.ok) { setNotice((upd && upd.error) || "Couldn't change that photo's visibility."); return; }
     photo.visibility = vis;
-    setNotice(vis === "public" ? "🌍 Public ✓ — visitors can see it on your page." : "👥 Friends-only ✓ — only your friends can see it.");
+    setNotice(vis === "public" ? "🌍 Public ✓ — visitors can see it on your page." : vis === "friends" ? "👥 Friends-only ✓ — only your friends can see it." : vis === "members" ? "👥 Members-only ✓ — only signed-in members can see it." : "🔒 Private ✓ — only you (and Chris) can see it.");
+    renderPicViewer();
+  },
+  // Save the short description (caption, 140 chars) for the gallery
+  // photo showing in the viewer. Owner or operator only; auto-saves
+  // via PUT /api/gallery — same no-Save-button pattern as visibility.
+  picViewerSaveCaption: async function () {
+    var pv = state.picViewer;
+    if (!pv || !state.profile) return;
+    var photo = pv.photos[pv.index];
+    if (!photo || !photo.subject || photo.subject.indexOf("gallery:") !== 0) return;
+    if (state.profile.id !== pv.memberId && !state.profile.is_operator) return;
+    var input = $("dwc-picviewer-caption");
+    var cap = input ? input.value.slice(0, 140) : "";
+    var gid = photo.subject.slice("gallery:".length);
+    var upd = await apiPut("/gallery", { device_id: deviceId(), id: Number(gid), caption: cap });
+    if (!upd || !upd.ok) { setNotice((upd && upd.error) || "Couldn't save that description."); return; }
+    photo.caption = cap;
+    photo.label = cap || photo.fallbackLabel || "Photo";
+    setNotice("✏️ Description saved ✓");
+    renderPicViewer();
+  },
+  // Delete the gallery photo showing in the viewer. Confirms first,
+  // then DELETE /api/gallery; the viewer moves to the next photo, or
+  // closes if it was the last one. Owner or operator only. If the
+  // deleted photo WAS the profile picture, the avatar entry in this
+  // viewer is stale too, so it goes as well — no photo is auto-promoted
+  // to pfp, and the member page re-renders so the VNR logo + "Upload a
+  // new pfp" placeholder shows in the avatar slot.
+  picViewerDeletePhoto: async function () {
+    var pv = state.picViewer;
+    if (!pv || !state.profile) return;
+    var photo = pv.photos[pv.index];
+    if (!photo || !photo.subject || photo.subject.indexOf("gallery:") !== 0) return;
+    if (state.profile.id !== pv.memberId && !state.profile.is_operator) return;
+    var gid = photo.subject.slice("gallery:".length);
+    if (!confirm("Delete this photo from your profile? This can't be undone.")) return;
+    var del = await apiDelete("/gallery?id=" + encodeURIComponent(gid) + "&device_id=" + encodeURIComponent(deviceId()));
+    if (!del || !del.ok) { setNotice((del && del.error) || "Couldn't delete that photo."); return; }
+    var wasAvatar = !!(del.cleared_avatar || (pv.photos[0] && pv.photos[0].subject === "avatar" && photo.url === pv.photos[0].url));
+    pv.photos.splice(pv.index, 1);
+    if (wasAvatar) pv.photos = pv.photos.filter(function (p) { return p.subject !== "avatar"; });
+    if (wasAvatar) {
+      if (state.profile) state.profile.avatar_url = null;
+      if (state.viewingMember) state.viewingMember.avatar_url = null;
+    }
+    if (!pv.photos.length) {
+      setNotice(wasAvatar ? "🗑️ Photo deleted — that was your profile picture, so your page shows the VNR logo until you pick a new one." : "🗑️ Photo deleted from your profile.");
+      DWC.closePicViewer();
+      if (wasAvatar) render();
+      return;
+    }
+    if (wasAvatar) {
+      pv.index = 0;
+      setNotice("🗑️ Photo deleted — that was your profile picture, so your page shows the VNR logo until you pick a new one.");
+      DWC.closePicViewer();
+      render();
+      return;
+    }
+    if (pv.index >= pv.photos.length) pv.index = pv.photos.length - 1;
+    setNotice("🗑️ Photo deleted from your profile.");
     renderPicViewer();
   },
   // v3.21 — Add photos panel on your own profile (bypasses the Taffy
   // Phone Gallery; the phone path stays). Up to 5 files at once, each
-  // with a short description + Public / Friends, uploaded straight to
-  // the stored gallery with the candy loader + "Uploaded ✓".
+  // with a short description + Public / Members / Friends / Private,
+  // uploaded straight to the stored gallery with the candy loader + "Uploaded ✓".
   openProfilePhotoUpload: function () {
     var host = $("dwc-photo-upload-host");
     if (!host) return;
@@ -7935,7 +8120,20 @@ window.DWC = {
     if (host) host.innerHTML = "";
   },
   profilePhotoPicked: function (input) {
-    var files = input && input.files ? Array.prototype.slice.call(input.files, 0, 5) : [];
+    // 3 photos total on a profile for now — only take as many as there
+    // is room for (the server refuses the 4th anyway; this just says so
+    // before anyone waits on an upload).
+    var stored = state.galleryStoredCount == null ? 0 : state.galleryStoredCount;
+    var room = 3 - stored;
+    var picked = input && input.files ? Array.prototype.slice.call(input.files) : [];
+    if (room <= 0) {
+      setNotice("You already have 3 photos saved — delete one to add another.");
+      state.profilePhotoFiles = [];
+      if (input) input.value = "";
+      return;
+    }
+    var files = picked.slice(0, room);
+    if (files.length < picked.length) setNotice("Room for " + room + " more photo" + (room === 1 ? "" : "s") + " — only the first " + room + " were kept.");
     state.profilePhotoFiles = files;
     var list = $("dwc-photo-upload-list");
     var btn = $("dwc-photo-upload-btn");
@@ -7944,7 +8142,7 @@ window.DWC = {
       list.innerHTML = files.map(function (f, i) {
         return '<div class="dwc-photo-upload-row"><span>' + esc(f.name || ("Photo " + (i + 1))) + '</span>' +
           '<input type="text" class="dwc-photo-upload-caption" maxlength="140" placeholder="Short description (140 max)" data-cap="' + i + '">' +
-          '<select class="dwc-photo-upload-vis" data-vis="' + i + '"><option value="public">🌍 Public</option><option value="friends">👥 Friends</option></select></div>';
+          '<select class="dwc-photo-upload-vis" data-vis="' + i + '"><option value="public">🌍 Public</option><option value="members">👥 Members</option><option value="friends">👥 Friends</option><option value="private">🔒 Private</option></select></div>';
       }).join("");
     }
     if (input) input.value = "";
@@ -7955,7 +8153,7 @@ window.DWC = {
     var btn = $("dwc-photo-upload-btn");
     var status = $("dwc-photo-upload-status");
     if (btn) btn.disabled = true;
-    var ok = 0, failed = 0;
+    var ok = 0, failed = 0, capHit = null;
     if (window.RCRloader) window.RCRloader.show();
     for (var k = 0; k < files.length; k++) {
       var f = files[k];
@@ -7964,21 +8162,27 @@ window.DWC = {
       var capEl = document.querySelector('[data-cap="' + k + '"]');
       var visEl = document.querySelector('[data-vis="' + k + '"]');
       if (capEl) cap = capEl.value.slice(0, 140);
-      if (visEl) vis = visEl.value === "friends" ? "friends" : "public";
+      if (visEl) vis = ["public", "friends", "members", "private"].indexOf(visEl.value) >= 0 ? visEl.value : "public";
       if (status) status.textContent = "Uploading " + (k + 1) + " of " + files.length + "… 🍬";
       var img = await fileToImage(f, 1500000, { maxDim: 1600 });
       if (!img || img.error) { failed++; continue; }
       var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: img.dataBase64, mimeType: img.mimeType }, caption: cap, visibility: vis });
-      if (data && data.ok) ok++; else failed++;
+      if (data && data.ok) ok++;
+      else {
+        failed++;
+        // The 3-photo cap answers here when the count moved under us —
+        // say so plainly instead of "couldn't be read", and stop.
+        if (data && data.error && data.error.indexOf("3-photo limit") >= 0) { capHit = data.error; break; }
+      }
     }
     if (window.RCRloader) window.RCRloader.hide();
     DWC.refreshGalleryCount();
     if (ok) {
       var newCount = state.galleryStoredCount == null ? ok : state.galleryStoredCount + ok;
       var countEl = $("dwc-photo-upload-count");
-      if (countEl) countEl.textContent = newCount + " of 20 photos saved.";
+      if (countEl) countEl.textContent = newCount + " of 3 photos saved.";
     }
-    if (status) status.textContent = ok ? "Uploaded ✓ — " + ok + " photo" + (ok === 1 ? "" : "s") + " saved to your profile." + (failed ? " " + failed + " couldn't be read." : "") : "Nothing uploaded — those photos couldn't be read.";
+    if (status) status.textContent = capHit ? capHit : ok ? "Uploaded ✓ — " + ok + " photo" + (ok === 1 ? "" : "s") + " saved to your profile." + (failed ? " " + failed + " couldn't be read." : "") : "Nothing uploaded — those photos couldn't be read.";
     if (ok) {
       state.profilePhotoFiles = [];
       var list = $("dwc-photo-upload-list");
@@ -10286,8 +10490,12 @@ window.DWC = {
   // (title, price, photo); with no listing attached the seller types
   // it in. The buyer gets the link in this chat and pays on Checkout.
   startPrivateSale: async function (form, partnerId) {
+    var dir = (form.querySelector('input[name="direction"]:checked') || {}).value || "sell";
+    if (dir === "buy") return DWC.sendBuyRequest(form, partnerId);
     var fd = new FormData(form);
     var err = form.querySelector("[data-err]");
+    var btn = form.querySelector("[data-submit]");
+    if (btn) btn.disabled = true;
     var listing = state.imListing && state.imListing[partnerId];
     var body = {
       device_id: deviceId(), kind: "sale",
@@ -10299,16 +10507,110 @@ window.DWC = {
       shipping_cents: Math.round(parseFloat(fd.get("shipping") || "0") * 100),
       private_buyer_id: partnerId,
       source_listing_id: listing ? listing.id : undefined,
+      // Answering a buy request: the listing is linked back to it so
+      // the request closes as 'listed' with the sale attached.
+      private_sale_request_id: (state.imBuyRequest && state.imBuyRequest[partnerId]) || undefined,
       allow_comments: false,
       images: [],
     };
     var data = await apiPost("/listings", body);
-    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't set up the sale."; } return false; }
+    if (!data || !data.ok) { if (btn) btn.disabled = false; if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't set up the sale."; } return false; }
     var link = location.origin + "/community.html#/listing/" + data.listing_id;
     await apiPost("/direct-messages", { device_id: deviceId(), to: partnerId, body: "Private sale ready: " + link + " — pay by card on Stripe Checkout there. " + (body.listing_type === "digital" ? "Digital Asset — no shipping." : "Physical — I'll ship it with tracking.") });
+    if (state.imBuyRequest) delete state.imBuyRequest[partnerId];
+    form.reset();
+    DWC.imSaleDirection(form, "sell");
+    if (btn) btn.disabled = false;
     setNotice("Private sale set up — the buyer got the link in this chat. They pay on Stripe Checkout.");
     await loadChatAim();
     return false;
+  },
+  // The sale panel in a DM window: one small button, form hidden until
+  // tapped. The message box stays front and center — nothing about
+  // selling sits in the way of a plain "Yo".
+  setIMSaleOpen: function (id, open) {
+    var host = $("dwc-imsale-" + id);
+    if (!host) return;
+    host.hidden = !open;
+    var btn = document.querySelector('[data-imsalebtn="' + id + '"]');
+    if (btn) btn.textContent = open ? "✕ Close the sale form" : "🛒 Start a private sale";
+  },
+  toggleIMSale: function (id) {
+    var host = $("dwc-imsale-" + id);
+    DWC.setIMSaleOpen(id, !!host && !!host.hidden);
+  },
+  imSaleDirection: function (form, dir) { setSaleDirection(form, dir); },
+  // Send a BUY request: "I want to buy X for $Y." The request is a
+  // durable row (POST /api/private-sale-requests) + a DM to the seller
+  // carrying its id. Nothing is charged — the seller accepts first,
+  // sets the sale up with the normal form, and only then does the
+  // buyer get a Stripe Checkout link.
+  sendBuyRequest: async function (form, partnerId) {
+    var err = form.querySelector("[data-err-buy]");
+    var titleEl = form.querySelector('[name="buy_title"]');
+    var priceEl = form.querySelector('[name="buy_price"]');
+    var title = String(titleEl ? titleEl.value : "").trim();
+    var priceCents = Math.round(parseFloat(priceEl ? priceEl.value : "0") * 100);
+    if (title.length < 3 || title.length > 120) { if (err) { err.hidden = false; err.textContent = "Say what you want to buy (3–120 characters)."; } return false; }
+    if (!priceCents || priceCents <= 0) { if (err) { err.hidden = false; err.textContent = "Offer an amount above $0."; } return false; }
+    var btn = form.querySelector("[data-submit-buy]");
+    if (btn) btn.disabled = true;
+    var listing = state.imListing && state.imListing[partnerId];
+    var data = await apiPost("/private-sale-requests", { device_id: deviceId(), seller_id: partnerId, title: title, price_cents: priceCents, source_listing_id: listing ? listing.id : undefined });
+    if (btn) btn.disabled = false;
+    if (!data || !data.ok) { if (err) { err.hidden = false; err.textContent = (data && data.error) || "Couldn't send that request."; } return false; }
+    var partner = state.openIMs.filter(function (x) { return x.id === partnerId; })[0];
+    setNotice("Buy request sent — @" + (partner ? partner.username : "") + " can accept it from this chat.");
+    form.reset();
+    DWC.imSaleDirection(form, "sell");
+    DWC.setIMSaleOpen(partnerId, false);
+    await loadChatAim();
+    return false;
+  },
+  // Answer a buy request from the DM. Accept does NOT create the
+  // listing or charge anyone — it marks the request accepted and opens
+  // the seller's sale form prefilled (item + offered price), so the
+  // seller picks physical/digital + shipping and submits. That submit
+  // is the existing startPrivateSale path (bank gate included).
+  acceptBuyRequest: async function (partnerId, msgId) {
+    var msgs = state.imCache[partnerId] || [];
+    var m = null;
+    for (var i = 0; i < msgs.length; i++) { if (msgs[i].id === msgId) { m = msgs[i]; break; } }
+    var parsed = m ? parseBuyRequest(m.body) : null;
+    if (!parsed) { setNotice("Couldn't read that request — ask them to send it again."); return; }
+    var data = await apiPost("/private-sale-requests/" + parsed.id + "/respond", { device_id: deviceId(), action: "accept" });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't accept that request."); return; }
+    state.buyReqHandled = state.buyReqHandled || {};
+    state.buyReqHandled[partnerId + ":" + msgId] = "accepted";
+    state.imBuyRequest = state.imBuyRequest || {};
+    state.imBuyRequest[partnerId] = parsed.id;
+    var host = $("dwc-imsale-" + partnerId);
+    if (host) {
+      var form = host.querySelector("form");
+      if (form) {
+        var t = form.querySelector('[name="title"]'); if (t) t.value = parsed.title;
+        var p = form.querySelector('[name="price"]'); if (p) p.value = (parsed.priceCents / 100).toFixed(2);
+        var sellRadio = form.querySelector('input[name="direction"][value="sell"]'); if (sellRadio) sellRadio.checked = true;
+        DWC.imSaleDirection(form, "sell");
+      }
+    }
+    DWC.setIMSaleOpen(partnerId, true);
+    var partner = state.openIMs.filter(function (x) { return x.id === partnerId; })[0];
+    setNotice("Buy request accepted — pick physical or digital + shipping, then submit to list it for @" + (partner ? partner.username : "") + ".");
+    await loadChatAim();
+  },
+  declineBuyRequest: async function (partnerId, msgId) {
+    var msgs = state.imCache[partnerId] || [];
+    var m = null;
+    for (var i = 0; i < msgs.length; i++) { if (msgs[i].id === msgId) { m = msgs[i]; break; } }
+    var parsed = m ? parseBuyRequest(m.body) : null;
+    if (!parsed) { setNotice("Couldn't read that request — ask them to send it again."); return; }
+    var data = await apiPost("/private-sale-requests/" + parsed.id + "/respond", { device_id: deviceId(), action: "decline" });
+    if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't decline that request."); return; }
+    state.buyReqHandled = state.buyReqHandled || {};
+    state.buyReqHandled[partnerId + ":" + msgId] = "declined";
+    setNotice("Declined — they got a message. Nothing was charged.");
+    await loadChatAim();
   },
   // Message icon on a listing — opens a private DM to that seller
   // (never the public live chat), carrying the listing along so the
@@ -10828,7 +11130,7 @@ window.DWC = {
   // button, the long-hold (mobile), and the drag-to-trash (desktop)
   // all come here, and all ask first — a gesture never deletes
   // silently. If the photo was published, the stored copy is deleted
-  // too, and the "N of 20" count refreshes.
+  // too, and the "N of 3" count refreshes.
   phoneGalleryDel: async function (i) {
     DWC.phoneGalleryLongEnd(); // a pending long-hold must not fire after a ✕ tap
     var it = state.phoneGallery[i];
@@ -10864,7 +11166,7 @@ window.DWC = {
     if (!state.profile) { state.galleryStoredCount = null; return; }
     try {
       // GET needs profile_id (the owner sees all rows, so total counts
-      // every stored photo — exactly what the 20-photo cap counts).
+      // every stored photo — exactly what the 3-photo cap counts).
       var data = await apiGet("/gallery?profile_id=" + state.profile.id + "&device_id=" + encodeURIComponent(deviceId()));
       var n = data && data.ok ? data.total : null;
       if (n == null && data && Array.isArray(data.photos)) n = data.photos.length;
@@ -10938,13 +11240,15 @@ window.DWC = {
       var av = document.querySelector(".dwc-avatar");
       if (av && av.tagName === "IMG") av.src = avatarUrl;
     }
-    setNotice("🖼️ That's your profile picture now.");
+    setNotice(data.visibility_coerced ? "🖼️ That's your profile picture now. Its visibility is Members now — a profile picture can only be Friends or Members." : "🖼️ That's your profile picture now.");
   },
   // Gallery visibility (v3.21) — per photo: Private / Public / Friends.
   // Private is session-only (nothing uploaded). Public / Friends upload
   // the photo (or update the one already up) and show a clear uploading
   // state while the file goes up — the candy loader + "Uploading…" text
-  // so you can tell when it finished.
+  // so you can tell when it finished. NOTE: this session Private is NOT
+  // the stored Private level (owner-only on the profile) — stored
+  // Members / Private are set in the picture viewer, not here.
   phoneGallerySetVisibility: async function (i, vis) {
     var it = state.phoneGallery[i];
     if (!it || !state.profile) return;
@@ -10985,6 +11289,12 @@ window.DWC = {
     var it = state.phoneGallery[i];
     if (!it || !state.profile) return;
     vis = vis === "friends" ? "friends" : "public";
+    // 3 photos total on a profile for now — the server refuses the 4th
+    // anyway; say so before the upload starts when the count is known.
+    if (state.galleryStoredCount != null && state.galleryStoredCount >= 3) {
+      setNotice("You already have 3 photos saved — delete one from your profile first.");
+      return;
+    }
     var m = /^data:([^;]+);base64,(.+)$/.exec(it.url || "");
     if (!m) { setNotice("That photo couldn't be read — add it again."); return; }
     it.uploading = true;

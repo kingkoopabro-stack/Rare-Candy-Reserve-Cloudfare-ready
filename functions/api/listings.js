@@ -215,6 +215,17 @@ export async function onRequestPost({ env, request }) {
       a.gif_url ? String(a.gif_url).slice(0, 500) : null,
       vs.slice(0, 40), String(a.verification_summary || "").slice(0, 800), now, now).run();
   }
+  // Buy request (DM): if this private sale answers one, close the loop
+  // — the request becomes 'listed' with the new listing attached, so
+  // the buyer sees it as done. Silent if the requests table isn't
+  // there yet (then no request could exist to link).
+  if (isPrivate && a.private_sale_request_id != null) {
+    try {
+      await db.prepare(
+        "UPDATE private_sale_requests SET status = 'listed', listing_id = ?, updated_at = ? WHERE id = ? AND seller_id = ? AND buyer_id = ? AND status IN ('open', 'accepted')",
+      ).bind(r.meta.last_row_id, now, Number(a.private_sale_request_id), me.id, privateBuyerId).run();
+    } catch { /* requests table not there yet — nothing to link */ }
+  }
   // Lucre (v3.11) — 10 for putting up a listing, once per listing.
   const lw = await awardLucre(db, me.id, LUCRE_AWARDS.listing, "listing", String(r.meta.last_row_id));
   const out = { ok: true, error: null, listing_id: r.meta.last_row_id };

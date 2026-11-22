@@ -177,6 +177,37 @@ export async function createNotification(db, n) {
   } catch { /* notifications table not there yet — skip quietly */ }
 }
 
+// DMs live one day (same TTL the POST /direct-messages endpoint uses).
+export const DM_TTL_MS = 24 * 60 * 60 * 1000;
+
+// sendDM writes a 1:1 DM from the server — request notices,
+// accept/decline follow-ups — the same rows the POST /direct-messages
+// endpoint writes: the message itself (24h expiry) + the "message"
+// notification. Falls back to a no-expiry insert when the
+// chat-attachments migration hasn't run yet, exactly like that
+// endpoint does, so a missing column can never break the notice.
+export async function sendDM(db, from, toId, body) {
+  const now = nowMs();
+  let r;
+  try {
+    r = await db.prepare(
+      "INSERT INTO direct_messages (sender_id, recipient_id, body, is_read, created_at, attachment_key, attachment_name, attachment_mime, attachment_size, expires_at) VALUES (?, ?, ?, 0, ?, NULL, '', '', 0, ?)",
+    ).bind(from.id, toId, body, now, now + DM_TTL_MS).run();
+  } catch (e) {
+    if (!/no such column/i.test(String((e && e.message) || e))) throw e;
+    r = await db.prepare(
+      "INSERT INTO direct_messages (sender_id, recipient_id, body, is_read, created_at) VALUES (?, ?, ?, 0, ?)",
+    ).bind(from.id, toId, body, now).run();
+  }
+  await createNotification(db, {
+    profile_id: toId, actor_profile_id: from.id, kind: "message",
+    ref_type: "direct_message", ref_id: r.meta.last_row_id,
+    text: `@${from.username} sent you a message`,
+    link: `#/member/${from.id}`,
+  });
+  return r.meta.last_row_id;
+}
+
 // notifyMentions scans a body for @username mentions and notifies each
 // matching profile (once each, never the author). Simple scan: @ followed
 // by the username characters the signup form allows. Returns the set of

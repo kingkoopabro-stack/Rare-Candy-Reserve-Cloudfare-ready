@@ -10,7 +10,7 @@
 //   public / friends / private (default public).
 // DELETE /api/profile-comments?id=&device_id= — the page owner, the
 //   author, or the operator can delete a comment.
-import { json, noDb, getDb, readJson, profileByDevice, roleOf, canDeleteContent, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles, commentReactionCounts, silenceCheck, bannedMemberCheck } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, roleOf, canDeleteContent, isOperator, adultCreatorIds, putImage, imageUrl, iso, nowMs, createNotification, notifyMentions, badgesForProfiles, commentReactionCounts, silenceCheck, bannedMemberCheck } from "./_lib.js";
 
 async function isFriendOf(db, viewerId, ownerId) {
   if (!viewerId || viewerId === ownerId) return viewerId === ownerId;
@@ -38,6 +38,14 @@ export async function onRequestGet({ env, request }) {
   const viewer = deviceId ? await profileByDevice(db, deviceId) : null;
   const owner = await db.prepare("SELECT id FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
   if (!owner) return json({ ok: false, error: "That page doesn't exist.", comments: [] });
+  // 18+ containment (2026-11-21): comments on an adult creator's page
+  // or pictures are 18+ content — only the owner, the operator, or a
+  // signed-in + ID-verified member sees them. Guests and non-verified
+  // members get nothing (same gate as the profile page).
+  const pageIsAdult = (await adultCreatorIds(db, [profileId])).has(profileId);
+  if (pageIsAdult && !(viewer && (viewer.id === profileId || isOperator(env, viewer) || viewer.age_verified === 1))) {
+    return json({ ok: true, comments: [], is_owner: false, can_comment: false });
+  }
   // v3.9 — subject: which picture a comment belongs to ("avatar",
   // "gallery:<id>"). Empty/missing = the page itself (existing behavior).
   const subject = String(url.searchParams.get("subject") || "").trim().slice(0, 40);
@@ -100,6 +108,13 @@ export async function onRequestPost({ env, request }) {
   if (!profileId) return json({ ok: false, error: "Pick a page first." });
   const owner = await db.prepare("SELECT id FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
   if (!owner) return json({ ok: false, error: "That page doesn't exist." });
+  // 18+ containment (2026-11-21): only the owner, the operator, or a
+  // signed-in + ID-verified member comments on an adult creator's page
+  // or pictures — same rule as post comments on adult posts.
+  const pageIsAdult = (await adultCreatorIds(db, [profileId])).has(profileId);
+  if (pageIsAdult && me.id !== profileId && !isOperator(env, me) && me.age_verified !== 1) {
+    return json({ ok: false, error: "That page is 18+ — verify your age with a photo ID first." });
+  }
   const isFriend = await isFriendOf(db, me.id, profileId);
   if (me.id !== profileId && !isFriend) {
     return json({ ok: false, error: "Add them as a friend first — only friends can leave page comments." });

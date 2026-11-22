@@ -1,12 +1,22 @@
 // GET /api/listings/:id/comments — listListingComments (oldest first).
 // POST /api/listings/:id/comments — addListingComment (when the poster left
 // comments on; optional GIF).
-import { json, noDb, getDb, readJson, profileByDevice, imageUrl, nowMs, createNotification, notifyMentions, awardLucre, LUCRE_AWARDS, commentReactionCounts, silenceCheck, bannedMemberCheck } from "../../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, imageUrl, nowMs, createNotification, notifyMentions, awardLucre, LUCRE_AWARDS, commentReactionCounts, silenceCheck, bannedMemberCheck } from "../../_lib.js";
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
   if (!db) return noDb();
   const id = Number(params.id);
+  // 18+ containment (2026-11-21): comments on an adult listing are 18+
+  // content — only the seller, the operator, or a signed-in +
+  // ID-verified member sees them. The single-listing read gates the
+  // listing itself the same way; this closes the direct endpoint.
+  const l = await db.prepare("SELECT is_adult, profile_id FROM listings WHERE id = ? LIMIT 1").bind(id).first();
+  if (l?.is_adult === 1) {
+    const deviceId = new URL(request.url).searchParams.get("device_id") || "";
+    const me = deviceId ? await profileByDevice(db, deviceId) : null;
+    if (!me || (me.id !== l.profile_id && !isOperator(env, me) && me.age_verified !== 1)) return json({ comments: [] });
+  }
   const { results } = await db.prepare(
     `SELECT c.*, a.id AS author_id, a.username AS author_username, a.avatar_blob_key AS author_avatar
      FROM listing_comments c JOIN profiles a ON a.id = c.profile_id WHERE c.listing_id = ? ORDER BY c.id ASC`,
@@ -41,8 +51,11 @@ export async function onRequestPost({ env, request, params }) {
   const body = String(a.body || "").trim().slice(0, 2000);
   if (!body && !a.gif_url) return fail("Write something or pick a GIF.");
   const id = Number(params.id);
-  const l = await db.prepare("SELECT id, profile_id, allow_comments FROM listings WHERE id = ? LIMIT 1").bind(id).first();
+  const l = await db.prepare("SELECT id, profile_id, allow_comments, is_adult FROM listings WHERE id = ? LIMIT 1").bind(id).first();
   if (!l) return fail("That listing is gone.");
+  // 18+ containment (2026-11-21): only the seller, the operator, or a
+  // signed-in + ID-verified member comments on an adult listing.
+  if (l.is_adult === 1 && me.id !== l.profile_id && !isOperator(env, me) && me.age_verified !== 1) return fail("That listing is 18+ — verify your age with a photo ID first.");
   if (l.allow_comments !== 1) return fail("The poster turned comments off for this one.");
   const r = await db.prepare(
     "INSERT INTO listing_comments (listing_id, profile_id, body, gif_url, gif_label, created_at) VALUES (?, ?, ?, ?, ?, ?)",

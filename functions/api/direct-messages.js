@@ -95,13 +95,30 @@ export async function onRequestGet({ env, request }) {
     // Auto-delete: never return a message past its day. The lazy purge
     // below also deletes the attached file blobs for this thread.
     await purgeExpiredBlobs(env, db, me.id, withId);
-    const { results } = await db.prepare(
-      `SELECT dm.*, s.username AS sender_username FROM direct_messages dm
-       JOIN profiles s ON s.id = dm.sender_id
-       WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
-         AND (dm.expires_at IS NULL OR dm.expires_at > ?)
-       ORDER BY dm.id ASC LIMIT 100`,
-    ).bind(me.id, withId, withId, me.id, nowMs()).all();
+    // The expiry filter needs the chat-attachments migration
+    // (expires_at on direct_messages). If it hasn't run yet, load the
+    // thread without the filter rather than failing the whole
+    // conversation — a missing column used to leave the DM stuck on
+    // "Loading…" forever. Run
+    // chat-attachments-autodelete-migration.sql and the filter applies.
+    let results;
+    try {
+      ({ results } = await db.prepare(
+        `SELECT dm.*, s.username AS sender_username FROM direct_messages dm
+         JOIN profiles s ON s.id = dm.sender_id
+         WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
+           AND (dm.expires_at IS NULL OR dm.expires_at > ?)
+         ORDER BY dm.id ASC LIMIT 100`,
+      ).bind(me.id, withId, withId, me.id, nowMs()).all());
+    } catch (e) {
+      if (!/no such column/i.test(String((e && e.message) || e))) throw e;
+      ({ results } = await db.prepare(
+        `SELECT dm.*, s.username AS sender_username FROM direct_messages dm
+         JOIN profiles s ON s.id = dm.sender_id
+         WHERE ((dm.sender_id = ? AND dm.recipient_id = ?) OR (dm.sender_id = ? AND dm.recipient_id = ?))
+         ORDER BY dm.id ASC LIMIT 100`,
+      ).bind(me.id, withId, withId, me.id).all());
+    }
     await db.prepare(
       "UPDATE direct_messages SET is_read = 1 WHERE sender_id = ? AND recipient_id = ? AND is_read = 0",
     ).bind(withId, me.id).run();

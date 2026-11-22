@@ -201,8 +201,14 @@ footer.site{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--mut
 .foot-links{display:flex;justify-content:center;align-items:center;gap:28px;flex-wrap:wrap}
 .foot-links a{display:inline-flex;align-items:center;gap:7px}
 .foot-bottom p{margin:10px 0}
-.follow-row{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px}
-.follow-row a{display:inline-flex;align-items:center;gap:7px;text-decoration:none;font-weight:800;font-size:14px;color:var(--ink);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:9px 15px}
+.follow-row{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px;justify-content:center}
+/* Compact streaming chips (2026-11-22) — a lot smaller than the old
+   pills (12.5px type, tight padding, uniform widths so a row reads as
+   one neat symmetrical line), but floored at a 44px tap target so
+   they stay easy to tap: the shrink is in type/padding/width, never
+   in height below a comfortable tap size. */
+.follow-row a{flex:1 1 120px;max-width:170px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:800;font-size:12.5px;color:var(--ink);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;text-align:center}
+.stream-line{margin:10px 0 8px;font-weight:700;color:var(--ink);text-align:center}
 .follow-row a:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.3)}
 .follow-row a.hot{border-color:var(--pink);background:linear-gradient(90deg,rgba(255,45,149,.22),rgba(0,229,255,.14))}
 .follow-label{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
@@ -1378,6 +1384,22 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-search-list a span{font-size:12px;color:var(--muted)}
 .dwc-search-hint{margin:8px 0;font-size:13px;color:var(--muted)}
 
+/* Mobile search fix (2026-11-22) — the bar went off-screen on phones:
+   the field is 280px wide anchored (right:0) to the search button, and
+   the button lives under the logo, whose right edge sits only ~210px
+   from the screen's left edge once the logo shrinks to 17px — so the
+   field spilled ~70px off the LEFT edge, and dropped down over the nav
+   links below it. On phones the wrap goes static so the field anchors
+   to the sticky header instead, and spans the full width below it:
+   left/right 12px, never wider than the screen, never over the nav.
+   Placed AFTER the base search rules on purpose — same specificity,
+   so later in the file wins over width:280px / right:0 above. */
+@media (max-width:640px){
+  .dwc-search-wrap{position:static}
+  .dwc-search-field{left:12px;right:12px;top:calc(100% + 6px);width:auto;max-width:none}
+  .dwc-search-results{max-height:55vh}
+}
+
 /* Feed intro + plain-language hint so a new member knows where
    their post goes and how the feed works. */
 .dwc-feed-intro{margin:0 0 10px}
@@ -1555,3 +1577,99 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 /* Member shops — the relative wrapper a listing photo needs so the
    watermark overlay (.dwc-wm, absolute) sits on top of it. */
 .dwc-listing-photo{position:relative;overflow:hidden}
+
+/* Creator menu + content vault (2026-11-21) — client side only. */
+/* Profile menu rows ("What is on sale, click to buy"). */
+.dwc-menu-row{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0;cursor:pointer;font:inherit;color:inherit}
+.dwc-menu-row:hover{border-color:var(--pink)}
+.dwc-menu-title{font-weight:700}
+.dwc-menu-summary{color:var(--muted);font-size:13px}
+.dwc-menu-price{font-weight:800;color:var(--green);margin-left:auto}
+.dwc-menu-pay{font-size:12px;color:var(--muted)}
+.dwc-menu-kind{font-size:12px;color:var(--muted);width:100%}
+.dwc-menu-paychip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin-right:4px;font-size:12px}
+/* Transactions queue — the red/green paid lights. */
+.dwc-tx-dot{font-size:16px;line-height:1}
+.dwc-tx-green{color:#22c55e}
+.dwc-tx-red{color:#ff3b30}
+.dwc-tx-manual{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+/* DM "Request" card + the inbox "Request" badge. */
+.dwc-req-card{border:1px solid var(--line);border-left:4px solid var(--pink);border-radius:10px;padding:10px 12px;margin:8px 0;background:var(--panel)}
+.dwc-req-badge{display:inline-block;background:var(--pink);color:#fff;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;margin-left:6px}
+/* "My stuff" — quota meter + rows (phone app, dark screen). */
+.dwc-quota-bar{height:10px;border-radius:999px;background:rgba(255,255,255,.25);overflow:hidden}
+.dwc-quota-fill{height:100%;background:#39ff88}
+.dwc-quota-fill.full{background:#ff3b30}
+.dwc-mystuff-row{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;border-top:1px solid rgba(255,255,255,.2);padding:10px 0}
+.tp-icon-mystuff{background:linear-gradient(135deg,#ff2ea6,#7c4dff)}
+.tp-icon-mystuff img{width:100%;height:100%;object-fit:cover;display:block}
+/* "My stuff" full-screen viewer — the picture viewer pattern, images
+   fill the screen, video plays full-screen. */
+.dwc-mystuff-view{position:fixed;inset:0;background:#000;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.dwc-mystuff-view img,.dwc-mystuff-view video{max-width:100%;max-height:100%;object-fit:contain}
+/* Find package rows under a matching member card. */
+.dwc-find-pkg{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:6px 0;cursor:pointer;font:inherit;color:inherit}
+.dwc-find-pkg:hover{border-color:var(--pink)}
+
+/* ---------- Edit Profile simplification (v3.21) ---------- */
+/* Sticky save bar — always visible at the top of the form, far right,
+   small type. It sticks at the viewport top (above the site header
+   while you scroll) so Save is never a scroll away. */
+.dwc-sticky-save{position:sticky;top:0;z-index:60;display:flex;justify-content:flex-end;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 12px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.dwc-sticky-save-btn{font-size:13px;padding:7px 14px}
+#dwc-sticky-dirty{font-size:13px;color:var(--amber)}
+/* Group headings — one per part of the page the section changes. */
+.dwc-edit-group-h{margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--line);font-size:17px}
+/* Settings search — browser-Find behavior; the hit is outlined, never hidden. */
+.dwc-setting-search{display:flex;gap:8px;align-items:center;margin:0 0 12px}
+.dwc-setting-search input{flex:1;min-width:0}
+.dwc-search-hit{outline:3px solid var(--pink);outline-offset:2px;border-radius:6px}
+/* Taffy's scroll picker. */
+.dwc-scrollbox{border-color:var(--amber)}
+#dwc-scroll-preview .dwc-layout-mini{margin-top:6px}
+/* Profile GIF starter gallery. */
+.dwc-gif-group{font-weight:700;margin:10px 0 4px;font-size:14px}
+.dwc-gif-gallery{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.dwc-gif-thumb{padding:0;border:2px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer;background:var(--panel)}
+.dwc-gif-thumb img{display:block;width:96px;height:72px;object-fit:cover}
+.dwc-gif-thumb.active{border-color:var(--pink)}
+/* One-box profile — the profile page is ONE box, like MySpace: the
+   container carries the background/border, and the sections inside it
+   sit flush, divided by hairlines instead of floating as separate
+   cards. Layout CSS comes later in the document at equal specificity,
+   so any layout that styles .card still wins over these base rules. */
+.dwc-onebox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.dwc-onebox .card{background:transparent;border:0;border-radius:0;box-shadow:none;padding:18px 0;margin:0}
+.dwc-onebox .card:first-child{padding-top:0}
+.dwc-onebox .card + .card{border-top:1px solid var(--line)}
+/* Page-sound players — soundscape or SteadyWave Radio, one grouped pick. */
+.dwc-player{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+.dwc-player-btn{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--pink);color:#fff;font-size:18px;cursor:pointer}
+.dwc-player-name{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dwc-player-badge{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:14px}
+/* Cassette tapes — three colors; the reels spin while it plays. */
+.dwc-cassette{padding:12px}
+.dwc-cassette-pink{background:linear-gradient(135deg,#ff5da2,#ff2d95)}
+.dwc-cassette-cyan{background:linear-gradient(135deg,#22d3ee,#0ea5e9)}
+.dwc-cassette-gold{background:linear-gradient(135deg,#f5d76e,#d4af37)}
+.dwc-cassette-tape{display:flex;align-items:center;gap:10px;flex:1;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.55);border-radius:8px;padding:10px 12px;cursor:pointer;color:#fff;font:inherit}
+.dwc-cassette-reel{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:#111;border:3px solid #eee;position:relative}
+.dwc-cassette-reel::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;background:#eee;border-radius:50%}
+.dwc-playing .dwc-cassette-reel{animation:dwcReel 1.2s linear infinite}
+@keyframes dwcReel{to{transform:rotate(360deg)}}
+.dwc-cassette-window{flex:1;background:rgba(255,255,255,.85);border-radius:4px;padding:4px 8px;color:#222;text-align:center}
+.dwc-cassette-label{font-weight:700;font-size:13px}
+/* Vinyl — wooden player, top view; the record spins while it plays. */
+.dwc-vinyl-wood{background:linear-gradient(135deg,#8b5a2b,#5d3a1a);border-radius:12px;padding:14px;position:relative;flex:1;display:flex;justify-content:center}
+.dwc-vinyl-record{width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,#111 0 30%,#222 31% 60%,#111 61%);border:2px solid #000;position:relative;display:flex;align-items:center;justify-content:center}
+.dwc-vinyl-record::after{content:"";position:absolute;inset:18px;border-radius:50%;border:1px solid rgba(255,255,255,.14)}
+.dwc-vinyl-tag{background:#ff2d95;color:#fff;font-size:11px;font-weight:700;border-radius:999px;padding:3px 8px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dwc-playing .dwc-vinyl-record{animation:dwcReel 3s linear infinite}
+.dwc-vinyl-arm{position:absolute;right:22px;top:14px;width:56px;height:8px;background:#c0c0c0;border-radius:4px;transform:rotate(28deg);transform-origin:right center}
+/* Visualizer — real waveform bars from the playing audio (Web Audio analyser). */
+.dwc-viz-canvas{width:100%;max-width:320px;height:72px;background:#0a0a12;border-radius:8px;display:block}
+.dwc-viz-static{display:flex;align-items:flex-end;gap:3px;height:72px;padding:6px 8px;background:#0a0a12;border-radius:8px}
+.dwc-viz-static span{flex:1;background:#ff2d95;border-radius:2px}
+/* Image/GIF player — the picture IS the play/pause control, and a
+   profile GIF is never more than a quarter of the page (Chris's rule). */
+.dwc-player-image img{display:block;max-width:25%;height:auto;border-radius:10px;cursor:pointer}

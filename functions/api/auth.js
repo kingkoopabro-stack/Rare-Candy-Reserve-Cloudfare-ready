@@ -1,0 +1,335 @@
+// Password auth (2026-11-22) — the Community's real sign-in.
+// POST /api/auth — one endpoint, dispatched on body.action:
+//   signin             { login, password } -> { device_id } (the session
+//                      key; the password gates its issue, nothing else)
+//   set-password       { device_id, current_password?, new_password }
+//                      signed-in members set (or change) their password
+//   request-reset      { login } -> ALWAYS the same reply, whether the
+//                      account exists or not (no existence leaks)
+//   reset-password     { token, new_password } — single-use, 1h link
+//   set-recovery-email { device_id, email } — new address must be
+//                      verified before it replaces the old one
+//   verify-email       { token } — confirms a pending recovery email
+//   request-recovery   { username, contact, message } — public; notifies
+//                      the operator, who verifies out-of-band
+//   list-recovery      { device_id } — operator only: pending requests
+//   issue-recovery     { device_id, request_id } — operator only: mints
+//                      a one-time recovery code, shown ONCE to the
+//                      operator, who sends it to the member privately
+//   use-recovery       { code, new_password } — burns the code, sets the
+//                      password
+// Passwords live in D1 as PBKDF2-SHA256 hashes + per-user salts only
+// (see _auth.js). Tokens live as SHA-256 hashes only. Nothing here ever
+// returns or logs a password, a token, or a device id except signin's
+// own session key to the member who just proved the password.
+// Reset / verify emails queue through notifications_outbound
+// ("waiting_provider") — the site sends NO email until Chris connects a
+// provider (Resend). The member still gets the in-app notice either way.
+// 2FA is a follow-up, deliberately NOT built here.
+import {
+  json, noDb, getDb, readJson, profileByDevice, isOperator,
+  createNotification, queueOutbound, nowMs,
+} from "./_lib.js";
+import {
+  hashPassword, verifyPassword, checkPasswordStrength, isValidEmail,
+  issueToken, consumeToken, invalidateTokens, checkRateLimit, hasAuthColumns,
+  RESET_TOKEN_TTL_MS, VERIFY_TOKEN_TTL_MS, RECOVERY_CODE_TTL_MS,
+  LOCKOUT_AFTER_FAILURES, LOCKOUT_MS,
+} from "./_auth.js";
+
+// Fixed dummy hash/salt so a sign-in for an account that doesn't exist
+// (or never set a password) still costs one PBKDF2 round — timing alone
+// can't tell an attacker the account isn't there.
+const DUMMY_HASH = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+const DUMMY_SALT = "AAAAAAAAAAAAAAAAAAAAAA==";
+
+const GENERIC_SIGNIN_ERROR = "That username/email or password didn't match — check both and try again.";
+const GENERIC_RESET_REPLY = "If an account uses that email or username, a reset link is on its way.";
+const EMAIL_NOT_CONNECTED_NOTE = " Email sending isn't connected yet, so it may take a while to arrive — the request is queued and will go out once the shop connects it.";
+
+function fail(error) { return json({ ok: false, error }); }
+
+async function findByLogin(db, login) {
+  const value = String(login || "").trim();
+  if (!value) return null;
+  let row = null;
+  try {
+    row = await db.prepare("SELECT * FROM profiles WHERE username = ? COLLATE NOCASE LIMIT 1").bind(value).first();
+  } catch { /* pre-migration table shape — fall through */ }
+  if (row) return row;
+  if (value.includes("@")) {
+    try {
+      row = await db.prepare("SELECT * FROM profiles WHERE recovery_email = ? COLLATE NOCASE AND recovery_email_verified = 1 LIMIT 1").bind(value).first();
+    } catch { /* recovery columns not there yet */ }
+  }
+  return row || null;
+}
+
+function resetLinkFor(request, token) {
+  return `${new URL(request.url).origin}/forgot-password.html?token=${encodeURIComponent(token)}`;
+}
+function verifyLinkFor(request, token) {
+  return `${new URL(request.url).origin}/forgot-password.html?verify=${encodeURIComponent(token)}`;
+}
+
+export async function onRequestPost({ env, request }) {
+  const db = getDb(env);
+  if (!db) return noDb();
+  const a = await readJson(request);
+  const action = String(a.action || "");
+  const now = nowMs();
+
+  // Everything below needs the password-auth migration. One clean error
+  // instead of a crash, so the site keeps working pre-migration.
+  if (!(await hasAuthColumns(db))) {
+    return fail("Password sign-in isn't set up yet — the shop is still running the database update. Try again once that's done.");
+  }
+
+  // --- signin ---------------------------------------------------------------
+  if (action === "signin") {
+    const login = String(a.login || "").trim();
+    const password = String(a.password || "");
+    if (!login || !password) return fail(GENERIC_SIGNIN_ERROR);
+    const rl = await checkRateLimit(db, "signin:" + login.toLowerCase(), 10, 15 * 60 * 1000);
+    if (!rl.allowed) return json({ ok: false, error: "Too many sign-in tries — wait a few minutes and try again." }, 429);
+    const profile = await findByLogin(db, login);
+    if (!profile || !profile.password_hash) {
+      // Dummy round: same cost, same reply, no existence leak.
+      await verifyPassword(password, DUMMY_HASH, DUMMY_SALT);
+      return fail(GENERIC_SIGNIN_ERROR);
+    }
+    if (profile.locked_until && now < profile.locked_until) {
+      return json({ ok: false, error: "Too many wrong tries — this account is locked for a few minutes. Try again shortly, or reset your password." }, 429);
+    }
+    const good = await verifyPassword(password, profile.password_hash, profile.password_salt);
+    if (!good) {
+      const fails = Number(profile.failed_login_attempts || 0) + 1;
+      const lockedUntil = fails >= LOCKOUT_AFTER_FAILURES ? now + LOCKOUT_MS : (profile.locked_until || null);
+      try {
+        await db.prepare("UPDATE profiles SET failed_login_attempts = ?, locked_until = ? WHERE id = ?").bind(fails, lockedUntil, profile.id).run();
+      } catch { /* counters not there yet — the error below still applies */ }
+      if (fails >= LOCKOUT_AFTER_FAILURES) {
+        return json({ ok: false, error: "Too many wrong tries — this account is locked for 15 minutes. Try again shortly, or reset your password." }, 429);
+      }
+      return fail(GENERIC_SIGNIN_ERROR);
+    }
+    try {
+      await db.prepare("UPDATE profiles SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?").bind(profile.id).run();
+    } catch { /* best effort */ }
+    return json({ ok: true, device_id: profile.device_id, username: profile.username });
+  }
+
+  // --- set-password (signed in, via the session device id) -------------------
+  if (action === "set-password") {
+    const me = await profileByDevice(db, String(a.device_id || ""));
+    if (!me) return fail("Sign in first — then you can set a password.");
+    const strengthError = checkPasswordStrength(a.new_password);
+    if (strengthError) return fail(strengthError);
+    if (me.password_hash) {
+      if (!(await verifyPassword(String(a.current_password || ""), me.password_hash, me.password_salt))) {
+        return fail("That current password didn't match.");
+      }
+    }
+    const { hash, salt } = await hashPassword(a.new_password);
+    await db.prepare(
+      "UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
+    ).bind(hash, salt, now, me.id).run();
+    await invalidateTokens(db, me.id, ["reset", "recovery"]);
+    await createNotification(db, {
+      profile_id: me.id, actor_profile_id: null, kind: "password_changed",
+      ref_type: "profile", ref_id: me.id,
+      text: "Your password was changed. If that wasn't you, reset it right away or ask Chris for help.",
+      link: "#/member/" + me.id,
+    });
+    return json({ ok: true, message: "Password saved — that's how you sign in from now on." });
+  }
+
+  // --- request-reset (identical reply whether the account exists or not) -----
+  if (action === "request-reset") {
+    const login = String(a.login || "").trim();
+    if (!login) return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+    const rl = await checkRateLimit(db, "reset:" + login.toLowerCase(), 3, 60 * 60 * 1000);
+    if (!rl.allowed) return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+    const profile = await findByLogin(db, login);
+    if (profile && profile.recovery_email_verified === 1 && profile.recovery_email) {
+      const token = await issueToken(db, profile.id, "reset", RESET_TOKEN_TTL_MS, "");
+      const link = resetLinkFor(request, token);
+      await queueOutbound(db, profile.id, "email", "password_reset",
+        "Reset your Rare Candy Reserve password",
+        `Someone asked to reset the password for @${profile.username}. Use this link once within 1 hour — after that it stops working:\n\n${link}\n\nIf that wasn't you, ignore this email. Your old password still works until a reset goes through.`);
+      await createNotification(db, {
+        profile_id: profile.id, actor_profile_id: null, kind: "password_reset",
+        ref_type: "profile", ref_id: profile.id,
+        text: "A password reset was requested for your account. If that wasn't you, ignore it — your old password still works.",
+        link: "#/member/" + profile.id,
+      });
+    } else if (profile) {
+      // Account exists but no verified recovery email: nothing to send
+      // to — tell them in-app so they can fix it, still no leak outside.
+      await createNotification(db, {
+        profile_id: profile.id, actor_profile_id: null, kind: "password_reset",
+        ref_type: "profile", ref_id: profile.id,
+        text: "Someone asked to reset your password, but you have no verified recovery email — add one in Edit profile so resets can reach you.",
+        link: "#/member/" + profile.id,
+      });
+    }
+    return json({ ok: true, message: GENERIC_RESET_REPLY + EMAIL_NOT_CONNECTED_NOTE });
+  }
+
+  // --- reset-password (single-use, 1h token) ----------------------------------
+  if (action === "reset-password") {
+    const strengthError = checkPasswordStrength(a.new_password);
+    if (strengthError) return fail(strengthError);
+    const row = await consumeToken(db, "reset", a.token);
+    if (!row) return fail("That reset link didn't work — it may have expired or already been used. Ask for a fresh one.");
+    const profile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(row.profile_id).first();
+    if (!profile) return fail("That reset link didn't work — it may have expired or already been used. Ask for a fresh one.");
+    const { hash, salt } = await hashPassword(a.new_password);
+    await db.prepare(
+      "UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
+    ).bind(hash, salt, now, profile.id).run();
+    await invalidateTokens(db, profile.id, ["reset", "recovery"]);
+    await createNotification(db, {
+      profile_id: profile.id, actor_profile_id: null, kind: "password_changed",
+      ref_type: "profile", ref_id: profile.id,
+      text: "Your password was reset. If that wasn't you, tell Chris right away.",
+      link: "#/member/" + profile.id,
+    });
+    if (profile.recovery_email_verified === 1 && profile.recovery_email) {
+      await queueOutbound(db, profile.id, "email", "password_changed",
+        "Your Rare Candy Reserve password was changed",
+        `The password for @${profile.username} was just changed. If that was you, nothing to do. If it wasn't, ask Chris for account recovery right away.`);
+    }
+    return json({ ok: true, message: "Password reset — sign in with your new password." });
+  }
+
+  // --- set-recovery-email (new address verified before it replaces the old) --
+  if (action === "set-recovery-email") {
+    const me = await profileByDevice(db, String(a.device_id || ""));
+    if (!me) return fail("Sign in first — then you can set a recovery email.");
+    const email = String(a.email || "").trim().toLowerCase();
+    if (!isValidEmail(email)) return fail("That doesn't look like an email address.");
+    if (me.recovery_email_verified === 1 && me.recovery_email === email) {
+      return json({ ok: true, message: "That email is already verified for your account." });
+    }
+    let clash = null;
+    try { clash = await db.prepare("SELECT id FROM profiles WHERE recovery_email = ? COLLATE NOCASE AND recovery_email_verified = 1 LIMIT 1").bind(email).first(); } catch { clash = null; }
+    if (clash && clash.id !== me.id) return fail("That email is already the verified recovery email for another account.");
+    await db.prepare("UPDATE profiles SET pending_email = ? WHERE id = ?").bind(email, me.id).run();
+    const token = await issueToken(db, me.id, "email_verify", VERIFY_TOKEN_TTL_MS, "");
+    const link = verifyLinkFor(request, token);
+    await queueOutbound(db, me.id, "email", "email_verify",
+      "Verify your Rare Candy Reserve recovery email",
+      `Confirm this email as the recovery address for @${me.username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`);
+    return json({ ok: true, message: "Verification email queued for that address — click the link in it within 24 hours and it becomes your recovery email." + EMAIL_NOT_CONNECTED_NOTE });
+  }
+
+  // --- verify-email ------------------------------------------------------------
+  if (action === "verify-email") {
+    const row = await consumeToken(db, "email_verify", a.token);
+    if (!row) return fail("That verification link didn't work — it may have expired or already been used. Ask for a fresh one from Edit profile.");
+    const profile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(row.profile_id).first();
+    if (!profile || !profile.pending_email) return fail("That verification link didn't work — it may have expired or already been used. Ask for a fresh one from Edit profile.");
+    await db.prepare(
+      "UPDATE profiles SET recovery_email = ?, recovery_email_verified = 1, pending_email = '', email_verified_at = ? WHERE id = ?",
+    ).bind(profile.pending_email, now, profile.id).run();
+    await invalidateTokens(db, profile.id, ["email_verify"]);
+    await createNotification(db, {
+      profile_id: profile.id, actor_profile_id: null, kind: "email_verified",
+      ref_type: "profile", ref_id: profile.id,
+      text: "Your recovery email is verified — you can now reset your password by email if you forget it.",
+      link: "#/member/" + profile.id,
+    });
+    return json({ ok: true, message: "Recovery email verified — password resets can now reach you there." });
+  }
+
+  // --- request-recovery (public; operator verifies out-of-band) ----------------
+  if (action === "request-recovery") {
+    const username = String(a.username || "").trim();
+    const contact = String(a.contact || "").trim().slice(0, 200);
+    const message = String(a.message || "").trim().slice(0, 500);
+    if (!username || !contact) return fail("Leave your username and a way for Chris to reach you.");
+    const rl = await checkRateLimit(db, "recovery:" + username.toLowerCase(), 5, 60 * 60 * 1000);
+    if (!rl.allowed) return json({ ok: true, message: "Thanks — your request is in. Chris will check it and reach you at the contact you left." });
+    const profile = await findByLogin(db, username);
+    if (profile) {
+      try {
+        await db.prepare(
+          "INSERT INTO recovery_requests (profile_id, username, contact, message, status, created_at) VALUES (?, ?, ?, ?, 'pending', ?)",
+        ).bind(profile.id, profile.username, contact, message, now).run();
+      } catch { /* table not there yet — operator still gets nothing; fail soft */ }
+      await createNotification(db, {
+        profile_id: 1, actor_profile_id: profile.id, kind: "recovery_request",
+        ref_type: "recovery", ref_id: profile.id,
+        text: `@${profile.username} asked for account recovery — check the recovery requests in the Admin panel.`,
+        link: "#/admin",
+      });
+    }
+    return json({ ok: true, message: "Thanks — your request is in. Chris will check it and reach you at the contact you left." });
+  }
+
+  // --- list-recovery (operator only) -------------------------------------------
+  if (action === "list-recovery") {
+    const me = await profileByDevice(db, String(a.device_id || ""));
+    if (!me || !isOperator(env, me)) return fail("Operator only.");
+    let rows = [];
+    try {
+      const { results } = await db.prepare(
+        "SELECT id, profile_id, username, contact, message, status, created_at, resolved_at FROM recovery_requests ORDER BY created_at DESC LIMIT 50",
+      ).all();
+      rows = results || [];
+    } catch { rows = []; /* table not there yet */ }
+    return json({ ok: true, requests: rows });
+  }
+
+  // --- issue-recovery (operator only; code shown ONCE) -------------------------
+  if (action === "issue-recovery") {
+    const me = await profileByDevice(db, String(a.device_id || ""));
+    if (!me || !isOperator(env, me)) return fail("Operator only.");
+    const reqId = Number(a.request_id);
+    if (!Number.isInteger(reqId)) return fail("Pick a recovery request first.");
+    let reqRow = null;
+    try {
+      reqRow = await db.prepare("SELECT * FROM recovery_requests WHERE id = ? LIMIT 1").bind(reqId).first();
+    } catch { return fail("Recovery requests aren't set up yet — run the password-auth migration first."); }
+    if (!reqRow) return fail("That recovery request doesn't exist.");
+    if (reqRow.status !== "pending") return fail("That request was already handled.");
+    const profile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(reqRow.profile_id).first();
+    if (!profile) return fail("That account doesn't exist any more.");
+    const code = await issueToken(db, profile.id, "recovery", RECOVERY_CODE_TTL_MS, String(reqRow.id));
+    await db.prepare("UPDATE recovery_requests SET status = 'issued', resolved_at = ?, resolved_by = ? WHERE id = ?").bind(now, me.id, reqRow.id).run();
+    // The code goes to the OPERATOR only, once, in this response — he
+    // sends it to the member privately (DM/text/in person). It is never
+    // emailed by the site and never stored in plaintext.
+    return json({ ok: true, code, username: profile.username, message: "Send this code to the member privately — it works once, for 24 hours, then it's dead." });
+  }
+
+  // --- use-recovery (burns the code, sets the password) ------------------------
+  if (action === "use-recovery") {
+    const strengthError = checkPasswordStrength(a.new_password);
+    if (strengthError) return fail(strengthError);
+    const row = await consumeToken(db, "recovery", a.code);
+    if (!row) return fail("That recovery code didn't work — it may have expired or already been used. Ask Chris for a fresh one.");
+    const profile = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(row.profile_id).first();
+    if (!profile) return fail("That recovery code didn't work — it may have expired or already been used. Ask Chris for a fresh one.");
+    const { hash, salt } = await hashPassword(a.new_password);
+    await db.prepare(
+      "UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
+    ).bind(hash, salt, now, profile.id).run();
+    await invalidateTokens(db, profile.id, ["reset", "recovery"]);
+    if (row.meta) {
+      try {
+        await db.prepare("UPDATE recovery_requests SET status = 'used', resolved_at = ? WHERE id = ?").bind(now, Number(row.meta)).run();
+      } catch { /* best effort */ }
+    }
+    await createNotification(db, {
+      profile_id: profile.id, actor_profile_id: null, kind: "password_changed",
+      ref_type: "profile", ref_id: profile.id,
+      text: "Your password was reset with a recovery code. If that wasn't you, tell Chris right away.",
+      link: "#/member/" + profile.id,
+    });
+    return json({ ok: true, device_id: profile.device_id, username: profile.username, message: "You're back in — sign in with your new password from now on." });
+  }
+
+  return fail("Unknown auth action.");
+}

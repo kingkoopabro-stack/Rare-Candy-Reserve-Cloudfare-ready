@@ -17,9 +17,14 @@ function notSetup() {
 
 function shapeSale(row, full) {
   var s = {
+    id: row.id,
     cs_number: row.cs_number,
     post_id: row.post_id ?? null,
     listing_id: row.listing_id ?? null,
+    // Creator menu / packages (2026-11-21) — what the sale unlocks
+    // in "My stuff" (the post to unblur, the package zip to download).
+    package_id: row.package_id ?? null,
+    menu_item_id: row.menu_item_id ?? null,
     conversation_id: row.conversation_id ?? null,
     item_title: row.item_title ?? "",
     buyer_username: row.buyer_username ?? "",
@@ -50,6 +55,16 @@ export async function onRequestGet({ env, request }) {
       const row = await db.prepare("SELECT * FROM content_sales WHERE cs_number = ? LIMIT 1").bind(cs).first();
       if (!row) return json({ ok: false, error: "No sale with that number yet.", sale: null });
       return json({ ok: true, sale: shapeSale(row, true) });
+    }
+    // Creator vault (2026-11-21) — ?as=seller returns rows where I am
+    // the SELLER (my sales, for the vault view). Same shape, and no
+    // buyer IP is ever exposed to a non-operator — shapeSale(false)
+    // omits it, exactly like the buyer read.
+    if (q.get("as") === "seller") {
+      const { results } = await db.prepare(
+        "SELECT * FROM content_sales WHERE seller_id = ? ORDER BY cs_number DESC LIMIT 100",
+      ).bind(me.id).all();
+      return json({ sales: (results || []).map((r) => shapeSale(r, false)) });
     }
     const { results } = await db.prepare(
       "SELECT * FROM content_sales WHERE buyer_id = ? ORDER BY cs_number DESC LIMIT 100",

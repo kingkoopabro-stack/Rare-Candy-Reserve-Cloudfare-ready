@@ -12,7 +12,12 @@ import {
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
   isFreeDivider, unlockForDivider,
   badgeListFor, cleanDisplayBadges, adultCreatorIds, awardLucre, LUCRE_AWARDS,
+  queueOutbound,
 } from "./_lib.js";
+import {
+  hashPassword, checkPasswordStrength, isValidEmail, issueToken,
+  VERIFY_TOKEN_TTL_MS,
+} from "./_auth.js";
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -80,6 +85,12 @@ export async function onRequestPost({ env, request }) {
     return fail("That username is already taken — try another one.");
   }
 
+  // Password auth (2026-11-22) — new signups set a password during
+  // signup; it's how they sign back in anywhere. Collected here so the
+  // same save stores it; the hash is written after the INSERT below.
+  let signupRecoveryEmail = "";
+  let passwordPending = false;
+  let recoveryEmailPending = false;
   if (!existing) {
     const fullName = String(a.full_name || "").trim();
     if (fullName.length < 2) return fail("Add your full name — one account per person, and name + date of birth is how we keep it that way. Your full name is never shown publicly.");
@@ -93,6 +104,12 @@ export async function onRequestPost({ env, request }) {
       (p) => (p.full_name || "").trim().toLowerCase().replace(/\s+/g, " ") === nameKey && p.birthday === a.birthday,
     );
     if (dupe) return fail("An account already exists for that name + date of birth — one account per person. If that's you, you're already on the street; if you lost access, that's the account to recover, not a new one.");
+    // Password (required at signup) + optional recovery email.
+    const pwError = checkPasswordStrength(a.password);
+    if (pwError) return fail(pwError);
+    if (String(a.password) !== String(a.password_confirm || "")) return fail("Those two passwords don't match — type the same one twice.");
+    signupRecoveryEmail = typeof a.recovery_email === "string" ? String(a.recovery_email).trim().toLowerCase() : "";
+    if (signupRecoveryEmail && !isValidEmail(signupRecoveryEmail)) return fail("That recovery email doesn't look like an email address.");
   }
 
   // v3.4 — avatar: a bad picture must NEVER kill the whole save. If
@@ -218,6 +235,22 @@ export async function onRequestPost({ env, request }) {
   if (typeof a.shop_tagline === "string") {
     v3Sets.push("shop_tagline = ?");
     v3Vals.push(str(a.shop_tagline, 140));
+  }
+  // Creator menu + content vault (2026-11-21) — the "Content sales
+  // enabled" master toggle, near the top of Edit Profile. Rides the
+  // v3 tier, same graceful retry as shop_name. Only an age-verified
+  // member may turn it ON (the toggle does not replace the 18+
+  // badge); anyone may turn it OFF. OFF hides the menu and stops
+  // new sales; it does not delete staged content or cancel
+  // in-flight orders. The toggle state itself is never public —
+  // shapeMember deliberately never carries it.
+  if (typeof a.content_sales_enabled === "boolean" || a.content_sales_enabled === 0 || a.content_sales_enabled === 1) {
+    const want = a.content_sales_enabled === true || a.content_sales_enabled === 1 ? 1 : 0;
+    if (want === 1 && (!existing || existing.age_verified !== 1)) {
+      return fail("Content sales need age verification first — verify your age with a photo ID (Rules & After Dark). A typed birthday alone is never enough.");
+    }
+    v3Sets.push("content_sales_enabled = ?");
+    v3Vals.push(want);
   }
   if (Number.isInteger(a.seller_price_min_cents) || Number.isInteger(a.seller_price_max_cents)) {
     const lo = Number.isInteger(a.seller_price_min_cents) ? Math.max(0, Math.min(a.seller_price_min_cents, 10000000)) : 0;
@@ -554,6 +587,33 @@ export async function onRequestPost({ env, request }) {
       // MySpace-Tom style — already added, they can remove him if they want.
       "1", now, now).run();
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(r.meta.last_row_id).first();
+    // Password auth — hash + store best-effort. If the migration
+    // hasn't run yet the UPDATE throws "no such column" and the account
+    // still gets created; the client is told via password_pending so
+    // the member sets a password in Edit profile once that's done.
+    // A recovery email, if given, goes to pending_email with a verify
+    // token queued the same way reset emails queue (waiting_provider
+    // until an email provider is connected).
+    if (row && a.password) {
+      try {
+        const { hash, salt } = await hashPassword(a.password);
+        await db.prepare("UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ? WHERE id = ?").bind(hash, salt, now, row.id).run();
+      } catch (e) {
+        if (/no such column|no column named/i.test(String((e && e.message) || e))) passwordPending = true;
+        else throw e;
+      }
+    }
+    if (row && signupRecoveryEmail) {
+      try {
+        await db.prepare("UPDATE profiles SET pending_email = ? WHERE id = ?").bind(signupRecoveryEmail, row.id).run();
+        const token = await issueToken(db, row.id, "email_verify", VERIFY_TOKEN_TTL_MS, "");
+        const link = `${new URL(request.url).origin}/forgot-password.html?verify=${encodeURIComponent(token)}`;
+        await queueOutbound(db, row.id, "email", "email_verify",
+          "Verify your Rare Candy Reserve recovery email",
+          `Confirm this email as the recovery address for @${username} — it lets you reset your password if you forget it:\n\n${link}\n\nThe link works for 24 hours. If you didn't ask for this, ignore it.`);
+        recoveryEmailPending = true;
+      } catch { /* columns/table missing — the member can add it later in Edit profile */ }
+    }
   }
   if (!row) return fail("Couldn't save that profile — try again.");
   // Notifications (v3.8) — a brand-new member just joined: tell the
@@ -592,7 +652,7 @@ export async function onRequestPost({ env, request }) {
       if (pc.awarded) lucreOut.profile_complete = pc.balance;
     }
   }
-  const out = { ok: true, error: null, profile: profileOut, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, v40_pending: v40Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError };
+  const out = { ok: true, error: null, profile: profileOut, password_pending: passwordPending, recovery_email_pending: recoveryEmailPending, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, v40_pending: v40Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError };
   if (Object.keys(lucreOut).length) out.lucre = lucreOut;
   return json(out);
 }

@@ -24,6 +24,15 @@ export async function onRequestPost({ env, request, params }) {
   if (!l) return fail("That listing is gone.");
   if (l.status !== "active") return fail("That item already sold.");
   if (l.profile_id === me.id) return fail("You can't buy your own listing.");
+  // Creator menu / packages (2026-11-21, §12.8 build-time check): the
+  // list/single GETs already gate private listings, but the buy
+  // endpoint never did — anyone who guessed the id could pay for a
+  // private sale meant for someone else. Only the designated buyer
+  // can buy a private listing (the operator included: they review
+  // sales, they don't take them).
+  if (l.is_private === 1 && l.private_buyer_id !== me.id) {
+    return fail("That private sale was set up for someone else — only the buyer it was set up for can pay for it.");
+  }
   if (l.kind === "trade") return fail("Trade listings aren't bought — leave a comment on the listing to offer your trade.");
   let amount = l.price_cents;
   if (l.kind === "flea") {
@@ -47,18 +56,29 @@ export async function onRequestPost({ env, request, params }) {
   const listingType = l.listing_type ?? "physical";
   const shipCents = listingType === "digital" ? 0 : Math.round(Number(l.shipping_cents) || 0);
   const now = nowMs();
+  const isNoColumn = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
   let r;
   try {
     r = await db.prepare(
-      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, shipping_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
-    ).bind(id, me.id, l.profile_id, l.title, amount, shipCents, now, now).run();
+      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, shipping_cents, status, created_at, updated_at, package_id) VALUES (?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?, ?)",
+    ).bind(id, me.id, l.profile_id, l.title, amount, shipCents, now, now, l.package_id ?? null).run();
   } catch (e) {
-    // The tax migration hasn't run yet (no shipping_cents on orders) —
-    // save without it; the read side defaults shipping to 0.
-    if (!/no such column|no column named/i.test(String((e && e.message) || e))) throw e;
-    r = await db.prepare(
-      "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
-    ).bind(id, me.id, l.profile_id, l.title, amount, now, now).run();
+    // Missing-column fallbacks, one tier at a time — the tax
+    // migration (shipping_cents) and the creator-menu migration
+    // (package_id) may each be un-run. The CS# log still recovers
+    // the package from the listing row at confirm time, so dropping
+    // the column here never loses the delivery.
+    if (!isNoColumn(e)) throw e;
+    try {
+      r = await db.prepare(
+        "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, shipping_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
+      ).bind(id, me.id, l.profile_id, l.title, amount, shipCents, now, now).run();
+    } catch (e2) {
+      if (!isNoColumn(e2)) throw e2;
+      r = await db.prepare(
+        "INSERT INTO orders (listing_id, buyer_id, seller_id, item_title, amount_cents, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'pending_payment', ?, ?)",
+      ).bind(id, me.id, l.profile_id, l.title, amount, now, now).run();
+    }
   }
   const orderId = r.meta.last_row_id;
   const origin = new URL(request.url).origin;

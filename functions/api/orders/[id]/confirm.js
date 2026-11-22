@@ -27,6 +27,15 @@ export async function onRequestPost({ env, request, params }) {
   }
   if (o.status === "shipped") {
     await db.prepare("UPDATE orders SET status = 'delivered', updated_at = ? WHERE id = ?").bind(now, id).run();
+    // Creator menu (2026-11-21): a delivered menu order completes
+    // its custom request too (requested → accepted → paid →
+    // delivered → completed). Best-effort — a missing requests table
+    // just means no request could exist.
+    try {
+      if (o.menu_item_id) {
+        await db.prepare("UPDATE creator_requests SET status = 'completed', updated_at = ? WHERE order_id = ? AND status IN ('paid', 'delivered')").bind(now, id).run();
+      }
+    } catch { /* requests table not there yet */ }
     // Wallet credit — twin of the shipping form's delivered credit:
     // once only (sale_credit row guards it), fee on item price only.
     // SKIPPED for Stripe Checkout orders: their money is already in

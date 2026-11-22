@@ -747,6 +747,14 @@ function renderPageSections(){
   set("followRow", followRowHTML());
   const follow2 = document.getElementById("followRowMusic");
   if(follow2) follow2.innerHTML = followRowHTML(true);
+  // Verbatim line (2026-11-22) — sits right above the streaming links
+  // in the footer (and the music page's copy of the row), so the line
+  // and the links read as one unit.
+  const streamLine = "If you like his website listen to 'A Steady Heart' on all major streaming platforms!";
+  ["followRow", "followRowMusic"].forEach(function (id) {
+    const row = document.getElementById(id);
+    if (row) row.insertAdjacentHTML("beforebegin", '<p class="stream-line">' + streamLine + "</p>");
+  });
 }
 function followRowHTML(withExtra){
   const links = [
@@ -759,6 +767,7 @@ function followRowHTML(withExtra){
     ["📘 Facebook", MUSIC_LINKS.facebook, false],
     ["🗳 Vote for his song", MUSIC_LINKS.vote, true],
     ["❤️ Donate", "about.html#donate", true, true],
+    ["🔗 AllMyLinks", ALLMYLINKS_URL, false],
   ];
   if(withExtra) links.push(["🔗 HyperFollow", MUSIC_LINKS.hyperfollow, true]);
   return links.map(l => `<a href="${l[1]}"${l[3] ? "" : ' target="_blank" rel="noopener"'}${l[2] ? ' class="hot"' : ""}>${l[0]}</a>`).join("");

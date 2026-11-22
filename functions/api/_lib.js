@@ -333,6 +333,11 @@ export function trackingUrl(carrier, trackingNumber) {
 // When o.digital_asset is true (a private digital sale), the sale
 // record's title carries the " [Digital Asset]" label — the same label
 // goes on the Stripe product name and the receipt.
+// Creator menu / packages (2026-11-21): o.postId / o.packageId /
+// o.menuItemId link the sale to the post being unblurred and the
+// package zip being downloaded in "My stuff". When the migration
+// hasn't run yet those columns don't exist — the insert falls back to
+// the original column list so the sale still logs.
 export async function createContentSale(db, o) {
   const buyerIp = o.buyerIp || "";
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -340,10 +345,19 @@ export async function createContentSale(db, o) {
       const mx = await db.prepare("SELECT MAX(cs_number) AS m FROM content_sales").first();
       const next = (mx && mx.m ? mx.m : 0) + 1;
       const wm = "RareCandyReserve.org • @" + o.buyerUsername + " • CS#" + next + " • redistribution of this is punishable by law";
-      await db.prepare(
-        `INSERT INTO content_sales (cs_number, listing_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).bind(next, o.listingId, o.buyerId, o.buyerUsername, o.sellerId, o.sellerUsername || "", o.digital_asset ? o.itemTitle + " [Digital Asset]" : o.itemTitle, o.amountCents, buyerIp, wm, o.now).run();
+      const title = o.digital_asset ? o.itemTitle + " [Digital Asset]" : o.itemTitle;
+      try {
+        await db.prepare(
+          `INSERT INTO content_sales (cs_number, listing_id, post_id, package_id, menu_item_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(next, o.listingId ?? null, o.postId ?? null, o.packageId ?? null, o.menuItemId ?? null, o.buyerId, o.buyerUsername, o.sellerId, o.sellerUsername || "", title, o.amountCents, buyerIp, wm, o.now).run();
+      } catch (e2) {
+        if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2;
+        await db.prepare(
+          `INSERT INTO content_sales (cs_number, listing_id, buyer_id, buyer_username, seller_id, seller_username, item_title, amount_cents, buyer_ip, watermark_text, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(next, o.listingId, o.buyerId, o.buyerUsername, o.sellerId, o.sellerUsername || "", title, o.amountCents, buyerIp, wm, o.now).run();
+      }
       return { csNumber: next, watermarkText: wm };
     } catch (e) {
       const msg = String((e && e.message) || e);
@@ -851,6 +865,20 @@ export function shapeProfile(row) {
     // (migration pending) — read defensively.
     contact_email: row.contact_email ?? "",
     show_contact_email: row.show_contact_email === 1,
+    // Password auth (2026-11-22) — own-profile shape ONLY. has_password
+    // is a boolean (never the hash); the recovery email is the member's
+    // own, shown only to them. Columns may not exist yet (migration
+    // pending) — read defensively; undefined reads as "no password".
+    has_password: !!row.password_hash,
+    recovery_email: row.recovery_email ?? "",
+    recovery_email_verified: row.recovery_email_verified === 1,
+    pending_email: row.pending_email ?? "",
+    // Creator menu + content vault (2026-11-21) — the master toggle
+    // and the discovery-signals opt-out. Own-profile shape ONLY:
+    // shapeMember deliberately never carries them, so a non-verified
+    // caller can never learn whether a member sells content.
+    content_sales_enabled: row.content_sales_enabled === 1,
+    signals_opt_out: row.signals_opt_out === 1,
     created_at: iso(row.created_at),
   };
 }
@@ -1252,6 +1280,33 @@ export function matchScore(candidateTypes, candidateTags, seekerTypes, seekerTag
   }
   return score;
 }
+// Discovery signals (creator menu, 2026-11-21) — the CALLER's own
+// click tally (types/tags they viewed, clicked, hearted, or searched
+// for on this site only). Signals feed the score at a LOWER weight
+// than typed prefs (typed type +2, typed tag +1): a signal type match
+// is +1, a signal tag match is +0.5, each capped so one heavy clicker
+// can't dominate the ranking. The seller side never receives a
+// buyer's click history — only the match + the types/tags, which the
+// Find card already shows. signals: [{ type, tag, count }].
+export function signalBonus(candidateTypes, candidateTags, signals) {
+  const ct = new Set((candidateTypes || []).map((t) => String(t).toLowerCase()));
+  const cg = new Set((candidateTags || []).map((t) => String(t).toLowerCase()));
+  let typeBonus = 0;
+  let tagBonus = 0;
+  const types = [];
+  const tags = [];
+  for (const s of (signals || [])) {
+    const ty = String((s && s.type) || "").toLowerCase();
+    const tg = String((s && s.tag) || "").toLowerCase();
+    if (ty && ct.has(ty) && !types.includes(ty)) { types.push(ty); typeBonus = Math.min(2, typeBonus + 1); }
+    if (tg && cg.has(tg) && !tags.includes(tg)) { tags.push(tg); tagBonus = Math.min(2, tagBonus + 0.5); }
+  }
+  return { bonus: typeBonus + tagBonus, types, tags };
+}
+export function matchScoreWithSignals(candidateTypes, candidateTags, seekerTypes, seekerTags, candidatePriceCents, seekerBudgetCents, signals) {
+  return matchScore(candidateTypes, candidateTags, seekerTypes, seekerTags, candidatePriceCents, seekerBudgetCents)
+    + signalBonus(candidateTypes, candidateTags, signals).bonus;
+}
 // Split a stored comma-separated pref field back into a list.
 export function parsePrefs(stored) {
   if (!stored) return [];
@@ -1322,7 +1377,11 @@ export const THEME_FONTS = ["", "serif", "typewriter", "comic", "rounded", "play
 export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost", "insert-coin"];
 // Taffy Layout Builder vibes (v3.10) — one of the fixed vibe ids, or "".
 export const VIBE_IDS = ["", "neon", "midnight", "candy", "classic", "forest", "sunset", "ocean", "bubblegum", "gold", "dark"];
-export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text", "sparkle-name", "sparkle-banner", "ticker-effect", "rgb-comment-border"];
+export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text", "sparkle-name", "sparkle-banner", "ticker-effect", "rgb-comment-border", "peaceful-rain", "rainy-city"];
+// Profile audio (2026-11-22) — soundscape ids + player skin ids.
+// soundscape "radio" = the SteadyWave Radio Player; "" = no sound.
+export const SOUNDSCAPE_IDS = ["rain", "storm", "night", "city", "cafe", "paris", "violin", "canon", "fur-elise"];
+export const PLAYER_SKIN_IDS = ["cassette-pink", "cassette-cyan", "cassette-gold", "vinyl", "visualizer", "image"];
 // Profile customization (v3.9) — preset backgrounds, picture size /
 // position / frame, comment-picture border color. All live in the theme
 // JSON (validated by parseTheme, same as the other theme fields).
@@ -1638,6 +1697,9 @@ export const LUCRE_STORE_PRICES = {
   "store:band-stand": 20,
   "store:portfolio": 20,
   "store:arcade80s": 50,
+  "store:pixel-quest": 20,
+  "store:nine-tails-one-heart": 20,
+  "store:blue-skies-2005": 20,
 };
 export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
 export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window
@@ -1742,7 +1804,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1754,6 +1816,20 @@ export function parseTheme(stored) {
   out.accent_color = hex(obj.accent_color);
   const img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
+  // Moving background GIF (2026-11-22) — a Giphy/direct .gif URL the
+  // member pasted in Edit Profile (already normalized client-side to
+  // the direct media URL). Same https-only rule as the still picture.
+  const gif = String(obj.bg_gif_url || "").trim().slice(0, 500);
+  out.bg_gif_url = /^https:\/\//i.test(gif) ? gif : "";
+  // GIF size (2026-11-22) — small or medium; medium is capped at a
+  // quarter of the page, so a GIF can never blow the page out.
+  out.bg_gif_size = obj.bg_gif_size === "medium" ? "medium" : "small";
+  // Profile audio (2026-11-22) — one pick: a soundscape, the radio
+  // player, or nothing. Player look is a separate pick.
+  out.soundscape = obj.soundscape === "radio" || SOUNDSCAPE_IDS.includes(obj.soundscape) ? obj.soundscape : "";
+  out.player_skin = PLAYER_SKIN_IDS.includes(obj.player_skin) ? obj.player_skin : "";
+  const pimg = String(obj.player_image_url || "").trim().slice(0, 500);
+  out.player_image_url = /^https:\/\//i.test(pimg) ? pimg : "";
   out.font = THEME_FONTS.includes(obj.font) ? obj.font : "";
   // Display-name font (v3.13) — same allowlist as the page text font.
   // `font` stays the page text font, so existing profiles keep their pick.
@@ -1776,6 +1852,8 @@ export function parseTheme(stored) {
   // never silently sit on top of it again. The form enforces the same
   // rule live; this is the backstop for stale or forged saves.
   if (out.bg_image_url) out.bg_preset = "";
+  // A GIF is the background: it wins over a still picture or a preset.
+  if (out.bg_gif_url) { out.bg_preset = ""; out.bg_image_url = ""; }
   // Comment-picture border color (v3.9) — any #rrggbb the member picks.
   // Mutually exclusive with the RGB comment-border effect: the RGB
   // effect wins when both are set, so the saved color is dropped.
@@ -1784,7 +1862,7 @@ export function parseTheme(stored) {
   // Animated rainbow background (v3.20) — the effect IS the background,
   // so it wins over a picture or a preset. The form says so when the
   // effect is ticked; this is the backstop for stale or forged saves.
-  if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; }
+  if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_gif_url = ""; }
   // Picture size / position / frame (v3.9) — fixed ids, "" = default.
   out.pic_size = PIC_SIZE_IDS.includes(String(obj.pic_size || "")) ? String(obj.pic_size) : "";
   out.pic_position = PIC_POSITION_IDS.includes(String(obj.pic_position || "")) ? String(obj.pic_position) : "";
@@ -1875,7 +1953,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button
@@ -1968,6 +2046,10 @@ export async function shapeListing(db, row, seller) {
     // Private sale — one buyer only, invisible to everyone else.
     is_private: row.is_private === 1,
     private_buyer_id: row.private_buyer_id ?? null,
+    // Creator menu / packages (2026-11-21) — the staged package this
+    // private digital listing sells, when one is attached (a package
+    // OR at least one photo satisfies the digital photo rule).
+    package_id: row.package_id ?? null,
     image_url: imageUrl(row.image_blob_key), image2_url: imageUrl(row.image2_blob_key),
     image3_url: imageUrl(row.image3_blob_key), gif_url: row.gif_url ?? null,
     trade_wanted: row.trade_wanted ?? "", allow_comments: row.allow_comments === 1,
@@ -1995,17 +2077,29 @@ export async function shapeOrder(db, row, profilesById) {
   const shipping = row.shipping_cents ?? 0;
   // CS# for digital Flea Market buys — the sale number from the
   // content_sales log (null for physical buys, or when the
-  // content-sales migration hasn't run yet).
+  // content-sales migration hasn't run yet). Menu/package orders have
+  // no listing to match on (listing_id is the 0 sentinel), so they
+  // match on package_id, then menu_item_id.
   let csNumber = null;
   try {
-    const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE listing_id = ? AND buyer_id = ? LIMIT 1").bind(row.listing_id, row.buyer_id).first();
-    csNumber = cs ? cs.cs_number : null;
+    if (row.listing_id) {
+      const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE listing_id = ? AND buyer_id = ? LIMIT 1").bind(row.listing_id, row.buyer_id).first();
+      csNumber = cs ? cs.cs_number : null;
+    }
+    if (csNumber == null && row.package_id) {
+      const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE package_id = ? AND buyer_id = ? LIMIT 1").bind(row.package_id, row.buyer_id).first();
+      csNumber = cs ? cs.cs_number : null;
+    }
+    if (csNumber == null && row.menu_item_id) {
+      const cs = await db.prepare("SELECT cs_number FROM content_sales WHERE menu_item_id = ? AND buyer_id = ? LIMIT 1").bind(row.menu_item_id, row.buyer_id).first();
+      csNumber = cs ? cs.cs_number : null;
+    }
   } catch { csNumber = null; }
-  const listing = await db.prepare("SELECT image_blob_key, listing_type FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first();
+  const listing = row.listing_id ? await db.prepare("SELECT image_blob_key, listing_type FROM listings WHERE id = ? LIMIT 1").bind(row.listing_id).first() : null;
   // Digital Asset label — a digital listing's order shows the tag on
   // the order card + receipt, same label as the Stripe product and
-  // the CS# sale record.
-  const digitalAsset = !!(listing && listing.listing_type === "digital");
+  // the CS# sale record. Menu/package orders are digital by nature.
+  const digitalAsset = !!(row.menu_item_id || row.package_id || (listing && listing.listing_type === "digital"));
   // Buyer + seller protection — whether the buyer tapped "I got it",
   // and whether an open dispute sits on this order (both sides see it
   // and can add their side from My Orders).
@@ -2029,6 +2123,17 @@ export async function shapeOrder(db, row, profilesById) {
     tracking_alerts: row.tracking_alerts === 1,
     cs_number: csNumber,
     digital_asset: digitalAsset,
+    // Creator menu / packages (2026-11-21) — 0/NULL when the order
+    // came from the Flea Market, the menu item + package when it came
+    // from a creator menu. payment_method 'stripe' unless the buyer
+    // paid manually outside the site; marked_paid_* record who + when
+    // a manual payment was marked paid (the green light with the
+    // manual tag). All default safely when the migration hasn't run.
+    package_id: row.package_id ?? null,
+    menu_item_id: row.menu_item_id ?? null,
+    payment_method: row.payment_method ?? "stripe",
+    marked_paid_by: row.marked_paid_by ?? null,
+    marked_paid_at: iso(row.marked_paid_at ?? null),
     buyer_confirmed_at: iso(row.buyer_confirmed_at ?? null),
     dispute_status: disputeStatus, dispute_id: disputeId,
     reviewed: reviewed,

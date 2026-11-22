@@ -38,6 +38,8 @@ export async function onRequestGet({ env, request }) {
     let label = `${r.target_type} #${r.target_id}`;
     let targetAuthorId = null;
     let orderSnap = null;
+    let appealedSlug = null;
+    let currentSlug = null;
     if (r.target_type === "general") label = "General ticket";
     else if (r.target_type === "post") {
       const p = await db.prepare("SELECT title, profile_id FROM posts WHERE id = ? LIMIT 1").bind(r.target_id).first();
@@ -56,6 +58,13 @@ export async function onRequestGet({ env, request }) {
       const u = byId.get(r.target_id)?.username;
       label = u ? `Page URL appeal from @${u}` : `Page URL appeal #${r.target_id}`;
       targetAuthorId = r.target_id;
+      // The appealed slug is the report reason; the member's current
+      // slug rides along so the operator sees both before granting.
+      try {
+        const m = await db.prepare("SELECT page_slug FROM profiles WHERE id = ? LIMIT 1").bind(r.target_id).first();
+        appealedSlug = String(r.reason || "").trim();
+        currentSlug = m ? String(m.page_slug || "") : "";
+      } catch { appealedSlug = String(r.reason || "").trim(); currentSlug = ""; }
     } else if (r.target_type === "order") {
       const o = await db.prepare("SELECT item_title, buyer_id, seller_id, status, carrier, tracking_number, amount_cents, buyer_confirmed_at FROM orders WHERE id = ? LIMIT 1").bind(r.target_id).first();
       if (o) {
@@ -84,6 +93,7 @@ export async function onRequestGet({ env, request }) {
       target_author_username: targetAuthorId ? (byId.get(targetAuthorId)?.username ?? "member") : null,
       reason: r.reason ?? "", detail: r.detail ?? "", outcome: r.outcome ?? "", resolution_note: r.resolution_note ?? "",
       order: orderSnap, notes: notesByReport.get(r.id) || [],
+      ...(appealedSlug !== null ? { appealed_slug: appealedSlug, current_page_slug: currentSlug ?? "" } : {}),
       status,
       reporter_username: byId.get(r.reporter_id)?.username ?? "member",
       assignee_id: r.assignee_id ?? null,

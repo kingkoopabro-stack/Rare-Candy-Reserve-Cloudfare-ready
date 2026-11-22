@@ -135,7 +135,10 @@ export async function onRequestPost({ env, request }) {
   // 6% cut). A hand-pasted link would bypass the cut and the automatic
   // payout, so incoming stripe_link values are ignored. The operator's
   // own catalog (shop-listings.js) is untouched.
-  const stripeLink = null;
+  // '' (not null): the column is NOT NULL on the member-shops
+  // migration, and binding null here would 500 every listing the
+  // moment that migration runs. The value is never read as a link.
+  const stripeLink = "";
   const handlingTime = String(a.handling_time || "").trim().slice(0, 120);
   // Best Offer: sale listings take offers unless the seller opts out.
   const allowsOffers = a.kind === "sale" && a.allows_offers !== false && a.allows_offers !== 0 ? 1 : 0;
@@ -143,7 +146,23 @@ export async function onRequestPost({ env, request }) {
   const photoInputs = [...(a.images || [])];
   if (a.image && photoInputs.length === 0) photoInputs.push(a.image);
   const firstPhoto = photoInputs[0] ?? null;
-  if (listingType === "digital" && !firstPhoto) return fail("Digital listings need at least one photo — the photos are the product the buyer gets.");
+  // Creator menu / packages (2026-11-21, §12.8 fix): a digital private
+  // sale may attach a staged package INSTEAD of photos — the package
+  // files are the product, delivered to "My stuff" via the CS# record
+  // on payment confirmation. The package must be the seller's, with
+  // its zip uploaded. (Also fixes a latent bug in the old rule: a
+  // source listing's photos carry over below, but the old check
+  // refused the listing before that carry-over could happen.)
+  let packageId = null;
+  if (a.package_id != null) {
+    if (listingType !== "digital") return fail("Packages attach to digital listings only — a package is the product the buyer downloads.");
+    const pkg = await db.prepare("SELECT * FROM creator_packages WHERE id = ? LIMIT 1").bind(Number(a.package_id)).first();
+    if (!pkg) return fail("That package is gone — pick a staged package from your vault.");
+    if (pkg.profile_id !== me.id) return fail("That package isn't yours.");
+    if (!pkg.zip_key) return fail("That package has no uploaded zip yet — upload it in your vault first.");
+    packageId = pkg.id;
+  }
+  if (listingType === "digital" && !firstPhoto && !packageId && !sourceListing) return fail("Digital listings need at least one photo — the photos are the product the buyer gets — or attach a package from your vault.");
   const vs = String(a.verification_status || "not_checked");
   if (a.kind === "trade") {
     if (!firstPhoto) return fail("Trades need a clear photo of the actual item — verification before trade is the rule here, so a photo is required.");
@@ -184,13 +203,13 @@ export async function onRequestPost({ env, request }) {
     photoKeys[0], photoKeys[1], photoKeys[2],
     a.gif_url ? String(a.gif_url).slice(0, 500) : null,
     vs.slice(0, 40), String(a.verification_summary || "").slice(0, 800), "active", now, now,
-    listingType, shippingCents, isAdult ? 1 : 0, stripeLink, handlingTime, allowsOffers, videoClipKey, isPrivate ? 1 : 0, privateBuyerId];
+    listingType, shippingCents, isAdult ? 1 : 0, stripeLink, handlingTime, allowsOffers, videoClipKey, isPrivate ? 1 : 0, privateBuyerId, packageId];
   let r;
   try {
     r = await db.prepare(
       `INSERT INTO listings (profile_id, kind, category, title, description, price_cents, trade_wanted, allow_comments,
          image_blob_key, image2_blob_key, image3_blob_key, gif_url, verification_status, verification_summary, status, created_at, updated_at,
-         listing_type, shipping_cents, is_adult, stripe_link, handling_time, allows_offers, video_clip_key, is_private, private_buyer_id)
+         listing_type, shipping_cents, is_adult, stripe_link, handling_time, allows_offers, video_clip_key, is_private, private_buyer_id, package_id)
        VALUES (${insertVals.map(() => "?").join(", ")})`,
     ).bind(...insertVals).run();
   } catch (e) {
@@ -201,8 +220,10 @@ export async function onRequestPost({ env, request }) {
     // everyone. So when any of them is set, fail plainly instead of
     // saving a wrong listing; a plain physical listing saves as before.
     // A private listing MUST fail here — saved without is_private it
-    // would show publicly to everyone.
-    if (isAdult || listingType !== "physical" || shippingCents > 0 || stripeLink || handlingTime || allowsOffersOptOut || videoClipKey || isPrivate) {
+    // would show publicly to everyone. A package link MUST fail here
+    // too — saved without it, the digital sale would have no file to
+    // deliver.
+    if (isAdult || listingType !== "physical" || shippingCents > 0 || stripeLink || handlingTime || allowsOffersOptOut || videoClipKey || isPrivate || packageId) {
       return fail("The shop is still running a quick database update — try listing again in a bit. Nothing saved yet.");
     }
     r = await db.prepare(

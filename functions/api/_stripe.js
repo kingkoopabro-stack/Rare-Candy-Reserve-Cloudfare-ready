@@ -85,6 +85,46 @@ export async function createCheckoutSession(env, opts) {
   return { url: res.data.url, sessionId: res.data.id };
 }
 
+// Stripe webhook signature check (creator menu, 2026-11-21). The
+// webhook endpoint reads the RAW body and verifies the
+// `Stripe-Signature` header (t + v1 HMAC-SHA256 with
+// STRIPE_WEBHOOK_SECRET) before trusting anything in the payload —
+// an unverified request must never mark an order paid. ~5 minute
+// tolerance on the timestamp, same as Stripe's own libraries.
+// Returns true only when a v1 signature matches.
+export async function verifyStripeWebhookSignature(rawBody, header, secret) {
+  if (!secret || !header || !rawBody) return false;
+  const parts = String(header).split(",");
+  let t = 0;
+  const v1s = [];
+  for (const p of parts) {
+    const eq = p.indexOf("=");
+    if (eq < 0) continue;
+    const k = p.slice(0, eq).trim();
+    const v = p.slice(eq + 1).trim();
+    if (k === "t") t = Number(v) || 0;
+    if (k === "v1" && v) v1s.push(v);
+  }
+  if (!t || !v1s.length) return false;
+  if (Math.abs(Date.now() / 1000 - t) > 300) return false;
+  let hex = "";
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+    );
+    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(t + "." + rawBody));
+    hex = [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch { return false; }
+  // Constant-time-ish compare per candidate (length first, then every char).
+  for (const cand of v1s) {
+    if (cand.length !== hex.length) continue;
+    let diff = 0;
+    for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ cand.charCodeAt(i);
+    if (diff === 0) return true;
+  }
+  return false;
+}
+
 // Charge a saved card off-session (offer accepted). The payment method
 // must already be attached to the buyer's Stripe Customer — see
 // offer.js, which attaches it at offer time. Returns the PaymentIntent

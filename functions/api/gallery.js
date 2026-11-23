@@ -32,7 +32,7 @@ import { json, noDb, getDb, readJson, profileByDevice, isOperator, isFriendWith,
 
 const MAX_PHOTOS = 3;
 
-const VISIBILITIES = ["public", "friends", "members", "private"];
+const VISIBILITIES = ["public", "friends", "members", "subscribers", "private"];
 
 export async function onRequestGet({ env, request }) {
   const db = getDb(env);
@@ -75,6 +75,11 @@ export async function onRequestGet({ env, request }) {
     if (v === "public") return true;
     if (v === "friends") return isOwner || isOp || isFriend;
     if (v === "members") return isOwner || isOp || !!viewer;
+    // Subscribers-only (2026-11-23, Catalogue): until the subscription
+    // system lands, only the owner + operator see these — paying
+    // subscribers aren't a thing the server can check yet, so v1 treats
+    // them as private rather than showing them to everyone.
+    if (v === "subscribers") return isOwner || isOp;
     return isOwner || isOp; // private: owner + operator only
   });
   // total is the VISIBLE count — it never leaks how many hidden photos a
@@ -142,7 +147,7 @@ export async function onRequestPost({ env, request }) {
 
 // PUT /api/gallery — change a published photo's visibility and/or its
 // short description (caption, 140 chars). Owner or operator only.
-// Visibility is public / friends / members / private. The photo that is
+// Visibility is public / friends / members / subscribers / private. The photo that is
 // currently the profile picture can only be Friends or Members — Public
 // and Private are refused on it with a plain message (the pfp follows
 // its role, not its position in the gallery).
@@ -165,7 +170,7 @@ export async function onRequestPut({ env, request }) {
   if (hasPosition && (!Number.isInteger(position) || position < 1 || position > 99)) return json({ ok: false, error: "Position needs to be 1 or higher." });
   if (!hasVisibility && !hasCaption && !hasPosition) return json({ ok: false, error: "Nothing to change." });
   const visibility = hasVisibility ? (VISIBILITIES.includes(a.visibility) ? a.visibility : null) : null;
-  if (hasVisibility && !visibility) return json({ ok: false, error: "Pick Public, Friends, Members, or Private." });
+  if (hasVisibility && !visibility) return json({ ok: false, error: "Pick Public, Friends, Members, Subscribers, or Private." });
   const caption = hasCaption ? String(a.caption || "").trim().slice(0, 140) : null;
   const row = await db.prepare("SELECT * FROM gallery_photos WHERE id = ? LIMIT 1").bind(id).first();
   if (!row) return json({ ok: false, error: "That photo is gone already." });

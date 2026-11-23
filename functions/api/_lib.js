@@ -507,6 +507,36 @@ export async function putVideo(env, prefix, deviceId, video, maxBytes = 15000000
   return { ok: true, key };
 }
 
+// --- Uploaded music (2026-11-23, Bands) -----------------------------------
+// One track per profile, stored in the same IMAGES R2 bucket under the
+// "profile-music/" prefix. Same shape as video (base64 JSON), same
+// never-kill-the-save pattern. MP3, WAV, OGG, or M4A, up to 10 MB — a
+// full song, not a clip, so there is no seconds cap like video has.
+export const AUDIO_MIMES = [
+  "audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav",
+  "audio/ogg", "audio/mp4", "audio/x-m4a",
+];
+export function decodeAudio(audio, maxBytes = 10000000) {
+  if (!audio || typeof audio.dataBase64 !== "string" || !audio.mimeType) return { ok: false, error: "No track attached." };
+  if (!AUDIO_MIMES.includes(audio.mimeType)) return { ok: false, error: "That track must be MP3, WAV, OGG, or M4A." };
+  let bytes;
+  try {
+    const bin = atob(audio.dataBase64.replace(/\s/g, ""));
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch { return { ok: false, error: "That track couldn't be read — try uploading it again." }; }
+  if (bytes.length > maxBytes) return { ok: false, error: `That track is too large — keep it under about ${(maxBytes / 1000000).toFixed(1).replace(".0", "")} MB.` };
+  return { ok: true, bytes, mime: audio.mimeType };
+}
+export async function putAudio(env, prefix, deviceId, audio, maxBytes = 10000000) {
+  const dec = decodeAudio(audio, maxBytes);
+  if (!dec.ok) return dec;
+  if (!env.IMAGES) return { ok: false, error: "Music uploads aren't connected yet — the shop is still setting up community file storage. You can keep your Spotify or SoundCloud link for now." };
+  const key = `${prefix}/${deviceId}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  await env.IMAGES.put(key, dec.bytes, { httpMetadata: { contentType: dec.mime } });
+  return { ok: true, key };
+}
+
 // --- Chat attachments ----------------------------------------------------
 // A file attached to a private message (or the live chat): images plus a
 // small allowlist of everyday files. PROPOSED CAPS (Chris's call):
@@ -2015,7 +2045,7 @@ export function parseSoundCloudUrl(str) {
   return "https://soundcloud.com/" + m[1] + "/" + m[3];
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [] };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -2185,6 +2215,42 @@ export function parseTheme(stored) {
   out.video_url = extractYouTubeId(vu) ? vu : "";
   const vf = String(obj.video_file_url || "").trim().slice(0, 500);
   out.video_file_url = (/^\/api\/files\?key=/i.test(vf) || /^https:\/\//i.test(vf)) ? vf : "";
+  // One uploaded track per profile (2026-11-23, Bands) — an audio file
+  // served from R2 (/api/files?key=... or https://). The member declares
+  // they own the rights (music_ip_rights); the track only plays on the
+  // page once the operator approves it (music_file_approved).
+  const mf = String(obj.music_file_url || "").trim().slice(0, 500);
+  out.music_file_url = (/^\/api\/files\?key=/i.test(mf) || /^https:\/\//i.test(mf)) ? mf : "";
+  out.music_ip_rights = obj.music_ip_rights === true;
+  out.music_file_approved = obj.music_file_approved === true;
+  // Tour dates (2026-11-23, Bands) — up to 10, each a date, a city or
+  // venue, and an optional ticket link. Dates must be YYYY-MM-DD.
+  var tds = Array.isArray(obj.tour_dates) ? obj.tour_dates : [];
+  out.tour_dates = tds.slice(0, 10).map(function (it) {
+    if (!it || typeof it !== "object") return null;
+    var d = String(it.date || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    var city = String(it.city || "").replace(/[<>]/g, "").trim().slice(0, 80);
+    if (!city) return null;
+    var u = String(it.url || "").trim().slice(0, 500);
+    if (u && !/^https:\/\//i.test(u)) u = "";
+    return { date: d, city: city, url: u };
+  }).filter(Boolean);
+  // Creator subscription (2026-11-23, Catalogue) — a monthly fee in
+  // whole dollars plus the PayPal / Stripe subscribe link the creator
+  // pastes in. No link, no subscription — the button never charges
+  // anything on its own. Fee 0 = no subscription set.
+  var sfee = parseInt(obj.subscribe_fee, 10);
+  out.subscribe_fee = (isFinite(sfee) && sfee > 0 && sfee <= 1000) ? sfee : 0;
+  var spp = String(obj.subscribe_paypal_url || "").trim().slice(0, 500);
+  out.subscribe_paypal_url = /^https:\/\//i.test(spp) ? spp : "";
+  var sps = String(obj.subscribe_stripe_url || "").trim().slice(0, 500);
+  out.subscribe_stripe_url = /^https:\/\//i.test(sps) ? sps : "";
+  // Blue pics (2026-11-23, Catalogue, Content Creators only) — who sees
+  // a creator's blue pics: "" = subscribers only (the default), "public"
+  // = everyone, including people who aren't subscribers. Sellers never
+  // get this option, so a non-creator value here means nothing.
+  out.blue_pics_visibility = (String(obj.blue_pics_visibility || "") === "public") ? "public" : "";
   // Video size + centering + stretch (v3.22) — Small / Normal / Big /
   // Stretch to fit. "" = Normal (the current size, the default).
   // video_align "" = the standard centered arrangement; "center" locks
@@ -2286,7 +2352,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !t.music_file_url && !t.music_ip_rights && !t.music_file_approved && !(t.tour_dates && t.tour_dates.length) && !t.subscribe_fee && !t.subscribe_paypal_url && !t.subscribe_stripe_url && t.blue_pics_visibility === "" && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

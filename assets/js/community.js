@@ -244,6 +244,7 @@ function audioPickLabel(th, p) {
   if (pick === "radio") return "SteadyWave Radio";
   if (pick === "spotify") return "Spotify";
   if (pick === "soundcloud") return "SoundCloud";
+  if (pick === "upload") return "My uploaded track";
   if (pick) { var sc = soundscapeById(pick); return sc ? sc.name : pick; }
   return "no sound";
 }
@@ -351,6 +352,19 @@ function audioSectionHTML(m, th, opts) {
       if (!scEmb) return "";
       return '<section class="card dwc-audiocard"><h3 style="margin-top:0">🎵 SoundCloud</h3><p style="color:var(--muted);font-size:13px;margin-top:0">Tries to autoplay — browsers may still hold it paused on a first visit until the visitor clicks anywhere. No sign-in needed; visitors hear the full song.</p>' +
         scEmb + '</section>';
+    }
+    // Uploaded track (2026-11-23, Bands) — the member's own song file.
+    // It only plays for visitors once the operator approves it (the
+    // IP-ownership check); the owner hears it in the preview and on
+    // their own page while it waits, with a plain pending note.
+    if (pick === "upload") {
+      var murl = (th && th.music_file_url) || "";
+      if (!murl) return "";
+      var canHear = !!(th.music_file_approved || noAuto || (m && m.is_mine));
+      if (!canHear) return "";
+      return '<section class="card dwc-audiocard"><h3 style="margin-top:0">🎵 My track</h3>' +
+        (th.music_file_approved ? '<p style="color:var(--muted);font-size:13px;margin-top:0">My own track — tap play.</p>' : '<p style="color:var(--amber);font-size:13px;margin-top:0">⏳ Waiting for approval — Chris checks every upload to make sure you own it before visitors can hear it. You can hear it here because it’s your page.</p>') +
+        '<audio controls preload="none" src="' + esc(murl) + '" style="width:100%">Your browser can’t play this track here.</audio></section>';
     }
     return "";
   }
@@ -795,6 +809,36 @@ function fileToVideo(file, maxBytes) {
       resolve({ dataBase64: parts[1] || "", mimeType: mime, fileName: file.name || "video" });
     };
     reader.onerror = function () { resolve({ error: "That video couldn't be read — try again." }); };
+    reader.readAsDataURL(file);
+  });
+}
+// Uploaded music (2026-11-23, Bands) — same shape as fileToVideo, but
+// audio only (MP3, WAV, OGG, M4A) and no seconds cap: a full song, not
+// a clip. 10 MB cap, mirroring the server's putAudio.
+var AUDIO_MIMES_CLIENT = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/ogg", "audio/mp4", "audio/x-m4a"];
+var AUDIO_EXT_MIMES = { ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".m4a": "audio/mp4", ".aac": "audio/mp4" };
+var MUSIC_MAX_BYTES = 10000000;
+function audioMimeFor(file) {
+  if (file.type && AUDIO_MIMES_CLIENT.indexOf(file.type) !== -1) return file.type;
+  var name = String(file.name || "");
+  var dot = name.lastIndexOf(".");
+  var ext = dot >= 0 ? name.slice(dot).toLowerCase() : "";
+  return AUDIO_EXT_MIMES[ext] || null;
+}
+function fileToAudio(file, maxBytes) {
+  return new Promise(function (resolve) {
+    if (!file) return resolve(null);
+    var mime = audioMimeFor(file);
+    if (!mime) return resolve({ error: "That track isn't an MP3, WAV, OGG, or M4A — pick one of those." });
+    var limitMB = ((maxBytes || MUSIC_MAX_BYTES) / 1000000).toFixed(1).replace(".0", "");
+    if (file.size > (maxBytes || MUSIC_MAX_BYTES)) return resolve({ error: "That track is too large — keep it under about " + limitMB + " MB." });
+    var reader = new FileReader();
+    reader.onload = function () {
+      var dataUrl = String(reader.result || "");
+      var parts = dataUrl.split(",");
+      resolve({ dataBase64: parts[1] || "", mimeType: mime, fileName: file.name || "track" });
+    };
+    reader.onerror = function () { resolve({ error: "That track couldn't be read — try again." }); };
     reader.readAsDataURL(file);
   });
 }
@@ -2085,7 +2129,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "gif_block_url", "gif_block_position", "gif_block_size", "gif_block_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url", "page_opacity", "font_fx", "overlay_items", "pad_page", "pad_cards", "pad_header", "bio_size", "bio_color", "bio_underline", "header_fit", "header_ratio", "header_use_default", "page_image_fit", "page_format", "header_border_width", "header_radius", "header_border_color", "header_crop", "hide_avatar", "header_links_pos", "links_side", "links_stack", "links_top", "header_side", "buttons_order", "reveal_sections"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "music_file_url", "tour_dates", "subscribe_fee", "subscribe_paypal_url", "subscribe_stripe_url", "blue_pics_visibility", "video_size", "video_align", "gif_block_url", "gif_block_position", "gif_block_size", "gif_block_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url", "page_opacity", "font_fx", "overlay_items", "pad_page", "pad_cards", "pad_header", "bio_size", "bio_color", "bio_underline", "header_fit", "header_ratio", "header_use_default", "page_image_fit", "page_format", "header_border_width", "header_radius", "header_border_color", "header_crop", "hide_avatar", "header_links_pos", "links_side", "links_stack", "links_top", "header_side", "buttons_order", "reveal_sections"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -2093,7 +2137,7 @@ function storeMergedTheme(item) {
   // speaks for the whole page — look + sound as one. The member's
   // saved sound only fills in when the layout doesn't name one, so
   // plain layouts keep the member's sound exactly as before.
-  var AUDIO_FIELDS = ["soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url"];
+  var AUDIO_FIELDS = ["soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url", "music_file_url"];
   LAYOUT_STRUCTURAL_FIELDS.forEach(function (k) {
     if (AUDIO_FIELDS.indexOf(k) >= 0) { if (merged[k] === undefined && cur[k] !== undefined) merged[k] = cur[k]; }
     else if (cur[k] !== undefined) merged[k] = cur[k];
@@ -2163,7 +2207,7 @@ function mixerHTML(p, th) {
     opt("", "None — no rain", rain) + opt("peaceful-rain", "Peaceful Rain — rain on the window, woods outside", rain) + opt("rainy-city", "Rainy city streets — city rain, dim neon", rain) + "</select>" +
     '<label>🎵 What plays</label><select id="dwc-mixer-sound">' +
     opt("", "Nothing — no sound on my page", sound) + opt("radio", "📻 SteadyWave Radio Player — the live station", sound) +
-    SOUNDSCAPES.map(function (sc) { return opt(sc.id, sc.name, sound); }).join("") + opt("spotify", "Spotify — a song from Spotify", sound) + opt("soundcloud", "SoundCloud — a song from SoundCloud", sound) + "</select>" +
+    SOUNDSCAPES.map(function (sc) { return opt(sc.id, sc.name, sound); }).join("") + opt("spotify", "Spotify — a song from Spotify", sound) + opt("soundcloud", "SoundCloud — a song from SoundCloud", sound) + (th.music_file_url ? opt("upload", "🎵 My uploaded track", sound) : "") + "</select>" +
     '<label>🎛️ How the player looks</label><select id="dwc-mixer-skin">' +
     PLAYER_SKINS.map(function (sk) { return opt(sk.id, sk.name, skin); }).join("") + "</select>" +
     '<label>🔤 Page font</label><select id="dwc-mixer-font">' +
@@ -3290,23 +3334,23 @@ function profileButtonsSectionHTML(p) {
     '<option value="xl"' + (btnSize === "xl" ? " selected" : "") + '>XL — extra large</option>' +
     "</select>" +
     '<h4 style="margin:16px 0 6px">✅ Which buttons show</h4>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">On: each ticked button shows in your button block. Off: that button does not show. Unticking every box hides the whole block (your video and links still show). The Message button on the professional look always shows — it’s how people reach you.</p>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">On: each ticked button shows in your button block. Off: that button does not show. Unticking every box hides the whole block (your video and links still show). The Message button on the Website look always shows — it’s how people reach you.</p>' +
     '<div class="dwc-checkgrid">' +
     [["add", "Add me"], ["message", "Message me — hides in MySpace look only; in Website look the Message button always shows"], ["favorite", "Add to Favorites"], ["group", "Add to group"], ["subscribe", "Subscribe (on my shop card only — not in the button block above)"]].map(function (kv) {
       return '<label><input type="checkbox" name="theme_buttons_visible" value="' + kv[0] + '" style="width:auto"' + (visOn(kv[0]) ? " checked" : "") + "> " + kv[1] + "</label>";
     }).join("") + "</div>" +
-    '<label style="margin-top:10px">Subscribe button text — what the Subscribe button on your page says (up to 40 characters)</label>' +
-    '<input name="subscribe_label" maxlength="40" value="' + esc(p ? (p.subscribe_label || "Subscribe to my page") : "Subscribe to my page") + '" placeholder="Subscribe to my page">' +
-    '<h4 style="margin:16px 0 6px">🌐 Professional-mode button</h4>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">On the professional (website) look, visitors get one button under your picture. Pick which side it sits on, and its color — big enough to see. (Pick a bigger size above to make it stand out even more.)</p>' +
-    '<label>Professional-mode button — which side, under your picture</label>' +
+    '<div class="dwc-myspace-only"><label style="margin-top:10px">Subscribe button text — what the Subscribe button on your page says (up to 40 characters)</label>' +
+    '<input name="subscribe_label" maxlength="40" value="' + esc(p ? (p.subscribe_label || "Subscribe to my page") : "Subscribe to my page") + '" placeholder="Subscribe to my page"></div>' +
+    '<div class="dwc-website-only"><h4 style="margin:16px 0 6px">🌐 Website look button</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">On the Website look, visitors get one button under your picture. Pick which side it sits on, and its color — big enough to see. (Pick a bigger size above to make it stand out even more.)</p>' +
+    '<label>Website look button — which side, under your picture</label>' +
     '<select name="theme_pro_button_side" onchange="DWC.applyProButtonSide(this.value)">' +
     '<option value="left"' + (proSide === "" || proSide === "left" ? " selected" : "") + '>Left</option>' +
     '<option value="center"' + (proSide === "center" ? " selected" : "") + '>Center</option>' +
     '<option value="right"' + (proSide === "right" ? " selected" : "") + '>Right</option>' +
     "</select>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the Message button in Website look sits on this side. (Left is the normal spot; Center puts it in the middle.)</p>' +
-    '<label>Professional-mode button — colour</label>' +
+    '<label>Website look button — colour</label>' +
     '<select name="theme_pro_button_color" onchange="DWC.applyProButtonColor(this.value)">' +
     '<option value=""' + (proCol === "" ? " selected" : "") + '>Default</option>' +
     [["#ff2d95", "Pink"], ["#00e5ff", "Cyan"], ["#22c55e", "Green"], ["#d4af37", "Gold"], ["#7c4dff", "Purple"], ["#ef4444", "Red"]].map(function (kv) {
@@ -3315,8 +3359,51 @@ function profileButtonsSectionHTML(p) {
     '<label>Or pick any color</label>' +
     '<input type="color" id="dwc-pro-color-pick" value="' + (proCol || "#ff2d95") + '" style="width:64px;height:36px;padding:2px" onchange="DWC.applyProButtonColor(this.value)"> ' +
     '<span style="color:var(--muted);font-size:13px">Leave it alone to keep the default look.</span>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the Message button in Website look uses this colour — it wins over the Message button’s own colour above. Off (Default): the Message button uses your page’s normal button colour.</p>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the Message button in Website look uses this colour — it wins over the Message button’s own colour above. Off (Default): the Message button uses your page’s normal button colour.</p></div>' +
     '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Leave a label blank to keep the standard wording, and leave a color unticked to keep the default. Colors are #rrggbb; the image must be https://.</p></div>';
+}
+// Subscribe button (2026-11-23, Catalogue) — a creator with a monthly
+// fee + a PayPal / Stripe subscribe link gets a real subscribe link
+// ("Subscribe — $5/month ↗"); everyone else gets the DM button, with
+// the fee in the label when one is set but no link is pasted yet.
+function subscribeButtonHTML(m, th) {
+  var fee = (th && th.subscribe_fee) || 0;
+  var link = (th && th.subscribe_paypal_url) || (th && th.subscribe_stripe_url) || "";
+  var label = esc(m.subscribe_label || "Subscribe to my page") + (fee ? " — $" + fee + "/month" : "");
+  if (fee && link) return '<a class="btn dwc-subscribe" href="' + esc(link) + '" target="_blank" rel="noopener">' + label + ' ↗</a> ';
+  return '<button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">' + label + '</button> ';
+}
+// Tour dates (2026-11-23, Bands) — the editor rows for a band's shows.
+// Each row is a date, a city or venue, and an optional ticket link.
+// The rows write JSON into the hidden theme_tour_dates input (see
+// DWC.syncTourDates); the server re-validates every date on save.
+function tourDatesRowsHTML(th) {
+  var dates = (th && th.tour_dates) || [];
+  if (!dates.length) return '<p style="color:var(--muted);font-size:13px;margin:0">No dates yet — add your first show below.</p>';
+  return dates.map(function (d, i) {
+    return '<div class="dwc-tour-row" data-tour-row="' + i + '" style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">' +
+      '<input type="date" value="' + esc(d.date || "") + '" onchange="DWC.syncTourDates()" style="width:150px">' +
+      '<input maxlength="80" value="' + esc(d.city || "") + '" placeholder="City / venue" oninput="DWC.syncTourDates()" style="flex:1;min-width:140px">' +
+      '<input maxlength="500" value="' + esc(d.url || "") + '" placeholder="Ticket link (https://…)" oninput="DWC.syncTourDates()" style="flex:1;min-width:180px">' +
+      '<button type="button" class="btn ghost small" onclick="DWC.removeTourDate(' + i + ')">✕</button></div>';
+  }).join("");
+}
+// Tour dates on the member page (2026-11-23, Bands) — a card in the
+// info column, right after the player. Dates sort earliest first;
+// past dates still show (the band clears them when the show is done).
+function tourDatesSectionHTML(th) {
+  var dates = (th && th.tour_dates) || [];
+  if (!dates.length) return "";
+  var sorted = dates.slice().sort(function (a, b) { return String(a.date || "").localeCompare(String(b.date || "")); });
+  var rows = sorted.map(function (d) {
+    var nice = "";
+    try { var dt = new Date(d.date + "T12:00:00"); nice = isNaN(dt) ? d.date : dt.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" }); } catch (e) { nice = d.date; }
+    var city = esc(d.city || "");
+    var line = '<strong>' + esc(nice) + '</strong> — ' + city;
+    if (d.url) line = '<a href="' + esc(d.url) + '" target="_blank" rel="noopener">' + line + ' 🎟️ Tickets ↗</a>';
+    return '<li style="margin-bottom:6px">' + line + '</li>';
+  }).join("");
+  return '<section class="card dwc-tourcard"><h3 style="margin-top:0">📅 Tour dates</h3><ul style="margin:0;padding-left:18px">' + rows + '</ul></section>';
 }
 // v3.10 — one video per profile: a YouTube link OR an uploaded clip.
 // Shows opposite the action buttons, and only ever plays when a
@@ -3433,15 +3520,15 @@ function websiteFieldsHTML(p) {
     return '<option value="' + id + '"' + (p && p.birthsign === id ? " selected" : "") + ">" + ZODIAC_SIGNS[id].symbol + " " + esc(ZODIAC_SIGNS[id].name) + "</option>";
   }).join("");
   return '<div class="dwc-layoutbox"><h4 style="margin:0 0 6px">🌐 Website look — make my profile look like a real website</h4>' +
-    "<p style=\"margin:0 0 8px\">Website look is the professional mode — the opposite of the MySpace look. It turns your profile into your own clean standalone website: your banner as the header at the top, just a Message link for contact, your shop listings, and nothing else cluttering it up. The personal bits below (hobbies, where you work, relationship status, sign, accomplishments) stay hidden while this is on. MySpace mode shows everything, arranged like a MySpace profile. Top Friends hide in this mode. These Show boxes only work in MySpace look. In Website look all five lines stay hidden whatever the boxes say.</p>" +
-    '<label>Page style — one or the other, never both</label><select id="dwc-page-mode" onchange="DWC.pageModePicked(this)"><option value="myspace"' + (p && p.website_mode ? "" : " selected") + '>MySpace look — show everything, arranged like a MySpace page</option><option value="website"' + (p && p.website_mode ? " selected" : "") + '>Website look — a clean professional page (banner header, Message link, listings)</option></select>' +
+    "<p style=\"margin:0 0 8px\">Website look is the opposite of the MySpace look. It turns your profile into your own clean standalone website: your banner as the header at the top, just a Message link for contact, your shop listings, and nothing else cluttering it up. The personal bits below (hobbies, where you work, relationship status, sign, accomplishments) stay hidden while this is on. MySpace mode shows everything, arranged like a MySpace profile. Top Friends hide in this mode. These Show boxes only work in MySpace look. In Website look all five lines stay hidden whatever the boxes say.</p>" +
+    '<label>Page style — one or the other, never both</label><select id="dwc-page-mode" onchange="DWC.pageModePicked(this)"><option value="myspace"' + (p && p.website_mode ? "" : " selected") + '>MySpace look — show everything, arranged like a MySpace page</option><option value="website"' + (p && p.website_mode ? " selected" : "") + '>Website look — a clean standalone page (banner header, Message link, listings)</option></select>' +
     '<input type="checkbox" name="website_mode" hidden' + (p && p.website_mode ? " checked" : "") + '>' +
     '<p id="dwc-page-mode-note" style="margin:4px 0 0;color:var(--muted);font-size:13px">' + (p && p.website_mode ? "Website look is ON — MySpace mode is off. Your personal bits below stay hidden while this is on." : "MySpace look is ON — Website look is off. Everything shows, arranged like a MySpace page.") + '</p>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On (Website look): your page becomes a clean standalone site — banner, Message button, and listings only. Your Top Friends and the five personal lines below stay hidden. Off (MySpace look): everything shows, arranged like a MySpace page.</p>' +
-    '<label class="dwc-enable-toggle"><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> <span>Show the Add me / Favorite / Add to group buttons too (Website look only)</span></label>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: visitors in Website look see your full button block as well as the Message button. Off: visitors just get the Message button. (In MySpace look this box does nothing — use “Which buttons show” above instead.)</p>' +
+    '<div class="dwc-website-only dwc-extra-btns"><label class="dwc-enable-toggle"><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> <span>Show the Add me / Favorite / Add to group buttons too (Website look only)</span></label>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: visitors in Website look see your full button block as well as the Message button. Off: visitors just get the Message button.</p></div>' +
     '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your email lives in <strong>Account &amp; payouts</strong> near the top of this page — one address for contact, password resets, and Stripe. Tick Show there and it appears on your page.</p>' +
-    '<label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies on my page</label>' +
+    '<div class="dwc-myspace-only"><label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies on my page</label>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: visitors see this line on your page (MySpace look only — in Website look this line stays hidden whatever the box says). Off: this line does not appear on your page at all. Your words stay saved here — tick the box and save to bring them back.</p>' +
     '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
     '<label><input type="checkbox" name="website_show_workplace" style="width:auto"' + chk("workplace") + '> Show where I work on my page</label>' +
@@ -3456,14 +3543,14 @@ function websiteFieldsHTML(p) {
     '<label>Sign</label><select name="birthsign"><option value="">— pick your sign —</option>' + signs + "</select>" +
     '<label><input type="checkbox" name="website_show_accomplishments" style="width:auto"' + chk("accomplishments") + '> Show my Recent accomplishments on my page</label>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: visitors see this line on your page (MySpace look only — in Website look this line stays hidden whatever the box says). Off: this line does not appear on your page at all. Your words stay saved here — tick the box and save to bring them back.</p>' +
-    '<label>Recent accomplishments</label><textarea name="accomplishments" rows="3" maxlength="500" placeholder="What have you pulled off lately?">' + val("accomplishments") + "</textarea>" +
+    '<label>Recent accomplishments</label><textarea name="accomplishments" rows="3" maxlength="500" placeholder="What have you pulled off lately?">' + val("accomplishments") + "</textarea></div>" +
     '<h4 style="margin:14px 0 6px">🌐 Custom page — your own code IS the page</h4>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Write your own page here — HTML for the words and pictures, and your CSS in the code box below for how it looks. When Website look is on and this box has something in it, this code IS your page (it replaces the MySpace columns — your listings and message link still show below it). Scripts and iframes are stripped out for safety — plain HTML only.</p>' +
     '<label>Your website page (HTML) — only shows when Website look is on; this code IS your page</label>' +
     '<textarea name="custom_page_html" rows="8" maxlength="8000" placeholder="e.g. Welcome to my shop — cards, prints, and more." oninput="DWC.customPagePreview(this)">' + esc(th.custom_page_html || "") + '</textarea>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px"><span id="dwc-custompage-count"></span>8,000 characters max — anything past that won’t save.</p>' +
     '<div id="dwc-custompage-preview" style="margin-top:8px"></div>' +
-    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Page comments are optional on a professional page too — hide them from “What shows on my page” below if you don\'t want them.</p></div>';
+    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">Page comments are optional on a Website look page too — hide them from “What shows on my page” below if you don\'t want them.</p></div>';
 }
 
 // Account & payouts (2026-11-22) — ONE email, one place, near the top
@@ -3650,7 +3737,7 @@ function profileFormHTML(p) {
   var th = parseThemeClient(p && p.profile_theme);
   return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
     "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
-    '<form onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
+    '<form class="dwc-mode-' + (p && p.website_mode ? "website" : "myspace") + ' dwc-fmt-' + pageFormatFor(th, p) + '" onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
     (isNew ? "" :
     // First-run orientation banner (2026-11-23) — only when the member
     // arrives from Step 3's "Make it yours later". Shown once;
@@ -3663,10 +3750,10 @@ function profileFormHTML(p) {
     // name what never changes from here (the server enforces it too).
     (state.adminEditingMemberId ? '<p class="note" style="margin:0 0 12px;border:2px solid var(--amber,#ffb020)">🛡️ <strong>Editing @' + esc(p ? (p.username || "") : "") + '’s page as the operator.</strong> Saving here changes THEIR page, not yours. Their page URL, password, recovery email, and payouts are never changed from here. <button type="button" class="dwc-linklike" onclick="DWC.adminStopEditing()">Stop editing this member →</button></p>' : "") +
     '<div class="dwc-setting-search" id="dwc-setting-search"><button type="button" class="dwc-setting-search-btn" onclick="DWC.editorSearchFocus()" aria-label="Search settings">🔍</button><input id="dwc-setting-search-input" type="search" placeholder="Find a setting… (e.g. name color, buttons, ticker)" aria-label="Search settings" oninput="DWC.editorSearch(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();DWC.editorSearchNext();}else if(event.key===\'Escape\'){DWC.editorSearchClear();}"><button type="button" class="btn ghost small" onclick="DWC.editorSearchNext()">Next ↓</button><span id="dwc-setting-search-count" style="color:var(--muted);font-size:12px"></span></div>') +
-    '<h3 class="dwc-edit-group-h" style="margin-top:14px">👀 Your page, live — changes show here as you make them</h3>' +
+    '<button type="button" class="btn dwc-preview-page-btn" onclick="DWC.openPagePreview()">👀 Preview my current page</button>' +
+    '<p style="margin:6px 0 12px;color:var(--muted);font-size:13px">See your page exactly as visitors see it — same order, same look. It slides in from the side; close it any time. Changes you make below show up in it — nothing saves until you hit Save profile.</p>' +
     '<div id="dwc-try-banner" class="note" style="margin:0 0 12px" hidden><span id="dwc-try-banner-text"></span> <button type="button" class="btn ghost small" onclick="DWC.storeTryBack()">Back to my look</button></div>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This is what visitors see. Change anything below and it updates here first — nothing saves until you hit Save profile.</p>' +
-    '<div id="dwc-layout-preview">' + layoutPreviewInnerHTML(p) + "</div>" +
+    '<div id="dwc-page-drawer" class="dwc-drawer" hidden><div class="dwc-drawer-backdrop" onclick="DWC.closePagePreview()"></div><div class="dwc-drawer-panel" role="dialog" aria-label="Your page preview"><div class="dwc-drawer-head"><img src="/images/heart-rise-official.webp" alt="" class="dwc-drawer-banner"><div class="dwc-drawer-title">Your page — live preview</div><button type="button" class="dwc-drawer-close" onclick="DWC.closePagePreview()" aria-label="Close preview">✕</button></div><div id="dwc-drawer-preview" class="dwc-drawer-body"></div><div class="dwc-drawer-foot"><button type="button" class="btn" onclick="DWC.closePagePreview()">Close preview</button></div></div></div>' +
     (isNew ? "" :
     '<div class="note" style="margin:0 0 12px"><strong>🔑 Password &amp; recovery</strong>' +
     '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and verify your email in the “Account &amp; payouts” box near the top of this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>') +
@@ -3842,13 +3929,13 @@ function profileFormHTML(p) {
     [["auto", "Auto — cover at the default height"], ["16:9", "16:9 — wide"], ["21:9", "21:9 — extra wide"], ["4:3", "4:3 — squarer"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.header_ratio || "auto") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Header spacing lives in Spacing, near the bottom of the Body box.</p>' +
     '<label><input type="checkbox" name="theme_header_use_default" value="off" style="width:auto"' + (th.header_use_default === false ? " checked" : "") + '> Hide the Rare Candy Reserve header (no default picture — name only)</label>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only when you have no custom banner. Uploading a banner wins over the default; removing it brings the default back (unless you ticked this box).</p>' + '<h4 style="margin:12px 0 6px">🖼️ Main overlay — where your picture &amp; name sit</h4>' + headerLayoutHTML(th) + websiteHeaderHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔘 Buttons &amp; links</summary>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only when you have no custom banner. Uploading a banner wins over the default; removing it brings the default back (unless you ticked this box).</p>' + '<h4 style="margin:12px 0 6px">🖼️ Main overlay — where your picture &amp; name sit</h4>' + headerLayoutHTML(th) + websiteHeaderHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat" data-fmt="social seller blog musician merchant creator"><summary>🔘 Buttons &amp; links</summary>' +
     (isNew ? "" : '<h3 class="dwc-edit-group-h">🔘 Buttons &amp; links — what visitors tap</h3>' + profileButtonsSectionHTML(p) + '<input type="hidden" name="theme_buttons_order" id="dwc-buttons-order-value" value="' + esc(JSON.stringify(th.buttons_order || [])) + '">') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔗 My links</summary>' +
     (isNew ? "" :
     '<div class="dwc-layoutbox" id="dwc-sec-links"><h4 style="margin:0 0 6px">🔗 My links — buttons on your page</h4>' +
     "<p style=\"margin:0 0 8px\">Add links that show as buttons on your member page — your shop, Instagram, whatever. Up to 6. A label, a full link starting with http:// or https://, and a button style just for that link. A link’s own style wins over your page’s button style — but your My Code CSS can still override it with !important (may cause a link’s button style to not work properly).</p>" +
     '<div id="dwc-links-list">' + myLinksRowsHTML(p ? (p.my_links || []) : []) + '</div>' +
-    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/6</span></p>' + linksPlacementHTML(th) + revealSectionsHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🌟 Top Friends</summary>' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/6</span></p>' + linksPlacementHTML(th) + revealSectionsHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat dwc-myspace-only" data-fmt="social blog musician creator"><summary>🌟 Top Friends</summary>' +
     (isNew ? "" :
       '<div class="dwc-layoutbox" id="dwc-sec-top8"><h4 style="margin:0 0 6px">🌟 Top Friends — your Top Friends</h4>' +
       "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 10 friends to show on your page. Thanks for the add — now show it off. They sit in the right-hand column of your page by default, above your page comments. They don’t show in Website look — your page is a website then, not a MySpace page.</p>" +
@@ -3921,7 +4008,8 @@ function profileFormHTML(p) {
       '<option value="radio"' + (audioPickValue(th, p) === "radio" ? " selected" : "") + '>📻 SteadyWave Radio Player — the live station</option>' +
       SOUNDSCAPES.map(function (sc) { return '<option value="' + sc.id + '"' + (audioPickValue(th, p) === sc.id ? " selected" : "") + ">" + esc(sc.name) + "</option>"; }).join("") +
       '<option value="spotify"' + (audioPickValue(th, p) === "spotify" ? " selected" : "") + '>Spotify — a song from Spotify</option>' +
-      '<option value="soundcloud"' + (audioPickValue(th, p) === "soundcloud" ? " selected" : "") + '>SoundCloud — a song from SoundCloud</option>' + "</select>" +
+      '<option value="soundcloud"' + (audioPickValue(th, p) === "soundcloud" ? " selected" : "") + '>SoundCloud — a song from SoundCloud</option>' +
+      ((th.music_file_url || pageFormatFor(th, p) === "musician") ? '<option value="upload"' + (audioPickValue(th, p) === "upload" ? " selected" : "") + '>🎵 My uploaded track — the song I uploaded</option>' : "") + "</select>" +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On (a sound, the radio, Spotify, or SoundCloud): visitors see a player and can tap play. The radio is the live station; a soundscape loops. Picking the radio also turns the SteadyWave player on — picking anything else turns it off. Off (Nothing): no player and no sound on your page at all.</p>' +
       '<div id="dwc-spotify-row"' + (audioPickValue(th, p) === "spotify" ? "" : " hidden") + '><label>Your Spotify song — paste the Share link</label>' +
       '<p style="margin:0 0 6px"><button type="button" class="dwc-spotify-login" onclick="DWC.spotifyLogin()">' + SPOTIFY_LOGO_SVG + 'Log in to Spotify</button> <span style="color:var(--muted);font-size:13px">Sign in first if you want to hear the full song while you pick it — or skip it if you are already signed in. Your visitors still need their own Spotify sign-in to hear the full song on your page.</span></p>' +
@@ -3943,15 +4031,42 @@ function profileFormHTML(p) {
       '<label><input type="checkbox" name="autoplay_vnr" style="width:auto"' + (p && p.autoplay_vnr ? " checked" : "") + '> ▶️ Autoplay when someone visits my page</label>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: sound starts by itself — but only after the visitor taps something on your page first. Browsers will not start sound on their own. Off: nothing plays until the visitor taps play. (Covers the radio and soundscapes alike.)</p>' +
       '<label><input type="checkbox" name="theme_hide_sections" value="radio" style="width:auto"' + (((th.hide_sections || []).indexOf("radio") >= 0) ? " checked" : "") + '> Hide the player from my page</label>' +
-      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick to hide the whole player box from visitors. Your sound pick stays saved — untick to bring it back.</p></div></details>') +
-    (isNew ? "" : '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="style">🌐 Page style — ' + (p && p.website_mode ? "Website look" : "MySpace look") + '</summary><h3 class="dwc-edit-group-h" id="dwc-sec-style">🌐 Page style — MySpace or professional (website look)</h3>' + websiteFieldsHTML(p) + '</details>') +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick to hide the whole player box from visitors. Your sound pick stays saved — untick to bring it back.</p>' +
+      // Uploaded track (2026-11-23, Bands) — Musician preset only. The
+      // wrapper hides it for every other preset (see .dwc-music-upload
+      // in style.css); the file + declaration + approval ride the same
+      // save as the rest of the form.
+      '<div class="dwc-music-upload">' +
+      '<h4 style="margin:12px 0 6px">🎵 Upload my own track — Bands only</h4>' +
+      "<p style=\"margin:0 0 8px\">Upload a song of yours and it can play on your page. MP3, WAV, OGG, or M4A, up to 10 MB. It only plays for visitors once it's approved — Chris checks every upload to make sure you own the rights first (that's the IP check).</p>" +
+      '<label>Upload a track (MP3, WAV, OGG, or M4A — up to 10 MB)</label>' +
+      '<input name="profile_music_file" type="file" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/x-m4a" onchange="DWC.musicPicked(this)">' +
+      '<p id="dwc-music-note" style="margin:4px 0 0;color:var(--muted);font-size:13px">' + (th.music_file_url ? "Current track: uploaded" + (th.music_file_approved ? " — approved, playing on your page." : " — waiting for approval.") : "No track uploaded yet.") + '</p>' +
+      '<input type="hidden" name="theme_music_file_url" value="' + esc(th.music_file_url || "") + '">' +
+      '<label><input type="checkbox" name="theme_music_ip_rights" style="width:auto"' + (th.music_ip_rights ? " checked" : "") + '> This is my own music — I own the rights to it.</label>' +
+      '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick this to say the track is your own original work and you own the rights. Uploads without it never play on your page. Don’t upload anyone else’s song.</p>' +
+      (state.adminEditingMemberId
+        ? '<label><input type="checkbox" name="theme_music_file_approved" style="width:auto"' + (th.music_file_approved ? " checked" : "") + '> ✅ Approved — this track plays on their page.</label><p style="margin:4px 0 0;color:var(--muted);font-size:13px">Operator only: tick once you’ve checked they own the rights. Until then visitors hear nothing from this track.</p>'
+        : '<input type="hidden" name="theme_music_file_approved" value="' + (th.music_file_approved ? "1" : "") + '">') +
+      (th.music_file_url ? '<label><input type="checkbox" name="remove_music" style="width:auto"> Remove my uploaded track</label><p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: your track is removed when you save. Off: it stays.</p>' : "") +
+      '</div></div></details>') +
+    // Tour dates (2026-11-23, Bands) — Musician preset only. The
+    // dates live in a hidden JSON input the rows keep in sync; the
+    // save reads it like the section order.
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="musician"><summary data-sum="tour">📅 Tour dates — ' + ((th.tour_dates || []).length) + ' listed</summary><div class="dwc-layoutbox" id="dwc-sec-tour"><h4 style="margin:0 0 6px">📅 Tour dates — where you’re playing</h4>' +
+    "<p style=\"margin:0 0 8px\">Your shows, in order, on your page — date, city or venue, and a ticket link if you have one. Up to 10. Only Bands get this one, because only they tour.</p>" +
+    '<div id="dwc-tour-rows">' + tourDatesRowsHTML(th) + '</div>' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addTourDate()">+ Add a date</button></p>' +
+    '<input type="hidden" name="theme_tour_dates" value="' + esc(JSON.stringify(th.tour_dates || [])) + '">' +
+    '</div></details>' +
+    (isNew ? "" : '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="style">🌐 Page style — ' + (p && p.website_mode ? "Website look" : "MySpace look") + '</summary><h3 class="dwc-edit-group-h" id="dwc-sec-style">🌐 Page style — MySpace look or Website look</h3>' + websiteFieldsHTML(p) + '</details>') +
     (isNew ? "" :
-    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="badges">🏅 Badges — ' + ((p && p.badges) || []).length + ' unlocked</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary data-sum="badges">🏅 Badges — ' + ((p && p.badges) || []).length + ' unlocked</summary>' +
     '<h4 id="dwc-sec-badges" style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
     "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
     badgeDisplayListHTML(p ? p.badges : []) +
     badgeSlotPickerHTML(p) + '</details>') +
-    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="divider">➗ Divider — ' + (th.divider || "none") + '</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat dwc-myspace-only" data-fmt="social blog creator"><summary data-sum="divider">➗ Divider — ' + (th.divider || "none") + '</summary>' +
     '<h4 style="margin:14px 0 6px">➗ Divider — the line between Top Friends and comments</h4>' +
     "<p style=\"margin:0 0 8px\">Pick the divider that sits between your Top Friends and your page comments. It only draws when Top Friends AND comments both show — hide either one and there’s no line to draw. The free designs are yours now — more unlock with Lucre or achievements later. Pick a color to match your page.</p>" +
     '<label>Divider — the line between Top Friends and comments</label><select name="theme_divider" onchange="DWC.applyDivider(this.value)">' +
@@ -3968,7 +4083,7 @@ function profileFormHTML(p) {
     '<div id="dwc-divider-preview" style="margin-top:8px">' + dividerHTML(th.divider || "", dividerColorFor(th, th.divider || "")) + "</div>" +
     "</div>" +
     '</details>' +
-    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="buttonsmenu">🔘 Buttons — ' + (th.buttons_visible ? th.buttons_visible.length : 4) + ' showing</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social seller blog musician merchant creator"><summary data-sum="buttonsmenu">🔘 Buttons — ' + (th.buttons_visible ? th.buttons_visible.length : 4) + ' showing</summary>' +
     '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
     "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime. A style here overrides your vibe's buttons.</p>" +
     '<label>Button style — one style for all the buttons on your page</label><select name="theme_button_style" onchange="DWC.applyButtonStyle(this.value, null)">' +
@@ -3977,7 +4092,7 @@ function profileFormHTML(p) {
       return '<option value="' + k + '"' + (th.button_style === k ? " selected" : "") + ">" + esc(BUTTON_STYLES[k].label) + "</option>";
     }).join("") + "</select>" +
     '</details>' +
-    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="effects">✨ Effects — ' + ((th.effects || []).length ? th.effects.length + " on" : "none yet") + '</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary data-sum="effects">✨ Effects — ' + ((th.effects || []).length ? th.effects.length + " on" : "none yet") + '</summary>' +
     '<h4 style="margin:14px 0 6px">✨ MySpace effects — Give it those oldschool effects</h4>' +
     "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF on your page goes in the GIF block above (after My video) — pick a GIF, choose where it sits, and how big it shows.</p>" +
     '<div hidden>' +
@@ -4003,7 +4118,7 @@ function profileFormHTML(p) {
     '<label style="flex:1">Header<select name="theme_pad_header">' + [["", "Normal (current)"], ["none", "None"], ["tight", "Tight"], ["roomy", "Roomy"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.pad_header || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
     '</div>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">None 0 · Tight 8 px · Normal 18 px · Roomy 28 px (24 px on the header). On phones the big values shrink so nothing breaks.</p></details>' +
-    '<details class="dwc-edit-group dwc-edit-cat"><summary>📜 Ticker</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary>📜 Ticker</summary>' +
     (isNew ? "" : '<h4 id="dwc-sec-ticker" style="margin:14px 0 6px">📜 Ticker — optional scrolling text above your page</h4>' +
     '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page — or pick Bitcoin and it shows the live price instead, updating every minute. Your name stays put — it never scrolls.</p>' +
     '<label>What the ticker shows</label><select name="theme_ticker_source">' +
@@ -4022,7 +4137,7 @@ function profileFormHTML(p) {
       '<p style="margin:0 0 8px">The left-hand column of your page: About, What I sell, and the Steady Wave player. Use the arrows or the Position number to put them in the order you want — no dragging needed. A hidden section stays hidden, wherever it sits in this list.</p>' +
       sectionOrderRowsHTML(th) + '</div>') +
     (isNew ? "" : profileHideSectionsHTML(p, th)) +
-    '</details>' +'</div>' +'<div class="dwc-edit-below">' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🛍️ Selling</summary>' +
+    '</details>' +'</div>' +'<div class="dwc-edit-below">' +'<details class="dwc-edit-group dwc-edit-cat" data-fmt="social seller website merchant"><summary>🛍️ Selling</summary>' +
     (isNew ? "" :
     '<h3 class="dwc-edit-group-h" id="dwc-sec-selling">🛍️ Selling — your shop, your buyers, getting paid</h3>' +
 '<div class="dwc-layoutbox" id="dwc-sec-sell"><h4 style="margin:0 0 6px">🛍️ What I sell — your creator card</h4>' +
@@ -4040,7 +4155,7 @@ function profileFormHTML(p) {
     '<input name="seller_open_to" maxlength="140" value="' + v("seller_open_to") + '" placeholder="e.g. custom sets on request">' +
     '<div class="dwc-rowform"><label style="flex:1">My price from ($)<input name="seller_price_min" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_min_cents) || 0) / 100) + '"></label>' +
     '<label style="flex:1">My price to ($)<input name="seller_price_max" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_max_cents) || 0) / 100) + '"></label></div>' +
-    '</div>' + (p && p.age_verified ? '<div class="dwc-layoutbox" id="dwc-sec-content-sales-group"><h4 style="margin:0 0 6px">🔞 Selling content</h4>' : "") + contentSalesToggleHTML(p) + contentMenuEditorHostHTML(p) + (p && p.age_verified ? "</div>" : "") +
+    '</div>' + (p && p.age_verified ? '<div class="dwc-layoutbox" id="dwc-sec-content-sales-group"><h4 style="margin:0 0 6px">🔞 Selling content</h4>' : "") + contentSalesToggleHTML(p) + (p && p.age_verified ? "</div>" : "") +
     '<div class="dwc-layoutbox" id="dwc-sec-buy"><h4 style="margin:0 0 6px">🔍 What I’m after — as a buyer</h4>' +
     "<p style=\"margin:0 0 8px\">Powers Find a Buyer. Same deal — only these fields are shown.</p>" +
     '<label>Content types I want — tick every kind you are after</label><p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: buyers can find you when they search for that type. Off: you do not show up for that type. These do not show on your page — they only help people find you.</p><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
@@ -4049,11 +4164,46 @@ function profileFormHTML(p) {
     '<label>Tags I’m after (comma separated, up to 8)</label>' +
     '<input name="buyer_tags" maxlength="240" value="' + esc(p ? (p.buyer_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, amateur">' +
     '<label>My budget — up to ($)</label>' +
-    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔑 Account &amp; payouts</summary>' +
+    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') + '</details>' +
+    // Catalogue (2026-11-23) — Creator / Seller / Merchant. The window
+    // where their content lives: uploads with who-sees-it, the menu
+    // with prices, and (Creators only) the subscription + blue pics.
+    // The menu editor moved here from Selling; Selling keeps the
+    // on/off switch + the shop card. The drawer rides the same form,
+    // so the subscription + blue-pics settings save with the profile.
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="creator seller merchant"><summary data-sum="catalogue">🗂️ My catalogue</summary><div class="dwc-layoutbox" id="dwc-sec-catalogue"><h4 style="margin:0 0 6px">🗂️ My catalogue — where your content lives</h4>' +
+    "<p style=\"margin:0 0 8px\">Your catalogue is the window where your content lives — upload it here, set who sees it, put your menu items and prices up, and (if you're a content creator) set your monthly subscription. Sellers get the catalogue for their goods, without the subscribers-only or blue-pics options — those are for content creators only.</p>" +
+    '<p style="margin:0"><button type="button" class="btn" onclick="DWC.openCatalogue()">Open my catalogue →</button></p>' +
+    '</div></details>' +
+    '<div id="dwc-catalogue-drawer" class="dwc-drawer" hidden><div class="dwc-drawer-backdrop" onclick="DWC.closeCatalogue()"></div><div class="dwc-drawer-panel" role="dialog" aria-label="My catalogue"><div class="dwc-drawer-head"><img src="/images/heart-rise-official.webp" alt="" class="dwc-drawer-banner"><div class="dwc-drawer-title">My catalogue</div><button type="button" class="dwc-drawer-close" onclick="DWC.closeCatalogue()" aria-label="Close catalogue">✕</button></div><div class="dwc-drawer-body">' +
+    '<h4 style="margin:0 0 6px">📤 Put content in my catalogue</h4>' +
+    "<p style=\"margin:0 0 8px\">Upload a picture, set who sees it, and it lives in your catalogue. Up to 3 photos on your profile at a time — delete one to add another.</p>" +
+    '<label>Picture to upload</label>' +
+    '<input name="catalogue_photo_file" type="file" accept="image/*" onchange="DWC.cataloguePhotoPicked(this)">' +
+    '<label>Short description</label><input id="dwc-catalogue-caption" maxlength="140" placeholder="Short description (140 max)">' +
+    '<label>Who sees it</label><select id="dwc-catalogue-vis"></select>' +
+    '<div class="dwc-creator-only"><label><input type="checkbox" id="dwc-catalogue-blue" style="width:auto"> 🔞 This is a blue pic</label><p style="margin:4px 0 0;color:var(--muted);font-size:13px">Blue pics follow your blue-pics setting below — subscribers only, or everyone.</p></div>' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn" onclick="DWC.catalogueUpload()">Upload to my catalogue</button></p>' +
+    '<p id="dwc-catalogue-note" style="margin:6px 0 0;color:var(--muted);font-size:13px"></p>' +
+    ((p && p.content_sales_enabled) ? contentMenuEditorHostHTML(p) : '<p style="color:var(--muted);font-size:13px">Your menu is off — switch on “Selling content” in the Selling section, then come back. Your menu lives here, with your prices.</p>') +
+    '<div class="dwc-creator-only">' +
+    '<h4 style="margin:14px 0 6px">💳 Monthly subscription</h4>' +
+    "<p style=\"margin:0 0 8px\">Charge a monthly fee for your subscribers. It only works if you paste a subscribe link — PayPal or Stripe — because that’s where the money actually moves. No link, no subscription. Square isn’t connected yet — when it is, it’ll sit here next to PayPal and Stripe.</p>" +
+    '<label>Monthly fee ($) — whole dollars, $1 to $1,000</label><input name="theme_subscribe_fee" type="number" step="1" min="0" max="1000" value="' + (th.subscribe_fee || "") + '">' +
+    '<label>PayPal subscribe link</label><input name="theme_subscribe_paypal_url" maxlength="500" value="' + esc(th.subscribe_paypal_url || "") + '" placeholder="https://www.paypal.com/...">' +
+    '<label>Stripe subscribe link</label><input name="theme_subscribe_stripe_url" maxlength="500" value="' + esc(th.subscribe_stripe_url || "") + '" placeholder="https://buy.stripe.com/...">' +
+    '<label>🔞 Blue pics — who sees them</label><select name="theme_blue_pics_visibility">' +
+    '<option value=""' + (th.blue_pics_visibility !== "public" ? " selected" : "") + '>Subscribers only — people who pay your monthly fee</option>' +
+    '<option value="public"' + (th.blue_pics_visibility === "public" ? " selected" : "") + '>Everyone — including people who aren’t subscribers</option>' +
+    '</select>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Sellers don’t get this one — it’s for content creators only. Your blue pics stay subscribers-only unless you pick Everyone here. Save profile to keep these settings.</p>' +
+    '</div>' +
+    '</div><div class="dwc-drawer-foot"><button type="button" class="btn" onclick="DWC.closeCatalogue()">Close catalogue</button> <span style="color:var(--muted);font-size:13px">Save profile to keep your subscription + blue-pics settings.</span></div></div></div>' +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary>🔑 Account &amp; payouts</summary>' +
         (isNew ? "" : accountSectionHTML(p)) +
     '<label>Birthday — month / day only shows publicly, never the year' + (isNew ? " (required — one account per person)" : "") + "</label>" +
     '<input name="birthday" type="date" value="' + (p && p.birthday ? esc(p.birthday) : "") + '"' + (isNew ? " required" : "") + ">" + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔗 Page URL</summary>' +
-    (isNew ? "" : pageSlugSectionHTML(p)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="overlay">🖼️ Make it one picture — ' + ((th.overlay_items && th.overlay_items.length) ? th.overlay_items.length + (th.overlay_items.length === 1 ? " item placed" : " items placed") : "no overlays yet") + '</summary>' +
+    (isNew ? "" : pageSlugSectionHTML(p)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary data-sum="overlay">🖼️ Make it one picture — ' + ((th.overlay_items && th.overlay_items.length) ? th.overlay_items.length + (th.overlay_items.length === 1 ? " item placed" : " items placed") : "no overlays yet") + '</summary>' +
     overlayEditorHTML(th) +
     '</details>' +
     '</div>' +    // (The old single-form signup tail — full name / password / recovery
@@ -4869,7 +5019,7 @@ function parseThemeClient(stored) {
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
   if (!obj || typeof obj !== "object") return empty;
   var hex = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
-  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", ticker_source: "", hide_sections: [] };
+  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", ticker_source: "", hide_sections: [] };
   var img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   var gif = String(obj.bg_gif_url || "").trim().slice(0, 500);
@@ -5012,6 +5162,36 @@ function parseThemeClient(stored) {
   out.video_url = extractYouTubeId(vu) ? vu : "";
   var vf = String(obj.video_file_url || "").trim().slice(0, 500);
   out.video_file_url = (/^\/api\/files\?key=/i.test(vf) || /^https:\/\//i.test(vf)) ? vf : "";
+  // One uploaded track (2026-11-23, Bands) — R2 file URL, the rights
+  // declaration, and the operator's approval. Mirrors the server.
+  var mf = String(obj.music_file_url || "").trim().slice(0, 500);
+  out.music_file_url = (/^\/api\/files\?key=/i.test(mf) || /^https:\/\//i.test(mf)) ? mf : "";
+  out.music_ip_rights = obj.music_ip_rights === true;
+  out.music_file_approved = obj.music_file_approved === true;
+  // Tour dates (2026-11-23, Bands) — up to 10, each a date, a city or
+  // venue, and an optional ticket link.
+  var tds = Array.isArray(obj.tour_dates) ? obj.tour_dates : [];
+  out.tour_dates = tds.slice(0, 10).map(function (it) {
+    if (!it || typeof it !== "object") return null;
+    var d = String(it.date || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    var city = String(it.city || "").replace(/[<>]/g, "").trim().slice(0, 80);
+    if (!city) return null;
+    var u = String(it.url || "").trim().slice(0, 500);
+    if (u && !/^https:\/\//i.test(u)) u = "";
+    return { date: d, city: city, url: u };
+  }).filter(Boolean);
+  // Creator subscription (2026-11-23, Catalogue) — monthly fee in whole
+  // dollars plus the PayPal / Stripe subscribe link. Fee 0 = none set.
+  var sfee = parseInt(obj.subscribe_fee, 10);
+  out.subscribe_fee = (isFinite(sfee) && sfee > 0 && sfee <= 1000) ? sfee : 0;
+  var spp = String(obj.subscribe_paypal_url || "").trim().slice(0, 500);
+  out.subscribe_paypal_url = /^https:\/\//i.test(spp) ? spp : "";
+  var sps = String(obj.subscribe_stripe_url || "").trim().slice(0, 500);
+  out.subscribe_stripe_url = /^https:\/\//i.test(sps) ? sps : "";
+  // Blue pics (2026-11-23, Catalogue, Content Creators only) — "" =
+  // subscribers only (the default), "public" = everyone.
+  out.blue_pics_visibility = (String(obj.blue_pics_visibility || "") === "public") ? "public" : "";
   // Video size + centering + stretch (v3.22) — "" = Normal (current
   // size, default); "s" Small, "l" Big, "stretch" Stretch to fit.
   // video_align "" = standard arrangement; "center" locks it centered.
@@ -5084,7 +5264,7 @@ var SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio",
 // of a member page, in render order. Rides in the theme JSON.
 var SECTION_ORDER_IDS = ["about", "seller", "radio"];
 var SECTION_ORDER_LABELS = { about: "About (website sections)", seller: "What I sell", radio: "Steady Wave radio" };
-var SECTION_HIDE_LABELS = { top8: "Top Friends", links: "My links", seller: "What I sell", about: "About", comments: "Page comments", radio: "Page sound (radio / soundscape)", video: "My video", relationship: "Relationship status", occupation: "Occupation", listings: "My listings (professional mode)" };
+var SECTION_HIDE_LABELS = { top8: "Top Friends", links: "My links", seller: "What I sell", about: "About", comments: "Page comments", radio: "Page sound (radio / soundscape)", video: "My video", relationship: "Relationship status", occupation: "Occupation", listings: "My listings (Website look)" };
 // Plain-words keywords Taffy's builder matches to each hideable section
 // (client-side only — the builder never leaves the browser).
 var SECTION_KEYWORDS = {
@@ -5953,10 +6133,12 @@ var PAGE_FORMATS = [
   { id: "social", name: "Social", icon: "👥", desc: "Heart Rise — a social profile: about, feed, friends, photos. The modernized default. Built for you to grow, to thrive — so you can finally be set free and make a future for yourself, no matter your circumstances." },
   { id: "seller", name: "Seller", icon: "🛒", desc: "Your page as a shop — what you sell and your ratings first, like an eBay profile." },
   { id: "website", name: "Website", icon: "🌐", desc: "Your page as a personal website — your own content first, links, about." },
-  { id: "blog", name: "Blog", icon: "📝", desc: "Your page as a blog — your posts first, in order, about and links after." },
-  { id: "musician", name: "Musician", icon: "🎵", desc: "Your page as a musician profile — your music first, about and links after." }
+  { id: "blog", name: "Blog", icon: "📝", desc: "A blog — your videos and posts first, long reads with pictures between the paragraphs, and your code box front and centre for the layout." },
+  { id: "musician", name: "Musician", icon: "🎵", desc: "Your page as a musician profile — your music first, about and links after." },
+  { id: "merchant", name: "Digital Merchant", icon: "🏪", desc: "Your page as a digital shop — what you want to buy and sell first, listings and payouts ready." },
+  { id: "creator", name: "Content Creator", icon: "🎬", desc: "Your page as a creator — about you first, then your videos, music, and links." }
 ];
-var PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician"];
+var PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician", "merchant", "creator"];
 function pageFormatFor(th, p) {
   var f = th && th.page_format;
   if (PAGE_FORMAT_IDS.indexOf(f) >= 0) return f;
@@ -5970,11 +6152,13 @@ var FORMAT_INFO_ORDER = {
   seller: ["seller", "about", "radio"],
   website: ["about", "seller", "radio"],
   blog: ["about", "seller", "radio"],
-  musician: ["radio", "about", "seller"]
+  musician: ["radio", "about", "seller"],
+  merchant: ["seller", "about", "radio"],
+  creator: ["about", "radio", "seller"]
 };
 // Which editor category opens by default for each format (the About
 // Me box is always open at the top; this is the second open one).
-var FORMAT_KEY_SECTION = { social: "", seller: "selling", website: "style", blog: "", musician: "music" };
+var FORMAT_KEY_SECTION = { social: "", seller: "selling", website: "style", blog: "", musician: "music", merchant: "selling", creator: "catalogue" };
 
 // ---------- Background library (2026-11-23) ----------
 // The 18 generated backgrounds (14 new + 4 existing), wired in as the
@@ -6533,7 +6717,7 @@ function layoutPreviewInnerHTML(p) {
     if (p.birthsign && !show.sign) offBits.push("Sign");
     if (p.accomplishments && !show.accomplishments) offBits.push("Recent accomplishments");
     if (offBits.length) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Hidden — tick Show to publish: ' + esc(offBits.join(", ")) + '.</p>';
-    if (p.website_mode && (p.hobbies || p.workplace || p.relationship_status || p.birthsign || p.accomplishments)) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Professional mode is on — the bits above stay hidden on your page until you turn it off.</p>';
+    if (p.website_mode && (p.hobbies || p.workplace || p.relationship_status || p.birthsign || p.accomplishments)) website += '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👁️ Website look is on — the bits above stay hidden on your page until you turn it off.</p>';
   }
   // Hidden sections — one line so the member sees the hide worked.
   var hiddenLabels = (th.hide_sections || []).map(function (k) { return SECTION_HIDE_LABELS[k] || k; });
@@ -6551,7 +6735,7 @@ function layoutPreviewInnerHTML(p) {
       tickerHTML(p, th) + (th.ticker_source !== "btc" ? vibeTickerHTML(p, th) : "") +
       '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(th.custom_page_html) + "</div>" +
       '<div style="pointer-events:none">' + actionsBlock + "</div>" +
-      audioSectionHTML(p, th, { noAutoplay: true }) +
+      audioSectionHTML(p, th, { noAutoplay: true }) + tourDatesSectionHTML(th) +
       '<p style="color:var(--muted);font-size:13px">Your listings still show below this on your page.</p>' +
       "</div>";
   }
@@ -6578,7 +6762,7 @@ function layoutPreviewInnerHTML(p) {
   // first in the preview, like on the live page.
   var fmtPrev = pageFormatFor(th, p);
   var actionsDiv = '<div style="pointer-events:none">' + actionsBlock + "</div>";
-  var audioDiv = audioSectionHTML(p, th, { noAutoplay: true });
+  var audioDiv = audioSectionHTML(p, th, { noAutoplay: true }) + tourDatesSectionHTML(th);
   return '<div class="dwc-myprofile dwc-onebox dwc-previewbox' + btnSizeCls + '">' +
     ((p && p.website_mode) ? "" : pageOverlayHTML(th, p)) +
     tickerHTML(p, th) + (p && th.ticker_source !== "btc" ? vibeTickerHTML(p, th) : "") + gifTop +
@@ -7982,7 +8166,7 @@ async function viewMembers(el) {
   var scope = (data && data.scope) || (team ? "all" : "friends");
   el.innerHTML =
     '<section aria-label="Community members">' + head +
-    (members.length ? '<div class="grid">' + members.map(function (m) {
+    (members.length ? '<div class="grid dwc-members-grid">' + members.map(function (m) {
       return '<article class="card">' +
         (m.avatar_url ? '<a href="#/member/' + m.id + '"><img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt=""></a>' : '<a href="#/member/' + m.id + '">' + rcrAvatarHTML() + '</a>') +
         '<h3><a href="#/member/' + m.id + '">@' + esc(m.username) + "</a> " + presenceDot(m) + "</h3>" +
@@ -8626,15 +8810,17 @@ function gbFrameColors(th) {
 // comments + heart). GB/GBA frames render a handheld around the
 // picture instead of a round ring.
 // No profile picture (never set, or the pfp photo was deleted): the
-// RCR placeholder avatar (2026-11-23) — the ONE fallback everywhere a
-// member has no photo: the Rare Candy Reserve mark
-// (images/rcr-avatar-placeholder.png). It replaces the Vita Nova logo in
-// the big picture slot and the 🍬 emoji span in lists, and fills the
-// spots that used to render nothing at all. .dwc-avatar-none /
+// Heart Rise placeholder avatar (2026-11-23) — the ONE fallback
+// everywhere a member has no photo: the Heart Rise symbol itself
+// (images/heart-rise-official.webp), just the image. Chris's call:
+// the RCR mark placeholder is out; the Heart Rise symbol is the
+// default picture now. It replaces the Vita Nova logo in the big
+// picture slot and the 🍬 emoji span in lists, and fills the spots
+// that used to render nothing at all. .dwc-avatar-none /
 // .dwc-avatar-logo CSS stays as a safety net. cls is the extra size
 // class ("" / " dwc-avatar-sm" / " dwc-avatar-big"); style is an
 // optional inline style (the 36px lists).
-var RCR_AVATAR_SRC = "images/rcr-avatar-placeholder.png";
+var RCR_AVATAR_SRC = "images/heart-rise-balloon.webp";
 function rcrAvatarHTML(cls, style) {
   return '<img class="dwc-avatar' + (cls || "") + '" src="' + RCR_AVATAR_SRC + '" alt="Rare Candy Reserve — upload a new profile picture"' + (style ? ' style="' + style + '"' : "") + ">";
 }
@@ -8783,7 +8969,7 @@ function websiteSectionsHTML(m, mth, preview) {
   // sees what stays hidden while professional mode is on.
   var pro = !!(m && m.website_mode);
   if (pro && !preview) return "";
-  var dimTag = preview ? ' <span style="color:var(--muted);font-size:12px">' + (pro ? "👁️ Hidden in professional mode" : "👁️ Hidden — tick Show to publish") + "</span>" : "";
+  var dimTag = preview ? ' <span style="color:var(--muted);font-size:12px">' + (pro ? "👁️ Hidden in Website look" : "👁️ Hidden — tick Show to publish") + "</span>" : "";
   var rows = "";
   var addRow = function (label, html, live, dimmed) {
     if (live) rows += '<p style="margin:10px 0 0">' + (label ? "<strong>" + label + "</strong><br>" : "") + html + "</p>";
@@ -8929,10 +9115,10 @@ async function viewMember(el, memberId, previewOp) {
       // Subscribe / Message privately buttons stay off here. The shop
       // info above still shows. v3.21 — the Subscribe button itself
       // can be hidden from Edit Profile > Buttons ("Which buttons show").
-      ((m.is_mine || isWebsite) ? "" : '<p>' + (showSubscribe ? '<button type="button" class="btn dwc-subscribe" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">' + esc(m.subscribe_label || "Subscribe to my page") + '</button> ' : "") + '<button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
+      ((m.is_mine || isWebsite) ? "" : '<p>' + (showSubscribe ? subscribeButtonHTML(m, mth) : "") + '<button type="button" class="btn ghost small" onclick="DWC.messageSeller(' + m.id + ", '" + esc(m.username.replace(/'/g, "")) + '\', null)">💬 Message privately</button></p>') +
       "</section>"
     : "");
-  var radioSection = !hidden("radio") ? audioSectionHTML(m, mth) : "";
+  var radioSection = (!hidden("radio") ? audioSectionHTML(m, mth) : "") + tourDatesSectionHTML(mth);
   // Professional mode (2026-11-21) is the opposite of MySpace: the five
   // website sections only render in MySpace mode, whenever their OWN
   // Show box is ticked. Professional mode hides them outright (see
@@ -9086,6 +9272,8 @@ async function viewMember(el, memberId, previewOp) {
   var bannerImg = el.querySelector(".dwc-banner img");
   if (bannerImg && bannerImg.complete) bannerFit(bannerImg);
   if (!hasCustomPage) loadMemberFeed(m.id);
+  else state.feedLoader = null; // custom page has no feed — a stale
+  // "Load more" from the last member's page must never fire here.
   if (isWebsite && !hidden("listings")) loadMemberListings(m.id);
   if (!hasCustomPage && !hidden("comments")) loadPageComments(m.id, m.is_mine, m.is_friend);
   loadSellerRating(m.id);
@@ -9149,15 +9337,29 @@ async function loadMemberFeed(memberId) {
   var list = $("dwc-member-feed-list");
   var moreHost = $("dwc-member-feed-more");
   if (!list) return;
+  // Tag the list with the member it belongs to. A load that resolves
+  // after the viewer has moved on to another member's page must never
+  // write into the new page's list — the tag + the isConnected check
+  // below are what stop a stale async load from showing another
+  // profile's posts at the bottom of this one.
+  list.setAttribute("data-feed-member", String(memberId));
   var feed = { before: null, hasMore: true, loading: false, loaded: 0 };
   async function loadPage() {
     if (feed.loading || !feed.hasMore) return;
+    // Still this member's list? If the page navigated away, the list is
+    // detached (or re-tagged for another member) — stop, don't write.
+    if (!list.isConnected || list.getAttribute("data-feed-member") !== String(memberId)) { feed.hasMore = false; return; }
+    if (state.viewingMember && state.viewingMember.id !== memberId) { feed.hasMore = false; return; }
     feed.loading = true;
     var q = "/posts?profile_id=" + memberId + "&limit=10&device_id=" + encodeURIComponent(deviceId());
     if (feed.before) q += "&before=" + feed.before;
     var data = await apiGet(q);
     feed.loading = false;
     if (!data) return;
+    // Re-check after the await — the viewer may have navigated while
+    // this page was in flight.
+    if (!list.isConnected || list.getAttribute("data-feed-member") !== String(memberId)) { feed.hasMore = false; return; }
+    if (state.viewingMember && state.viewingMember.id !== memberId) { feed.hasMore = false; return; }
     if (data.feed_visible === false) {
       list.innerHTML = '<p style="color:var(--muted)">This member’s posts are private.</p>';
       if (moreHost) moreHost.innerHTML = "";
@@ -11574,6 +11776,15 @@ window.DWC = {
       }
       if (video && video.error) { videoError = video.error; video = null; }
     }
+    // Uploaded track (2026-11-23, Bands) — MP3/WAV/OGG/M4A, up to
+    // 10 MB, no seconds cap. A bad track never kills the save.
+    var musicFile = fd.get("profile_music_file") && fd.get("profile_music_file").size ? fd.get("profile_music_file") : null;
+    var music = null;
+    var musicError = null;
+    if (musicFile) {
+      music = await fileToAudio(musicFile, MUSIC_MAX_BYTES);
+      if (music && music.error) { musicError = music.error; music = null; }
+    }
     var body = {
       device_id: deviceId(),
       username: String(fd.get("username") || "").trim(),
@@ -11598,6 +11809,8 @@ window.DWC = {
     if (banner) body.banner = { dataBase64: banner.dataBase64, mimeType: banner.mimeType };
     if (video) body.video = { dataBase64: video.dataBase64, mimeType: video.mimeType };
     if (fd.get("remove_video")) body.remove_video = true;
+    if (music) body.music = { dataBase64: music.dataBase64, mimeType: music.mimeType };
+    if (fd.get("remove_music")) body.remove_music = true;
     // v3.7 — ticker: optional custom text (up to 200 chars) + on/off + color.
     if (form.querySelector('input[name="ticker_text"]')) {
       body.ticker_text = String(fd.get("ticker_text") || "").trim().slice(0, 200);
@@ -11812,6 +12025,36 @@ window.DWC = {
       if (extractYouTubeId(vidUrl)) theme.video_url = vidUrl;
       var vidFile = String(fd.get("theme_video_file_url") || "").trim().slice(0, 500);
       if (vidFile) theme.video_file_url = vidFile;
+      // Uploaded track (2026-11-23, Bands) — the file URL rides the
+      // hidden input (the server sets it from the upload); the rights
+      // tick is a checkbox; the approval is a hidden "1" for the member
+      // (so a plain save never wipes it) and a checkbox for the
+      // operator. The server re-validates all three.
+      var musFile = String(fd.get("theme_music_file_url") || "").trim().slice(0, 500);
+      if (musFile) theme.music_file_url = musFile;
+      theme.music_ip_rights = !!fd.get("theme_music_ip_rights");
+      var musAppr = String(fd.get("theme_music_file_approved") || "");
+      if (musAppr === "1" || musAppr === "on") theme.music_file_approved = true;
+      // Tour dates (2026-11-23, Bands) — the hidden input holds JSON;
+      // the editor keeps it in sync. Bad JSON or a bad row never kills
+      // the save; the server re-validates every date.
+      var tourRaw = String(fd.get("theme_tour_dates") || "").trim();
+      if (tourRaw) {
+        try {
+          var tourParsed = JSON.parse(tourRaw);
+          if (Array.isArray(tourParsed)) theme.tour_dates = tourParsed.slice(0, 10);
+        } catch (e) { /* keep the saved dates; the editor re-syncs them */ }
+      }
+      // Creator subscription + blue pics (2026-11-23, Catalogue) — the
+      // drawer inputs; the server re-validates the fee and the links.
+      var subFee = parseInt(String(fd.get("theme_subscribe_fee") || ""), 10);
+      if (isFinite(subFee) && subFee > 0 && subFee <= 1000) theme.subscribe_fee = subFee;
+      var subPP = String(fd.get("theme_subscribe_paypal_url") || "").trim().slice(0, 500);
+      if (/^https:\/\//i.test(subPP)) theme.subscribe_paypal_url = subPP;
+      var subST = String(fd.get("theme_subscribe_stripe_url") || "").trim().slice(0, 500);
+      if (/^https:\/\//i.test(subST)) theme.subscribe_stripe_url = subST;
+      var blueVis = String(fd.get("theme_blue_pics_visibility") || "");
+      if (blueVis === "public") theme.blue_pics_visibility = "public";
       // Video size + centering + stretch (v3.22) — Small / Normal / Big /
       // Stretch to fit; "" = Normal (current size, default). Center locks
       // the video block in the middle of its spot.
@@ -12014,6 +12257,11 @@ window.DWC = {
     else if (data.video_error) videoNote = " Your video didn't save — " + data.video_error;
     else if (video) videoNote = " Video saved ✓";
     else if (fd.get("remove_video")) videoNote = " Video removed.";
+    var musicNote = "";
+    if (musicError) musicNote = " Your track didn't save — " + musicError;
+    else if (data.music_error) musicNote = " Your track didn't save — " + data.music_error;
+    else if (music) musicNote = " Track saved ✓ — it plays on your page once it's approved.";
+    else if (fd.get("remove_music")) musicNote = " Track removed.";
     // Password auth (2026-11-22) — pre-migration, a new signup's password
     // may not have stuck (password_pending). Say so plainly instead of
     // letting the member believe they're covered.
@@ -12027,10 +12275,10 @@ window.DWC = {
       if (data.v37_pending) pendingParts.push("your banner / ticker");
       if (data.v39_pending) pendingParts.push("your website look");
       setNotice("Profile saved — but " + pendingParts.join(" and ") + " didn't stick yet. " +
-        "The shop is still running a quick database update; try saving again later." + avatarNote + bannerNote + videoNote + pwNote + recNote);
+        "The shop is still running a quick database update; try saving again later." + avatarNote + bannerNote + videoNote + musicNote + pwNote + recNote);
     } else {
       // Build 5 — an operator edit names the member whose page saved.
-      setNotice((state.adminEditingMemberId ? "Saved @" + data.profile.username + "’s page." : (isNew ? "Welcome to Heart Rise, @" + data.profile.username + " — you're on." : "Profile saved.")) + avatarNote + bannerNote + videoNote + pwNote + recNote);
+      setNotice((state.adminEditingMemberId ? "Saved @" + data.profile.username + "’s page." : (isNew ? "Welcome to Heart Rise, @" + data.profile.username + " — you're on." : "Profile saved.")) + avatarNote + bannerNote + videoNote + musicNote + pwNote + recNote);
     }
     if (state.signupStep) {
       // Stepped signup — stay in the flow: advance one step and
@@ -13136,6 +13384,51 @@ window.DWC = {
     else return;
     DWC.refreshLayoutPreviewSoon();
   },
+  // Tour dates (2026-11-23, Bands) — add / remove a show row, and keep
+  // the hidden theme_tour_dates JSON in sync with the rows. Rows are
+  // re-rendered from the stored theme on add/remove; edits sync live.
+  addTourDate: function () {
+    var th = parseThemeClient(state.profile ? state.profile.profile_theme : "");
+    var dates = (th.tour_dates || []).slice(0, 10);
+    if (dates.length >= 10) { setNotice("That’s the 10-date limit — remove one to add another."); return; }
+    dates.push({ date: "", city: "", url: "" });
+    var host = document.getElementById("dwc-tour-rows");
+    if (host) host.innerHTML = tourDatesRowsHTML({ tour_dates: dates });
+    DWC.syncTourDates();
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  removeTourDate: function (i) {
+    var rows = document.querySelectorAll("#dwc-tour-rows [data-tour-row]");
+    var dates = [];
+    rows.forEach(function (row) {
+      var idx = Number(row.getAttribute("data-tour-row"));
+      if (idx === i) return;
+      var inputs = row.querySelectorAll("input");
+      dates.push({ date: inputs[0] ? inputs[0].value : "", city: inputs[1] ? inputs[1].value : "", url: inputs[2] ? inputs[2].value : "" });
+    });
+    var host = document.getElementById("dwc-tour-rows");
+    if (host) host.innerHTML = tourDatesRowsHTML({ tour_dates: dates });
+    DWC.syncTourDates();
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  syncTourDates: function () {
+    var rows = document.querySelectorAll("#dwc-tour-rows [data-tour-row]");
+    var dates = [];
+    rows.forEach(function (row) {
+      var inputs = row.querySelectorAll("input");
+      var d = inputs[0] ? String(inputs[0].value || "").trim() : "";
+      var city = inputs[1] ? String(inputs[1].value || "").trim() : "";
+      var url = inputs[2] ? String(inputs[2].value || "").trim() : "";
+      if (d || city) dates.push({ date: d, city: city, url: url });
+    });
+    var form = document.querySelector("#dwc-account form");
+    var hid = form && form.querySelector('input[name="theme_tour_dates"]');
+    if (hid) hid.value = JSON.stringify(dates.slice(0, 10));
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
   // Avatar picker feedback (v3.4) — the moment Chris picks a file, show
   // its size and whether it will work, instead of failing silently on save.
   avatarPicked: async function (input) {
@@ -13750,26 +14043,117 @@ window.DWC = {
     document.querySelectorAll(".dwc-format-pill").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-format") === id);
     });
+    if (form && form.classList) { PAGE_FORMAT_IDS.forEach(function (f) { form.classList.toggle("dwc-fmt-" + f, f === id); }); }
     var desc = document.getElementById("dwc-format-desc");
     var f = PAGE_FORMATS.filter(function (x) { return x.id === id; })[0];
     if (desc && f) desc.textContent = f.desc;
     var key = FORMAT_KEY_SECTION[id];
     if (key) {
-      var map = { selling: "dwc-sec-selling", style: "dwc-sec-style", music: "dwc-sec-radio" };
+      var map = { selling: "dwc-sec-selling", style: "dwc-sec-style", music: "dwc-sec-radio", video: "dwc-sec-video", catalogue: "dwc-sec-catalogue" };
       var el = document.getElementById(map[key] || "");
       if (el) DWC.editorJump(map[key]);
     }
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
-  // The sticky bar's Preview: scroll to the live preview at the top of
-  // the editor and flash it, so the member sees what visitors see.
-  previewProfile: function () {
-    var host = document.getElementById("dwc-layout-preview");
-    if (!host) return;
-    host.scrollIntoView({ behavior: "smooth", block: "start" });
-    host.classList.add("dwc-preview-flash");
-    setTimeout(function () { host.classList.remove("dwc-preview-flash"); }, 1200);
+  // The sticky bar's Preview + the big "Preview my current page" button:
+  // open the slide-out drawer with the live preview, so the member sees
+  // what visitors see without scrolling. Close it any time (✕, backdrop,
+  // Close button, or Esc).
+  previewProfile: function () { DWC.openPagePreview(); },
+  openPagePreview: function () {
+    var d = document.getElementById("dwc-page-drawer");
+    if (!d) return;
+    DWC.refreshLayoutPreview();
+    d.hidden = false;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", DWC._drawerEsc);
+  },
+  closePagePreview: function () {
+    var d = document.getElementById("dwc-page-drawer");
+    if (!d) return;
+    d.hidden = true;
+    document.body.style.overflow = "";
+    document.removeEventListener("keydown", DWC._drawerEsc);
+  },
+  _drawerEsc: function (e) { if (e.key === "Escape") DWC.closePagePreview(); },
+  _catalogueEsc: function (e) { if (e.key === "Escape") DWC.closeCatalogue(); },
+  // Catalogue (2026-11-23) — the window where a creator's / seller's /
+  // merchant's content lives. Opens the drawer, refreshes the who-sees-it
+  // options for the CURRENT page type (Subscribers-only is for Content
+  // Creators only — sellers never see it), and refills the menu editor
+  // (it lives in the drawer now, not in Selling).
+  openCatalogue: function () {
+    var d = document.getElementById("dwc-catalogue-drawer");
+    if (!d) return;
+    var form = document.querySelector("#dwc-account form");
+    var fmt = "";
+    if (form) { PAGE_FORMAT_IDS.forEach(function (f) { if (form.classList && form.classList.contains("dwc-fmt-" + f)) fmt = f; }); }
+    var sel = document.getElementById("dwc-catalogue-vis");
+    if (sel) {
+      var cur = sel.value || "public";
+      var opts = '<option value="public">🌍 Public — everyone</option><option value="friends">👥 Friends only</option><option value="members">👥 Members — anyone signed in</option>' +
+        (fmt === "creator" ? '<option value="subscribers">🔒 Subscribers only — people who pay your monthly fee</option>' : "") +
+        '<option value="private">🔒 Private — only me</option>';
+      sel.innerHTML = opts;
+      sel.value = ["public", "friends", "members", "subscribers", "private"].indexOf(cur) >= 0 ? cur : "public";
+      if (fmt !== "creator" && sel.value === "subscribers") sel.value = "public";
+    }
+    d.hidden = false;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", DWC._catalogueEsc);
+    if (state.editingProfile) loadMenuEditor(true);
+  },
+  closeCatalogue: function () {
+    var d = document.getElementById("dwc-catalogue-drawer");
+    if (!d) return;
+    d.hidden = true;
+    document.body.style.overflow = "";
+    document.removeEventListener("keydown", DWC._catalogueEsc);
+  },
+  // Catalogue upload (2026-11-23) — one picture into the gallery with
+  // the who-sees-it the member picked. A blue pic (Creators only) rides
+  // the creator's blue-pics setting: subscribers-only by default, or
+  // everyone if they picked that. Until the subscription system lands,
+  // subscribers-only photos are owner + operator only on the server.
+  cataloguePhotoPicked: function (input) {
+    var note = document.getElementById("dwc-catalogue-note");
+    var f = input && input.files && input.files[0];
+    if (!f) return;
+    if (note) note.textContent = "✓ " + f.name + " — ready to upload.";
+    DWC.profileFormDirty();
+  },
+  catalogueUpload: async function () {
+    var note = document.getElementById("dwc-catalogue-note");
+    var input = document.querySelector('input[name="catalogue_photo_file"]');
+    var f = input && input.files && input.files[0];
+    if (!f) { if (note) note.textContent = "Pick a picture first."; return; }
+    var capEl = document.getElementById("dwc-catalogue-caption");
+    var visEl = document.getElementById("dwc-catalogue-vis");
+    var blueEl = document.getElementById("dwc-catalogue-blue");
+    var cap = capEl ? capEl.value.slice(0, 140) : "";
+    var vis = visEl ? visEl.value : "public";
+    if (["public", "friends", "members", "subscribers", "private"].indexOf(vis) < 0) vis = "public";
+    // A blue pic follows the creator's blue-pics setting, not the picker
+    // above — subscribers-only unless they picked Everyone.
+    if (blueEl && blueEl.checked) {
+      var form = document.querySelector("#dwc-account form");
+      var blueSel = form && form.querySelector('select[name="theme_blue_pics_visibility"]');
+      vis = (blueSel && blueSel.value === "public") ? "public" : "subscribers";
+    }
+    if (note) note.textContent = "Uploading… 🍬";
+    var img = await fileToImage(f, 1500000, { maxDim: 1600 });
+    if (!img || img.error) { if (note) note.textContent = img && img.error ? img.error : "That picture couldn't be read — try again."; return; }
+    var data = await apiPost("/gallery", { device_id: deviceId(), image: { dataBase64: img.dataBase64, mimeType: img.mimeType }, caption: cap, visibility: vis });
+    if (data && data.ok) {
+      if (note) note.textContent = "✓ In your catalogue — " + (vis === "subscribers" ? "subscribers only." : vis + ".");
+      if (input) input.value = "";
+      if (capEl) capEl.value = "";
+      if (blueEl) blueEl.checked = false;
+      DWC.refreshGalleryCount();
+    } else {
+      if (note) note.textContent = (data && data.error) || "Couldn't upload that — try again.";
+    }
   },
   // Jump-to nav: open the accordion section that holds the target id,
   // then scroll to it. (A plain #hash link can't land inside a closed
@@ -14031,7 +14415,9 @@ window.DWC = {
   loadRevealPosts: async function () {
     var host = document.getElementById("dwc-reveal-posts-list");
     if (!host || !state.viewingMember) return;
-    var data = await apiGet("/posts?profile_id=" + state.viewingMember.id + "&limit=10&device_id=" + encodeURIComponent(deviceId()));
+    var mid = state.viewingMember.id;
+    var data = await apiGet("/posts?profile_id=" + mid + "&limit=10&device_id=" + encodeURIComponent(deviceId()));
+    if (!host.isConnected || !state.viewingMember || state.viewingMember.id !== mid) return;
     var posts = (data && data.posts) || [];
     host.innerHTML = posts.length ? posts.map(postCardHTML).join("") : '<p style="color:var(--muted)">No posts yet.</p>';
   },
@@ -14516,6 +14902,7 @@ window.DWC = {
     if (real && sel !== real) real.value = mode;
     var chk = form && form.querySelector('input[name="website_mode"]');
     if (chk) chk.checked = (mode === "website");
+    if (form) { form.classList.toggle("dwc-mode-website", mode === "website"); form.classList.toggle("dwc-mode-myspace", mode !== "website"); }
     var note = document.getElementById("dwc-page-mode-note");
     if (note) note.textContent = mode === "website"
       ? "Website look is ON — your profile is your own clean standalone site. MySpace extras (Top Friends, personal bits) hide while this is on."
@@ -14749,7 +15136,7 @@ window.DWC = {
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
-  // Professional-mode button side (v3.21) — Left / Center / Right pills.
+  // Website look button side (v3.21) — Left / Center / Right pills.
   // Sets the hidden theme_pro_button_side field ("" = left).
   applyProButtonSide: function (side) {
     var v = (side === "center" || side === "right") ? side : "";
@@ -14763,7 +15150,7 @@ window.DWC = {
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
-  // Professional-mode button color (v3.21) — preset pills or the color
+  // Website look button color (v3.21) — preset pills or the color
   // input. Sets the hidden theme_pro_button_color field ("" = default
   // look, untouched) and syncs the picker + pills.
   fontFxPicked: function () {
@@ -14925,6 +15312,24 @@ window.DWC = {
         note.textContent = "⚠ " + f.name + " is " + mb + " MB — profile videos cap at " + (VIDEO_MAX_BYTES / 1048576) + " MB. Pick a shorter clip or a YouTube link instead.";
       } else {
         note.textContent = "✓ " + f.name + " (" + mb + " MB) — ready to save. It wins over any YouTube link above.";
+      }
+    }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Uploaded track picked (2026-11-23, Bands) — instant feedback
+  // (name, size, too big), mirroring videoPicked. The track only plays
+  // once it's approved, so the note says so while it waits.
+  musicPicked: function (input) {
+    var note = $("dwc-music-note");
+    var f = input && input.files && input.files[0];
+    if (!f) return;
+    var mb = (f.size / 1048576).toFixed(1);
+    if (note) {
+      if (f.size > MUSIC_MAX_BYTES) {
+        note.textContent = "⚠ " + f.name + " is " + mb + " MB — tracks cap at " + (MUSIC_MAX_BYTES / 1000000) + " MB. Pick a smaller file.";
+      } else {
+        note.textContent = "✓ " + f.name + " (" + mb + " MB) — ready to save. It plays on your page once it's approved.";
       }
     }
     DWC.profileFormDirty();
@@ -15230,6 +15635,27 @@ window.DWC = {
     var vidUrl = get("theme_video_url").trim().slice(0, 500);
     th.video_url = extractYouTubeId(vidUrl) ? vidUrl : "";
     th.video_file_url = get("theme_video_file_url").trim().slice(0, 500);
+    // Uploaded track + tour dates + subscription + blue pics
+    // (2026-11-23) — same fields saveProfile reads, so the preview and
+    // the save can never drift.
+    th.music_file_url = get("theme_music_file_url").trim().slice(0, 500);
+    th.music_ip_rights = !!fd.get("theme_music_ip_rights");
+    var musAppr2 = String(fd.get("theme_music_file_approved") || "");
+    th.music_file_approved = (musAppr2 === "1" || musAppr2 === "on");
+    var tourRaw2 = get("theme_tour_dates").trim();
+    if (tourRaw2) {
+      try {
+        var tourParsed2 = JSON.parse(tourRaw2);
+        if (Array.isArray(tourParsed2)) th.tour_dates = parseThemeClient({ tour_dates: tourParsed2 }).tour_dates;
+      } catch (e) { /* keep the saved dates */ }
+    }
+    var subFee2 = parseInt(get("theme_subscribe_fee"), 10);
+    th.subscribe_fee = (isFinite(subFee2) && subFee2 > 0 && subFee2 <= 1000) ? subFee2 : 0;
+    var subPP2 = get("theme_subscribe_paypal_url").trim().slice(0, 500);
+    th.subscribe_paypal_url = /^https:\/\//i.test(subPP2) ? subPP2 : "";
+    var subST2 = get("theme_subscribe_stripe_url").trim().slice(0, 500);
+    th.subscribe_stripe_url = /^https:\/\//i.test(subST2) ? subST2 : "";
+    th.blue_pics_visibility = (get("theme_blue_pics_visibility") === "public") ? "public" : "";
     // Video size + centering + stretch + cover (v3.22) — same fields
     // saveProfile reads, so the preview and the save can never drift.
     var vidSize2 = get("theme_video_size");
@@ -15292,8 +15718,9 @@ window.DWC = {
   },
   refreshLayoutPreview: function () {
     var host = $("dwc-layout-preview");
+    var drawerHost = $("dwc-drawer-preview");
     var form = document.querySelector("#dwc-account form");
-    if (!host || !form || !state.profile) return;
+    if ((!host && !drawerHost) || !form || !state.profile) return;
     // Resolve any effect fight BEFORE reading the form, so the preview
     // and the save can never disagree (rain vs stars, two rains,
     // RGB border vs custom colour, theme glow vs glow-text effect).
@@ -15407,10 +15834,13 @@ window.DWC = {
       top_friend_ids: tfIds,
       top_friends: tfFriends
     });
-    host.innerHTML = layoutPreviewInnerHTML(fake);
+    var pvHTML = layoutPreviewInnerHTML(fake);
+    if (host) host.innerHTML = pvHTML;
+    if (drawerHost) drawerHost.innerHTML = pvHTML;
     // Rain drops on the live preview too (the CSS rain alone reads as
     // streaks — see rainLayerHTML).
-    applyRainLayer(host, th.effects);
+    if (host) applyRainLayer(host, th.effects);
+    if (drawerHost) applyRainLayer(drawerHost, th.effects);
     // Layout CSS first, then the theme — same order as the profile page.
     applyPreviewCSS(get("layout_css"));
     var tst = document.getElementById("dwc-layout-preview-theme");
@@ -15426,7 +15856,9 @@ window.DWC = {
     // Tap-to-place (§8): bind the delegated preview click once.
     if (!state._ovBound) { state._ovBound = true; document.addEventListener("click", DWC._ovPlaceClick); }
     // Overlay edit markers (§8): dashed outline on the preview layer.
-    var _ovl = host.querySelector(".dwc-page-overlay");
+    // The drawer preview is the visible one in the editor; the inline
+    // host covers signup step 2, where there is no drawer.
+    var _ovl = (drawerHost || host).querySelector(".dwc-page-overlay");
     if (_ovl) { _ovl.classList.add("dwc-ov-edit"); if (state._ovSelected != null) { var _ovItems = _ovl.querySelectorAll(".dwc-ov-item"); var _ovRows = document.querySelectorAll("#dwc-account .dwc-ov-row"); if (_ovItems[state._ovSelected]) _ovItems[state._ovSelected].classList.add("dwc-ov-selected"); } }
     // Header source box (§5.3): keep the generated source in step with
     // the pickers — unless the member is typing in it right now.
@@ -15904,7 +16336,7 @@ window.DWC = {
     if (spRow) spRow.hidden = pick !== "spotify";
     if (scRow) scRow.hidden = pick !== "soundcloud";
     var skinSel = form.querySelector('select[name="theme_player_skin"]');
-    if (skinSel) skinSel.disabled = !pick || pick === "spotify" || pick === "soundcloud";
+    if (skinSel) skinSel.disabled = !pick || pick === "spotify" || pick === "soundcloud" || pick === "upload";
   },
   // Spotify sign-in (2026-11-23) — a plain popup to Spotify's own
   // sign-in page. NOT an OAuth flow: no tokens, no credentials, and

@@ -6,7 +6,7 @@
 // human-check. No age proof is required to join — only for the 18+ area.
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeProfile,
-  checkChallenge, putImage, putVideo, fileUrl, imageUrl, nowMs, sanitizeLayoutCss, parseTopFriendIds,
+  checkChallenge, putImage, putVideo, putAudio, fileUrl, imageUrl, nowMs, sanitizeLayoutCss, parseTopFriendIds,
   cleanTheme, cleanMyLinks, cleanProfileButtons, SLUG_RE, slugChangeCheck,
   createNotification, cleanWebsiteShow, RELATIONSHIP_IDS, ZODIAC_IDS,
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
@@ -203,6 +203,19 @@ export async function onRequestPost({ env, request }) {
     const up = await putVideo(env, "profile-video", deviceId, a.video, 15000000);
     if (!up.ok) videoError = up.error;
     else videoKey = up.key;
+  }
+  // 2026-11-23 — one uploaded track (Bands). Same pattern as the video:
+  // a bad track never kills the whole save; the client shows
+  // music_error. An upload is stored with the rights declaration the
+  // member ticked; it only plays on the page once the operator approves
+  // it. Removing clears the track and both flags.
+  let musicKey = undefined; // undefined = keep
+  let musicError = null;
+  if (a.remove_music) musicKey = null;
+  else if (a.music) {
+    const up = await putAudio(env, "profile-music", deviceId, a.music, 10000000);
+    if (!up.ok) musicError = up.error;
+    else musicKey = up.key;
   }
 
   const now = nowMs();
@@ -416,6 +429,19 @@ export async function onRequestPost({ env, request }) {
       } else if (videoKey) {
         incoming.video_file_url = fileUrl(videoKey);
         incoming.video_url = "";
+        themeIn = incoming;
+      }
+      // Uploaded track: a fresh upload stores the R2 file URL with the
+      // rights declaration; removing clears the track and both flags.
+      // A failed upload leaves the previous track alone (music_error
+      // tells the member) instead of wiping it.
+      if (musicKey === null) {
+        incoming.music_file_url = "";
+        incoming.music_ip_rights = false;
+        incoming.music_file_approved = false;
+        themeIn = incoming;
+      } else if (musicKey) {
+        incoming.music_file_url = fileUrl(musicKey);
         themeIn = incoming;
       }
     }
@@ -792,7 +818,7 @@ export async function onRequestPost({ env, request }) {
       if (pc.awarded) lucreOut.profile_complete = pc.balance;
     }
   }
-  const out = { ok: true, error: null, profile: profileOut, password_pending: passwordPending, recovery_email_pending: recoveryEmailPending, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, v40_pending: v40Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError };
+  const out = { ok: true, error: null, profile: profileOut, password_pending: passwordPending, recovery_email_pending: recoveryEmailPending, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, v40_pending: v40Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError, music_error: musicError };
   if (operatorEdit) out.operator_edit = true;
   if (Object.keys(lucreOut).length) out.lucre = lucreOut;
   return json(out);

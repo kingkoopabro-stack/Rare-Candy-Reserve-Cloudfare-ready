@@ -99,6 +99,16 @@ section{margin-top:44px}
 .card-desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .card-more{font-size:13px;margin-top:6px}
 .grid .card > .dwc-actions{margin-top:auto}
+/* Members directory — compact cards (2026-11-23): cards size to their own
+   content instead of stretching to the tallest in the row, bios clamp to
+   3 lines, tighter padding/gap. Applies to Members + My Friends (same grid).
+   The shop .grid keeps its equal-height stretch on purpose. */
+.dwc-members-grid{align-items:start;gap:12px}
+.dwc-members-grid .card{padding:12px 14px}
+.dwc-members-grid .card h3{margin:6px 0 2px;font-size:16px}
+.dwc-members-grid .card p{margin:4px 0}
+.dwc-members-grid .dwc-bio-text{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.dwc-members-grid .dwc-meta{font-size:12.5px}
 .card-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:0}
 .tag{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan)}
 .price{font-size:22px;font-weight:900}
@@ -1311,6 +1321,55 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-recovery-box h4{margin:0 0 4px}
 .dwc-recovery-box label{font-size:13px}
 .dwc-recovery-box input[name="code"]{width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace}
+/* Page-mode settings (2026-11-23) — the editor only shows the settings
+   that do something in the picked look. Website look hides the MySpace-only
+   bits (personal lines, Top Friends, divider); MySpace look hides the
+   Website-only bits (extra-buttons toggle, custom page, Website look
+   button). Hidden fields stay in the form and still save — display:none
+   never drops a value. */
+.dwc-mode-website .dwc-myspace-only{display:none!important}
+.dwc-mode-myspace .dwc-website-only{display:none!important}
+/* Page preview drawer (2026-11-23) — "Preview my current page" slides in
+   from the side (full-screen on phones) with the Heart Rise banner on top.
+   The live preview lives here now, not inline — that is what saves the
+   scrolling on mobile. */
+.dwc-preview-page-btn{display:block;width:100%;padding:12px 16px;font-size:16px}
+.dwc-drawer{position:fixed;inset:0;z-index:90}
+.dwc-drawer[hidden]{display:none}
+.dwc-drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.65)}
+.dwc-drawer-panel{position:absolute;top:0;right:0;height:100%;height:100dvh;width:min(480px,100vw);background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;animation:dwc-slide-in .25s ease}
+@keyframes dwc-slide-in{from{transform:translateX(100%)}to{transform:none}}
+.dwc-drawer-head{position:relative;flex-shrink:0}
+.dwc-drawer-banner{display:block;width:100%;height:110px;object-fit:cover}
+.dwc-drawer-title{position:absolute;left:14px;bottom:10px;font-size:18px;font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.dwc-drawer-close{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(0,0,0,.55);color:#fff;font-size:16px;cursor:pointer}
+.dwc-drawer-body{flex:1;overflow-y:auto;padding:12px}
+.dwc-drawer-foot{flex-shrink:0;padding:10px 12px;border-top:1px solid var(--line)}
+/* Page-format filtering (2026-11-23) — picking a page type shows only
+   that type's settings; the rest hide until you pick another type.
+   Social shows everything. Background, layout, music, and the rest of
+   the page building blocks are in ALL presets — only the mode settings
+   (MySpace-side: Top Friends, Divider) and the selling / built-in
+   buttons settings filter by preset. The Website preset hides the
+   built-in buttons (its members make their own) — the extra-buttons
+   toggle too. Sections with no data-fmt never hide: the coding boxes
+   (About Me, Custom page), the names + personal details, and the
+   page-itself controls (Background, Layouts, Page style, What shows). */
+.dwc-fmt-seller details[data-fmt]:not([data-fmt~="seller"]){display:none}
+.dwc-fmt-website details[data-fmt]:not([data-fmt~="website"]){display:none}
+.dwc-fmt-blog details[data-fmt]:not([data-fmt~="blog"]){display:none}
+.dwc-fmt-musician details[data-fmt]:not([data-fmt~="musician"]){display:none}
+.dwc-fmt-merchant details[data-fmt]:not([data-fmt~="merchant"]){display:none}
+.dwc-fmt-creator details[data-fmt]:not([data-fmt~="creator"]){display:none}
+.dwc-fmt-website .dwc-extra-btns{display:none}
+/* Bands upload + Creator catalogue (2026-11-23) — the upload-my-track
+   block shows only for the Musician preset, and the creator-only bits
+   inside the catalogue (subscription, blue pics) only for Content
+   Creator. Any other preset never sees them, so the editor stays short. */
+.dwc-music-upload{display:none}
+.dwc-fmt-musician .dwc-music-upload{display:block}
+.dwc-creator-only{display:none}
+.dwc-fmt-creator .dwc-creator-only{display:block}
 
 /* Horizontal-overflow hardening (base, 2026-11-23 — moved out of the
    ≤640px query so long words / wide images can't overflow on desktop
@@ -1859,11 +1918,14 @@ span.dwc-cassette-tape{cursor:default}
 .dwc-edit-cat[open] > summary::before{content:"▾ ";color:var(--pink)}
 /* About Me merged box: code at the top, bio underneath, one textarea. */
 #dwc-about-me{width:100%;min-height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical}
-/* Page format picker — one click, five formats. */
+/* Page format picker — one click, seven formats. Solid buttons with a
+   neon background (2026-11-23) — not pills. The active format gets the
+   bright Heart Rise gradient + a glow; the rest sit on a deep violet
+   solid so the row reads as buttons, not chips. */
 .dwc-format-picker{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
-.dwc-format-pill{border:2px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);border-radius:999px;padding:9px 15px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em}
-.dwc-format-pill.active{border-color:var(--pink);background:rgba(255,45,149,.15);color:#ffd7ef;box-shadow:0 0 14px rgba(255,45,149,.45)}
-.dwc-format-pill:hover{border-color:var(--cyan)}
+.dwc-format-pill{border:2px solid rgba(168,85,247,.55);background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.dwc-format-pill.active{border-color:#ff2d95;background:linear-gradient(135deg,#7c3aed,#db2777 55%,#06b6d4);color:#fff;box-shadow:0 0 16px rgba(255,45,149,.5)}
+.dwc-format-pill:hover{border-color:var(--cyan);transform:translateY(-1px)}
 /* Layout Converter: input + converted output, side by side on desktop. */
 .dwc-layout-converter textarea{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical}
 #dwc-converter-out{background:rgba(255,255,255,.04)}

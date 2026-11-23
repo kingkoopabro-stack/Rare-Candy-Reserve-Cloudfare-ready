@@ -3694,7 +3694,9 @@ function unlockCardHTML() {
     '<button type="button" class="btn" onclick="DWC.go(\'adult\')">🔞 18+ areas<br><span style="font-weight:400;font-size:13px">ID check — only if you want in</span></button>' +
     '</div>' +
     '<p style="margin:10px 0 0;color:var(--muted);font-size:13px">No ID needed to join or sell regular stuff — only for the 18+ areas. No rush on any of it.</p>' +
-    '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">🔑 Your password is set — that\'s how you sign back in anywhere. If you added a recovery email, verify it (Edit profile → Password &amp; sign-in) so you can reset your password if you ever forget it.</p>' +
+    (p.has_password
+      ? '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">🔑 Your password is set — that\'s how you sign back in anywhere. If you added a recovery email, verify it (Edit profile → Password &amp; sign-in) so you can reset your password if you ever forget it.</p>'
+      : '<p style="margin:8px 0 0;color:var(--muted);font-size:13px">⚠️ Your password couldn\'t be saved yet — the shop is still finishing password setup. Set it in Edit profile → Password &amp; sign-in once that\'s done; until then, stay signed in on this browser.</p>') +
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.dismissUnlock()">I\'ll do this later →</button></p>' +
     '</section>';
 }
@@ -12039,6 +12041,7 @@ window.DWC = {
     // typed in slides away. Keep the scroll spot (and the caret, if
     // focus was lost) exactly where they were.
     var _sy = window.scrollY;
+    var _hash = location.hash;
     var _ae = document.activeElement;
     var _aeName = _ae && _ae.name ? _ae.name : null;
     var _aeSel = (_ae && typeof _ae.selectionStart === "number") ? _ae.selectionStart : null;
@@ -12267,13 +12270,18 @@ window.DWC = {
     if (th.ticker_source === "btc") refreshBtcTicker();
     // Put the scroll spot (and the caret, if focus was lost) back where
     // they were — the preview rebuild above changes the page height.
-    if (typeof window.scrollTo === "function") window.scrollTo(0, _sy);
-    if (_aeName) {
-      var _again = document.querySelector('#dwc-account form [name="' + _aeName + '"]');
-      if (_again && _again !== document.activeElement) {
-        _again.focus({ preventScroll: true });
-        if (_aeSel !== null && typeof _again.setSelectionRange === "function") {
-          try { _again.setSelectionRange(_aeSel, _aeSel); } catch (e) {}
+    // But only if the member is still on the same spot: if they clicked
+    // a "Jump to:" link since, the anchor scroll they asked for stands
+    // and this must not drag the page back to the top of the editor.
+    if (location.hash === _hash) {
+      if (typeof window.scrollTo === "function") window.scrollTo(0, _sy);
+      if (_aeName) {
+        var _again = document.querySelector('#dwc-account form [name="' + _aeName + '"]');
+        if (_again && _again !== document.activeElement) {
+          _again.focus({ preventScroll: true });
+          if (_aeSel !== null && typeof _again.setSelectionRange === "function") {
+            try { _again.setSelectionRange(_aeSel, _aeSel); } catch (e) {}
+          }
         }
       }
     }

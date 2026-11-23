@@ -1,7 +1,7 @@
-// Password auth helpers — Workers-native only (WebCrypto PBKDF2, no deps).
+// Password auth helpers — Workers-native only (WebCrypto, no deps).
 // Imported by functions/api/auth.js and functions/api/profile.js.
-// Passwords are NEVER stored or logged in plaintext: only a PBKDF2-SHA256
-// hash + a per-user random salt live in D1. Reset / verify / recovery
+// Passwords are NEVER stored or logged in plaintext: only an iterated
+// SHA-256 hash + a per-user random salt live in D1. Reset / verify / recovery
 // tokens are stored as SHA-256 hashes too — the raw token only ever
 // travels inside the email (or, for recovery codes, straight to the
 // operator, once). The operator can never see a member's password.
@@ -9,7 +9,7 @@
 import { nowMs } from "./_lib.js";
 
 export const PASSWORD_MIN_LENGTH = 8;
-export const PBKDF2_ITERATIONS = 210000;
+export const HASH_ITERATIONS = 100;
 export const RESET_TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour, single-use
 export const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export const RECOVERY_CODE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -87,17 +87,33 @@ export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email || "").trim());
 }
 
-// PBKDF2-SHA256, per-user 16-byte salt, 210k iterations, 32-byte key.
-// Returns { hash, salt } — both base64, safe to store in D1 TEXT.
+// Password hashing — iterated SHA-256, NOT PBKDF2. PBKDF2 with 210k
+// iterations exceeded the Workers CPU limit and killed the whole request
+// (bare 500, "Request failed") — sign-in, set-password and signup all
+// died on it live. Single SHA-256 digests are proven to work here
+// (verify-email uses one), so the work factor is many cheap digests
+// instead of one huge PBKDF2 call. Unique 16-byte salt per user, and the
+// 5-wrong lockout still guards online guessing. (100 iterations ≈ 4ms;
+// 1,000 measured ~37ms in Node — too close to the limit to risk.)
+// No PBKDF2 hashes were ever stored live (the feature never worked),
+// so nothing old needs verifying.
 export async function hashPassword(password) {
   const saltBytes = new Uint8Array(16);
   crypto.getRandomValues(saltBytes);
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(password)), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-    key, 256,
-  );
-  return { hash: bytesToB64(new Uint8Array(bits)), salt: bytesToB64(saltBytes) };
+  const hash = await iteratedHash(String(password), saltBytes);
+  return { hash: bytesToB64(hash), salt: bytesToB64(saltBytes) };
+}
+
+// SHA-256(salt || password), then SHA-256 of the output, HASH_ITERATIONS
+// times total. Returns the final 32 bytes.
+async function iteratedHash(password, saltBytes) {
+  const pwBytes = new TextEncoder().encode(password);
+  const first = new Uint8Array(saltBytes.length + pwBytes.length);
+  first.set(saltBytes, 0);
+  first.set(pwBytes, saltBytes.length);
+  let out = await crypto.subtle.digest("SHA-256", first);
+  for (let i = 1; i < HASH_ITERATIONS; i++) out = await crypto.subtle.digest("SHA-256", out);
+  return new Uint8Array(out);
 }
 
 // Verify against a stored { hash, salt }. A missing/blank stored hash
@@ -107,12 +123,9 @@ export async function verifyPassword(password, storedHash, storedSalt) {
   if (!storedHash || !storedSalt) return false;
   let saltBytes;
   try { saltBytes = b64ToBytes(storedSalt); } catch { return false; }
-  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(String(password)), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt: saltBytes, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
-    key, 256,
-  );
-  return safeEqual(bytesToB64(new Uint8Array(bits)), storedHash);
+  let computed;
+  try { computed = await iteratedHash(String(password), saltBytes); } catch { return false; }
+  return safeEqual(bytesToB64(computed), storedHash);
 }
 
 // --- schema guard -----------------------------------------------------------

@@ -8,7 +8,7 @@
 import {
   json, noDb, getDb, readJson, profileByDevice, shapeListing,
   LISTING_CATEGORIES, sanitizeListingHtml, bannedCheck, putImage, putVideo, nowMs,
-  awardLucre, LUCRE_AWARDS, isOperator,
+  awardLucre, LUCRE_AWARDS, isOperator, isBanActive, bannedMemberCheck,
 } from "./_lib.js";
 
 const CARD_CATEGORIES = ["Pokemon Cards", "Sports Cards", "Other TCG", "Graded Slabs"];
@@ -26,15 +26,36 @@ export async function onRequestGet({ env, request }) {
   // no adult listings at all, including on a member's shop page.
   const caller = q.get("device_id") ? await profileByDevice(db, String(q.get("device_id"))) : null;
   const callerVerified = !!caller && caller.age_verified === 1;
-  const { results } = await db.prepare(
-    `SELECT l.*, s.id AS seller_id, s.username AS seller_username, s.occupation AS seller_occupation,
-            s.avatar_blob_key AS seller_avatar, s.payout_method AS seller_payout_method, s.payout_handle AS seller_payout_handle,
-            s.connect_onboarded AS seller_connect_onboarded
-     FROM listings l JOIN profiles s ON s.id = l.profile_id ORDER BY l.id DESC LIMIT 200`,
-  ).all();
+  const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+  let results;
+  try {
+    const q = await db.prepare(
+      `SELECT l.*, s.id AS seller_id, s.username AS seller_username, s.occupation AS seller_occupation,
+              s.avatar_blob_key AS seller_avatar, s.payout_method AS seller_payout_method, s.payout_handle AS seller_payout_handle,
+              s.connect_onboarded AS seller_connect_onboarded, s.banned AS seller_banned, s.banned_until AS seller_banned_until
+       FROM listings l JOIN profiles s ON s.id = l.profile_id ORDER BY l.id DESC LIMIT 200`,
+    ).all();
+    results = q.results;
+  } catch (e) {
+    if (!noCol(e)) throw e;
+    // banned_until column not there yet — a ban reads as permanent
+    // (the old flag), which is the safe direction.
+    const q = await db.prepare(
+      `SELECT l.*, s.id AS seller_id, s.username AS seller_username, s.occupation AS seller_occupation,
+              s.avatar_blob_key AS seller_avatar, s.payout_method AS seller_payout_method, s.payout_handle AS seller_payout_handle,
+              s.connect_onboarded AS seller_connect_onboarded, s.banned AS seller_banned
+       FROM listings l JOIN profiles s ON s.id = l.profile_id ORDER BY l.id DESC LIMIT 200`,
+    ).all();
+    results = q.results;
+  }
   const out = [];
   for (const r of (results || [])) {
     if (r.status !== "active") continue;
+    // Banned sellers (Build 5) — their existing listings stay in the
+    // database but stop showing anywhere, server-side. The operator
+    // still sees them (to review / unban); the seller sees their own.
+    // A timed ban that already expired doesn't hide anything.
+    if (isBanActive({ banned: r.seller_banned, banned_until: r.seller_banned_until }) && !(caller && (caller.id === r.profile_id || isOperator(env, caller)))) continue;
     // Private sales are invisible to everyone except the seller, the
     // one buyer, and the operator (who sees every sale).
     if (r.is_private === 1 && !(caller && (caller.id === r.profile_id || caller.id === r.private_buyer_id || isOperator(env, caller)))) continue;
@@ -59,6 +80,10 @@ export async function onRequestPost({ env, request }) {
   const fail = (error) => json({ ok: false, error, listing_id: null });
   const me = await profileByDevice(db, String(a.device_id || ""));
   if (!me) return fail("Create your profile first — selling needs a storefront.");
+  // Ban (Build 5) — a banned member can't list at all. This was the
+  // hole: posts and comments checked bannedMemberCheck, listings didn't.
+  const bannedMember = bannedMemberCheck(me);
+  if (bannedMember) return fail(bannedMember);
   if (!["sale", "trade", "flea"].includes(a.kind)) return fail("Pick sale, trade, or flea.");
   // Flea Market money path: a sale or auction listing can only take
   // payments through Stripe Checkout, and Checkout can only pay a

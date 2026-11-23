@@ -3,7 +3,7 @@
 // Either way the ID image is DELETED from the ID_VAULT bucket immediately
 // and the request row's blob_key is cleared — the only record kept is the
 // decision (status + timestamps) and the age_verified flag on the profile.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, nowMs } from "../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, nowMs, recordAuditLog } from "../_lib.js";
 
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);
@@ -29,5 +29,8 @@ export async function onRequestPost({ env, request }) {
   if (row.blob_key && env.ID_VAULT) {
     try { await env.ID_VAULT.delete(row.blob_key); } catch { /* already gone — decision still stands */ }
   }
+  // Audit log (Build 5) — the age-verification decision is decide-only
+  // (never a self-serve toggle); the log is the record of who decided.
+  await recordAuditLog(db, { actorId: me.id, action: "age-verification", targetId: row.profile_id, detail: `ID review ${status} (request ${id})` });
   return json({ ok: true, error: null, status });
 }

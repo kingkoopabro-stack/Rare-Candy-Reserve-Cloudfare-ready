@@ -28,7 +28,7 @@
 // the watermark work noted). This endpoint never hands the URL out to
 // someone who shouldn't see the picture, but it can't un-share a URL
 // that already leaked.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, isFriendWith, putImage, imageUrl, iso, nowMs, adultCreatorIds } from "./_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, isFriendWith, putImage, imageUrl, iso, nowMs, adultCreatorIds, recordAuditLog } from "./_lib.js";
 
 const MAX_PHOTOS = 3;
 
@@ -44,10 +44,18 @@ export async function onRequestGet({ env, request }) {
   const ownerRow = await db.prepare("SELECT avatar_blob_key FROM profiles WHERE id = ? LIMIT 1").bind(profileId).first();
   const avatarKey = ownerRow?.avatar_blob_key || null;
   let rows = [];
+  // Gallery order (Build 5) — position ASC, then newest first. The
+  // position column lands with the admin-audit-log migration; before
+  // that the ORDER BY falls back to newest-first, never a crash.
   try {
-    const r = await db.prepare("SELECT * FROM gallery_photos WHERE profile_id = ? ORDER BY created_at DESC LIMIT ?").bind(profileId, MAX_PHOTOS).all();
+    const r = await db.prepare("SELECT * FROM gallery_photos WHERE profile_id = ? ORDER BY position ASC, created_at DESC LIMIT ?").bind(profileId, MAX_PHOTOS).all();
     rows = r.results || [];
-  } catch { return json({ ok: true, photos: [] }); /* table not there yet */ }
+  } catch {
+    try {
+      const r = await db.prepare("SELECT * FROM gallery_photos WHERE profile_id = ? ORDER BY created_at DESC LIMIT ?").bind(profileId, MAX_PHOTOS).all();
+      rows = r.results || [];
+    } catch { return json({ ok: true, photos: [] }); /* table not there yet */ }
+  }
   const isOwner = !!viewer && viewer.id === profileId;
   const isOp = !!viewer && isOperator(env, viewer);
   // 18+ containment: an adult creator's pictures are 18+ content — only
@@ -75,7 +83,7 @@ export async function onRequestGet({ env, request }) {
   return json({
     ok: true,
     total: visible.length,
-    photos: visible.map((p) => ({ id: p.id, url: imageUrl(p.blob_key), caption: p.caption ?? "", visibility: p.visibility || "public", is_avatar: avatarKey ? p.blob_key === avatarKey : false, created_at: iso(p.created_at) })),
+    photos: visible.map((p) => ({ id: p.id, url: imageUrl(p.blob_key), caption: p.caption ?? "", visibility: p.visibility || "public", is_avatar: avatarKey ? p.blob_key === avatarKey : false, position: p.position == null ? null : Number(p.position), created_at: iso(p.created_at) })),
   });
 }
 
@@ -86,11 +94,25 @@ export async function onRequestPost({ env, request }) {
   const me = a.device_id ? await profileByDevice(db, String(a.device_id)) : null;
   if (!me) return json({ ok: false, error: "Sign in to make a photo public." });
   if (!a.image) return json({ ok: false, error: "No photo attached." });
+  // Upload FOR a member (Build 5, operator-only) — the Admin panel's
+  // "Upload a photo for this member" flow. The operator's own upload
+  // is unchanged; a profile_id target must be a real member, and the
+  // 3-photo cap + visibility rules are checked against THAT member.
+  let owner = me;
+  let forMember = false;
+  if (a.profile_id != null) {
+    if (!isOperator(env, me)) return json({ ok: false, error: "Only the operator can upload a photo for another member." });
+    const tid = Number(a.profile_id);
+    const trow = Number.isInteger(tid) && tid > 0 ? await db.prepare("SELECT id FROM profiles WHERE id = ? LIMIT 1").bind(tid).first() : null;
+    if (!trow) return json({ ok: false, error: "That member doesn't exist." });
+    if (tid === me.id) { /* same member — falls through as a self upload */ }
+    else { owner = { id: tid }; forMember = true; }
+  }
   const caption = String(a.caption || "").trim().slice(0, 140);
   const visibility = VISIBILITIES.includes(a.visibility) ? a.visibility : "public";
   let count = 0;
   try {
-    const c = await db.prepare("SELECT COUNT(*) AS n FROM gallery_photos WHERE profile_id = ?").bind(me.id).first();
+    const c = await db.prepare("SELECT COUNT(*) AS n FROM gallery_photos WHERE profile_id = ?").bind(owner.id).first();
     count = c?.n || 0;
   } catch { return json({ ok: false, error: "Public photos aren't switched on yet — run the v3.9 update first." }); }
   if (count >= MAX_PHOTOS) return json({ ok: false, error: "You've reached the 3-photo limit — delete one to add another." });
@@ -99,20 +121,22 @@ export async function onRequestPost({ env, request }) {
   let photoId = null;
   try {
     const r = await db.prepare("INSERT INTO gallery_photos (profile_id, blob_key, caption, visibility, created_at) VALUES (?, ?, ?, ?, ?)")
-      .bind(me.id, up.key, caption, visibility, nowMs()).run();
+      .bind(owner.id, up.key, caption, visibility, nowMs()).run();
     photoId = r.meta.last_row_id;
   } catch {
     // Table without the visibility column yet (migration not run) —
     // fall back to the old insert; the photo reads back as public.
     try {
       const r2 = await db.prepare("INSERT INTO gallery_photos (profile_id, blob_key, caption, created_at) VALUES (?, ?, ?, ?)")
-        .bind(me.id, up.key, caption, nowMs()).run();
+        .bind(owner.id, up.key, caption, nowMs()).run();
       photoId = r2.meta.last_row_id;
     } catch {
       return json({ ok: false, error: "Public photos aren't switched on yet — run the v3.9 update first." });
     }
+    if (forMember) await recordAuditLog(db, { actorId: me.id, action: "upload-for-member", targetId: owner.id, detail: `uploaded gallery photo ${photoId} for member ${owner.id}` });
     return json({ ok: true, error: null, photo: { id: photoId, url: imageUrl(up.key), caption, visibility: "public", created_at: iso(nowMs()) } });
   }
+  if (forMember) await recordAuditLog(db, { actorId: me.id, action: "upload-for-member", targetId: owner.id, detail: `uploaded gallery photo ${photoId} for member ${owner.id}` });
   return json({ ok: true, error: null, photo: { id: photoId, url: imageUrl(up.key), caption, visibility, created_at: iso(nowMs()) } });
 }
 
@@ -132,9 +156,16 @@ export async function onRequestPut({ env, request }) {
   if (!id) return json({ ok: false, error: "Pick a photo first." });
   const hasVisibility = a.visibility !== undefined && a.visibility !== null;
   const hasCaption = a.caption !== undefined && a.caption !== null;
+  // Gallery order (Build 5) — position 1..N within the member's gallery
+  // (1 = first). The client swaps two photos by PUTting each one's new
+  // position. Needs the position column (admin-audit-log migration);
+  // before that, a plain message — never a silent no-op.
+  const hasPosition = a.position !== undefined && a.position !== null;
+  const position = hasPosition ? Number(a.position) : null;
+  if (hasPosition && (!Number.isInteger(position) || position < 1 || position > 99)) return json({ ok: false, error: "Position needs to be 1 or higher." });
+  if (!hasVisibility && !hasCaption && !hasPosition) return json({ ok: false, error: "Nothing to change." });
   const visibility = hasVisibility ? (VISIBILITIES.includes(a.visibility) ? a.visibility : null) : null;
   if (hasVisibility && !visibility) return json({ ok: false, error: "Pick Public, Friends, Members, or Private." });
-  if (!hasVisibility && !hasCaption) return json({ ok: false, error: "Nothing to change." });
   const caption = hasCaption ? String(a.caption || "").trim().slice(0, 140) : null;
   const row = await db.prepare("SELECT * FROM gallery_photos WHERE id = ? LIMIT 1").bind(id).first();
   if (!row) return json({ ok: false, error: "That photo is gone already." });
@@ -152,8 +183,20 @@ export async function onRequestPut({ env, request }) {
       await db.prepare("UPDATE gallery_photos SET visibility = ?, caption = ? WHERE id = ?").bind(visibility, caption, id).run();
     } else if (hasVisibility) {
       await db.prepare("UPDATE gallery_photos SET visibility = ? WHERE id = ?").bind(visibility, id).run();
-    } else {
+    } else if (hasCaption) {
       await db.prepare("UPDATE gallery_photos SET caption = ? WHERE id = ?").bind(caption, id).run();
+    }
+    // Position rides its own UPDATE so a missing position column only
+    // fails the ordering, never a visibility/caption change alongside it.
+    if (hasPosition) {
+      try {
+        await db.prepare("UPDATE gallery_photos SET position = ? WHERE id = ?").bind(position, id).run();
+      } catch (e) {
+        if (/no such column|no column named/i.test(String((e && e.message) || e))) {
+          return json({ ok: false, error: "Gallery ordering needs the database update first — run admin-audit-log-migration.sql in the D1 console, then try again." });
+        }
+        throw e;
+      }
     }
   } catch {
     return json({ ok: false, error: "Photo visibility needs the gallery update — run the visibility migration first." });
@@ -161,6 +204,7 @@ export async function onRequestPut({ env, request }) {
   const out = { id };
   if (hasVisibility) out.visibility = visibility;
   if (hasCaption) out.caption = caption;
+  if (hasPosition) out.position = position;
   return json({ ok: true, error: null, photo: out });
 }
 

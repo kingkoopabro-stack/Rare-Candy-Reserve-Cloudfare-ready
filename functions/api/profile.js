@@ -12,7 +12,7 @@ import {
   recordActivityDay, grantUnlocks, parseTheme, isFreeFrame, unlockForFrame,
   isFreeDivider, unlockForDivider,
   badgeListFor, cleanDisplayBadges, adultCreatorIds, awardLucre, LUCRE_AWARDS,
-  deliverOutbound,
+  deliverOutbound, isOperator, recordAuditLog,
 } from "./_lib.js";
 import { txEmailHtml } from "./_mail.js";
 import {
@@ -25,6 +25,20 @@ export async function onRequestGet({ env, request }) {
   if (!db) return noDb();
   const deviceId = new URL(request.url).searchParams.get("device_id") || "";
   const row = await profileByDevice(db, deviceId);
+  // Operator edit-a-member (Build 5) — the Admin panel loads a member's
+  // settings into the same editor. Operator-only, and the response
+  // blanks the fields the operator must never see or change from here:
+  // recovery email, payout method/handle, SMS number. The password
+  // hash never leaves the server (shapeProfile only carries a boolean).
+  const targetId = Number(new URL(request.url).searchParams.get("profile_id") || 0);
+  if (targetId && row && isOperator(env, row) && targetId !== row.id) {
+    const t = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(targetId).first();
+    if (!t) return json({ profile: null });
+    const tp = shapeProfile(t);
+    tp.recovery_email = ""; tp.pending_email = "";
+    tp.payout_method = ""; tp.payout_handle = ""; tp.sms_number = "";
+    return json({ profile: tp, operator_edit: true });
+  }
   if (!row) return json({ profile: null });
   // v3.9 — daily usage: loading the community counts as a day, and any
   // newly-earned frame unlocks are granted here. Both are best-effort
@@ -57,7 +71,36 @@ export async function onRequestPost({ env, request }) {
   const fail = (error) => json({ ok: false, error, profile: null });
   const deviceId = String(a.device_id || "");
   if (deviceId.length < 8 || deviceId.length > 128) return fail("Missing device id.");
-  const existing = await profileByDevice(db, deviceId);
+  let existing = await profileByDevice(db, deviceId);
+
+  // Operator edit-a-member (Build 5) — POST /api/profile accepts an
+  // operator-supplied profile_id target. Operator role only (checked
+  // here, server-side — the same isOperator gate admin.js uses).
+  // From here on, `existing` IS the target member, so the whole save
+  // below writes their row, not the operator's. EXCLUDED from operator
+  // edits, always: slug (page_slug), password, recovery email,
+  // contact email (it doubles as the recovery address), payout method
+  // + handle, SMS number, full name, birthday, and the terms flag.
+  // The operator can change the look, bio, links, Top Friends, theme,
+  // avatar/banner/video (upload-for-member rides this same save).
+  let operatorEdit = false;
+  let operatorTargetId = null;
+  let operatorActorId = null;
+  if (a.profile_id != null && existing && isOperator(env, existing)) {
+    const tid = Number(a.profile_id);
+    if (Number.isInteger(tid) && tid > 0 && tid !== existing.id) {
+      const trow = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(tid).first();
+      if (!trow) return fail("That member doesn't exist.");
+      operatorEdit = true;
+      operatorTargetId = tid;
+      operatorActorId = existing.id;
+      delete a.page_slug; delete a.password; delete a.password_confirm;
+      delete a.recovery_email; delete a.contact_email; delete a.sms_number;
+      delete a.payout_method; delete a.payout_handle;
+      delete a.full_name; delete a.birthday; delete a.terms_agreed;
+      existing = trow;
+    }
+  }
 
   // Payout method: only a listed value (or "" for none) is ever written.
   // A submitted value outside the list is a legacy free-text value the
@@ -525,11 +568,18 @@ export async function onRequestPost({ env, request }) {
   let v2Pending = false;
   let v3Pending = false;
   if (existing) {
-    const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(pm, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals];
-    if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
-    if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
-    if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
+    // Operator edits never touch payout method/handle (excluded above)
+    // — dropping the two columns from the SET list, so a blanked
+    // operator form can never wipe the member's payouts.
+    const sets = operatorEdit
+      ? ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets]
+      : ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets];
+    const vals = operatorEdit
+      ? [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 500), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals]
+      : [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 500), str(pm, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals];
+    if (!operatorEdit && !existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
+    if (!operatorEdit && a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
+    if (!operatorEdit && a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
     if (avatarKey !== undefined) { sets.push("avatar_blob_key = ?"); vals.push(avatarKey); }
     vals.push(existing.id);
     try {
@@ -624,7 +674,7 @@ export async function onRequestPost({ env, request }) {
       `INSERT INTO profiles (device_id, username, full_name, birthday, terms_agreed_at, chat_name, occupation, bio, payout_method, payout_handle, avatar_blob_key, top_friends, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(deviceId, username, String(a.full_name).trim().slice(0, 80), a.birthday ?? null, now,
-      str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280),
+      str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 500),
       str(pm, 40), str(a.payout_handle, 80), avatarKey ?? null,
       // Chris (member id 1) is every new member's first Top Friend,
       // MySpace-Tom style — already added, they can remove him if they want.
@@ -666,8 +716,37 @@ export async function onRequestPost({ env, request }) {
         recoveryEmailPending = true;
       } catch { /* columns/table missing — the member can add it later in Edit profile */ }
     }
+    // Default first profile look (2026-11-23) — the FREE classic MySpace
+    // look, so a brand-new page looks finished from the first second:
+    // classic vibe, navy accent, retro buttons, ticker effect, radio
+    // soundscape, vinyl player skin. Deliberately NOT the store preset
+    // "Blue Skies, 2005" (20 Lucre; a new member only has 10) — granting
+    // that free is a separate decision for Chris. Best-effort UPDATE,
+    // same pattern as the password block above: if the profile_theme
+    // column hasn't migrated yet the account still gets created.
+    // The rest of the theme rides on parseTheme defaults (empty / false
+    // / [] / topfriends_count 8 / buttons_show true / buttons_visible
+    // null) via cleanTheme, so nothing is stripped. New signups only —
+    // existing members' themes are never rewritten.
+    if (row) {
+      try {
+        const defaultTheme = cleanTheme({
+          vibe: "classic", accent_color: "#003399", button_style: "retro",
+          effects: ["ticker-effect"], soundscape: "radio", player_skin: "vinyl",
+          topfriends_count: 8, buttons_show: true, buttons_visible: null,
+          website_buttons: false,
+        });
+        if (defaultTheme) {
+          await db.prepare("UPDATE profiles SET profile_theme = ? WHERE id = ?").bind(defaultTheme, row.id).run();
+        }
+      } catch { /* profile_theme column missing — the member can pick a look in Edit profile */ }
+    }
   }
   if (!row) return fail("Couldn't save that profile — try again.");
+  // Audit log (Build 5) — an operator edit of a member's page.
+  if (operatorEdit && row) {
+    await recordAuditLog(db, { actorId: operatorActorId, action: "edit-member-page", targetId: operatorTargetId, detail: `edited @${row.username}'s page (slug, password, recovery email, payouts untouched)` });
+  }
   // Notifications (v3.8) — a brand-new member just joined: tell the
   // operator (Chris, member id 1). Fresh signups only, never a profile
   // edit. createNotification skips quietly when the table isn't there
@@ -680,7 +759,16 @@ export async function onRequestPost({ env, request }) {
       link: `#/member/${row.id}`,
     });
   }
-  const profileOut = shapeProfile(row);
+  let profileOut = shapeProfile(row);
+  // NOTE (2026-11-23): re-read the row for a new signup and re-shape it
+  // — the password UPDATE above runs after the INSERT-time SELECT, so
+  // shaping the stale row always reported has_password: false and the
+  // unlock card wrongly said the password hadn't saved. The re-read
+  // also picks up pending_email from the recovery-email UPDATE.
+  if (!existing && row) {
+    const fresh = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(row.id).first();
+    if (fresh) { row = fresh; profileOut = shapeProfile(row); }
+  }
   const lucreOut = {};
   if (row) {
     const grants = await grantUnlocks(db, row.id);
@@ -705,6 +793,7 @@ export async function onRequestPost({ env, request }) {
     }
   }
   const out = { ok: true, error: null, profile: profileOut, password_pending: passwordPending, recovery_email_pending: recoveryEmailPending, v2_pending: v2Pending, v3_pending: v3Pending, v36_pending: v36Pending, v37_pending: v37Pending, v39_pending: v39Pending, v40_pending: v40Pending, avatar_error: avatarError, banner_error: bannerError, video_error: videoError };
+  if (operatorEdit) out.operator_edit = true;
   if (Object.keys(lucreOut).length) out.lucre = lucreOut;
   return json(out);
 }

@@ -695,6 +695,18 @@ export function sanitizeListingHtml(input) {
 
 // --- MySpace throwback v2 helpers ---------------------------------------
 
+// A pasted MySpace layout is a whole page, not just CSS: keep the CSS
+// from its FIRST <style> block and drop everything else (page HTML,
+// scripts, ...). Returns the inner CSS, or null when there is no
+// <style> block. The kept CSS still runs through every strip below,
+// so this is NOT a hole in the block list — it only stops the old
+// behaviour of deleting the style block WITH its contents.
+function extractStyleBlockCss(css) {
+  const m = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/i.exec(String(css || ""));
+  if (!m) return null;
+  return m[1];
+}
+
 // Layout CSS sanitizer — custom profile layouts are CSS ONLY. Strips anything
 // that could run code or phone home: <script>/<style> blocks, @import and
 // @font-face (no external stylesheets or fonts), javascript:/vbscript: URLs,
@@ -705,6 +717,11 @@ export function sanitizeListingHtml(input) {
 export function sanitizeLayoutCss(input) {
   var css = String(input || "").slice(0, 8000);
   css = css.replace(/<!--[\s\S]*?-->/g, "");
+  // Pasted MySpace layout: keep the first <style> block's CSS, drop the
+  // rest of the page. (See extractStyleBlockCss — the block list below
+  // still applies to what was kept.)
+  const styled = extractStyleBlockCss(css);
+  if (styled !== null) css = styled;
   // Strip whole <script>/<style>/etc blocks first (through the closing tag),
   // then any leftover lone tags — a lazy match on the opening tag alone
   // would leave the block's contents behind.
@@ -921,6 +938,11 @@ export function shapeProfile(row) {
     ticker_enabled: row.ticker_enabled === 1,
     ticker_color: row.ticker_color ?? "",
     banned: row.banned === 1,
+    // Timed bans (Build 5) — ms timestamp the ban lifts, NULL = permanent.
+    // Reads undefined before the migration, which parses as permanent.
+    banned_until: row.banned_until == null ? null : Number(row.banned_until),
+    // 18+ test mode (Build 5) — 1 = sandbox test member, never a real one.
+    is_test: row.is_test === 1,
     // v3.9 — website look: the five website fields + which ones show.
     // Columns may not exist yet (migration pending) — read defensively.
     website_mode: row.website_mode === 1,
@@ -1074,10 +1096,50 @@ export function silenceCheck(me, now) {
 // Ban (v3.18) — a banned member can't post or comment at all. The ban flag
 // is the permanent ban (operator-only); without this check a banned member
 // who isn't also muted could still post, because silence and ban are separate.
+// Build 5 (2026-11-23) — TIMED bans: banned_until is a ms timestamp, or
+// NULL for permanent. A timed ban whose time has passed is NOT a ban any
+// more — the member is free again without anyone having to unban them.
+// Rows written before the banned_until migration read as permanent
+// (undefined = NULL), so old bans never silently lift.
+export function isBanActive(me, now) {
+  if (!me) return false;
+  if (me.banned !== 1) return false;
+  const until = Number(me.banned_until || 0);
+  if (until && until <= (now || Date.now())) return false;
+  return true;
+}
+export function banLabel(me) {
+  if (!isBanActive(me)) return "";
+  const until = Number(me.banned_until || 0);
+  if (!until) return "Banned permanently";
+  return "Banned until " + new Date(until).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 export function bannedMemberCheck(me) {
   if (!me) return null;
-  if (me.banned === 1) return "Your account is banned — you can't post or comment. If you think that's a mistake, contact the team.";
-  return null;
+  if (!isBanActive(me)) return null;
+  const until = Number(me.banned_until || 0);
+  if (until) {
+    const when = new Date(until).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    return `Your account is banned until ${when} — you can't post, comment, or list until then. If you think that's a mistake, contact the team.`;
+  }
+  return "Your account is banned — you can't post, comment, or list. If you think that's a mistake, contact the team.";
+}
+// Ban durations (Build 5) — the SAME keys/labels as SILENCE_DURATIONS, so
+// the admin dropdown and the server can never disagree about what a label
+// means. "permanent" = banned_until NULL (the old ban flag, unchanged).
+export const BAN_DURATIONS = SILENCE_DURATIONS;
+// --- Admin audit log (Build 5) ------------------------------------------
+// One row per operator/team action: who did it, to whom, what, when.
+// Best-effort by design: a missing table (migration not run yet) just
+// no-ops — an audit write must never break the action it records.
+export async function recordAuditLog(db, { actorId, action, targetId, detail }) {
+  if (!db || !actorId || !action) return false;
+  try {
+    await db.prepare(
+      "INSERT INTO admin_audit_log (actor_profile_id, action, target_profile_id, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+    ).bind(Number(actorId), String(action).slice(0, 60), targetId == null ? null : Number(targetId), String(detail || "").slice(0, 500), Date.now()).run();
+    return true;
+  } catch { return false; }
 }
 // Admins (and the operator) may delete other people's posts/comments;
 // mods may not. Server-enforced in the delete endpoints, never just UI.
@@ -1443,11 +1505,21 @@ export function parseAshTracks(stored) {
 // client map (community.js THEME_FONTS) carries the matching stacks and
 // Google family params — the two lists must stay in sync (the smoke test
 // checks it). Webfonts load only from that map, never from user input.
-export const THEME_FONTS = ["", "serif", "typewriter", "comic", "rounded", "playfair", "cormorant", "vibes", "cinzel", "orbitron", "bangers", "pressstart", "monoton", "creepster"];
+export const THEME_FONTS = ["", "serif", "typewriter", "comic", "rounded", "playfair", "cormorant", "vibes", "cinzel", "orbitron", "bangers", "pressstart", "monoton", "creepster", "dancing", "pacifico", "lobster", "alexbrush"];
 export const BUTTON_STYLE_IDS = ["", "neon", "arcade", "gradient", "rounded", "retro", "gold", "ghost", "insert-coin"];
 // Taffy Layout Builder vibes (v3.10) — one of the fixed vibe ids, or "".
 export const VIBE_IDS = ["", "neon", "midnight", "candy", "classic", "forest", "sunset", "ocean", "bubblegum", "gold", "dark"];
-export const MYSPACE_EFFECT_IDS = ["animated-bg", "sparkle", "marquee", "glow-text", "sparkle-name", "sparkle-banner", "ticker-effect", "rgb-comment-border", "peaceful-rain", "rainy-city"];
+export const MYSPACE_EFFECT_IDS = ["animated-bg", "starfield-drift", "marquee", "glow-text", "ticker-effect", "rgb-comment-border", "peaceful-rain", "rainy-city"];
+// Font effects (two-box editor, 2026-11-23): text effects per target,
+// gated separately from page effects above. "marquee" lives here as a
+// named font effect (drift left, bounce back) — it is NOT a page effect
+// and has no MYSPACE_EFFECTS entry on the client.
+export const FONT_FX_IDS = ["", "glow", "neon", "flash", "marquee", "rainbow", "blood"];
+export const FONT_FX_TARGETS = ["all", "name", "comments", "bio"];
+// NOTE (2026-11-23): "starfield-drift" must stay here — the editor offers it
+// and the preview renders it; dropping it here silently wiped it on save.
+// "marquee" was removed: no client effect offers it, so it could only ever
+// be stored by a forged save and would render nothing.
 // Profile audio (2026-11-22) — soundscape ids + player skin ids.
 // soundscape "radio" = the SteadyWave Radio Player; "" = no sound.
 export const SOUNDSCAPE_IDS = ["rain", "storm", "night", "city", "cafe", "paris", "violin", "canon", "fur-elise"];
@@ -1884,14 +1956,53 @@ export function cleanWebsiteShow(input) {
   return JSON.stringify(parseWebsiteShow(input));
 }
 export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments", "radio", "video", "relationship", "occupation", "listings"];
+// Profile-section order (Build 5) — the three blocks in the info column
+// of a member page, in the order they render: About (website sections),
+// What I sell, Steady Wave radio. Rides in the theme JSON, so no
+// migration. Any other order is dropped on parse; missing = default.
+export const SECTION_ORDER_IDS = ["about", "seller", "radio"];
 const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
 export function extractYouTubeId(str) {
   if (!str) return "";
   const m = String(str).match(YOUTUBE_ID_RE);
   return m ? m[1] : "";
 }
+// Profile music (2026-11-23) — Spotify + SoundCloud picks. The member
+// pastes a Share link; we keep only the canonical share URL and build
+// the official embed iframe from that at render time. A raw pasted URL
+// is never rendered as an iframe src. No API key, no OAuth, nothing
+// stored beyond the link itself.
+export function parseSpotifyUrl(str) {
+  if (!str) return null;
+  const s = String(str).trim();
+  let m = s.match(/^spotify:(track|album|playlist):([A-Za-z0-9]{22})$/);
+  if (m) return { type: m[1], id: m[2] };
+  m = s.match(/^https?:\/\/open\.spotify\.com\/(?:embed\/)?(track|album|playlist)\/([A-Za-z0-9]{22})(?:[?#].*)?$/i);
+  if (m) return { type: m[1].toLowerCase(), id: m[2] };
+  return null;
+}
+export function spotifyCanonicalUrl(str) {
+  const p = parseSpotifyUrl(str);
+  return p ? "https://open.spotify.com/" + p.type + "/" + p.id : "";
+}
+export function spotifyEmbedUrl(str) {
+  const p = parseSpotifyUrl(str);
+  return p ? "https://open.spotify.com/embed/" + p.type + "/" + p.id + "?utm_source=generator&theme=0" : "";
+}
+// SoundCloud reserved first path segments — pages, not tracks.
+const SOUNDCLOUD_RESERVED = ["you", "stream", "discover", "search", "settings", "upload", "charts", "feed", "notifications", "messages", "likes", "popular", "creators", "pro", "terms", "pages", "albums", "stations", "sets"];
+export function parseSoundCloudUrl(str) {
+  if (!str) return "";
+  const s = String(str).trim().replace(/[?#].*$/, "").replace(/\/+$/, "");
+  const m = s.match(/^https?:\/\/soundcloud\.com\/([^/?#]+)\/(?:sets\/([^/?#]+)|([^/?#]+))$/i);
+  if (!m) return "";
+  if (SOUNDCLOUD_RESERVED.includes(m[1].toLowerCase())) return "";
+  if (m[2]) return "https://soundcloud.com/" + m[1] + "/sets/" + m[2];
+  if (m[3].toLowerCase() === "sets") return "";
+  return "https://soundcloud.com/" + m[1] + "/" + m[3];
+}
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1925,7 +2036,13 @@ export function parseTheme(stored) {
   out.gif_block_align = (String(obj.gif_block_align || "") === "left") ? "left" : "center";
   // Profile audio (2026-11-22) — one pick: a soundscape, the radio
   // player, or nothing. Player look is a separate pick.
-  out.soundscape = obj.soundscape === "radio" || SOUNDSCAPE_IDS.includes(obj.soundscape) ? obj.soundscape : "";
+  // Profile music (2026-11-23) — "spotify"/"soundcloud" ride in the
+  // soundscape slot, same as "radio" already did: one pick, and the
+  // embed replaces the built-in player. The link itself is validated
+  // below; a bad link stores as "" and the player renders nothing.
+  out.soundscape = obj.soundscape === "radio" || obj.soundscape === "spotify" || obj.soundscape === "soundcloud" || SOUNDSCAPE_IDS.includes(obj.soundscape) ? obj.soundscape : "";
+  out.spotify_url = spotifyCanonicalUrl(obj.spotify_url);
+  out.soundcloud_url = parseSoundCloudUrl(obj.soundcloud_url);
   out.player_skin = PLAYER_SKIN_IDS.includes(obj.player_skin) ? obj.player_skin : "";
   const pimg = String(obj.player_image_url || "").trim().slice(0, 500);
   out.player_image_url = /^https:\/\//i.test(pimg) ? pimg : "";
@@ -1991,7 +2108,7 @@ export function parseTheme(stored) {
   // Action buttons (v3.10) — which side they sit on ("" = left default)
   // and whether they show at all (default true — hiding is opt-in).
   out.buttons_side = (String(obj.buttons_side || "") === "right") ? "right" : "";
-  out.buttons_show = obj.buttons_show === false ? false : true;
+  out.buttons_show = obj.buttons_show === false ? false : ((Array.isArray(obj.overlay_items) && obj.overlay_items.length) ? obj.buttons_show === true : true); // §8.3: overlays supersede the block unless explicitly ticked
   // Button size + which buttons show + professional-mode button
   // (v3.21) — the Buttons group in Edit Profile. Size "" = M, the
   // current size; "s" is the smallest clearly readable, "xl" decently
@@ -2032,6 +2149,14 @@ export function parseTheme(stored) {
   // to hide on their page (MySpace-style: show only what you want).
   const hs = Array.isArray(obj.hide_sections) ? obj.hide_sections : [];
   out.hide_sections = [...new Set(hs.map((k) => String(k || "")))].filter((k) => SECTION_HIDE_IDS.includes(k)).slice(0, 10);
+  // Section order (Build 5) — the info-column blocks in render order.
+  // A stored order that drops a key (or adds an unknown one) is repaired
+  // to the full default order, so a forged value can't hide a section.
+  const so = Array.isArray(obj.section_order) ? obj.section_order : [];
+  const soClean = [...new Set(so.map((k) => String(k || "")))].filter((k) => SECTION_ORDER_IDS.includes(k));
+  out.section_order = SECTION_ORDER_IDS.filter((k) => soClean.indexOf(k) === -1).length === 0 && soClean.length === SECTION_ORDER_IDS.length
+    ? soClean
+    : [...soClean, ...SECTION_ORDER_IDS.filter((k) => soClean.indexOf(k) === -1)];
   // Member page layout (v3.20) — how many Top Friends show (3/4/5/8/10,
   // default 8), which side the Top Friends column sits on ("" = right
   // default, "left" swaps it with the info column), and who can see the
@@ -2056,13 +2181,56 @@ export function parseTheme(stored) {
   // page. Sanitized on the way in (scripts/iframes stripped); renders
   // only when website_mode is on.
   out.custom_page_html = sanitizeCustomPageHtml(obj.custom_page_html);
+  // Two-box editor (2026-11-23) — font effects per target, one-image
+  // overlays, padding presets, bio size/colour/underline, header fit.
+  var fxTargets = ["all", "name", "comments", "bio"];
+  out.font_fx = {};
+  fxTargets.forEach(function (k) {
+    var f = (obj.font_fx && typeof obj.font_fx === "object") ? obj.font_fx[k] : null;
+    var eff = (f && FONT_FX_IDS.indexOf(String(f.effect || "")) >= 0) ? String(f.effect) : "";
+    // Flashing is never site-wide: a forged flash on "all" is dropped.
+    if (k === "all" && eff === "flash") eff = "";
+    out.font_fx[k] = { effect: eff, color: hex(f ? f.color : ""), outline: hex(f ? f.outline : "") };
+  });
+  // One-image overlays (2026-11-23) — max 8 items, one bad item never
+  // kills the others. x/y are percent integers 0-100.
+  var ovs = Array.isArray(obj.overlay_items) ? obj.overlay_items : [];
+  out.overlay_items = ovs.slice(0, 8).map(function (it) {
+    if (!it || typeof it !== "object") return null;
+    var kind = ["action", "link", "text"].indexOf(String(it.kind || "")) >= 0 ? String(it.kind) : "text";
+    var label = String(it.label || "").replace(/[<>\n\r]/g, "").slice(0, 30);
+    var target = "";
+    if (kind === "action") target = ["add", "message", "favorite", "group", "subscribe"].indexOf(String(it.target || "")) >= 0 ? String(it.target) : "";
+    else if (kind === "link") { var u = String(it.target || "").trim().slice(0, 500); target = (/^https:\/\//i.test(u) || u.indexOf("#/") === 0 || u.charAt(0) === "/") ? u : ""; }
+    var x = Math.max(0, Math.min(100, parseInt(it.x, 10) || 0));
+    var y = Math.max(0, Math.min(100, parseInt(it.y, 10) || 0));
+    var style = (String(it.style || "") === "plain" || BUTTON_STYLE_IDS.indexOf(String(it.style || "")) >= 0) ? String(it.style) : "";
+    if (!label) return null;
+    if (kind !== "text" && !target) return null;
+    return { id: String(it.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12) || "ov", kind: kind, label: label, target: target, x: x, y: y, style: style };
+  }).filter(Boolean);
+  // Padding presets (2026-11-23) — bounded, never free numbers.
+  var padOk = function (v) { return ["", "none", "tight", "roomy"].indexOf(String(v || "")) >= 0 ? String(v || "") : ""; };
+  out.pad_page = padOk(obj.pad_page);
+  out.pad_cards = padOk(obj.pad_cards);
+  out.pad_header = padOk(obj.pad_header);
+  // Bio size / colour / underline (2026-11-23).
+  out.bio_size = ["s", "l"].indexOf(String(obj.bio_size || "")) >= 0 ? String(obj.bio_size) : "";
+  out.bio_color = hex(obj.bio_color);
+  out.bio_underline = obj.bio_underline === true;
+  // Header fit (2026-11-23) — cover / stretch / contain; ratio;
+  // header_use_default true unless explicitly false.
+  out.header_fit = ["cover", "stretch", "contain"].indexOf(String(obj.header_fit || "")) >= 0 ? String(obj.header_fit) : "cover";
+  out.header_ratio = ["16:9", "21:9", "4:3", "auto"].indexOf(String(obj.header_ratio || "")) >= 0 ? String(obj.header_ratio) : "auto";
+  out.header_use_default = obj.header_use_default === false ? false : true;
+  out.page_image_fit = ["cover", "stretch", "contain"].indexOf(String(obj.page_image_fit || "")) >= 0 ? String(obj.page_image_fit) : "";
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

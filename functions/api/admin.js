@@ -8,19 +8,42 @@
 // POST /api/admin — actions, each gated server-side:
 //   set-role        operator only (admin/mod/member). Cannot change the
 //                   operator (id 1) or yourself.
-//   ban             operator only — the PERMANENT ban flag. Cannot ban
+//   ban             operator only — TIMED or permanent (Build 5). A
+//                   duration key (1d / 3d / 1w / 2w / 6w / 3mo, same keys
+//                   as the silence durations) sets banned_until; the ban
+//                   lifts itself when the time passes. "permanent" (or
+//                   no duration, for the old call) sets banned_until
+//                   NULL — banned forever until unbanned. Cannot ban
 //                   the operator or yourself.
 //   silence         operator / admin / mod, capped by role: operator any
 //                   duration incl. permanent (= ban flag), admin up to 3
 //                   months, mod up to 1 week (proposed default).
 //   unsilence       operator / admin / mod — clears a silence.
+//   reset-layout    operator only — resets a member's layout/theme to
+//                   the default MySpace look (Build 5).
 //   delete-profile  operator only — removes the member's account row.
 //                   Cannot delete the operator or yourself. Their posts
 //                   and comments stay in the database as orphan rows but
 //                   stop showing anywhere (every list joins profiles).
-// A banned member's posts/listings are hidden by the frontend; the flag
-// is the record.
-import { json, noDb, getDb, readJson, profileByDevice, isOperator, roleOf, isTeamRole, imageUrl, presenceOf, iso, nowMs, parsePrefs, SILENCE_DURATIONS, canSilenceFor } from "./_lib.js";
+// A banned member's posts and listings are hidden SERVER-SIDE (posts.js
+// and listings.js skip banned authors; a timed ban that expired doesn't
+// hide anything), and a banned member can't create posts, comments, or
+// listings (bannedMemberCheck in posts.js, profile-comments.js, and
+// listings.js). The flag alone is not the enforcement — the checks are.
+// Every action in this file is written to admin_audit_log (Build 5) —
+// who did it, to whom, what, when. The log write is best-effort and
+// never breaks the action itself.
+import { json, noDb, getDb, readJson, profileByDevice, isOperator, roleOf, isTeamRole, imageUrl, presenceOf, iso, nowMs, parsePrefs, SILENCE_DURATIONS, canSilenceFor, recordAuditLog, cleanTheme, BAN_DURATIONS } from "./_lib.js";
+
+// Default MySpace look (Build 5 layout reset) — the same free classic
+// look a brand-new signup gets in profile.js: classic vibe, navy
+// accent, retro buttons, ticker effect, radio soundscape, vinyl skin.
+const DEFAULT_LAYOUT_THEME = cleanTheme({
+  vibe: "classic", accent_color: "#003399", button_style: "retro",
+  effects: ["ticker-effect"], soundscape: "radio", player_skin: "vinyl",
+  topfriends_count: 8, buttons_show: true, buttons_visible: null,
+  website_buttons: false,
+});
 
 function needOperator(env, me) {
   return me && isOperator(env, me);
@@ -39,18 +62,20 @@ export async function onRequestGet({ env, request }) {
   // the panel still loads (with empty types) instead of breaking.
   // v3.18 — muted_until / muted_reason ride along the same way (the
   // silence columns land with the team-moderation migration).
+  // Build 5 — banned_until (timed bans) + is_test (18+ test mode) ride
+  // along the same way; a table without them falls back below.
   const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
   var results;
   try {
     const q = await db.prepare(
-      "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, muted_until, muted_reason, age_verified, presence_status, last_seen, created_at, seller_types, buyer_types FROM profiles ORDER BY id ASC",
+      "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, banned_until, is_test, muted_until, muted_reason, age_verified, presence_status, last_seen, created_at, seller_types, buyer_types FROM profiles ORDER BY id ASC",
     ).all();
     results = q.results;
   } catch (e) {
     if (!noCol(e)) throw e;
     try {
       const q = await db.prepare(
-        "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, age_verified, presence_status, last_seen, created_at, seller_types, buyer_types FROM profiles ORDER BY id ASC",
+        "SELECT id, username, avatar_blob_key, role, is_operator, banned, banned_reason, muted_until, muted_reason, age_verified, presence_status, last_seen, created_at, seller_types, buyer_types FROM profiles ORDER BY id ASC",
       ).all();
       results = q.results;
     } catch (e2) {
@@ -76,6 +101,8 @@ export async function onRequestGet({ env, request }) {
     members: (results || []).map((r) => ({
       id: r.id, username: r.username, avatar_url: imageUrl(r.avatar_blob_key),
       role: roleOf(r), banned: r.banned === 1, banned_reason: r.banned_reason ?? "",
+      banned_until: r.banned_until == null ? null : Number(r.banned_until),
+      is_test: r.is_test === 1,
       muted_until: r.muted_until ?? null, muted_reason: r.muted_reason ?? "",
       age_verified: r.age_verified === 1, presence: presenceOf(r),
       seller_types: parsePrefs(r.seller_types),
@@ -108,15 +135,38 @@ export async function onRequestPost({ env, request }) {
       return json({ ok: false, error: "Role must be admin, mod, or member." });
     }
     await db.prepare("UPDATE profiles SET role = ? WHERE id = ?").bind(role, targetId).run();
+    await recordAuditLog(db, { actorId: me.id, action: "role-change", targetId, detail: `role -> ${role}` });
     return json({ ok: true, error: null, role });
   }
   if (action === "ban") {
-    if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can ban permanently — admins silence for up to 3 months instead." });
+    if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can ban — admins silence for up to 3 months instead." });
     const banned = a.banned === true || a.banned === 1;
     const reason = String(a.reason || "").trim().slice(0, 200);
-    await db.prepare("UPDATE profiles SET banned = ?, banned_at = ?, banned_reason = ? WHERE id = ?")
-      .bind(banned ? 1 : 0, banned ? nowMs() : null, banned ? reason : "", targetId).run();
-    return json({ ok: true, error: null, banned });
+    // Timed ban (Build 5): a duration key sets banned_until and the ban
+    // lifts itself when the time passes. "permanent" — or no duration
+    // on the old call — is the old permanent ban (banned_until NULL).
+    // Unban clears both the flag and the timer.
+    const durKey = String(a.duration || "").toLowerCase();
+    const dur = BAN_DURATIONS.find((d) => d.key === durKey);
+    if (banned && durKey && !dur) return json({ ok: false, error: "Pick a ban length — 1 day, a few days, 1 week, 2 weeks, 6 weeks, 3 months, or permanent." });
+    const until = banned && dur && dur.ms != null ? nowMs() + dur.ms : null;
+    const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+    try {
+      await db.prepare("UPDATE profiles SET banned = ?, banned_at = ?, banned_reason = ?, banned_until = ? WHERE id = ?")
+        .bind(banned ? 1 : 0, banned ? nowMs() : null, banned ? reason : "", until, targetId).run();
+    } catch (e) {
+      if (!noCol(e)) throw e;
+      // banned_until column not there yet — the ban still lands as the
+      // old permanent flag, and the client is told the timer didn't stick.
+      await db.prepare("UPDATE profiles SET banned = ?, banned_at = ?, banned_reason = ? WHERE id = ?")
+        .bind(banned ? 1 : 0, banned ? nowMs() : null, banned ? reason : "", targetId).run();
+      if (banned && until) return json({ ok: true, error: null, banned, banned_until_pending: true });
+    }
+    await recordAuditLog(db, {
+      actorId: me.id, action: banned ? "ban" : "unban", targetId,
+      detail: banned ? `banned ${dur ? dur.label : "permanently"}${reason ? " — " + reason : ""}` : "unbanned",
+    });
+    return json({ ok: true, error: null, banned, banned_until: until });
   }
   if (action === "silence") {
     const key = String(a.duration || "").toLowerCase();
@@ -128,8 +178,11 @@ export async function onRequestPost({ env, request }) {
     if (key === "permanent") {
       // Permanent silence IS the ban flag — operator only (enforced by
       // canSilenceFor above, which only allows it for the operator).
-      await db.prepare("UPDATE profiles SET banned = 1, banned_at = ?, banned_reason = ?, muted_until = NULL, muted_reason = ? WHERE id = ?")
+      // banned_until is cleared (NULL = permanent) so a stale timer
+      // from an earlier timed ban can't silently lift this one.
+      await db.prepare("UPDATE profiles SET banned = 1, banned_at = ?, banned_reason = ?, banned_until = NULL, muted_until = NULL, muted_reason = ? WHERE id = ?")
         .bind(nowMs(), reason, reason, targetId).run();
+      await recordAuditLog(db, { actorId: me.id, action: "ban", targetId, detail: `banned permanently (via silence)${reason ? " — " + reason : ""}` });
       return json({ ok: true, error: null, banned: true });
     }
     const dur = SILENCE_DURATIONS.find((d) => d.key === key);
@@ -140,6 +193,7 @@ export async function onRequestPost({ env, request }) {
       if (!noCol(e)) throw e;
       return json({ ok: false, error: "Silencing isn't switched on yet — the shop is still running a quick database update. Try again later." });
     }
+    await recordAuditLog(db, { actorId: me.id, action: "silence", targetId, detail: `silenced ${dur.label}${reason ? " — " + reason : ""}` });
     return json({ ok: true, error: null, muted_until: until });
   }
   if (action === "unsilence") {
@@ -150,11 +204,31 @@ export async function onRequestPost({ env, request }) {
       if (!noCol(e)) throw e;
       return json({ ok: false, error: "Silencing isn't switched on yet — the shop is still running a quick database update. Try again later." });
     }
+    await recordAuditLog(db, { actorId: me.id, action: "unsilence", targetId, detail: "silence cleared" });
     return json({ ok: true, error: null });
+  }
+  if (action === "reset-layout") {
+    if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can reset a member's layout." });
+    // The default MySpace look: classic preset, no custom CSS, the
+    // default theme JSON. Top Friends / links / bio are untouched —
+    // only the look resets. Graceful when the v2/v3 columns aren't
+    // there yet: the preset + theme just don't stick, and the client
+    // is told via layout_pending.
+    const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+    try {
+      await db.prepare("UPDATE profiles SET layout_preset = 'classic', layout_css = '', profile_theme = ?, updated_at = ? WHERE id = ?")
+        .bind(DEFAULT_LAYOUT_THEME, nowMs(), targetId).run();
+    } catch (e) {
+      if (!noCol(e)) throw e;
+      return json({ ok: false, error: "Layout reset needs the database update — the shop is still running it. Try again later.", layout_pending: true });
+    }
+    await recordAuditLog(db, { actorId: me.id, action: "reset-layout", targetId, detail: "layout reset to the default MySpace look" });
+    return json({ ok: true, error: null, reset: true });
   }
   if (action === "delete-profile") {
     if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can delete profiles." });
     await db.prepare("DELETE FROM profiles WHERE id = ?").bind(targetId).run();
+    await recordAuditLog(db, { actorId: me.id, action: "delete-profile", targetId, detail: "profile deleted" });
     return json({ ok: true, error: null, deleted: true });
   }
   return json({ ok: false, error: "Unknown admin action." });

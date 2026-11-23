@@ -6,17 +6,27 @@
 // be changed at most 3 times — every edit is logged in post_edits, and
 // the limit is enforced here, server-side. Needs the feed-redesign
 // migration (post_edits table + posts.visibility column) to run first.
-import { json, noDb, getDb, readJson, profileByDevice, shapePost, normalizeTags, putImage, putVideo, nowMs, canSeePost, roleOf, canDeleteContent } from "../_lib.js";
+import { json, noDb, getDb, readJson, profileByDevice, shapePost, normalizeTags, putImage, putVideo, nowMs, canSeePost, roleOf, canDeleteContent, isBanActive, isOperator } from "../_lib.js";
 
 export async function onRequestGet({ env, request, params }) {
   const db = getDb(env);
   if (!db) return noDb();
   const id = Number(params.id);
   const deviceId = new URL(request.url).searchParams.get("device_id") || "";
-  const row = await db.prepare(
-    `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
-     FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.id = ? LIMIT 1`,
-  ).bind(id).first();
+  const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+  let row;
+  try {
+    row = await db.prepare(
+      `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned, a.banned_until AS author_banned_until
+       FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.id = ? LIMIT 1`,
+    ).bind(id).first();
+  } catch (e) {
+    if (!noCol(e)) throw e;
+    row = await db.prepare(
+      `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned
+       FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.id = ? LIMIT 1`,
+    ).bind(id).first();
+  }
   if (!row) return json({ post: null });
   if ((row.kind ?? "forum") === "adult") {
     const caller = deviceId ? await profileByDevice(db, deviceId) : null;
@@ -26,6 +36,9 @@ export async function onRequestGet({ env, request, params }) {
   // even on a direct link.
   const caller = deviceId ? await profileByDevice(db, deviceId) : null;
   if (!(await canSeePost(db, caller, row))) return json({ post: null });
+  // Banned authors (Build 5) — a direct link to a banned member's post
+  // shows nothing, same as the feeds. Operator + author still see it.
+  if (isBanActive({ banned: row.author_banned, banned_until: row.author_banned_until }) && !(caller && (caller.id === row.profile_id || isOperator(env, caller)))) return json({ post: null });
   return json({ post: await shapePost(db, row, { id: row.author_id, username: row.author_username, occupation: row.author_occupation, avatar_blob_key: row.author_avatar }) });
 }
 

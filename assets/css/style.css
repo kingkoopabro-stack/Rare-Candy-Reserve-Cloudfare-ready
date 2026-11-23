@@ -5,6 +5,9 @@
   --grad:linear-gradient(90deg,#ff2d95,#ff9a00,#00e5ff,#7c4dff);
 }
 *{box-sizing:border-box}
+/* Horizontal-overflow backstop (2026-11-23): clip, NOT hidden, so
+   position:sticky (site header) keeps working. */
+html,body{overflow-x:clip}
 figure{margin:0}
 html{scroll-behavior:smooth}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;line-height:1.55}
@@ -948,6 +951,8 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 @keyframes dwcBgShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
 @keyframes dwcStarDrift{from{background-position:0 0}to{background-position:-512px 0}}
 @keyframes dwcMarquee{0%{transform:translateX(100%)}100%{transform:translateX(-100%)}}
+@keyframes dwcFxFlash{0%,49%{color:#000}50%,100%{color:#fff}}
+@keyframes dwcFxMarquee{0%{transform:translateX(0)}50%{transform:translateX(-14px)}100%{transform:translateX(0)}}
 @keyframes dwcSparkleTwinkle{0%,100%{opacity:.25}50%{opacity:.9}}
 @keyframes dwcRgbBorderGlow{0%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}25%{border-color:#7c4dff;box-shadow:0 0 8px #7c4dff}50%{border-color:#00e5ff;box-shadow:0 0 8px #00e5ff}75%{border-color:#39ff88;box-shadow:0 0 8px #39ff88}100%{border-color:#ff2d95;box-shadow:0 0 8px #ff2d95}}
 
@@ -1015,12 +1020,15 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-picviewer-comments{text-align:left}
 
 /* Profile action buttons (v3.6) — the 4-button block on a member page.
-   v3.10: 2×2 grid — two buttons side by side, two directly under. */
-.dwc-action-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
+   Horizontal row (2026-11-23, operator's ask: "normal and horizontal"):
+   the buttons flex into one row and wrap only when the column is too
+   narrow, instead of the old documented 2×2 grid that collapsed into a
+   tall stack with 3–4-line labels on a new profile. */
+.dwc-action-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel2)}
 .dwc-action-buttons-image{background-size:cover;background-position:center;background-color:var(--panel2)}
 .dwc-action-buttons-image .btn{background:rgba(11,11,20,.82)}
-.dwc-action-buttons .btn{width:100%}
-/* Profile overlap fix (v3.21) — the 2×2 buttons and the link buttons
+.dwc-action-buttons .btn{flex:1 1 150px;width:auto}
+/* Profile overlap fix (v3.21) — the action buttons and the link buttons
    sit in a narrow cell (46% of the middle column). Let their text wrap
    inside the cell instead of forcing the block wider than the column
    and sliding under Top Friends. */
@@ -1034,6 +1042,9 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-side-cell{flex:1 1 0;min-width:0}
 .dwc-side-cell:empty{display:none}
 .dwc-side-buttons{flex:0 0 46%}
+/* No video beside them (new profile): the buttons take the full row
+   instead of sitting in a fixed 46% cell next to an empty video cell. */
+.dwc-side-buttons-full{flex:1 1 auto}
 .dwc-side-video{flex:1 1 0}
 .dwc-side-right .dwc-side-buttons{order:2}
 .dwc-side-right .dwc-side-video{order:1}
@@ -1135,7 +1146,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
    by default and stays put unless the member picks Left (flip class).
    On narrow screens the columns stack: feed first, then the right
    column, then info — so the posts are never buried. */
-.dwc-member-cols{display:flex;gap:16px;align-items:flex-start;margin-top:16px}
+.dwc-member-cols{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-top:16px}
 .dwc-member-col{min-width:0}
 .dwc-member-col-info{flex:0 0 260px}
 .dwc-member-col-main{flex:1 1 auto}
@@ -1156,11 +1167,11 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 /* Dividers: inline SVG, color comes from the wrapping span. */
 .dwc-divider{margin:14px 0}
 .dwc-divider svg{display:block}
-/* Banner auto-fit (v3.20): wide pictures stretch across the top to
-   almost the width of the profile walls (small margin, never full
-   bleed); small/square ones stay centered and small, like a logo. */
+/* Banner auto-fit (v3.20, §22): every banner renders cover — wide
+   pictures stretch across the top to almost the width of the profile
+   walls (small margin, never full bleed). The small centered mode is
+   retired; cover_size Small now means a 240px-tall cover. */
 .dwc-banner-wide img{width:calc(100% - 24px);height:200px;max-height:200px}
-.dwc-banner-small img{max-width:260px;max-height:260px}
 /* v3.22 — cover photo: Big makes the top picture a tall cover area
    taking up almost the whole top of the page (the ticker below it
    stays visible). The cover rule beats the wide/small auto-fit rules
@@ -1168,10 +1179,10 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
    left or the right of the picture. */
 .dwc-banner.dwc-banner-cover{height:320px;overflow:hidden}
 .dwc-banner.dwc-banner-cover img{width:100%;height:100%;max-height:none;object-fit:cover}
-.dwc-cover-row{display:flex;gap:14px;align-items:center}
+.dwc-cover-row{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
 .dwc-cover-row .dwc-banner{flex:1;min-width:0;margin:0}
-.dwc-cover-name{flex:0 0 auto}
-.dwc-cover-name h2{white-space:nowrap}
+.dwc-cover-name{flex:1 1 auto;min-width:0}
+.dwc-cover-name h2{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .dwc-cover-name-right{flex-direction:row-reverse}
 /* Professional-mode listings grid on a member page. */
 .dwc-member-listings-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:10px}
@@ -1187,13 +1198,14 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 
 /* Professional mode (website look, 2026-11-21) — the banner IS the
    header: full width, edge to edge, at the very top, name overlaid on
-   it like a business website. The 100vw breakout is exact (the
-   -6px profile margin and 18px profile padding cancel out), and the
-   body clip below stops any sub-pixel sideways scroll. A square
-   banner still stretches full width here — bannerFit's "small like a
-   logo" rule never applies in website mode. */
+   it like a business website. The breakout is calc(100% + 36px) with a
+   -18px left margin (2026-11-23): it exactly undoes .dwc-myprofile's
+   18px padding, where the old 100vw breakout included the scrollbar
+   (~15px) and overflowed sideways. The body clip below is defence in
+   depth. A square banner still stretches full width here — bannerFit's
+   "small like a logo" rule never applies in website mode. */
 body.dwc-website-view{overflow-x:hidden;overflow-x:clip}
-.dwc-website .dwc-website-banner{width:100vw;max-width:100vw;margin:0 0 14px calc(50% - 50vw);border-radius:0}
+.dwc-website .dwc-website-banner{width:calc(100% + 36px);max-width:calc(100% + 36px);margin:0 0 14px -18px;border-radius:0}
 .dwc-website .dwc-website-banner img{width:100%;height:230px;max-height:230px;max-width:none;border-radius:0;object-fit:cover}
 .dwc-website .dwc-website-banner .dwc-website-banner-name{left:max(16px, calc(50% - 522px));font-size:34px}
 .dwc-website .dwc-website-banner-none{min-height:120px}
@@ -1235,6 +1247,7 @@ body.dwc-website-view footer.site,
 body.dwc-website-view .hero,
 body.dwc-website-view #meme-stash,
 body.dwc-website-view .dwc-pills,
+body.dwc-website-view .dwc-big-nav,
 body.dwc-website-view .dwc-stats,
 body.dwc-website-view .dwc-coin-row,
 body.dwc-website-view .dwc-profile-card{display:none !important;}
@@ -1246,7 +1259,7 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 /* Custom page (v3.20) — the member's own HTML as their website-mode
    page. Their code is scoped by the sanitizer; the wrapper just gives
    it the same canvas as the rest of the profile. */
-.dwc-custom-page{margin:0 0 14px;}
+.dwc-custom-page{margin:0 0 14px;overflow-wrap:anywhere;overflow-x:auto}
 .dwc-custom-page img{max-width:100%;height:auto;}
 
 /* Layout miniatures (v3.20) — a live, scaled-down sample profile page
@@ -1290,6 +1303,28 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-admin-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .dwc-admin-row:last-of-type{border-bottom:0}
 .dwc-admin-row select{max-width:110px}
+
+/* Horizontal-overflow hardening (base, 2026-11-23 — moved out of the
+   ≤640px query so long words / wide images can't overflow on desktop
+   either). */
+.card, .dwc-myprofile { overflow-wrap: anywhere; }
+img { max-width: 100%; height: auto; }
+
+/* Stepped signup (2026-11-23) — progress header, look picker, live
+   password hints. Additive only. */
+.dwc-signup-steps{margin:0 0 4px;font-size:13px;font-weight:700;color:var(--muted)}
+.dwc-signup-steps strong{color:var(--ink)}
+.dwc-look-picks{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0}
+.dwc-look-pick{flex:1 1 150px;text-align:left}
+.dwc-look-pick.active{border-color:var(--pink);box-shadow:0 0 16px rgba(255,45,149,.45)}
+.dwc-pw-hint{margin:4px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.dwc-pw-hint .ok{color:var(--green)}
+/* Dashboard landing (2026-11-23) — three big buttons under the "You"
+   card, everything else in one "More" row, 18+ separate and last. */
+.dwc-big-nav{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap}
+.dwc-big-nav .btn{flex:1 1 160px;min-height:52px;font-size:16px}
+.dwc-more-label{align-self:center;color:var(--muted);font-size:13px;font-weight:800;margin-right:2px}
+.dwc-pills-adult{margin-top:0}
 
 /* ---------- Phone scaling (v3.7) ---------- */
 /* Phones: keep everything tappable, stacked, and inside the screen. */
@@ -1347,6 +1382,10 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
   /* v3.22 — cover photo on phones: shorter cover, name above the
      picture instead of beside it. */
   .dwc-banner.dwc-banner-cover { height: 200px; }
+  /* Two-box editor §18 — positioned overlays stack on phones instead of
+     overlapping: the layer becomes a plain column, items full-width. */
+  .dwc-page-overlay { position: static !important; display: flex; flex-direction: column; gap: 8px; }
+  .dwc-page-overlay .dwc-ov-item { position: static !important; transform: none !important; width: 100%; min-height: 38px; font-size: 13.5px; text-align: center; }
   .dwc-cover-row { flex-direction: column; align-items: stretch; }
   /* Meme drawer: even when open, it never takes the whole page on a
      phone — it caps at most of the screen and scrolls inside itself. */
@@ -1354,9 +1393,6 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
   /* Professional-mode banner header on phones: shorter, name smaller. */
   .dwc-website .dwc-website-banner img{height:170px;max-height:170px}
   .dwc-website .dwc-website-banner .dwc-website-banner-name{font-size:24px;left:16px}
-  /* Headlines + posts: no sideways scroll. */
-  .card, .dwc-myprofile { overflow-wrap: anywhere; }
-  img { max-width: 100%; height: auto; }
   /* Taffy Phone status bar on phones: shrink the black island, hide the
      wifi logo so "VNR Wireless" fits, and respect the real notch. */
   .tp-island{width:64px;height:18px;top:4px}
@@ -1468,7 +1504,7 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-feed-card{width:100%;max-width:100%;box-sizing:border-box;border:2px solid transparent;background:linear-gradient(var(--panel),var(--panel)) padding-box,var(--grad) border-box;padding:14px 16px}
 .dwc-feed-card:hover{box-shadow:0 0 0 1px var(--violet),0 8px 30px rgba(124,77,255,.25)}
 .dwc-feed-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
-.dwc-feed-who{min-width:0;flex:1 1 auto;overflow-wrap:normal}
+.dwc-feed-who{min-width:0;flex:1 1 auto;overflow-wrap:normal;overflow:hidden}
 .dwc-feed-who .dwc-titlelink{color:var(--ink)}
 .dwc-feed-right{display:flex;align-items:center;gap:6px;flex:none;margin-left:auto}
 .dwc-feed-when{color:var(--muted);font-size:12.5px;white-space:nowrap}
@@ -1479,8 +1515,10 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
    column. Now the name never breaks mid-word; when the name + date
    don't fit side by side, the header wraps and the date drops to its
    own line below the name, right-aligned. The avatar never squeezes
-   the name column. */
-.dwc-feed-who strong{white-space:nowrap}
+   the name column. Safety valve (2026-11-23): a very long name
+   ellipsizes instead of pushing the card wider — overflow-wrap:anywhere
+   on the name is NOT reintroduced (it regresses the v3.22 fix). */
+.dwc-feed-who strong{white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom}
 .dwc-comment .dwc-avatar-sm,.dwc-comment-card .dwc-avatar-sm{flex-shrink:0}
 .dwc-feed-typeline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px}
 .dwc-type-label{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#0b0b14;background:var(--grad);border-radius:999px;padding:2px 9px}
@@ -1749,3 +1787,45 @@ span.dwc-cassette-tape{cursor:default}
 /* Image/GIF player — the picture IS the play/pause control, and a
    profile GIF is never more than a quarter of the page (Chris's rule). */
 .dwc-player-image img{display:block;max-width:25%;height:auto;border-radius:10px;cursor:pointer}
+
+/* ---------- Two-box editor (2026-11-23) ---------- */
+/* Default header (cover banner + overlay text). Small = 240px tall,
+   Big = 320px desktop / 200px mobile (the .dwc-banner-cover rule). */
+.dwc-banner-default { position: relative; }
+.dwc-banner-default img { width: 100%; height: 240px; object-fit: cover; }
+.dwc-banner-default.dwc-banner-cover img { height: 320px; }
+.dwc-header-overlay { position: absolute; inset: 0; pointer-events: none; }
+.dwc-header-logo { position: absolute; top: 12px; left: 12px; width: 48px; height: 48px; }
+.dwc-header-name { position: absolute; left: 72px; top: 14px; font-size: 26px; font-weight: 900; letter-spacing: .04em; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,.7); }
+.dwc-header-tag { position: absolute; left: 72px; top: 48px; font-size: 13px; color: #f2f2f8; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.dwc-header-user { position: absolute; left: 72px; bottom: 12px; font-size: 13px; font-weight: 700; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+.dwc-header-vnr { position: absolute; right: 12px; bottom: 10px; width: 56px; height: auto; opacity: .9; }
+/* Quick colour oval (§20). */
+.dwc-oval-color { width: 44px; height: 44px; padding: 2px; border: 2px solid var(--line); border-radius: 50%; cursor: pointer; vertical-align: middle; }
+/* One-picture overlays (§8). The layer never blocks scrolling; items do. */
+.dwc-page-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.dwc-page-overlay .dwc-ov-item { position: absolute; pointer-events: auto; white-space: nowrap; }
+.dwc-page-overlay .dwc-ov-item.dwc-ov-text { background: none; border: 0; box-shadow: none; color: inherit; padding: 2px 6px; }
+.dwc-page-overlay.dwc-ov-edit .dwc-ov-item { outline: 2px dashed #00e5ff; outline-offset: 2px; }
+.dwc-page-overlay.dwc-ov-edit .dwc-ov-item.dwc-ov-selected { outline: 3px dashed #ff2d95; }
+.dwc-ov-row { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin: 6px 0; display: grid; gap: 6px; }
+.dwc-ov-row.dwc-ov-selected { border-color: #00e5ff; box-shadow: 0 0 0 1px #00e5ff; }
+/* Bio reference table (§7.3). */
+.dwc-bio-codes { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 13px; }
+.dwc-bio-codes th, .dwc-bio-codes td { border: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+.dwc-bio-codes code { overflow-wrap: anywhere; }
+/* Editor groups (§13): collapsed <details> with a state summary. */
+#dwc-account .dwc-edit-group { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 10px 0; }
+#dwc-account .dwc-edit-group > summary { cursor: pointer; font-weight: 700; font-size: 15px; padding: 2px 0; }
+#dwc-account .dwc-edit-group > summary:hover { color: var(--pink); }
+/* Edit profile — compact (§13.2). Editor-only, scoped to #dwc-account form. */
+#dwc-account form .dwc-layoutbox { padding: 10px; margin: 10px 0; }
+#dwc-account form h3, #dwc-account form h4 { margin: 10px 0 4px; }
+#dwc-account form label { margin: 6px 0 2px; }
+#dwc-account form .dwc-edit-group > p, #dwc-account form .dwc-layoutbox > p { margin: 2px 0 6px; }
+
+/* Profile music (2026-11-23) — Spotify sign-in button + embed player. */
+.dwc-spotify-login{display:inline-flex;align-items:center;background:#1DB954;color:#000;border:0;border-radius:999px;padding:8px 16px;font-weight:800;font-size:14px;cursor:pointer}
+.dwc-spotify-login:hover{background:#1ed760}
+.dwc-embed-player{margin:8px 0}
+.dwc-embed-player iframe{display:block;width:100%;border:0;border-radius:12px}

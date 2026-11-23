@@ -514,13 +514,14 @@ async function rcrSubscribe(ev, form){
 /* ---------- cart (localStorage) ---------- */
 let cart = [];
 try { cart = JSON.parse(localStorage.getItem("rcr-cart") || "[]"); } catch(e){ cart = []; }
+if(!Array.isArray(cart)) cart = [];
 function saveCart(){ try { localStorage.setItem("rcr-cart", JSON.stringify(cart)); } catch(e){} updateCount(); }
 function updateCount(){
   const el = document.getElementById("cartCount");
-  if(el) el.textContent = cart.reduce((n,i)=>n+i.qty,0);
+  if(el) el.textContent = cart.reduce((n,i)=>n+(i && (i.qty||0)),0);
 }
 function findItem(id){ return PRODUCTS.find(x => x.id === id) || CATALOG.find(x => x.id === id); }
-function entryPrice(e){ return (e.varPrice != null) ? e.varPrice : findItem(e.id).price; }
+function entryPrice(e){ if(e && e.varPrice != null) return e.varPrice; const item = e ? findItem(e.id) : undefined; return item ? item.price : 0; }
 function addToCart(id){
   const item = cart.find(i => i.id === id && i.varLabel == null);
   if(item) item.qty++; else cart.push({id, qty:1});
@@ -611,15 +612,24 @@ function setQty(idx, d){
   item.qty += d; if(item.qty <= 0) cart.splice(idx,1);
   saveCart(); renderCart();
 }
-function cartTotal(){ return cart.reduce((t,i) => t + entryPrice(i)*i.qty, 0); }
+function cartTotal(){ return cart.reduce((t,i) => t + entryPrice(i)*(i && (i.qty||0)), 0); }
 function renderCart(){
+  // Self-heal: drop lines whose item no longer exists (removed/renamed
+  // product) so a stale saved cart can never brick the drawer again.
+  const beforePrune = cart.length;
+  cart = cart.filter(i => i && findItem(i.id));
+  const removedCount = beforePrune - cart.length;
+  if(removedCount > 0) saveCart();
+  const removedNote = removedCount > 0
+    ? '<div class="note">' + (removedCount === 1 ? "1 item was removed — it's no longer for sale." : removedCount + " items were removed — they're no longer for sale.") + '</div>'
+    : "";
   const body = document.getElementById("cartBody"); if(!body) return;
   const foot = document.getElementById("cartFootTotal");
   if(!cart.length){
-    body.innerHTML = '<div class="note">Your cart is empty. <a href="shop.html">Browse the shop →</a></div>';
+    body.innerHTML = removedNote + '<div class="note">Your cart is empty. <a href="shop.html">Browse the shop →</a></div>';
     if(foot) foot.textContent = "";
   } else {
-    body.innerHTML = cart.map((i,idx) => { const p = findItem(i.id); const unit = entryPrice(i); return `
+    body.innerHTML = removedNote + cart.map((i,idx) => { const p = findItem(i.id); const unit = entryPrice(i); return `
       <div class="cart-line">
         <div><b>${p.name}</b>${i.varLabel ? `<br><span style="color:var(--muted);font-size:13px">${i.varLabel}</span>` : ""}<br><span style="color:var(--muted);font-size:13px">${money(unit)}${p.ship ? " · "+p.ship : ""}</span></div>
         <div class="qty"><button onclick="setQty(${idx},-1)">−</button> <b>${i.qty}</b> <button onclick="setQty(${idx},1)">+</button></div>
@@ -630,10 +640,10 @@ function renderCart(){
   const page = document.getElementById("cartPageBody");
   if(page){
     if(!cart.length){
-      page.innerHTML = '<div class="note">Your cart is empty. <a href="shop.html">Browse the shop →</a></div>';
-      document.getElementById("checkoutBox").style.display = "none";
+      page.innerHTML = removedNote + '<div class="note">Your cart is empty. <a href="shop.html">Browse the shop →</a></div>';
+      const cb0 = document.getElementById("checkoutBox"); if(cb0) cb0.style.display = "none";
     } else {
-      page.innerHTML = cart.map((i,idx) => { const p = findItem(i.id); const unit = entryPrice(i); return `
+      page.innerHTML = removedNote + cart.map((i,idx) => { const p = findItem(i.id); const unit = entryPrice(i); return `
         <div class="cart-line">
           <div><b>${p.name}</b>${i.varLabel ? `<br><span style="color:var(--muted);font-size:13px">${i.varLabel}</span>` : ""}<br><span style="color:var(--muted);font-size:13px">${money(unit)}${p.ship ? " · "+p.ship : ""}</span></div>
           <div class="qty"><button onclick="setQty(${idx},-1)">−</button> <b>${i.qty}</b> <button onclick="setQty(${idx},1)">+</button></div>
@@ -641,11 +651,11 @@ function renderCart(){
         </div>`; }).join("") +
         `<div class="cart-line" style="border-bottom:0"><div><b>Subtotal</b></div><div></div><div><b>${money(cartTotal())}</b></div></div>
          <p style="color:var(--muted);font-size:13px">Shipping is by location unless the item says free shipping — calculated at checkout. No charge is made until you pay with Stripe or PayPal.</p>`;
-      document.getElementById("checkoutBox").style.display = "block";
+      const cb = document.getElementById("checkoutBox"); if(cb) cb.style.display = "block";
       const pp = document.getElementById("paypalCartBox");
       if(pp){
         if(PAYPAL_EMAIL){
-          const shipTotal = cart.reduce((t, i) => t + (((findItem(i.id) || {}).shipping_charge || 0) * i.qty), 0);
+          const shipTotal = cart.reduce((t, i) => t + (((findItem(i.id) || {}).shipping_charge || 0) * (i.qty||0)), 0);
           pp.innerHTML = `<form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
             <input type="hidden" name="cmd" value="_xclick">
             <input type="hidden" name="business" value="${PAYPAL_EMAIL}">
@@ -663,8 +673,17 @@ function renderCart(){
     }
   }
 }
-function openCart(){ renderCart(); document.getElementById("cartDrawer").classList.add("open"); document.getElementById("drawerScrim").classList.add("show"); }
-function closeCart(){ document.getElementById("cartDrawer").classList.remove("open"); document.getElementById("drawerScrim").classList.remove("show"); }
+function openCart(){
+  renderCart();
+  if(!document.getElementById("cartDrawer") || !document.getElementById("drawerScrim")) injectChrome();
+  const drawer = document.getElementById("cartDrawer"); if(drawer) drawer.classList.add("open");
+  const scrim = document.getElementById("drawerScrim"); if(scrim) scrim.classList.add("show");
+}
+function closeCart(){
+  if(!document.getElementById("cartDrawer") || !document.getElementById("drawerScrim")) injectChrome();
+  const drawer = document.getElementById("cartDrawer"); if(drawer) drawer.classList.remove("open");
+  const scrim = document.getElementById("drawerScrim"); if(scrim) scrim.classList.remove("show");
+}
 /* ---------- rendering ---------- */
 function photoHTML(p, idx){
   const total = (p.imgs && p.imgs.length) || 3;

@@ -12,7 +12,7 @@ import {
   CATEGORIES, ADULT_CATEGORIES, CREATOR_GENRES, normalizeTags, normalizeCreatorTags,
   parseTags, putImage, putVideo, putPrintFile, nowMs, notifyMentions,
   createNotification, badgesForProfiles, awardLucre, LUCRE_AWARDS, filterVisiblePosts, silenceCheck, bannedMemberCheck,
-  parseTheme, isFriendWith,
+  parseTheme, isFriendWith, isBanActive,
 } from "./_lib.js";
 
 export async function onRequestGet({ env, request }) {
@@ -60,14 +60,40 @@ export async function onRequestGet({ env, request }) {
     if (!visible) return json({ posts: [], feed_visible: false, has_more: false });
   }
 
-  const { results } = await db.prepare(
-    profileId
-      ? `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
-         FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.profile_id = ? ORDER BY p.id DESC LIMIT 200`
-      : `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar
-         FROM posts p JOIN profiles a ON a.id = p.profile_id ORDER BY p.id DESC LIMIT 200`,
-  ).bind(...(profileId ? [profileId] : [])).all();
+  const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+  let results;
+  try {
+    const q = await db.prepare(
+      profileId
+        ? `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned, a.banned_until AS author_banned_until
+           FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.profile_id = ? ORDER BY p.id DESC LIMIT 200`
+        : `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned, a.banned_until AS author_banned_until
+           FROM posts p JOIN profiles a ON a.id = p.profile_id ORDER BY p.id DESC LIMIT 200`,
+    ).bind(...(profileId ? [profileId] : [])).all();
+    results = q.results;
+  } catch (e) {
+    if (!noCol(e)) throw e;
+    // banned_until column not there yet — a ban reads as permanent
+    // (the old flag), which is the safe direction.
+    const q = await db.prepare(
+      profileId
+        ? `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned
+           FROM posts p JOIN profiles a ON a.id = p.profile_id WHERE p.profile_id = ? ORDER BY p.id DESC LIMIT 200`
+        : `SELECT p.*, a.id AS author_id, a.username AS author_username, a.occupation AS author_occupation, a.avatar_blob_key AS author_avatar, a.banned AS author_banned
+           FROM posts p JOIN profiles a ON a.id = p.profile_id ORDER BY p.id DESC LIMIT 200`,
+    ).bind(...(profileId ? [profileId] : [])).all();
+    results = q.results;
+  }
   let rows = results || [];
+  // Banned authors (Build 5) — their existing posts stay in the
+  // database but stop showing anywhere, server-side. The operator
+  // still sees them (to review / unban); the author sees their own.
+  // A timed ban that already expired doesn't hide anything.
+  const callerIsOp = !!caller && isOperator(env, caller);
+  rows = rows.filter((r) => {
+    if (!isBanActive({ banned: r.author_banned, banned_until: r.author_banned_until })) return true;
+    return !!caller && (caller.id === r.profile_id || callerIsOp);
+  });
   if (profileId) rows = rows.filter((r) => r.profile_id === profileId);
   if (before) rows = rows.filter((r) => r.id < before);
   rows = rows.filter((r) => {

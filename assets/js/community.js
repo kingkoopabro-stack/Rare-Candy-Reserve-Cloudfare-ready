@@ -9096,7 +9096,12 @@ window.DWC = {
     ["current_password", "new_password", "new_password_confirm"].forEach(function (n) { var i = form.querySelector('input[name="' + n + '"]'); if (i) i.value = ""; });
     await refreshProfile();
     setNotice(data.message || "Password saved.");
-    render();
+    // No render() — it would rebuild the profile form from saved state
+    // and wipe everything else typed so far. Flip the button label in
+    // place instead ("Set my password" → "Change my password").
+    if (state.profile) state.profile.has_password = true;
+    var pwBtn = form.querySelector('button[onclick*="savePassword"]');
+    if (pwBtn) pwBtn.textContent = "Change my password →";
     return false;
   },
   // Verify the one account email (Account & payouts): send the
@@ -9112,7 +9117,9 @@ window.DWC = {
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't save that email."); return; }
     await refreshProfile();
     setNotice((data.message || "Verification email sent — check that inbox for the link.") + " Save your profile below so the email is kept as your contact email too.");
-    render();
+    // No render() here — rebuilding the whole app would throw away
+    // everything typed in the profile form so far. Update in place.
+    if (btn) { btn.disabled = true; btn.textContent = "Verification email sent ✓"; }
   },
   // Set / change the recovery email (verified before it counts).
   saveRecoveryEmail: async function (form) {
@@ -9121,7 +9128,8 @@ window.DWC = {
     if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't save that email.");
     await refreshProfile();
     setNotice(data.message || "Recovery email saved.");
-    render();
+    // No render() — it would rebuild the profile form from saved state
+    // and wipe everything typed so far.
     return false;
   },
   // Re-send the verification email for the pending address.
@@ -9130,7 +9138,8 @@ window.DWC = {
     if (!email) { setNotice("No pending recovery email — save one first."); return; }
     var data = await apiPost("/auth", { action: "set-recovery-email", device_id: deviceId(), email: email });
     setNotice((data && data.ok) ? (data.message || "Verification email sent.") : ((data && data.error) || "Couldn't send that email."));
-    render();
+    // No render() — it would rebuild the profile form from saved state
+    // and wipe everything typed so far.
   },
   // Operator only — issue a one-time recovery code for a locked-out
   // member. The code shows once, in this panel; send it privately.
@@ -9932,16 +9941,24 @@ window.DWC = {
     } else {
       setNotice((isNew ? "Welcome to YourSpace, @" + data.profile.username + " — you're on." : "Profile saved.") + avatarNote + bannerNote + videoNote + pwNote + recNote);
     }
-    render();
-    // Meme drawer (2026-11-21): saving used to land the member on the
-    // memes — the tall edit form collapses on render and the browser
-    // clamps the old scroll position to the bottom of the now-shorter
-    // page, which is the meme stash. Close the drawer if it was open
-    // and put the member back at the top of the feed instead.
-    if (window.__dwcMemeDrawer) window.__dwcMemeDrawer(false);
-    var feedTop = document.getElementById("dwc-app");
-    if (feedTop) feedTop.scrollIntoView({ behavior: "smooth", block: "start" });
-    else if (typeof window !== "undefined") window.scrollTo(0, 0);
+    if (isNew) {
+      render();
+      // Meme drawer (2026-11-21): saving used to land the member on the
+      // memes — the tall edit form collapses on render and the browser
+      // clamps the old scroll position to the bottom of the now-shorter
+      // page, which is the meme stash. Close the drawer if it was open
+      // and put the member back at the top of the feed instead.
+      if (window.__dwcMemeDrawer) window.__dwcMemeDrawer(false);
+      var feedTop = document.getElementById("dwc-app");
+      if (feedTop) feedTop.scrollIntoView({ behavior: "smooth", block: "start" });
+      else if (typeof window !== "undefined") window.scrollTo(0, 0);
+    } else {
+      // Editing: stay in the editor, right where the member was. The
+      // form rebuilds from the just-saved profile, so nothing is lost
+      // and the page never jumps to the feed.
+      state.editingProfile = true;
+      renderAccount();
+    }
     await refreshStats();
     if (window.RCRloader) window.RCRloader.hide();
     return false;
@@ -12017,6 +12034,14 @@ window.DWC = {
     var host = $("dwc-layout-preview");
     var form = document.querySelector("#dwc-account form");
     if (!host || !form || !state.profile) return;
+    // The preview rebuilds on every keystroke — without this, the page
+    // jumps every time the preview grows or shrinks and the field being
+    // typed in slides away. Keep the scroll spot (and the caret, if
+    // focus was lost) exactly where they were.
+    var _sy = window.scrollY;
+    var _ae = document.activeElement;
+    var _aeName = _ae && _ae.name ? _ae.name : null;
+    var _aeSel = (_ae && typeof _ae.selectionStart === "number") ? _ae.selectionStart : null;
     var fd = new FormData(form);
     var get = function (n) { return String(fd.get(n) || ""); };
     var hexOk = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
@@ -12240,6 +12265,18 @@ window.DWC = {
       bfSample.style.paintOrder = glowOn ? "stroke fill" : "";
     }
     if (th.ticker_source === "btc") refreshBtcTicker();
+    // Put the scroll spot (and the caret, if focus was lost) back where
+    // they were — the preview rebuild above changes the page height.
+    if (typeof window.scrollTo === "function") window.scrollTo(0, _sy);
+    if (_aeName) {
+      var _again = document.querySelector('#dwc-account form [name="' + _aeName + '"]');
+      if (_again && _again !== document.activeElement) {
+        _again.focus({ preventScroll: true });
+        if (_aeSel !== null && typeof _again.setSelectionRange === "function") {
+          try { _again.setSelectionRange(_aeSel, _aeSel); } catch (e) {}
+        }
+      }
+    }
   },
   setPresence: async function (status) {
     if (!state.profile) return;
@@ -14929,7 +14966,14 @@ async function init() {
   ensurePhoneRoot();
   loadPhoneWallpaper();
   renderPhone();
-  window.addEventListener("hashchange", function () { render(); });
+  // In-page anchors (the editor's "Jump to:" links are #dwc-sec-*) are
+  // plain scroll targets — re-rendering the whole app here rebuilds the
+  // profile form from saved state (wiping unsaved edits) and loses the
+  // scroll spot, so skip the render for them.
+  window.addEventListener("hashchange", function () {
+    if (String(location.hash || "").indexOf("#dwc-") === 0) return;
+    render();
+  });
   // Post photos enlarge on tap (the whole picture fits in the post now,
   // and a tap opens it full-screen). Locked/blurred previews are exempt —
   // a tap there stays on reveal/unlock duty, never the raw file.

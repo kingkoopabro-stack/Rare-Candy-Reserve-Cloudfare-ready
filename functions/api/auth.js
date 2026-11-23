@@ -141,9 +141,16 @@ export async function onRequestPost({ env, request }) {
       }
     }
     const { hash, salt } = await hashPassword(a.new_password);
-    await db.prepare(
-      "UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
-    ).bind(hash, salt, now, me.id).run();
+    try {
+      await db.prepare(
+        "UPDATE profiles SET password_hash = ?, password_salt = ?, password_set_at = ?, failed_login_attempts = 0, locked_until = NULL WHERE id = ?",
+      ).bind(hash, salt, now, me.id).run();
+    } catch (e) {
+      // A half-run password migration (password_hash exists so the guard
+      // passed, but a later column is missing) used to crash this whole
+      // request into a "Request failed" page. One clean error instead.
+      return fail("Password setup isn't finished yet — the shop's database update is incomplete. Try again once that's done.");
+    }
     await invalidateTokens(db, me.id, ["reset", "recovery"]);
     await createNotification(db, {
       profile_id: me.id, actor_profile_id: null, kind: "password_changed",

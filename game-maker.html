@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Harmony Engine v1.00 — a Vita Nova Product</title>
+<meta name="description" content="Harmony Engine v1.00 — make your own retro 16-bit RPG in the browser. Paint tiles, place NPCs, chests and slimes, pick an asset pack, add your own art and soundtrack, then play it.">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+/* Harmony Engine editor layout only — site chrome comes from style.css. */
+.gm-layout{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.gm-main{flex:1 1 560px;min-width:0}
+.gm-side{flex:0 1 300px;min-width:260px}
+.gm-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.gm-panel h3{margin:.2em 0 .6em}
+#gm-host{position:relative;display:inline-block;max-width:100%;overflow:auto;border:2px solid var(--line);border-radius:10px;background:#0b0b14}
+#gm-canvas{display:block;image-rendering:pixelated;touch-action:none;cursor:crosshair;max-width:100%;height:auto}
+.rcrgm-canvas{display:block;image-rendering:pixelated;max-width:100%;height:auto}
+.gm-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.gm-tool{border:2px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;text-transform:capitalize}
+.gm-tool:hover{border-color:var(--cyan)}
+.gm-tool.active{background:var(--grad);color:#0b0b14;border-color:transparent}
+.gm-tool.small{padding:5px 10px;font-size:12px}
+.gm-tool.danger{border-color:var(--pink);color:var(--pink)}
+.gm-tool.danger:hover{background:var(--pink);color:#fff}
+.gm-kindwrap{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.gm-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.gm-row label{font-size:13px;color:var(--muted);font-weight:700}
+.gm-row input[type=text]{flex:1 1 180px}
+.gm-row input[type=number]{width:64px}
+.gm-row input,.gm-field input,.gm-field textarea,.gm-field select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+.gm-field{display:block;margin:10px 0}
+.gm-field span{display:block;font-size:13px;color:var(--muted);font-weight:700;margin-bottom:4px}
+.gm-field input,.gm-field textarea,.gm-field select{width:100%}
+.gm-hint{color:var(--muted);font-size:13.5px}
+#gm-saves{list-style:none;padding:0;margin:8px 0}
+#gm-saves li{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+#gm-saves li span{flex:1}
+#gm-status{font-size:13.5px;color:var(--muted)}
+.gm-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+/* --- RPG Maker 2000 style tabs (right side) --- */
+.gm-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.gm-tabbtn{border:2px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:999px;padding:7px 13px;font-weight:700;font-size:13px;cursor:pointer}
+.gm-tabbtn:hover{border-color:var(--cyan)}
+.gm-tabbtn.active{background:var(--grad);color:#0b0b14;border-color:transparent}
+.gm-tabpanel[hidden]{display:none}
+.gm-dblist{list-style:none;padding:0;margin:6px 0}
+.gm-dblist li{display:flex;gap:6px;align-items:center;padding:4px 0;font-size:14px}
+.gm-dblist li span{flex:1}
+#gm-custom-list{list-style:none;padding:0;margin:8px 0}
+#gm-custom-list li{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+#gm-custom-list li span{flex:1}
+/* --- Engine overlays (shared with play-game.html) --- */
+.rcrgm-hud{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-weight:800;font-size:14px}
+.rcrgm-hud .rcrgm-goal{margin-left:auto;color:var(--cyan)}
+.rcrgm-dlg{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(20,20,36,.97);border:2px solid var(--cyan);border-radius:10px;padding:12px 14px;cursor:pointer;z-index:5}
+.rcrgm-dlg-title{color:var(--cyan);font-weight:900;font-size:14px;margin-bottom:4px}
+.rcrgm-dlg-body{font-size:15px}
+.rcrgm-dlg-hint{text-align:right;font-size:12px;color:var(--muted);margin-top:6px}
+.rcrgm-battle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--pink);border-radius:12px;padding:16px;z-index:6;text-align:center}
+.rcrgm-battle h3{margin:.1em 0;color:var(--pink)}
+.rcrgm-battle-log{color:var(--muted);font-size:14px;min-height:20px}
+.rcrgm-battle-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.rcrgm-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;padding:10px 18px;font-size:14px;background:var(--grad);color:#0b0b14}
+.rcrgm-btn:disabled{opacity:.45;cursor:not-allowed}
+.rcrgm-toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--cyan);border-radius:999px;padding:6px 14px;font-size:13.5px;font-weight:700;z-index:5;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.rcrgm-end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--green);border-radius:12px;padding:20px;z-index:7;text-align:center}
+.rcrgm-end h2{margin:.1em 0}
+.rcrgm-dpad{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:10px;flex-wrap:wrap}
+.rcrgm-dpad button{width:48px;height:48px;font-size:20px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;font-weight:900}
+.rcrgm-dpad button:active{background:var(--cyan);color:#0b0b14}
+.rcrgm-dpad .rcrgm-talkbtn{width:auto;padding:0 18px;font-size:14px}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="merch.html">Merch</a>
+      <a href="community.html">Heart Rise</a>
+      <a href="game-maker.html" class="active">Harmony Engine</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <p class="kicker">Harmony Engine v1.00 · a Vita Nova Product</p>
+    <h1><span class="grad-text">Harmony Engine</span></h1>
+    <p class="lede">Build your own 16-bit RPG right here — paint the map, drop in villagers, chests and slimes, pick an asset pack, add your own art and a soundtrack, then hit play-test. No coding, no downloads. Your games save on this device, or share them with a link.</p>
+  </div>
+
+  <div class="gm-layout">
+    <div class="gm-main">
+      <div class="gm-row">
+        <label for="gm-name">Game name</label>
+        <input type="text" id="gm-name" value="My Adventure" maxlength="80">
+        <label for="gm-width">Width</label>
+        <input type="number" id="gm-width" min="10" max="30" value="20">
+        <label for="gm-height">Height</label>
+        <input type="number" id="gm-height" min="10" max="30" value="15">
+        <label for="gm-color">Hero color</label>
+        <input type="color" id="gm-color" value="#ff2d95">
+      </div>
+
+      <div id="gm-host">
+        <canvas id="gm-canvas" width="640" height="480"></canvas>
+      </div>
+      <p id="gm-status" role="status">Loading…</p>
+
+      <div class="gm-actions">
+        <button type="button" class="btn" id="gm-play">▶ Play-test</button>
+        <button type="button" class="btn ghost" id="gm-stop">■ Stop testing</button>
+        <button type="button" class="btn ghost" id="gm-new">＋ New map</button>
+      </div>
+    </div>
+
+    <div class="gm-side">
+      <div class="gm-tabs" role="tablist" aria-label="Editor panels">
+        <button type="button" class="gm-tabbtn" data-gmtab="map" role="tab">🗺 Map</button>
+        <button type="button" class="gm-tabbtn" data-gmtab="database" role="tab">📖 Database</button>
+        <button type="button" class="gm-tabbtn" data-gmtab="events" role="tab">💬 Events</button>
+        <button type="button" class="gm-tabbtn" data-gmtab="tools" role="tab">🧰 Tools</button>
+      </div>
+
+      <div class="gm-tabpanel" data-gmpanel="map">
+        <div class="gm-panel">
+          <h3>🎨 Tiles — click / drag to paint</h3>
+          <div class="gm-toolbar" id="gm-palette"></div>
+          <h3>🧩 Objects — click the map to place</h3>
+          <div class="gm-toolbar" id="gm-objects"></div>
+          <p class="gm-hint">Tip: paint water and walls to block the hero. Bridges let the hero cross water. Doors need a key — hide one somewhere on the map. Walk into a slime to fight it. Reach the ★ portal (or collect enough coins) to win.</p>
+        </div>
+
+        <div class="gm-panel">
+          <h3>🌄 Asset pack</h3>
+          <div class="gm-toolbar" id="gm-pack"></div>
+          <p class="gm-hint" id="gm-pack-desc"></p>
+        </div>
+
+        <div class="gm-panel">
+          <h3>🖼 Your own pictures</h3>
+          <p class="gm-hint">Upload a picture as a tile or a sprite. PNG or JPG, under 256 KB. Tiles are scaled to 32×32, sprites to 64×64. Pictures are stored inside your .rcg file — big pictures make big game files, so small is better.</p>
+          <label class="gm-field"><span>Use it as</span>
+            <select id="gm-asset-kind">
+              <option value="tile:grass">Tile: grass</option>
+              <option value="tile:path">Tile: path</option>
+              <option value="tile:water">Tile: water</option>
+              <option value="tile:wall">Tile: wall</option>
+              <option value="tile:bridge">Tile: bridge</option>
+              <option value="tile:floor">Tile: floor</option>
+              <option value="sprite:hero">Sprite: hero</option>
+              <option value="sprite:npc">Sprite: NPC</option>
+              <option value="sprite:enemy">Sprite: enemy</option>
+            </select>
+          </label>
+          <div class="gm-actions">
+            <label class="btn ghost small" for="gm-asset-file" style="cursor:pointer">⬆ Upload a picture</label>
+            <input type="file" id="gm-asset-file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" hidden>
+          </div>
+          <p class="gm-hint" id="gm-asset-status" role="status"></p>
+          <ul id="gm-custom-list"></ul>
+
+          <h3>🎨 Pixel Art Designer</h3>
+          <p class="gm-hint">Draw your own sprite in the Pixel Art Designer, export it, then import it here as your hero, NPC or enemy sprite. Use the “Use it as” choice above to pick which one.</p>
+          <div class="gm-actions">
+            <button type="button" class="btn ghost small" id="gm-open-pixel">🎨 Open Pixel Art Designer</button>
+            <button type="button" class="btn ghost small" id="gm-import-pixel">⬇ Import pixel sprite</button>
+          </div>
+          <p class="gm-hint" id="gm-pixel-status" role="status"></p>
+        </div>
+      </div>
+
+      <div class="gm-tabpanel" data-gmpanel="database" hidden>
+        <div class="gm-panel">
+          <h3>📖 Database</h3>
+          <p class="gm-hint">Everyone and everything in your game. Tap one to edit it.</p>
+          <h3>🧑 Actors (NPCs)</h3>
+          <ul id="gm-db-npcs" class="gm-dblist"></ul>
+          <h3>👾 Enemies</h3>
+          <ul id="gm-db-enemies" class="gm-dblist"></ul>
+          <h3>🔑 Items</h3>
+          <ul id="gm-db-items" class="gm-dblist"></ul>
+          <p class="gm-hint" id="gm-db-goal"></p>
+          <label class="gm-field"><span>Win text — shown when the player wins</span>
+            <input type="text" id="gm-wintext" maxlength="280">
+          </label>
+        </div>
+      </div>
+
+      <div class="gm-tabpanel" data-gmpanel="events" hidden>
+        <div class="gm-panel" id="gm-inspector">
+          <h3>Edit</h3>
+          <p class="gm-hint">Click an object with the ✎ select tool to edit it here.</p>
+        </div>
+      </div>
+
+      <div class="gm-tabpanel" data-gmpanel="tools" hidden>
+        <div class="gm-panel">
+          <h3>💾 Save &amp; share</h3>
+          <p class="gm-hint">Your map autosaves on this device as you work.</p>
+          <div class="gm-row">
+            <input type="text" id="gm-savename" placeholder="Save name (optional)" maxlength="60">
+            <button type="button" class="btn small" id="gm-save">Save</button>
+          </div>
+          <ul id="gm-saves"></ul>
+          <div class="gm-actions">
+            <button type="button" class="btn ghost small" id="gm-download">⬇ Download .rcg</button>
+            <label class="btn ghost small" for="gm-loadfile" style="cursor:pointer">⬆ Load from file</label>
+            <input type="file" id="gm-loadfile" accept=".rcg,.rpg.json,.json" hidden>
+          </div>
+          <div class="gm-actions">
+            <button type="button" class="btn ghost small" id="gm-copylink">🔗 Copy play link</button>
+            <button type="button" class="btn ghost small" id="gm-copycode">📋 Copy game code</button>
+          </div>
+          <p class="gm-hint">The play link opens the game on the play page. Very big maps may be too long for a link — then the game code is copied instead, and players paste it into the code box on the play page. Games save as .rcg project files; older .rpg.json files still open.</p>
+        </div>
+
+        <div class="gm-panel">
+          <h3>🎵 Soundtrack</h3>
+          <p class="gm-hint">Make your game&rsquo;s music in the Studio DAW, then attach it here — it plays on loop while anyone plays your game.</p>
+          <p><a class="btn small" href="vn-studio-v2.html" target="_blank" rel="noopener">🎹 Open the Studio DAW (VN-StudioV2) ↗</a></p>
+          <p class="gm-hint">How to: 1) Open the DAW (it is also in the Music tab of the Learn hub). 2) Make your tune. 3) Click <b>Export WAV</b> in the DAW. 4) Pick that WAV file below.</p>
+          <div class="gm-actions">
+            <label class="btn ghost small" for="gm-sound-file" style="cursor:pointer">⬆ Attach a WAV</label>
+            <input type="file" id="gm-sound-file" accept=".wav,audio/wav,audio/*" hidden>
+            <button type="button" class="btn ghost small" id="gm-sound-remove">Remove soundtrack</button>
+          </div>
+          <p class="gm-hint" id="gm-sound-status" role="status">No soundtrack yet.</p>
+          <p class="gm-hint">WAVs up to 1 MB are saved inside your .rcg file and play for everyone. A bigger file is remembered by name only — keep tunes short and light so they travel with the game.</p>
+        </div>
+
+        <div class="gm-panel">
+          <h3>🕹 How to play</h3>
+          <p class="gm-hint">Move: arrow keys / WASD, or the on-screen d-pad.<br>
+          Talk / read signs: Space or E next to someone, or tap TALK.<br>
+          Chests &amp; items: walk onto them.<br>
+          Battles: walk into an enemy — Attack, use a potion, or Run.<br>
+          Win: reach the portal, or collect the coins your goal asks for.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/game-maker.js"></script>
+<script>
+(function () {
+  if (!window.RCRGame) {
+    document.getElementById('gm-status').textContent =
+      'Could not load the game engine (assets/js/game-maker.js). Please reload the page.';
+    return;
+  }
+  window.RCRGame.initEditor({});
+})();
+</script>
+</body>
+</html>

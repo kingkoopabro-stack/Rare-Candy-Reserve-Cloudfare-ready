@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Play a Game — Harmony Engine v1.00</title>
+<meta name="description" content="Play a retro 16-bit RPG made with Harmony Engine v1.00, a Vita Nova Product.">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+/* Play page layout only — site chrome comes from style.css. */
+.gm-playwrap{max-width:760px;margin:0 auto}
+#gm-playhost{position:relative;display:inline-block;max-width:100%;overflow:auto;border:2px solid var(--line);border-radius:10px;background:#0b0b14}
+#gm-playhost canvas{display:block;image-rendering:pixelated;max-width:100%;height:auto}
+.rcrgm-canvas{display:block;image-rendering:pixelated;max-width:100%;height:auto}
+.gm-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.gm-panel textarea{width:100%;min-height:90px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:10px;font-family:ui-monospace,monospace;font-size:12.5px}
+.gm-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:10px 0}
+.gm-hint{color:var(--muted);font-size:13.5px}
+#gm-playerror{color:var(--pink);font-weight:700}
+/* --- Engine overlays (same as game-maker.html) --- */
+.rcrgm-hud{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-weight:800;font-size:14px}
+.rcrgm-hud .rcrgm-goal{margin-left:auto;color:var(--cyan)}
+.rcrgm-dlg{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(20,20,36,.97);border:2px solid var(--cyan);border-radius:10px;padding:12px 14px;cursor:pointer;z-index:5}
+.rcrgm-dlg-title{color:var(--cyan);font-weight:900;font-size:14px;margin-bottom:4px}
+.rcrgm-dlg-body{font-size:15px}
+.rcrgm-dlg-hint{text-align:right;font-size:12px;color:var(--muted);margin-top:6px}
+.rcrgm-battle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--pink);border-radius:12px;padding:16px;z-index:6;text-align:center}
+.rcrgm-battle h3{margin:.1em 0;color:var(--pink)}
+.rcrgm-battle-log{color:var(--muted);font-size:14px;min-height:20px}
+.rcrgm-battle-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.rcrgm-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;padding:10px 18px;font-size:14px;background:var(--grad);color:#0b0b14}
+.rcrgm-btn:disabled{opacity:.45;cursor:not-allowed}
+.rcrgm-toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--cyan);border-radius:999px;padding:6px 14px;font-size:13.5px;font-weight:700;z-index:5;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.rcrgm-end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--green);border-radius:12px;padding:20px;z-index:7;text-align:center}
+.rcrgm-end h2{margin:.1em 0}
+.rcrgm-dpad{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:10px;flex-wrap:wrap}
+.rcrgm-dpad button{width:48px;height:48px;font-size:20px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;font-weight:900}
+.rcrgm-dpad button:active{background:var(--cyan);color:#0b0b14}
+.rcrgm-dpad .rcrgm-talkbtn{width:auto;padding:0 18px;font-size:14px}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="merch.html">Merch</a>
+      <a href="community.html">Heart Rise</a>
+      <a href="game-maker.html">Harmony Engine</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="gm-playwrap">
+    <div class="hero">
+      <p class="kicker">Harmony Engine v1.00 · a Vita Nova Product</p>
+      <h1 id="gm-title"><span class="grad-text">Play a Game</span></h1>
+      <p class="lede" id="gm-subtitle">A retro RPG made with Harmony Engine.</p>
+    </div>
+
+    <p id="gm-playerror" role="alert"></p>
+
+    <div id="gm-playhost" style="display:none"></div>
+
+    <div class="gm-panel" id="gm-loader">
+      <h3>🕹 Load a game</h3>
+      <p class="gm-hint">This page plays games shared from Harmony Engine. Open a play link, or load a game one of these ways:</p>
+      <div class="gm-row">
+        <button type="button" class="btn small" id="gm-load-autosave">▶ Play my autosaved map</button>
+        <label class="btn ghost small" for="gm-loadfile" style="cursor:pointer">⬆ Open a .rcg file</label>
+        <input type="file" id="gm-loadfile" accept=".rcg,.rpg.json,.json" hidden>
+      </div>
+      <p class="gm-hint">Games are .rcg project files — older .rpg.json files still open too.</p>
+      <div class="gm-row" id="gm-savesrow" style="display:none">
+        <label for="gm-saveselect">My saved games:</label>
+        <select id="gm-saveselect"></select>
+        <button type="button" class="btn ghost small" id="gm-loadsave">Load</button>
+      </div>
+      <h3>📋 …or paste a game code</h3>
+      <textarea id="gm-code" placeholder="Paste the game code here (the long string from “Copy game code”)"></textarea>
+      <div class="gm-row">
+        <button type="button" class="btn" id="gm-loadcode">▶ Play pasted code</button>
+      </div>
+      <p class="gm-hint">No account needed — games live in your browser or in a file you keep. <a href="game-maker.html">Make your own game in Harmony Engine →</a></p>
+    </div>
+
+    <div class="gm-panel" id="gm-howto" style="display:none">
+      <h3>How to play</h3>
+      <p class="gm-hint">Move: arrow keys / WASD, or the on-screen d-pad. Talk / read signs: Space or E next to someone, or tap TALK. Chests &amp; items: walk onto them. Battles: walk into an enemy — Attack, use a potion, or Run. Win by reaching the portal, or collecting the coins your goal asks for. If the game has a soundtrack, it plays on loop — use the soundtrack button under the game to mute it.</p>
+      <div class="gm-row">
+        <a class="btn ghost small" href="game-maker.html">✏ Make your own game in Harmony Engine</a>
+        <button type="button" class="btn ghost small" id="gm-playanother">↻ Play a different game</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/game-maker.js"></script>
+<script>
+(function () {
+  var errorEl = document.getElementById('gm-playerror');
+  var host = document.getElementById('gm-playhost');
+  var loader = document.getElementById('gm-loader');
+  var howto = document.getElementById('gm-howto');
+  var titleEl = document.getElementById('gm-title');
+  var engine = null;
+
+  function showError(msg) {
+    errorEl.textContent = msg;
+  }
+
+  function startGame(game, sourceLabel) {
+    if (engine) { engine.stop(); host.innerHTML = ''; }
+    var res = window.RCRGame.loadGame(game);
+    if (!res.game) { showError('Could not load that game: ' + res.errors.join(' ')); return false; }
+    if (res.errors.length) showError('Loaded with warnings: ' + res.errors.join(' '));
+    else showError('');
+    titleEl.textContent = res.game.name;
+    host.style.display = 'inline-block';
+    loader.style.display = 'none';
+    howto.style.display = 'block';
+    engine = window.RCRGame.playGame(host, res.game);
+    return true;
+  }
+
+  function loadFromCode(code) {
+    try {
+      var game = window.RCRGame.decodeGame(code);
+      startGame(game, 'code');
+    } catch (e) {
+      showError('That code did not work: ' + e.message);
+    }
+  }
+
+  function loadFromFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var res = window.RCRGame.loadGame(String(reader.result));
+      if (res.game) startGame(res.game, 'file');
+      else showError('Could not load that file: ' + res.errors.join(' '));
+    };
+    reader.readAsText(file);
+  }
+
+  if (!window.RCRGame) {
+    showError('Could not load the game engine (assets/js/game-maker.js). Please reload the page.');
+    return;
+  }
+
+  // 1) ?data= base64url game in the URL (from "Copy play link").
+  var params = new URLSearchParams(location.search);
+  var data = params.get('data');
+  if (data) {
+    loadFromCode(data);
+  }
+
+  // 2) Autosave button.
+  document.getElementById('gm-load-autosave').addEventListener('click', function () {
+    var game = window.RCRGame.loadAutosave();
+    if (game) startGame(game, 'autosave');
+    else showError('No autosaved map on this device yet — make one in Harmony Engine first.');
+  });
+
+  // 3) File upload.
+  document.getElementById('gm-loadfile').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (f) loadFromFile(f);
+    e.target.value = '';
+  });
+
+  // 4) Named saves (localStorage).
+  var saves = window.RCRGame.listSaves();
+  if (saves.length) {
+    var row = document.getElementById('gm-savesrow');
+    var sel = document.getElementById('gm-saveselect');
+    row.style.display = 'flex';
+    saves.forEach(function (name) {
+      var opt = document.createElement('option');
+      opt.value = name; opt.textContent = name;
+      sel.appendChild(opt);
+    });
+    document.getElementById('gm-loadsave').addEventListener('click', function () {
+      var game = window.RCRGame.loadNamed(sel.value);
+      if (game) startGame(game, 'save');
+      else showError('Could not load that save.');
+    });
+  }
+
+  // 5) Paste-code box.
+  document.getElementById('gm-loadcode').addEventListener('click', function () {
+    var code = document.getElementById('gm-code').value.trim();
+    if (!code) { showError('Paste a game code first.'); return; }
+    loadFromCode(code);
+  });
+
+  // Play another game.
+  document.getElementById('gm-playanother').addEventListener('click', function () {
+    if (engine) { engine.stop(); engine = null; }
+    host.innerHTML = '';
+    host.style.display = 'none';
+    howto.style.display = 'none';
+    loader.style.display = 'block';
+    titleEl.innerHTML = '<span class="grad-text">Play a Game</span>';
+    showError('');
+    history.replaceState(null, '', location.pathname);
+  });
+})();
+</script>
+</body>
+</html>

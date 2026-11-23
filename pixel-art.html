@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixel Art Designer — Rare Candy Reserve</title>
+<meta name="description" content="Draw retro pixel art in the browser — sprites, tiles and characters for the Harmony Engine game maker. No downloads, works on phone and desktop.">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+/* Pixel Art Designer layout only — site chrome comes from style.css. */
+.px-layout{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.px-main{flex:1 1 560px;min-width:0}
+.px-side{flex:0 1 300px;min-width:260px}
+.px-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.px-panel h3{margin:.2em 0 .6em}
+.px-canvas-wrap{display:inline-block;max-width:100%;overflow:auto;border:2px solid var(--line);border-radius:10px;background:#0b0b14;
+  background-image:linear-gradient(45deg,#1a1a2e 25%,transparent 25%,transparent 75%,#1a1a2e 75%),linear-gradient(45deg,#1a1a2e 25%,transparent 25%,transparent 75%,#1a1a2e 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+#px-canvas{display:block;image-rendering:pixelated;touch-action:none;cursor:crosshair;width:min(512px,100%);height:auto}
+.px-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.px-tool{border:2px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.px-tool:hover{border-color:var(--cyan)}
+.px-tool.active{background:var(--grad);color:#0b0b14;border-color:transparent}
+.px-tool:disabled{opacity:.45;cursor:not-allowed}
+.px-tool.danger{border-color:var(--pink);color:var(--pink)}
+.px-tool.danger:hover{background:var(--pink);color:#fff}
+.px-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.px-row label{font-size:13px;color:var(--muted);font-weight:700}
+.px-row input[type=text],.px-row select{flex:1 1 180px;background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+.px-row input[type=color]{width:48px;height:36px;padding:2px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.px-hint{color:var(--muted);font-size:13.5px}
+#px-status{font-size:13.5px;color:var(--muted);min-height:20px}
+#px-palette{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+#px-custom-colors{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;align-items:center}
+.px-swatch{width:32px;height:32px;border-radius:8px;border:2px solid var(--line);cursor:pointer;padding:0}
+.px-swatch:hover{border-color:var(--cyan)}
+.px-swatch.active{border-color:#fff;outline:2px solid var(--cyan)}
+#px-current-color{display:inline-block;min-width:84px;text-align:center;border-radius:8px;border:1px solid var(--line);padding:6px 8px;font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.8)}
+.px-preview-wrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.px-preview-box{border:2px solid var(--line);border-radius:10px;padding:10px;background:#0b0b14;
+  background-image:linear-gradient(45deg,#1a1a2e 25%,transparent 25%,transparent 75%,#1a1a2e 75%),linear-gradient(45deg,#1a1a2e 25%,transparent 25%,transparent 75%,#1a1a2e 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px}
+#px-preview{display:block;image-rendering:pixelated}
+#px-preview.px-bob{animation:px-bob 0.9s ease-in-out infinite alternate,px-wobble 1.8s ease-in-out infinite alternate}
+@keyframes px-bob{from{transform:translateY(0)}to{transform:translateY(-8px)}}
+@keyframes px-wobble{from{transform:rotate(-2deg)}to{transform:rotate(2deg)}}
+.px-howto{font-size:14px}
+.px-howto li{margin:4px 0}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="merch.html">Merch</a>
+      <a href="community.html">Heart Rise</a>
+      <a href="game-maker.html">Game Maker</a>
+      <a href="pixel-art.html" class="active">Pixel Art</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <p class="kicker">Rare Candy Reserve · Make &amp; Play</p>
+    <h1><span class="grad-text">Pixel Art Designer</span></h1>
+    <p class="lede">Draw retro sprites, tiles and characters — then send them straight to the Harmony Engine game maker. No downloads, no account. Your designs save on this device.</p>
+  </div>
+
+  <div class="px-layout">
+    <div class="px-main">
+      <div class="px-row">
+        <label>Grid size</label>
+        <div class="px-toolbar" style="margin:0">
+          <button type="button" class="px-tool active" data-size="16">16×16</button>
+          <button type="button" class="px-tool" data-size="32">32×32</button>
+          <button type="button" class="px-tool" data-size="48">48×48</button>
+        </div>
+        <span class="px-hint">Switching size keeps your drawing where it fits — growing adds empty space on the right and bottom, shrinking crops only what falls past the new edge.</span>
+      </div>
+
+      <div class="px-canvas-wrap">
+        <canvas id="px-canvas" width="16" height="16"></canvas>
+      </div>
+      <p id="px-status" role="status">Loading…</p>
+
+      <div class="px-toolbar">
+        <button type="button" class="px-tool active" data-tool="pencil">✏️ Pencil</button>
+        <button type="button" class="px-tool" data-tool="eraser">🧽 Eraser</button>
+        <button type="button" class="px-tool" data-tool="fill">🪣 Fill bucket</button>
+        <button type="button" class="px-tool" data-tool="eyedropper">💧 Eyedropper</button>
+        <button type="button" class="px-tool" id="px-grid-toggle">Grid: on</button>
+        <button type="button" class="px-tool" id="px-undo">↩ Undo</button>
+        <button type="button" class="px-tool" id="px-redo">↪ Redo</button>
+        <button type="button" class="px-tool danger" id="px-clear">🗑 Clear</button>
+      </div>
+
+      <div class="px-panel">
+        <h3>👀 Live preview</h3>
+        <div class="px-preview-wrap">
+          <div class="px-preview-box">
+            <canvas id="px-preview" width="16" height="16"></canvas>
+          </div>
+          <div>
+            <div class="px-toolbar" style="margin-top:0">
+              <button type="button" class="px-tool" data-scale="1">1×</button>
+              <button type="button" class="px-tool active" data-scale="4">4×</button>
+              <button type="button" class="px-tool" data-scale="8">8×</button>
+            </div>
+            <button type="button" class="px-tool" id="px-animate-toggle">▶ Animate (bob / wobble)</button>
+            <p class="px-hint">The animation bobs and wobbles the preview so you can see how a character reads in motion in a game.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-side">
+      <div class="px-panel">
+        <h3>🎨 Colours</h3>
+        <div class="px-row">
+          <label for="px-palette-select">Palette</label>
+          <select id="px-palette-select"></select>
+        </div>
+        <p class="px-hint" id="px-palette-name">SNES (16 colours)</p>
+        <div id="px-palette"></div>
+        <div class="px-row">
+          <label for="px-color-picker">Pick a colour</label>
+          <input type="color" id="px-color-picker" value="#ff2d95">
+          <span id="px-current-color">#ff2d95</span>
+          <button type="button" class="px-tool" id="px-add-custom">+ Add</button>
+        </div>
+        <h3>⭐ My colours</h3>
+        <div id="px-custom-colors"></div>
+        <p class="px-hint">Tap “+ Add” to keep the colour you picked (up to 6, saved on this device while the page is open). Tap a saved colour to paint with it.</p>
+      </div>
+
+      <div class="px-panel">
+        <h3>💾 Save &amp; export</h3>
+        <div class="px-row">
+          <input type="text" id="px-save-name" placeholder="Design name (e.g. slime)" maxlength="60">
+          <button type="button" class="btn small" id="px-save">Save</button>
+        </div>
+        <div class="px-row">
+          <select id="px-load-list"></select>
+        </div>
+        <div class="px-toolbar">
+          <button type="button" class="btn ghost small" id="px-load">Load</button>
+          <button type="button" class="btn ghost small" id="px-delete-save">Delete</button>
+        </div>
+        <div class="px-toolbar">
+          <button type="button" class="btn" id="px-download">⬇ Download PNG</button>
+        </div>
+        <div class="px-toolbar">
+          <button type="button" class="btn" id="px-send-harmony">🎮 Send to Harmony Engine</button>
+        </div>
+        <p class="px-hint">“Send to Harmony Engine” hands your sprite to the Game Maker on this device — open <a href="game-maker.html">Game Maker</a> next and it will be waiting. Downloads are PNGs with a transparent background.</p>
+      </div>
+
+      <div class="px-panel" id="px-howto">
+        <h3>❓ How to use</h3>
+        <ol class="px-howto">
+          <li>Pick a palette colour (or your own colour) and paint by clicking or dragging on the grid. It works with touch too.</li>
+          <li>Use the fill bucket for big areas, the eraser to take pixels away, and the eyedropper to grab a colour from your drawing.</li>
+          <li>Made a mistake? Undo goes back up to 20 steps; Redo brings a step back.</li>
+          <li>Check the live preview — try 8× and the animation to see how it reads in a game.</li>
+          <li>Save named designs on this device, download a PNG, or hit “Send to Harmony Engine” to use it in the Game Maker.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/pixel-art.js"></script>
+<script>
+(function () {
+  if (!window.RCRPixel) {
+    document.getElementById('px-status').textContent =
+      'Could not load the designer (assets/js/pixel-art.js). Please reload the page.';
+    return;
+  }
+  window.RCRPixel.init({});
+})();
+</script>
+</body>
+</html>

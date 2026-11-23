@@ -1361,6 +1361,7 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-fmt-musician details[data-fmt]:not([data-fmt~="musician"]){display:none}
 .dwc-fmt-merchant details[data-fmt]:not([data-fmt~="merchant"]){display:none}
 .dwc-fmt-creator details[data-fmt]:not([data-fmt~="creator"]){display:none}
+.dwc-fmt-streamer details[data-fmt]:not([data-fmt~="streamer"]){display:none}
 .dwc-fmt-website .dwc-extra-btns{display:none}
 /* Bands upload + Creator catalogue (2026-11-23) — the upload-my-track
    block shows only for the Musician preset, and the creator-only bits
@@ -1918,7 +1919,7 @@ span.dwc-cassette-tape{cursor:default}
 .dwc-edit-cat[open] > summary::before{content:"▾ ";color:var(--pink)}
 /* About Me merged box: code at the top, bio underneath, one textarea. */
 #dwc-about-me{width:100%;min-height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical}
-/* Page format picker — one click, seven formats. Solid buttons with a
+/* Page format picker — one click, eight formats. Solid buttons with a
    neon background (2026-11-23) — not pills. The active format gets the
    bright Heart Rise gradient + a glow; the rest sit on a deep violet
    solid so the row reads as buttons, not chips. */
@@ -1953,3 +1954,86 @@ span.dwc-cassette-tape{cursor:default}
 /* Preview flash: the sticky bar's Preview button scrolls to the live
    preview and flashes it once, so the member sees what visitors see. */
 .dwc-preview-flash{outline:3px solid var(--pink);outline-offset:4px;border-radius:12px;transition:outline-color 1.2s}
+
+/* ---------- Drag-and-drop page editor (2026-11-23, spec §8) ---------- */
+/* Blocks canvas + blocks. The block's own inline styles (left/top/width/
+   opacity/font/size/colour) carry the member's choices; these rules are
+   deliberately light. Palette: Heart Rise violet/pink/cyan. */
+.dwc-blocks-canvas{position:relative;width:100%;max-width:1080px;margin:0 auto;min-height:400px;overflow:hidden;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
+.dwc-block{position:absolute;box-sizing:border-box;min-height:20px;overflow-wrap:anywhere;cursor:move;touch-action:pan-y}
+.dwc-block-selected{outline:2px solid var(--pink);outline-offset:1px;box-shadow:0 0 0 1px var(--violet),0 0 12px rgba(255,45,149,.45)}
+.dwc-block-dragging{opacity:.75;cursor:grabbing}
+.dwc-block-text{padding:4px 6px;line-height:1.4}
+.dwc-block-image img,.dwc-block-gif img{display:block;width:100%;height:auto;border-radius:8px}
+.dwc-block-link a{color:var(--cyan);text-decoration:underline;overflow-wrap:anywhere}
+.dwc-block-button a{display:inline-block;min-height:44px;padding:10px 16px;border:2px solid rgba(168,85,247,.55);border-radius:10px;background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;font-weight:800;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.dwc-block-button a:hover{border-color:var(--cyan)}
+.dwc-block-divider hr{margin:8px 0;border:0;border-top:2px solid var(--violet)}
+.dwc-block-spacer{min-height:16px;background:transparent}
+.dwc-block-embed iframe{width:100%;border:0;border-radius:12px}
+.dwc-block-tour,.dwc-block-catalogue,.dwc-block-postlist,.dwc-block-stream,.dwc-block-social,.dwc-block-chat{padding:8px;background:rgba(124,77,255,.08);border:1px solid rgba(124,77,255,.35);border-radius:10px}
+.dwc-block-stream iframe,.dwc-block-stream video{width:100%;aspect-ratio:16/9;border:0;border-radius:10px}
+.dwc-block-social .dwc-action-buttons{display:flex;flex-wrap:wrap;gap:6px}
+.dwc-block-chat{font-size:14px}
+/* Editor chrome: top bar, tray, style panel, template picker. */
+.dwc-editor{display:flex;flex-direction:column;gap:10px}
+.dwc-editor-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.dwc-editor-topbar .btn,.dwc-editor-topbar button{min-height:44px}
+.dwc-editor-title{font-weight:800;font-size:16px;margin:0 auto 0 0}
+.dwc-editor-main{display:grid;grid-template-columns:180px minmax(0,1fr) 260px;gap:10px;align-items:start}
+.dwc-editor-canvas-wrap{min-width:0}
+.dwc-block-tray{display:flex;flex-direction:column;gap:8px;padding:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.dwc-tray-item{display:flex;align-items:center;gap:8px;min-height:44px;width:100%;padding:10px 12px;border:2px solid rgba(168,85,247,.55);border-radius:10px;background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;text-align:left;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.dwc-tray-item:hover{border-color:var(--cyan)}
+.dwc-tray-item.active{border-color:var(--pink);background:linear-gradient(135deg,#7c3aed,#db2777 55%,#06b6d4);color:#fff}
+.dwc-style-panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+.dwc-style-panel h3,.dwc-style-panel h4{margin:6px 0 8px}
+.dwc-style-field{margin:8px 0}
+.dwc-style-field > label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin:0 0 4px}
+.dwc-style-field input[type="range"]{width:100%;min-height:44px;padding:0}
+.dwc-style-row{display:flex;flex-wrap:wrap;gap:6px}
+.dwc-style-btn{min-height:44px;min-width:44px;padding:10px 12px;border:2px solid rgba(168,85,247,.55);border-radius:10px;background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer}
+.dwc-style-btn:hover{border-color:var(--cyan)}
+.dwc-style-btn.active{border-color:var(--pink);background:linear-gradient(135deg,#7c3aed,#db2777 55%,#06b6d4);color:#fff}
+.dwc-style-btn.danger{border-color:rgba(255,45,149,.7)}
+.dwc-style-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.dwc-template-picker{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.dwc-template-card{min-height:44px;padding:10px 14px;border:2px solid rgba(168,85,247,.55);border-radius:10px;background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.dwc-template-card:hover{border-color:var(--cyan)}
+.dwc-template-card.active{border-color:var(--pink);background:linear-gradient(135deg,#7c3aed,#db2777 55%,#06b6d4);color:#fff;box-shadow:0 0 16px rgba(255,45,149,.5)}
+/* Drag handle (44px tap target, shown on the selected block) + resize
+   handles (desktop only — touch never gets the small handles). */
+.dwc-drag-handle{position:absolute;top:4px;left:4px;z-index:3;display:none;width:44px;height:44px;align-items:center;justify-content:center;background:rgba(11,11,20,.65);border:1px solid var(--line);border-radius:8px;color:#fff;font-size:18px;line-height:1;cursor:grab;touch-action:none}
+.dwc-block-selected .dwc-drag-handle{display:flex}
+.dwc-drag-handle:active{cursor:grabbing}
+.dwc-resize-handle{position:absolute;z-index:3;display:none;width:16px;height:16px;background:var(--pink);border:2px solid #fff;border-radius:50%;touch-action:none}
+.dwc-block-selected .dwc-resize-handle{display:block}
+.dwc-resize-nw{top:-8px;left:-8px;cursor:nwse-resize}
+.dwc-resize-ne{top:-8px;right:-8px;cursor:nesw-resize}
+.dwc-resize-sw{bottom:-8px;left:-8px;cursor:nesw-resize}
+.dwc-resize-se{bottom:-8px;right:-8px;cursor:nwse-resize}
+/* Drop indicator while dragging; mode toggle (Drag & drop / Generator /
+   Code) reusing the solid preset-picker button style. */
+.dwc-drop-indicator{position:absolute;z-index:5;display:none;border:2px dashed var(--cyan);border-radius:8px;background:rgba(0,229,255,.12);pointer-events:none}
+.dwc-drop-indicator.on{display:block}
+.dwc-mode-toggle{display:inline-flex;border:2px solid rgba(168,85,247,.55);border-radius:10px;overflow:hidden}
+.dwc-mode-btn{min-height:44px;padding:10px 14px;border:0;background:linear-gradient(135deg,#2b1a4d,#1a1030);color:#f3e8ff;font-size:14px;font-weight:800;font-family:inherit;cursor:pointer}
+.dwc-mode-btn + .dwc-mode-btn{border-left:1px solid rgba(168,85,247,.55)}
+.dwc-mode-btn:hover{border-color:var(--cyan)}
+.dwc-mode-btn.active{background:linear-gradient(135deg,#7c3aed,#db2777 55%,#06b6d4);color:#fff}
+.dwc-editor-save-msg{margin:4px 0;font-size:14px;font-weight:700;color:var(--muted)}
+/* Mobile: phone-width editor, tray as a horizontal scroll row, style
+   panel as a bottom sheet, tap targets >= 44px, no small handles. */
+@media (max-width:760px){
+  .dwc-editor-main{display:flex;flex-direction:column;gap:10px}
+  .dwc-block-tray{flex-direction:row;overflow-x:auto;padding:8px;-webkit-overflow-scrolling:touch}
+  .dwc-tray-item{flex:0 0 auto;width:auto;white-space:nowrap}
+  .dwc-style-panel{position:fixed;left:0;right:0;bottom:0;z-index:80;max-height:70vh;overflow-y:auto;border-radius:16px 16px 0 0;border-bottom:0;box-shadow:0 -8px 30px rgba(0,0,0,.6)}
+  .dwc-style-panel[hidden]{display:none}
+  .dwc-style-panel.closed,.dwc-style-panel--closed{transform:translateY(102%)}
+  .dwc-style-panel.open{transform:none}
+  .dwc-editor-topbar{position:sticky;top:0;z-index:40}
+}
+@media (pointer:coarse){
+  .dwc-resize-handle{display:none !important}
+}

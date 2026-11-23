@@ -2045,7 +2045,7 @@ export function parseSoundCloudUrl(str) {
   return "https://soundcloud.com/" + m[1] + "/" + m[3];
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [] };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [], page_blocks: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -2331,6 +2331,45 @@ export function parseTheme(stored) {
     if (kind !== "text" && !target) return null;
     return { id: String(it.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12) || "ov", kind: kind, label: label, target: target, x: x, y: y, style: style };
   }).filter(Boolean);
+  // Drag-and-drop page blocks (2026-11-23) — up to 40 blocks, each an
+  // id + type + position/size + styling. One bad block never kills the
+  // others; per-type requirements (text needs text, image/gif need an
+  // https src, link/button need a label + https url, embed needs an
+  // https url) drop only that row.
+  var BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
+  var pbs = Array.isArray(obj.page_blocks) ? obj.page_blocks : [];
+  out.page_blocks = pbs.slice(0, 40).map(function (it) {
+    if (!it || typeof it !== "object") return null;
+    var bid = String(it.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 12);
+    if (!bid) return null;
+    var btype = BLOCK_TYPES.indexOf(String(it.type || "")) >= 0 ? String(it.type) : "";
+    if (!btype) return null;
+    var bx = Math.max(0, Math.min(100, parseInt(it.x, 10) || 0));
+    var by = Math.max(0, Math.min(100, parseInt(it.y, 10) || 0));
+    var bw = Math.max(5, Math.min(100, parseInt(it.w, 10) || 50));
+    var bh = Math.max(0, Math.min(100, parseInt(it.h, 10) || 0));
+    var btext = String(it.text || "").replace(/[<>]/g, "");
+    if (btype !== "text") btext = btext.replace(/[\n\r]/g, "");
+    btext = btext.slice(0, 500);
+    var burl = String(it.url || "").trim().slice(0, 500);
+    if (burl && !/^https:\/\//i.test(burl)) burl = "";
+    var bsrc = String(it.src || "").trim().slice(0, 500);
+    if (bsrc && !/^https:\/\//i.test(bsrc)) bsrc = "";
+    var bcolor = hex(it.color);
+    var bbg = hex(it.bg);
+    var bfontRaw = String(it.font || "");
+    var bfont = THEME_FONTS.indexOf(bfontRaw) >= 0 ? bfontRaw : "";
+    var bsize = parseInt(it.size, 10);
+    bsize = (isFinite(bsize) && bsize >= 8 && bsize <= 96) ? bsize : "";
+    var bop = Math.max(10, Math.min(100, parseInt(it.opacity, 10) || 100));
+    var balign = ["left", "center", "right"].indexOf(String(it.align || "")) >= 0 ? String(it.align) : "left";
+    var blabel = String(it.label || "").replace(/[<>\n\r]/g, "").slice(0, 40);
+    if (btype === "text" && !btext.trim()) return null;
+    if ((btype === "image" || btype === "gif") && !bsrc) return null;
+    if ((btype === "link" || btype === "button") && (!blabel || !burl)) return null;
+    if (btype === "embed" && !burl) return null;
+    return { id: bid, type: btype, x: bx, y: by, w: bw, h: bh, text: btext, url: burl, src: bsrc, color: bcolor, bg: bbg, font: bfont, size: bsize, opacity: bop, align: balign, bold: it.bold === true, italic: it.italic === true, underline: it.underline === true, label: blabel };
+  }).filter(Boolean);
   // Padding presets (2026-11-23) — bounded, never free numbers.
   var padOk = function (v) { return ["", "none", "tight", "roomy"].indexOf(String(v || "")) >= 0 ? String(v || "") : ""; };
   out.pad_page = padOk(obj.pad_page);
@@ -2352,7 +2391,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !t.music_file_url && !t.music_ip_rights && !t.music_file_approved && !(t.tour_dates && t.tour_dates.length) && !t.subscribe_fee && !t.subscribe_paypal_url && !t.subscribe_stripe_url && t.blue_pics_visibility === "" && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !t.music_file_url && !t.music_ip_rights && !t.music_file_approved && !(t.tour_dates && t.tour_dates.length) && !t.subscribe_fee && !t.subscribe_paypal_url && !t.subscribe_stripe_url && t.blue_pics_visibility === "" && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !(t.page_blocks && t.page_blocks.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

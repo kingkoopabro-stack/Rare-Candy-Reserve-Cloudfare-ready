@@ -44,6 +44,12 @@ export async function onRequestGet({ env, request }) {
 
 const USERNAME_RE = /^[A-Za-z0-9_.-]+$/;
 
+// Payout method (2026-11-22) — the Edit Profile dropdown. Google Pay is
+// NOT on it: Google killed US person-to-person payments on June 4, 2024
+// (Google Wallet has no P2P in the US). A stored value outside this list
+// is a legacy free-text value — it is never wiped or rejected (see below).
+const PAYOUT_METHODS = ["Chime", "Varo", "Cash App", "Venmo", "PayPal", "Zelle", "Apple Cash", "Other"];
+
 export async function onRequestPost({ env, request }) {
   const db = getDb(env);
   if (!db) return noDb();
@@ -52,6 +58,14 @@ export async function onRequestPost({ env, request }) {
   const deviceId = String(a.device_id || "");
   if (deviceId.length < 8 || deviceId.length > 128) return fail("Missing device id.");
   const existing = await profileByDevice(db, deviceId);
+
+  // Payout method: only a listed value (or "" for none) is ever written.
+  // A submitted value outside the list is a legacy free-text value the
+  // dropdown can't spell — on edit, keep the member's existing stored
+  // value instead of wiping it or storing junk; on signup there is
+  // nothing to keep, so it stores "". A bare "Other" stores as-is.
+  var pmRaw = typeof a.payout_method === "string" ? a.payout_method.trim() : "";
+  var pm = (pmRaw === "" || PAYOUT_METHODS.indexOf(pmRaw) !== -1) ? pmRaw : (existing ? (existing.payout_method || "") : "");
 
   // Set the profile picture from a stored gallery photo (v3.21) — runs
   // BEFORE the username checks below on purpose: a bare set-avatar
@@ -512,7 +526,7 @@ export async function onRequestPost({ env, request }) {
   let v3Pending = false;
   if (existing) {
     const sets = ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets];
-    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(a.payout_method, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals];
+    const vals = [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280), str(pm, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals];
     if (!existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
@@ -611,7 +625,7 @@ export async function onRequestPost({ env, request }) {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(deviceId, username, String(a.full_name).trim().slice(0, 80), a.birthday ?? null, now,
       str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 280),
-      str(a.payout_method, 40), str(a.payout_handle, 80), avatarKey ?? null,
+      str(pm, 40), str(a.payout_handle, 80), avatarKey ?? null,
       // Chris (member id 1) is every new member's first Top Friend,
       // MySpace-Tom style — already added, they can remove him if they want.
       "1", now, now).run();

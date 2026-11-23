@@ -1114,6 +1114,20 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .tp-icon-badges{background:linear-gradient(135deg,#ffd700,#ff9a00)}
 .dwc-banner{margin:0 0 12px;text-align:center}
 .dwc-banner img{max-width:100%;max-height:260px;border-radius:14px;object-fit:cover;display:block;margin:0 auto}
+/* GIF block (2026-11-22) — one placeable GIF on the page, like a
+   video block: a real <img> in normal flow at the member's chosen
+   spot, never a container background, never stretched. Actual size
+   is the GIF's true size (width:auto), capped at the width of its
+   spot so a huge GIF can never break the page; Small / Medium /
+   Large are fixed widths with the same cap. Centered by default;
+   released to the left when the member taps Center again. */
+.dwc-gifblock{margin:8px 0}
+.dwc-gifblock img{display:block;height:auto;border-radius:10px;max-width:100%}
+.dwc-gifblock-centered img{margin:0 auto}
+.dwc-gifblock-actual img{width:auto}
+.dwc-gifblock-s img{width:160px}
+.dwc-gifblock-m img{width:50%}
+.dwc-gifblock-l img{width:92%}
 
 /* ---------- Member page three columns (v3.20) ---------- */
 /* MySpace layout: LEFT = info, MIDDLE = goods + endless feed, RIGHT =
@@ -1657,6 +1671,8 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
    while you scroll) so Save is never a scroll away. */
 .dwc-sticky-save{position:sticky;top:0;z-index:60;display:flex;justify-content:flex-end;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 12px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
 .dwc-sticky-save-btn{font-size:13px;padding:7px 14px}
+/* Save-button stability (2026-11-22) — the editor card must NOT lift on hover. The global .card:hover{transform:translateY(-2px)} moved the whole editor card — sticky Save button included — out from under the cursor, and the .15s transition made it oscillate: hover -> card lifts 2px -> cursor leaves the button's edge -> hover drops -> card falls back -> hover again. Worst at high browser zoom on a big screen, where 2px CSS is 3-4 device px and the button is small. The glow stays; the movement goes. Scoped to the editor only — cards everywhere else keep their lift. */
+#dwc-account .card:hover{transform:none}
 #dwc-sticky-dirty{font-size:13px;color:var(--amber)}
 /* Group headings — one per part of the page the section changes. */
 .dwc-edit-group-h{margin:22px 0 8px;padding-top:14px;padding-bottom:6px;border-top:1px solid var(--line);border-bottom:2px solid var(--line);font-size:17px}

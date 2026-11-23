@@ -260,6 +260,11 @@ function audioSectionHTML(m, th, opts) {
     soundscapePlayerHTML(th, false, !!(m && m.autoplay_vnr) && !noAuto) +
     '<p style="margin:8px 0 0;font-size:13px;color:var(--muted)">Loops on your page — tap play (browsers won’t start sound on their own until you tap something).</p></section>';
 }
+// GIF gallery for the GIF block (2026-11-22) — tap one to place it
+// on your page as a GIF block, at the spot + size you pick in the
+// GIF block section. It is NOT a background any more: the old
+// background-GIF field is gone, and an old background GIF moves into
+// the block on save (see gifBlockURL / the save gather).
 function profileGifGalleryHTML(current) {
   var cur = resolveGifUrl(current || "");
   // Grouped by the theme each GIF fits (MySpace classics, Dance party,
@@ -268,16 +273,17 @@ function profileGifGalleryHTML(current) {
   // ungrouped (the Hitcher GIFs: crude humor, their own thing).
   var groups = [];
   PROFILE_GIFS.forEach(function (g) { if (groups.indexOf(g.group) < 0) groups.push(g.group); });
-  return groups.map(function (grp) {
+  return '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Tap one to put it on your page as a GIF block — it shows where you place it (pick the spot + size in the GIF block section), not as your banner.</p>' + groups.map(function (grp) {
     return (grp ? '<p class="dwc-gif-group">' + esc(grp) + "</p>" : "") +
       '<div class="dwc-gif-gallery">' + PROFILE_GIFS.filter(function (g) { return g.group === grp; }).map(function (g) {
         var u = profileGifUrl(g);
-        return '<button type="button" class="dwc-gif-thumb' + (cur === u ? " active" : "") + '" onclick="DWC.pickProfileGif(\'' + esc(u) + '\', \'' + esc(g.label.replace(/\'/g, "")) + '\')" title="' + esc(g.label) + '">' +
+        return '<button type="button" class="dwc-gif-thumb' + (cur === u ? " active" : "") + '" onclick="DWC.pickGifBlock(\'' + esc(u) + '\', \'' + esc(g.label.replace(/\'/g, "")) + '\')" title="' + esc(g.label) + '">' +
           '<img src="' + esc(u) + '" alt="' + esc(g.label) + '" loading="lazy">' +
           '<span>' + esc(g.label) + "</span></button>";
       }).join("") + "</div>";
   }).join("") +
-  '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Tap one to use it — or paste any Giphy page link above. The gallery is small on purpose; more get added when Chris drops the link.</p>';
+  '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Tap one to place it on your page — or paste any Giphy page link above. This is a GIF block on your page, not your banner: your banner is set above, in Banner / cover photo. The gallery is small on purpose; more get added when Chris drops the link.</p>' +
+  '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.gifAsBanner()">🖼️ Use the picked GIF as my banner instead</button> <span id="dwc-gif-banner-note" style="color:var(--muted);font-size:13px"></span></p>';
 }
 
 // Chris's approved Age Verification Notice — VERBATIM. Shown wherever the
@@ -1918,7 +1924,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "page_opacity"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "gif_block_url", "gif_block_position", "gif_block_size", "gif_block_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "page_opacity"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -1931,6 +1937,27 @@ function storeMergedTheme(item) {
     if (AUDIO_FIELDS.indexOf(k) >= 0) { if (merged[k] === undefined && cur[k] !== undefined) merged[k] = cur[k]; }
     else if (cur[k] !== undefined) merged[k] = cur[k];
   });
+  // Background (2026-11-22) — a layout only overwrites a background
+  // field when it actually defines one. Most layouts define no
+  // background (bg_image_url "" etc.), and copying those blanks
+  // wholesale silently wiped the member's picture when the layout was
+  // applied from the store — very likely what ate Chris's
+  // look-to-the-light.png. A layout that DOES define an image, a
+  // preset, or a color applies it, and the three are mutually
+  // exclusive, so the one it defines clears the other two.
+  // A layout that defines no background leaves the member's saved
+  // background exactly as it is.
+  var layImg = merged.bg_image_url || "";
+  var layPre = merged.bg_preset || "";
+  var layCol = merged.bg_color || "";
+  if (layImg) { merged.bg_preset = ""; merged.bg_color = ""; }
+  else if (layPre) { merged.bg_image_url = ""; merged.bg_color = ""; }
+  else if (layCol) { merged.bg_image_url = ""; merged.bg_preset = ""; }
+  else {
+    merged.bg_image_url = cur.bg_image_url || "";
+    merged.bg_preset = cur.bg_preset || "";
+    merged.bg_color = cur.bg_color || "";
+  }
   if (!merged.custom_page_html && cur.custom_page_html) merged.custom_page_html = cur.custom_page_html;
   return merged;
 }
@@ -3286,13 +3313,32 @@ function accountSectionHTML(p) {
     : pend
       ? '<span style="color:var(--amber)">Waiting for verification — check that inbox for the link.</span>'
       : '<span style="color:var(--muted)">Not verified yet — without a verified email, a forgotten password means asking Chris for recovery.</span>';
+  // Payout method (2026-11-22) — a dropdown, not free text. Google Pay is
+  // NOT on it: Google killed US person-to-person payments on June 4, 2024
+  // (Google Wallet has no P2P in the US). A stored value that isn't on the
+  // list (typed in before the dropdown existed) is matched
+  // case/spacing-insensitively when it can be, and otherwise the dropdown
+  // shows "Other" and the old value rides along in a hidden field so the
+  // save never wipes it (the server keeps it too).
+  var PAYOUT_METHODS = ["Chime", "Varo", "Cash App", "Venmo", "PayPal", "Zelle", "Apple Cash", "Other"];
+  var storedPm = (p && p.payout_method) || "";
+  var pmKey = function (s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); };
+  var pmSel = "";
+  PAYOUT_METHODS.forEach(function (m) { if (pmKey(m) === pmKey(storedPm)) pmSel = m; });
+  var pmLegacy = (!pmSel && storedPm) ? storedPm : "";
+  if (!pmSel) pmSel = storedPm ? "Other" : "";
+  var pmOpts = '<option value=""' + (pmSel === "" ? " selected" : "") + ">— No manual method —</option>";
+  PAYOUT_METHODS.forEach(function (m) { pmOpts += '<option value="' + esc(m) + '"' + (pmSel === m ? " selected" : "") + ">" + esc(m) + "</option>"; });
   return '<h3 class="dwc-edit-group-h" id="dwc-sec-account">👤 Account &amp; payouts — your email, password, and how you get paid</h3>' +
     '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">One email for everything: where people reach you, where password-reset links go, and the email Stripe uses when you link your bank. Your password is stored scrambled — nobody at the shop, not even Chris, can see it. At least 8 characters, with a letter and a number.</p>' +
     '<div class="dwc-field-grid">' +
     '<div class="dwc-field"><label>Your email — one address for everything</label>' +
     '<input id="dwc-account-email" type="email" name="contact_email" maxlength="120" value="' + esc(email) + '" placeholder="you@example.com"></div>' +
-    '<div class="dwc-field"><label>Payout method</label>' +
-    '<input name="payout_method" maxlength="40" value="' + esc((p && p.payout_method) || "") + '" placeholder="e.g. PayPal, Cash App, Chime…"></div>' +
+    '<div class="dwc-field"><label>Payout method — how a buyer pays you by hand in private chat</label>' +
+    '<select name="payout_method">' + pmOpts + "</select>" +
+    (pmLegacy ? '<input type="hidden" name="payout_method_legacy" value="' + esc(pmLegacy) + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">You had “' + esc(pmLegacy) + '” saved from before — it stays unless you pick a method from the list above.</p>' : "") +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">For manual payments in private chat only — a buyer pays you directly with this method + your handle. This is NOT your bank payout: card sales go straight to your linked bank (Payouts tab → Link your bank).</p></div>' +
     '<div class="dwc-field"><label>Payout handle — not an email unless your method uses one</label>' +
     '<input name="payout_handle" maxlength="80" value="' + esc((p && p.payout_handle) || "") + '" placeholder="Your handle / address on that method"></div>' +
     '<div class="dwc-field"><label class="dwc-enable-toggle"><input type="checkbox" name="show_contact_email" style="width:auto"' + (p && p.show_contact_email ? " checked" : "") + '> <span>Show my contact email on my page</span></label>' +
@@ -3322,7 +3368,7 @@ function profileFormHTML(p) {
     (isNew ? '<p style="color:var(--muted);margin-top:0">Just 4 things and you’re in — username, birthday, your name, and a quick human check. Picture, bio, links, layout, and payout can all wait until after — hit Edit profile any time.</p><p style="color:var(--green);font-weight:700;margin-top:0">Free to join — no ID needed. Selling regular stuff never needs an ID. ID is only ever asked for adult content and digital assets.</p>' : "") +
     '<form onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
     (isNew ? "" :
-    '<div class="dwc-sticky-save" id="dwc-sticky-save"><span id="dwc-sticky-dirty" hidden>✏️ Unsaved changes</span><button type="submit" class="btn small dwc-sticky-save-btn">Save profile</button></div>' +
+    '<div class="dwc-sticky-save" id="dwc-sticky-save"><span id="dwc-sticky-dirty" style="visibility:hidden">✏️ Unsaved changes</span><button type="submit" class="btn small dwc-sticky-save-btn">Save profile</button></div>' +
     '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-name">Name &amp; display</a> · <a href="#dwc-sec-account">Account &amp; payouts</a> · <a href="#dwc-sec-picture">Picture</a> · <a href="#dwc-sec-bg">Background</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-radio">Page sound</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-sell">Selling</a> · <a href="#dwc-sec-layout">Page look</a> · <a href="#dwc-sec-taffy">Layouts</a> · <a href="#dwc-sec-badges">Badges</a></p>' +
     '<p id="dwc-unsaved-note" class="dwc-unsaved" hidden>✏️ You have unsaved changes — hit <strong>Save profile</strong> (top right, always visible) to keep them. Nothing saves until you do.</p>' +
     '<div class="dwc-setting-search" id="dwc-setting-search"><button type="button" class="dwc-setting-search-btn" onclick="DWC.editorSearchFocus()" aria-label="Search settings">🔍</button><input id="dwc-setting-search-input" type="search" placeholder="Find a setting… (e.g. name color, buttons, ticker)" aria-label="Search settings" oninput="DWC.editorSearch(this.value)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();DWC.editorSearchNext();}else if(event.key===\'Escape\'){DWC.editorSearchClear();}"><button type="button" class="btn ghost small" onclick="DWC.editorSearchNext()">Next ↓</button><span id="dwc-setting-search-count" style="color:var(--muted);font-size:12px"></span></div>') +
@@ -3452,6 +3498,7 @@ function profileFormHTML(p) {
       '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') +
     (isNew ? "" : '<h3 class="dwc-edit-group-h">🔘 Buttons &amp; links — what visitors tap</h3>' + profileButtonsSectionHTML(p)) +
     (isNew ? "" : profileVideoSectionHTML(p, th)) +
+    (isNew ? "" : profileGifBlockSectionHTML(p, th)) +
     (isNew ? "" : profileHideSectionsHTML(p, th)) +
     (isNew ? "" : pageSlugSectionHTML(p)) +
     (isNew ? "" :
@@ -3506,7 +3553,7 @@ function profileFormHTML(p) {
     (isNew ? "" :
     '<h3 class="dwc-edit-group-h" id="dwc-sec-look">🎨 Page look — background, colors, buttons &amp; code</h3>' +
     '<div class="dwc-layoutbox" id="dwc-sec-layout"><h4 style="margin:0 0 6px">🎨 Make it yours — layout, colors &amp; code</h4>' +
-    "<p style=\"margin:0 0 8px\">This is the styling area — everything here changes how YOUR page looks, and nothing else. Two ways to do it: <strong>1)</strong> use the pickers below (background, colors, button style, effects), or <strong>2)</strong> paste your own CSS in the code box — or skip both and pick a ready-made layout from Taffy’s scroll at the bottom of this page. Your layout shows on <strong>your page only</strong> — it never touches anyone else's. They can fight each other — a preset background wins over your vibe's background, and your own color, font, and button picks win over a preset or a vibe. The notes next to each picker say what wins. The live preview at the top shows what visitors see.</p>" +
+    "<p style=\"margin:0 0 8px\">This is the styling area — everything here changes how YOUR page looks, and nothing else. Two ways to do it: <strong>1)</strong> use the pickers below (background, colors, button style, effects), or <strong>2)</strong> paste your own CSS in the code box — or skip both and pick a ready-made layout from Taffy’s scroll at the bottom of this page. Your layout shows on <strong>your page only</strong> — it never touches anyone else's. They can fight each other — a preset background wins over your vibe's background, and your own font and button picks win over a preset or a vibe. Background color, picture, and preset are either/or — only one shows at a time. The notes next to each picker say what wins. The live preview at the top shows what visitors see.</p>" +
     '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">The four quick looks (Classic, Neon, Midnight, Candy) live in Taffy’s scroll at the bottom of this page now — same looks, same one-tap apply, with a preview underneath. Use the pickers below for your own mix.</p>' +
     '<label>💻 Your page code (CSS) — changes how your whole page looks</label>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">This box is YOUR code — it styles your whole page (colors, borders, spacing, everything). Paste a MySpace layout’s CSS here, or write your own. Taffy can’t write code, and nobody else’s code goes here: what you type is what shows. Rules only ever restyle YOUR page — start every rule with <code>.dwc-myprofile</code> and it stays on your page. Your vibe + color/font picks still win over this CSS — add !important to force it.</p>' +
@@ -3519,8 +3566,8 @@ function profileFormHTML(p) {
     '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.publishLayout()">📣 Publish as a layout</button> <span style="color:var(--muted);font-size:13px">Publishes this box’s CSS with your saved look. You can take it down from the store later.</span></p></div>' +
     '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
     "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
-    '<h4 id="dwc-sec-bg" style="margin:14px 0 6px">🖼️ Page background — pick ONE: a preset, your own picture, a GIF, or None</h4>' +
-    "<p style=\"margin:0 0 8px\">These four are either/or — picking one turns the others off, so a preset can never sit on top of your picture again. Your background color below still shows behind a picture (or on its own). Your background color below still shows behind a picture (or on its own).</p>" +
+    '<h4 id="dwc-sec-bg" style="margin:14px 0 6px">🖼️ Page background — pick ONE: a preset, your own picture, or None</h4>' +
+    "<p style=\"margin:0 0 8px\">Preset and picture are either/or — picking one turns the other off, so a preset can never sit on top of your picture again. Your background color below is either/or with both of them — pick a picture or a preset and the color turns off; tick the color and the picture and preset turn off.</p>" +
     '<p id="dwc-bg-now" style="margin:0 0 4px;font-size:13px"><strong>Showing now:</strong> ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset “" + esc((PRESET_BACKGROUNDS.filter(function (pr) { return pr.id === th.bg_preset; })[0] || {}).name || th.bg_preset) + "”" : "no picture or preset — your background color / vibe shows") + '</p>' +
     '<p id="dwc-bg-note" style="margin:0 0 8px;color:var(--muted);font-size:13px"></p>' +
     '<label>Preset background — one tap, a whole background (picking one turns your picture off)</label><select name="theme_bg_preset" onchange="DWC.applyBgPreset(this.value)">' +
@@ -3528,20 +3575,14 @@ function profileFormHTML(p) {
     '<label>Your own picture — paste an image URL (https://), or use your banner below</label>' +
     '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url) + '" placeholder="https://…" oninput="DWC.bgImageChanged(this)">' +
     '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.useBannerAsBackground()">🖼️ Use my banner as the background</button></p>' +
-    '<label>Moving picture (GIF) — a moving background for your page</label>' +
-    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Paste a Giphy page link (we pull the GIF out of it) or a direct .gif link — or tap one below. A GIF wins over a still picture or a preset. If the link is bad it just doesn\'t show — your page never breaks.</p>' +
-    '<input name="theme_bg_gif" maxlength="500" value="' + esc(th.bg_gif_url || "") + '" placeholder="https://giphy.com/gifs/… or https://…gif" oninput="DWC.refreshLayoutPreviewSoon()" onchange="DWC.gifChanged(this)">' +
-    '<label>GIF size — how big the moving picture shows (never more than a quarter of the page)</label><select name="theme_bg_gif_size" onchange="DWC.refreshLayoutPreviewSoon()"><option value="small"' + (th.bg_gif_size !== "medium" ? " selected" : "") + '>Small — about a postcard</option><option value="medium"' + (th.bg_gif_size === "medium" ? " selected" : "") + '>Medium — up to a quarter of the page</option></select>' +
-    '<p style="margin:4px 0 0"><span id="dwc-gif-note" style="color:var(--muted);font-size:13px"></span> <button type="button" class="btn ghost small" onclick="DWC.clearProfileGif()">Remove GIF</button></p>' +
-    profileGifGalleryHTML(th.bg_gif_url || "") +
     '<label>Page opacity — how see-through your page is over its background</label>' +
     '<div style="display:flex;gap:10px;align-items:center"><input type="range" name="theme_page_opacity" min="40" max="100" step="5" value="' + Math.round((th.page_opacity || 1) * 100) + '" style="flex:1" oninput="DWC.pageOpacityChanged(this)"><span id="dwc-page-opacity-val" style="min-width:44px;text-align:right;font-weight:700">' + Math.round((th.page_opacity || 1) * 100) + '%</span></div>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">100% is solid. Lower lets the background behind your page show through — but your words fade too, so keep it above 70% to stay readable. The live preview above shows it as you slide.</p>' +
 
     '<h4 style="margin:14px 0 6px">🎨 Page colors — background color</h4>' +
-    "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. These sit on top of your preset and your vibe — a pick here wins over the vibe for that one thing. Your custom CSS can still override them with !important.</p>" +
+    "<p style=\"margin:0 0 8px\">Pickers only — nothing changes unless you tick a box or pick something. A pick here wins over your vibe for that one thing — but background color is either/or with a picture or a preset: ticking the color turns both off, and picking a picture or preset turns the color off. Your custom CSS can still override them with !important.</p>" +
     '<div class="dwc-themebox">' +
-    '<label><input type="checkbox" name="theme_bg_use" style="width:auto"' + (th.bg_color ? " checked" : "") + '> Use a custom background color (overrides your vibe’s background)</label>' +
+    '<label><input type="checkbox" name="theme_bg_use" style="width:auto" onchange="DWC.bgColorUseChanged(this)"' + (th.bg_color ? " checked" : "") + '> Use a custom background color (overrides your vibe’s background)</label>' +
     '<input type="color" name="theme_bg_color" value="' + (th.bg_color || "#12002e") + '" style="width:64px;height:40px;padding:2px">' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Your background picture lives in the “Page background” group above — pick a preset, a picture, or None, one at a time, so nothing can cover it up.</p>' +
 
@@ -3575,7 +3616,7 @@ function profileFormHTML(p) {
     '<textarea name="theme_button_css" rows="4" maxlength="4000" placeholder="e.g. .dwc-myprofile .btn{background:url(https://example.com/my.gif);background-size:cover;box-shadow:0 0 16px #ff2d95;}">' + esc(th.button_css || "") + "</textarea>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Targets the buttons on your page only. Images in url() must be https:// — a GIF URL works as a button background. CSS only, same limits as the layout box.</p>' +
     '<h4 style="margin:14px 0 6px">✨ MySpace effects — Give it those oldschool effects</h4>' +
-    "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF background goes in the Moving picture (GIF) box in the background section above — any Giphy link or direct .gif works.</p>" +
+    "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF on your page goes in the GIF block above (after My video) — pick a GIF, choose where it sits, and how big it shows.</p>" +
     '<label>Stars &amp; sparkle — pick one (only one star effect shows at a time)</label><select id="dwc-star-effect" onchange="DWC.starEffectPicked(this)">' +
     '<option value="">None — no stars</option>' +
     ["starfield-drift", "sparkle", "sparkle-name", "sparkle-banner"].map(function (k) { var fx = MYSPACE_EFFECTS[k]; return '<option value="' + k + '"' + ((th.effects || []).indexOf(k) >= 0 ? " selected" : "") + ">" + esc(fx.label) + "</option>"; }).join("") + "</select>" +
@@ -4227,7 +4268,7 @@ function ensureProfileFonts(theme) {
   if (link.getAttribute("href") !== url) link.setAttribute("href", url);
 }
 function parseThemeClient(stored) {
-  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
+  var empty = { bg_color: "", bg_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "" };
   if (!stored) return empty;
   var obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
@@ -4239,6 +4280,17 @@ function parseThemeClient(stored) {
   var gif = String(obj.bg_gif_url || "").trim().slice(0, 500);
   out.bg_gif_url = /^https:\/\//i.test(gif) ? gif : "";
   out.bg_gif_size = obj.bg_gif_size === "medium" ? "medium" : "small";
+  // GIF block (2026-11-22) — one placeable GIF: the URL (https only,
+  // same rule as the background picture), the spot (one of the real
+  // anchors, "" = centered top of profile), the size ("" = actual
+  // size, the GIF's true size), and the centering ("center" default,
+  // "left" to release it). bg_gif_url is still parsed (old saves) so
+  // the block can carry it over until the member saves — gifBlockURL.
+  var gbu = String(obj.gif_block_url || "").trim().slice(0, 500);
+  out.gif_block_url = /^https:\/\//i.test(gbu) ? gbu : "";
+  out.gif_block_position = (obj.gif_block_position !== "top" && GIF_BLOCK_POSITIONS.some(function (pp) { return pp[0] === obj.gif_block_position; })) ? String(obj.gif_block_position) : "";
+  out.gif_block_size = ["small", "medium", "large"].indexOf(String(obj.gif_block_size || "")) >= 0 ? String(obj.gif_block_size) : "";
+  out.gif_block_align = (String(obj.gif_block_align || "") === "left") ? "left" : "center";
   out.soundscape = (obj.soundscape === "radio" || SOUNDSCAPES.some(function (s) { return s.id === obj.soundscape; })) ? obj.soundscape : "";
   out.player_skin = PLAYER_SKINS.some(function (s) { return s.id === obj.player_skin; }) ? obj.player_skin : "";
   var pimg = String(obj.player_image_url || "").trim().slice(0, 500);
@@ -4279,17 +4331,23 @@ function parseThemeClient(stored) {
   out.effects = eff.filter(function (e) { return MYSPACE_EFFECTS[e]; }).slice(0, 8);
   var presetIds = PRESET_BACKGROUNDS.map(function (p) { return p.id; });
   out.bg_preset = presetIds.indexOf(String(obj.bg_preset || "")) >= 0 ? String(obj.bg_preset || "") : "";
-  // Background choices are either/or (v3.20): a custom picture and a
-  // preset can never both be on — the picture wins. Same rule as the
-  // server parseTheme, so the form and the live page can never disagree.
-  if (out.bg_image_url) out.bg_preset = "";
+  // Background choices are either/or (2026-11-22): one background at
+  // a time — a picture wins over a preset and a color, and a preset
+  // wins over a color. Same rule as the server parseTheme, so the
+  // form and the live page can never disagree.
+  if (out.bg_image_url) { out.bg_preset = ""; out.bg_color = ""; }
+  else if (out.bg_preset) { out.bg_color = ""; }
   // A GIF is the background: it wins over a still picture or a preset.
   if (out.bg_gif_url) { out.bg_preset = ""; out.bg_image_url = ""; }
   out.comment_border_color = hex(obj.comment_border_color);
   if (out.effects.indexOf("rgb-comment-border") >= 0) out.comment_border_color = "";
   // Animated rainbow background (v3.20) — the effect IS the background,
-  // so it wins over a picture or a preset. Same rule as the server.
-  if (out.effects.indexOf("animated-bg") >= 0) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_gif_url = ""; }
+  // so it wins over a picture, a preset, AND a color. Same rule as
+  // the server.
+  // It no longer clears bg_gif_url: the GIF is a placeable block now,
+  // not a background, so it survives the effect and still carries over
+  // until the member saves (the save is what clears bg_gif_url).
+  if (out.effects.indexOf("animated-bg") >= 0) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_color = ""; }
   // Page opacity (2026-11-22) — how see-through the page is over its
   // background, 0.4–1. "" = solid (the default). Same rule as the server.
   var po = parseFloat(obj.page_opacity);
@@ -4387,7 +4445,7 @@ function resolveGifUrl(str) {
   if (/^https:\/\//i.test(s) && /\.gif(\?[^\s]*)?$/i.test(s)) return s.slice(0, 500);
   return "";
 }
-function themeCSS(theme) {
+function themeCSS(theme, pageFill) {
   var t = parseThemeClient(theme);
   var css = "";
   // Vibe (Taffy Layout Builder) — a full look: background, cards,
@@ -4410,16 +4468,39 @@ function themeCSS(theme) {
   }
   if (t.bg_color) css += ".dwc-myprofile{background-color:" + t.bg_color + ";}";
   if (t.bg_image_url) css += '.dwc-myprofile{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:cover;background-position:center;background-repeat:no-repeat;}';
-  // Moving GIF background — same treatment as a still picture, and it
-  // comes AFTER it so the GIF wins when both are somehow set.
-  // GIF background — small (160px) or medium (25% of the page: the
-  // hard cap, so a GIF can never blow the page out). Top-center, once.
-  if (t.bg_gif_url) css += '.dwc-myprofile{background-image:url("' + t.bg_gif_url.replace(/"/g, "") + '");background-size:' + (t.bg_gif_size === "medium" ? "25% auto" : "160px auto") + ';background-position:center top;background-repeat:no-repeat;}';
+  // Moving GIF background — NOT a container background any more
+  // (2026-11-22): painting it on .dwc-myprofile at "center top" put
+  // it exactly where the banner goes, behind the ticker, so it read
+  // as a stretched, glitched banner. The GIF lives in the placeable
+  // GIF block now (gifBlockHTML, one block per profile, at the
+  // member's chosen spot), so it can never sit behind the ticker or
+  // overlap anything. themeCSS deliberately emits nothing for
+  // bg_gif_url any more.
   // Preset background (v3.9) — wins over the plain color/image pickers.
   if (t.bg_preset) {
     var preset = null;
     PRESET_BACKGROUNDS.forEach(function (p) { if (p.id === t.bg_preset) preset = p; });
     if (preset && preset.css) css += preset.css;
+  }
+  // Whole-page fill (2026-11-22) — the member's background also fills
+  // the page BEHIND the profile box (the empty space around it), not
+  // just the box. Only when the live page asks for it (pageFill):
+  // viewMember sets the body class dwc-profile-bg and passes true;
+  // the editor preview, store preview, and layout minis never pass
+  // it, so the fill can never leak onto a preview. renderView() takes
+  // the class down on every navigation, and the dwc-member-theme
+  // <style> carrying these rules is removed on navigation too — so
+  // the fill lives only while this member's page is showing. Same
+  // precedence as the box: preset wins, then picture, then vibe,
+  // then color (one background at a time).
+  if (pageFill) {
+    var fillPreset = null;
+    if (t.bg_preset) PRESET_BACKGROUNDS.forEach(function (p) { if (p.id === t.bg_preset) fillPreset = p; });
+    var fillVibe = (t.vibe && LAYOUT_VIBES[t.vibe]) ? LAYOUT_VIBES[t.vibe] : null;
+    if (fillPreset && fillPreset.css) css += fillPreset.css.replace(/\.dwc-myprofile/g, "body.dwc-profile-bg");
+    else if (t.bg_image_url) css += 'body.dwc-profile-bg{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:cover;background-position:center;background-repeat:no-repeat;}';
+    else if (fillVibe) css += "body.dwc-profile-bg{background:linear-gradient(160deg," + fillVibe.bg + " 0%," + fillVibe.bg2 + " 100%);}";
+    else if (t.bg_color) css += "body.dwc-profile-bg{background-color:" + t.bg_color + ";}";
   }
   // Page opacity (2026-11-22) — the whole page box goes more or less
   // see-through over the background behind it. Text fades with it, so
@@ -4817,14 +4898,35 @@ function layoutPreviewInnerHTML(p) {
       '<p style="color:var(--muted);font-size:13px">Your listings still show below this on your page.</p>' +
       "</div>";
   }
+  // GIF block (2026-11-22) — the live preview is a single column, so
+  // the anchors collapse to the nearest slot: top after the ticker,
+  // video above/below the actions row, sell after the website bits,
+  // Top Friends above/below the Top Friends box, comments after the
+  // Top Friends box (the preview has no comments section), and
+  // below-comments at the very end. The real page renders the exact
+  // anchor (see viewMember); the preview shows the GIF in the right
+  // neighborhood.
+  var gifBlock = gifBlockHTML(th);
+  var gpos = gifBlockPosition(th);
+  var gifTop = gpos === "top" ? gifBlock : "";
+  var gifAboveSell = gpos === "above-sell" ? gifBlock : "";
+  var gifBelowSell = gpos === "below-sell" ? gifBlock : "";
+  var gifAboveVideo = gpos === "above-video" ? gifBlock : "";
+  var gifBelowVideo = gpos === "below-video" ? gifBlock : "";
+  var gifAboveTop = gpos === "above-topfriends" ? gifBlock : "";
+  var gifBelowTop = gpos === "below-topfriends" ? gifBlock : "";
+  var gifAboveComments = gpos === "above-comments" ? gifBlock : "";
+  var gifBelowComments = gpos === "below-comments" ? gifBlock : "";
   return '<div class="dwc-myprofile dwc-onebox dwc-previewbox' + btnSizeCls + '">' +
-    tickerHTML(p, th) +
+    tickerHTML(p, th) + gifTop +
     '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : '<img class="dwc-avatar dwc-avatar-logo" src="images/vnr-steady-wave-logo.jpg" alt="Vita Nova Records — upload a new profile picture" style="width:64px;height:64px">') + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
+    gifAboveVideo +
     '<div style="pointer-events:none">' + actionsBlock + "</div>" +
+    gifBelowVideo +
     audioSectionHTML(p, th, { noAutoplay: true }) +
-    website +
-    top8 +
-    hiddenNote +
+    website + gifAboveSell +
+    gifAboveTop + top8 + gifBelowTop + gifAboveComments + gifBelowSell +
+    hiddenNote + gifBelowComments +
     "</div>";
 }
 function applyPreviewCSS(css) {
@@ -5297,7 +5399,10 @@ function renderView() {
   });
   // Website-mode chrome fade lives only on a website-mode member page —
   // take the body class down whenever we navigate anywhere else.
+  // Same for the whole-page background fill (dwc-profile-bg): it lives
+  // only while a member's page is showing.
   if (typeof document !== "undefined" && document.body) document.body.classList.remove("dwc-website-view");
+  if (typeof document !== "undefined" && document.body) document.body.classList.remove("dwc-profile-bg");
   if (r.name === "street") return viewStreet(el);
   if (r.name === "cardcheck") return viewCardCheck(el);
   if (r.name === "market" || r.name === "trade" || r.name === "flea") return viewMarket(el, r.name);
@@ -6444,6 +6549,89 @@ function bannerHTML(m, th) {
   var coverCls = (th && th.cover_size === "big") ? " dwc-banner-cover" : "";
   return '<div class="dwc-banner' + coverCls + '"><img src="' + esc(m.banner_url) + '" alt="Cover photo" onload="DWC.bannerFit(this)"></div>';
 }
+// Moving background GIF (2026-11-22) — an in-flow strip below the
+// ---------- GIF block (2026-11-22) — one placeable GIF on the page,
+// like the video block. The member picks the GIF (gallery or link),
+// where it sits (real anchors on the page), and how big it shows.
+// "Actual size" is the GIF's true size, capped at the width of its
+// spot so a huge GIF can never break the page. One block in v1.
+// The old strip below the ticker (bgGifHTML) is gone — Chris wants
+// the GIF where HE puts it, not fixed under the ticker, and never as
+// a page background.
+// Positions are relative to the real section order on the page:
+// top = centered under the banner/ticker; above/below Top Friends,
+// video, comments, and "What I sell". The video lives inside the
+// actions block, so "below video" is right after it, before Posts.
+// In website mode there are no Top Friends — the above/below Top
+// Friends anchors simply render nothing there (the block still shows
+// at its other anchors). Custom pages show no GIF block at all —
+// their HTML IS the page.
+var GIF_BLOCK_POSITIONS = [
+  ["top", "Centered top of profile"],
+  ["above-topfriends", "Above Top Friends"],
+  ["below-topfriends", "Below Top Friends"],
+  ["above-video", "Above my video"],
+  ["below-video", "Below my video"],
+  ["above-comments", "Above page comments"],
+  ["below-comments", "Below page comments"],
+  ["above-sell", "Above What I sell"],
+  ["below-sell", "Below What I sell"],
+];
+function gifBlockPosition(th) {
+  var pos = th && th.gif_block_position;
+  for (var i = 0; i < GIF_BLOCK_POSITIONS.length; i++) if (GIF_BLOCK_POSITIONS[i][0] === pos) return pos;
+  return "top";
+}
+function gifBlockURL(th) {
+  // New block field wins. An old background GIF carries over until
+  // the member saves — the save moves it into the block field and
+  // clears bg_gif_url, so the GIF never vanishes mid-migration.
+  var url = resolveGifUrl((th && th.gif_block_url) || "");
+  if (!url) url = resolveGifUrl((th && th.bg_gif_url) || "");
+  return url;
+}
+function gifBlockHTML(th) {
+  var url = gifBlockURL(th);
+  if (!url) return "";
+  var size = (th && th.gif_block_size) || "actual";
+  var cls = size === "small" ? " dwc-gifblock-s" : size === "medium" ? " dwc-gifblock-m" : size === "large" ? " dwc-gifblock-l" : " dwc-gifblock-actual";
+  var centerCls = ((th && th.gif_block_align) || "center") === "center" ? " dwc-gifblock-centered" : "";
+  return '<div class="dwc-gifblock' + cls + centerCls + '"><img src="' + esc(url) + '" alt=""></div>';
+}
+// The GIF block editor section (Edit Profile) — mirrors the video
+// block: the URL inside the block, a size dropdown, a Center pill,
+// and the gallery below. "Actual size" is the default.
+function profileGifBlockSectionHTML(p, th) {
+  var cur = gifBlockURL(th);
+  var carried = !((th && th.gif_block_url) || "") && !!((th && th.bg_gif_url) || "");
+  var pos = gifBlockPosition(th);
+  var size = (th && th.gif_block_size) || "actual";
+  var align = (th && th.gif_block_align) || "center";
+  return '<div class="dwc-layoutbox" id="dwc-sec-gifblock"><h4 style="margin:0 0 6px">🎞️ GIF block — one GIF on my page, where I put it</h4>' +
+    "<p style=\"margin:0 0 8px\">One GIF on your page, like a video block — pick a GIF, choose where it sits, and how big it shows. Actual size is the GIF's true size (a flashing “buy from me” banner shows at its real size), capped at the width of its spot so a huge GIF can't break the page.</p>" +
+    (carried ? '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This GIF came from your old background GIF — saving moves it into this block, so it keeps showing and stops blocking your background picture.</p>' : "") +
+    '<label>GIF link — paste a Giphy page link (we pull the GIF out of it) or a direct .gif link</label>' +
+    '<input name="theme_gif_block_url" maxlength="500" value="' + esc(cur) + '" placeholder="https://giphy.com/gifs/… or https://…gif" oninput="DWC.refreshLayoutPreviewSoon()" onchange="DWC.gifBlockChanged(this)">' +
+    '<p style="margin:4px 0 0"><span id="dwc-gifblock-note" style="color:var(--muted);font-size:13px"></span> <button type="button" class="btn ghost small" onclick="DWC.clearGifBlock()">Remove GIF</button></p>' +
+    '<label>Where it goes — pick a spot on your page</label>' +
+    '<select name="theme_gif_block_position" onchange="DWC.refreshLayoutPreviewSoon()">' +
+    GIF_BLOCK_POSITIONS.map(function (o) { return '<option value="' + o[0] + '"' + (pos === o[0] ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>" +
+    '<label>Size — how big the GIF shows (Actual size is the GIF\'s true size)</label>' +
+    '<select name="theme_gif_block_size" onchange="DWC.refreshLayoutPreviewSoon()">' +
+    '<option value="actual"' + (size === "actual" ? " selected" : "") + '>Actual size — the GIF\'s true size</option>' +
+    '<option value="small"' + (size === "small" ? " selected" : "") + '>Small — about a postcard</option>' +
+    '<option value="medium"' + (size === "medium" ? " selected" : "") + '>Medium — about half the page</option>' +
+    '<option value="large"' + (size === "large" ? " selected" : "") + '>Large — nearly the full width</option>' +
+    "</select>" +
+    '<label>Centering — put the GIF block in the middle of its spot</label>' +
+    '<div class="dwc-presets">' +
+    '<button type="button" class="dwc-pill' + (align === "center" ? " active" : "") + '" data-gifblockcenterbtn onclick="DWC.applyGifBlockAlign(\'center\')">🎯 Center GIF</button>' +
+    "</div>" +
+    '<input type="hidden" name="theme_gif_block_align" value="' + esc(align) + '">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">The GIF is centered in its spot by default. Tap Center again to release it to the left.</p>' +
+    profileGifGalleryHTML(cur) +
+    "</div>";
+}
 // Cover photo + name placement (v3.22) — the top picture with the
 // member's name beside it, when they picked Left / Right. The head card
 // below hides its own name line then, so the name shows exactly once.
@@ -6914,7 +7102,7 @@ async function viewMember(el, memberId) {
   // Their theme pickers (v3.2) — injected AFTER the layout CSS, so the
   // pickers win over a preset for the properties they set; custom CSS
   // can still override them with !important.
-  var memberThemeCss = themeCSS(m.profile_theme);
+  var memberThemeCss = themeCSS(m.profile_theme, true);
   if (memberThemeCss) {
     var tst = document.createElement("style");
     tst.id = "dwc-member-theme";
@@ -6969,11 +7157,27 @@ async function viewMember(el, memberId) {
   // banner, the Message link, the shop, and an opted-in contact email.
   // v3.21 — the bio + occupation live inside the grouped About card
   // (websiteSectionsHTML), so there is no separate About card anymore.
+  // GIF block (2026-11-22) — one placeable GIF, at the member's
+  // chosen anchor. Only one anchor is ever non-empty, so the block
+  // renders exactly once. "top" is centered under the banner/ticker
+  // (wired into the head line below); the video lives inside the
+  // actions block, so "below video" is right after it, before Posts.
+  var gifBlock = gifBlockHTML(mth);
+  var gpos = gifBlockPosition(mth);
+  var gifTop = gpos === "top" ? gifBlock : "";
+  var gifAboveSell = gpos === "above-sell" ? gifBlock : "";
+  var gifBelowSell = gpos === "below-sell" ? gifBlock : "";
+  var gifAboveVideo = gpos === "above-video" ? gifBlock : "";
+  var gifBelowVideo = gpos === "below-video" ? gifBlock : "";
+  var gifAboveTop = gpos === "above-topfriends" ? gifBlock : "";
+  var gifBelowTop = gpos === "below-topfriends" ? gifBlock : "";
+  var gifAboveComments = gpos === "above-comments" ? gifBlock : "";
+  var gifBelowComments = gpos === "below-comments" ? gifBlock : "";
   var infoCol =
     websiteSectionsHTML(m, mth) +
-    sellerSection + '<div id="dwc-profile-menu"></div>' + radioSection;
+    gifAboveSell + sellerSection + gifBelowSell + '<div id="dwc-profile-menu"></div>' + radioSection;
   // MIDDLE — goods on top, then the post feed scrolling endlessly below.
-  var mainCol = profileActionsHTML(m, isWebsite, mth) +
+  var mainCol = gifAboveVideo + profileActionsHTML(m, isWebsite, mth) + gifBelowVideo +
     '<section class="card dwc-member-feed"><h3 style="margin-top:0">📝 Posts</h3>' +
     '<div class="dwc-member-feed-list" id="dwc-member-feed-list"><p style="color:var(--muted)">Loading posts…</p></div>' +
     '<div id="dwc-member-feed-more" style="margin-top:10px"></div></section>';
@@ -6988,13 +7192,17 @@ async function viewMember(el, memberId) {
   // v3.7 — page comments (spec section 9): anyone who added this
   // member can leave a comment — public, friends-only, or private.
   var commentsSection = (!hidden("comments") ? '<section class="card dwc-side-comments" id="dwc-page-comments"><h3 style="margin-top:0">💬 Page comments</h3><div id="dwc-page-comments-list"><p style="color:var(--muted)">Loading comments…</p></div><div id="dwc-page-comments-form"></div></section>' : "");
-  var sideCol = top8Section + dividerStr + commentsSection;
+  var sideCol = gifAboveTop + top8Section + gifBelowTop + dividerStr + gifAboveComments + commentsSection + gifBelowComments;
   // Website mode is the member's own standalone site: the platform
   // chrome fades away (body class hides the site header, hero,
   // community pills, profile card, meme drawer, and footer — the tiny
   // footer link below is the only way back). Standard mode leaves the
   // chrome alone.
   if (typeof document !== "undefined" && document.body) document.body.classList.toggle("dwc-website-view", !!isWebsite);
+  // Whole-page fill (2026-11-22) — the member's background fills the
+  // page behind the profile box while this page is showing.
+  // renderView() takes the class down on every navigation.
+  if (typeof document !== "undefined" && document.body) document.body.classList.add("dwc-profile-bg");
   // Custom page (v3.20) — website mode + the member's own HTML: their
   // code IS the page. It replaces the banner header and the three
   // columns (but not the listings, the message link, or the way back).
@@ -7018,7 +7226,7 @@ async function viewMember(el, memberId) {
     '<div class="dwc-myprofile dwc-onebox' + (isWebsite ? " dwc-website" : "") + btnSizeCls + '">' +
     (hasCustomPage
       ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth) + listingsSection + websiteBack
-      : (picOnTop ? headTop + topBanner : topBanner + headCard) +
+      : (picOnTop ? headTop + topBanner + gifTop : topBanner + gifTop + headCard) +
         '<div id="dwc-photo-upload-host"></div>' +
         '<div id="dwc-seller-rating" data-seller="' + m.id + '"></div>' +
         '<div id="dwc-seller-reviews"></div>' +
@@ -9339,7 +9547,14 @@ window.DWC = {
       occupation: String(fd.get("occupation") || "").trim(),
       bio: String(fd.get("bio") || "").trim(),
       birthday: fd.get("birthday") || null,
-      payout_method: String(fd.get("payout_method") || "").trim(),
+      payout_method: (function () {
+        var m = String(fd.get("payout_method") || "").trim();
+        // "Other" with a saved legacy value keeps that value — the
+        // dropdown never wipes a method it can't spell. (The server
+        // keeps it too, so a stale tab can't lose it either.)
+        if (m === "Other") { var leg = String(fd.get("payout_method_legacy") || "").trim(); return leg || "Other"; }
+        return m;
+      })(),
       payout_handle: String(fd.get("payout_handle") || "").trim(),
       notify_email: !!fd.get("notify_email"),
       remove_avatar: !!fd.get("remove_avatar"),
@@ -9408,11 +9623,25 @@ window.DWC = {
       if (fd.get("theme_bg_use")) theme.bg_color = hexOk(fd.get("theme_bg_color"));
       var bgImg = String(fd.get("theme_bg_image") || "").trim().slice(0, 500);
       if (/^https:\/\//i.test(bgImg)) theme.bg_image_url = bgImg;
-      // Moving GIF background — a GIF wins over the still picture and
-      // the preset, same either/or rule as the server backstop.
-      var bgGif = resolveGifUrl(String(fd.get("theme_bg_gif") || ""));
-      if (bgGif) { theme.bg_gif_url = bgGif; theme.bg_image_url = ""; theme.bg_preset = ""; }
-      theme.bg_gif_size = String(fd.get("theme_bg_gif_size") || "small") === "medium" ? "medium" : "small";
+      // GIF block (2026-11-22) — the GIF lives in the placeable block
+      // now, NOT in bg_gif_url. bg_gif_url is NEVER stored any more:
+      // while it was stored, the either/or rule below wiped the
+      // background picture on every save, so no background image
+      // could ever stick while a GIF was set. The block URL input is
+      // prefilled with an old background GIF when the editor opens,
+      // so the first save moves it into the block field and the wipe
+      // can never come back. Stale-form guard: a cached editor from
+      // before this change still has the old theme_bg_gif input — its
+      // value migrates into the block too, instead of vanishing.
+      var blockGif = resolveGifUrl(String(fd.get("theme_gif_block_url") || ""));
+      if (!blockGif) blockGif = resolveGifUrl(String(fd.get("theme_bg_gif") || ""));
+      if (blockGif) theme.gif_block_url = blockGif;
+      var gPos = String(fd.get("theme_gif_block_position") || "");
+      if (GIF_BLOCK_POSITIONS.some(function (pp) { return pp[0] === gPos; }) && gPos !== "top") theme.gif_block_position = gPos;
+      var gSize = String(fd.get("theme_gif_block_size") || "");
+      if (gSize === "small" || gSize === "medium" || gSize === "large") theme.gif_block_size = gSize;
+      var gAlign = String(fd.get("theme_gif_block_align") || "");
+      if (gAlign === "left") theme.gif_block_align = "left";
       // Profile audio (2026-11-22) — one pick: a soundscape, the radio
       // player, or nothing. Player look + picture are separate picks.
       var scPick = String(fd.get("theme_soundscape") || "");
@@ -9463,12 +9692,20 @@ window.DWC = {
       // Background choices are either/or (v3.20): the animated-bg
       // effect wins over both, and a picture wins over a preset — so a
       // preset can never silently sit on top of a custom picture again.
+      // Background choices are either/or (2026-11-22): one background
+      // at a time — the animated-bg effect wins over all three, a
+      // picture wins over a preset and a color, and a preset wins over
+      // a color. The editor enforces it live; this is the backstop
+      // for stale or forged saves.
       if (theme.effects.indexOf("animated-bg") >= 0) {
         theme.bg_preset = "";
         theme.bg_image_url = "";
-        theme.bg_gif_url = "";
+        theme.bg_color = "";
       } else if (theme.bg_image_url) {
         theme.bg_preset = "";
+        theme.bg_color = "";
+      } else if (theme.bg_preset) {
+        theme.bg_color = "";
       }
       // Page opacity (2026-11-22) — the slider, 40–100%; 100% = solid.
       var pageOp = parseInt(String(fd.get("theme_page_opacity") || "100"), 10);
@@ -10689,13 +10926,22 @@ window.DWC = {
     };
     th = th || {};
     setVal("theme_vibe", th.vibe || "");
-    setChk("theme_bg_use", !!th.bg_color);
-    setVal("theme_bg_color", th.bg_color || "#12002e");
-    setVal("theme_bg_image", th.bg_image_url || "");
-    setVal("theme_bg_preset", th.bg_preset || "");
-    setVal("theme_bg_gif", th.bg_gif_url || "");
-    setVal("theme_bg_gif_size", th.bg_gif_size || "small");
-    setPills("data-bgpresetbtn", th.bg_preset || "");
+    // Background (2026-11-22) — a preset only overwrites a background
+    // field when it actually defines one. Most presets define no
+    // background at all, and copying their blanks wholesale silently
+    // wiped the member's picture (very likely what ate Chris's
+    // look-to-the-light.png). A preset that DOES define an image, a
+    // preset, or a color applies it — and the three are mutually
+    // exclusive, so the one it defines clears the other two.
+    // A preset that defines no background leaves the member's
+    // background exactly as it is.
+    if (th.bg_image_url || th.bg_preset || th.bg_color) {
+      setVal("theme_bg_image", th.bg_image_url || "");
+      setVal("theme_bg_preset", th.bg_preset || "");
+      setChk("theme_bg_use", !!th.bg_color);
+      setVal("theme_bg_color", th.bg_color || "#12002e");
+      setPills("data-bgpresetbtn", th.bg_preset || "");
+    }
     setChk("theme_text_use", !!th.text_color);
     setVal("theme_text_color", th.text_color || "#f2f2f8");
     setChk("theme_accent_use", !!th.accent_color);
@@ -10751,16 +10997,43 @@ window.DWC = {
     var hidden = form.querySelector('[name="theme_bg_preset"]');
     var imgVal = img ? String(img.value || "").trim() : "";
     var presetVal = hidden ? String(hidden.value || "") : "";
-    var gifEl = form.querySelector('input[name="theme_bg_gif"]');
-    var gifVal = gifEl ? String(gifEl.value || "").trim() : "";
     var label = "no picture or preset — your background color / vibe shows";
-    if (gifVal) label = "your moving picture (GIF)";
-    else if (imgVal) label = "your picture";
+    if (imgVal) label = "your picture";
     else if (presetVal) {
       var pr = PRESET_BACKGROUNDS.filter(function (x) { return x.id === presetVal; })[0];
       label = "preset “" + (pr ? pr.name : presetVal) + "”";
     }
     now.innerHTML = "<strong>Showing now:</strong> " + esc(label);
+  },
+  // Background color is either/or with a picture or a preset
+  // (2026-11-22): one background at a time. Ticking "Use a custom
+  // background color" clears the picture and the preset; picking a
+  // picture, a preset, or the animated-bg effect clears the color.
+  bgColorUseChanged: function (cb) {
+    if (!cb || !cb.checked) { DWC.refreshBgNow(); DWC.refreshLayoutPreviewSoon(); return; }
+    var form = document.querySelector("#dwc-account form");
+    var img = form && form.querySelector('input[name="theme_bg_image"]');
+    if (img) img.value = "";
+    var hidden = form && form.querySelector('[name="theme_bg_preset"]');
+    if (hidden) hidden.value = "";
+    document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
+    });
+    DWC.bgNote("Picture and preset are off — your custom background color is now showing.");
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Clear the color pick (untick the box, reset the swatch) when a
+  // picture, preset, or the animated-bg effect takes over the
+  // background. The save only stores a color while the box is ticked,
+  // so unticking is what actually clears it.
+  clearBgColorPick: function () {
+    var form = document.querySelector("#dwc-account form");
+    if (!form) return;
+    var use = form.querySelector('input[name="theme_bg_use"]');
+    if (use) use.checked = false;
+    var col = form.querySelector('input[name="theme_bg_color"]');
+    if (col) col.value = "#12002e";
   },
   applyBgPreset: function (id) {
     var form = document.querySelector("#dwc-account form");
@@ -10770,13 +11043,14 @@ window.DWC = {
       b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === id);
     });
     if (id) {
-      // A preset turns the picture OFF.
+      // A preset turns the picture AND the background color OFF.
       var img = form && form.querySelector('input[name="theme_bg_image"]');
       if (img) img.value = "";
+      DWC.clearBgColorPick();
       var pr = PRESET_BACKGROUNDS.filter(function (x) { return x.id === id; })[0];
-      DWC.bgNote("Your picture is off — preset “" + (pr ? pr.name : id) + "” is now showing.");
+      DWC.bgNote("Your picture and background color are off — preset “" + (pr ? pr.name : id) + "” is now showing.");
     } else {
-      DWC.bgNote("Preset off — your background color / vibe shows (add a picture below if you want one).");
+      DWC.bgNote("Preset off — your vibe shows (add a picture below if you want one, or tick a custom background color).");
     }
     DWC.refreshBgNow();
     DWC.refreshLayoutPreviewSoon();
@@ -10787,7 +11061,7 @@ window.DWC = {
     if (el) el.textContent = String(input.value || "100") + "%";
     DWC.refreshLayoutPreviewSoon();
   },
-  // A picture turns the preset OFF.
+  // A picture turns the preset AND the background color OFF.
   bgImageChanged: function (input) {
     var v = String((input && input.value) || "").trim();
     if (v) {
@@ -10797,7 +11071,8 @@ window.DWC = {
       document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
         b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
       });
-      DWC.bgNote("Preset turned off — your custom picture is now showing.");
+      DWC.clearBgColorPick();
+      DWC.bgNote("Preset and background color turned off — your custom picture is now showing.");
     } else {
       DWC.bgNote("Picture removed — your preset / background color shows.");
     }
@@ -10805,7 +11080,8 @@ window.DWC = {
     DWC.refreshLayoutPreviewSoon();
   },
   // The animated rainbow background IS the background — it wins over a
-  // picture or a preset, so ticking it turns both off (and says so).
+  // picture, a preset, and the background color, so ticking it turns
+  // all three off (and says so).
   bgEffectChanged: function (cb) {
     if (!cb || cb.value !== "animated-bg") return;
     if (cb.checked) {
@@ -10817,7 +11093,8 @@ window.DWC = {
       document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
         b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
       });
-      DWC.bgNote("Animated background is on — your picture and preset are off while it runs.");
+      DWC.clearBgColorPick();
+      DWC.bgNote("Animated background is on — your picture, preset, and background color are off while it runs.");
     } else {
       DWC.bgNote("Animated background off — your picture / preset can show again (re-pick it below).");
     }
@@ -10836,7 +11113,8 @@ window.DWC = {
     document.querySelectorAll("[data-bgpresetbtn]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-bgpresetbtn") === "");
     });
-    DWC.bgNote("Preset turned off — your banner picture is now showing.");
+    DWC.clearBgColorPick();
+    DWC.bgNote("Preset and background color turned off — your banner picture is now showing.");
     DWC.refreshBgNow();
     DWC.refreshLayoutPreviewSoon();
   },
@@ -11157,6 +11435,15 @@ window.DWC = {
     setVal("theme_video_file_url", th.video_file_url || "");
     setVal("theme_video_size", th.video_size || "");
     setVal("theme_video_align", th.video_align || "");
+    // GIF block (2026-11-22) — structural like the video, so a staged
+    // layout never changes it. The URL carries over from an old
+    // background GIF until the member saves, same as the editor
+    // section; the Center pill follows the stored align.
+    setVal("theme_gif_block_url", th.gif_block_url || th.bg_gif_url || "");
+    setVal("theme_gif_block_position", th.gif_block_position || "top");
+    setVal("theme_gif_block_size", th.gif_block_size || "actual");
+    setVal("theme_gif_block_align", th.gif_block_align || "center");
+    document.querySelectorAll("[data-gifblockcenterbtn]").forEach(function (b) { b.classList.toggle("active", (th.gif_block_align || "center") === "center"); });
     setVal("theme_cover_size", th.cover_size || "");
     setVal("theme_cover_name", th.cover_name || "");
     setVal("theme_ticker_source", th.ticker_source || "");
@@ -11185,7 +11472,9 @@ window.DWC = {
       topfriends_count: g("theme_topfriends_count"), topfriends_side: g("theme_topfriends_side"),
       feed_privacy: g("theme_feed_privacy"), divider: g("theme_divider"), divider_color: g("theme_divider_color"),
       video_url: g("theme_video_url"), video_file_url: g("theme_video_file_url"), video_size: g("theme_video_size"),
-      video_align: g("theme_video_align"), cover_size: g("theme_cover_size"), cover_name: g("theme_cover_name"),
+      video_align: g("theme_video_align"), gif_block_url: g("theme_gif_block_url"),
+      gif_block_position: g("theme_gif_block_position"), gif_block_size: g("theme_gif_block_size"),
+      gif_block_align: g("theme_gif_block_align"), cover_size: g("theme_cover_size"), cover_name: g("theme_cover_name"),
       ticker_source: g("theme_ticker_source"), buttons_side: g("theme_buttons_side"),
       buttons_show: !!g("theme_buttons_show"), button_size: g("theme_button_size"),
       buttons_visible: ga("theme_buttons_visible"), pro_button_side: g("theme_pro_button_side"),
@@ -11208,6 +11497,11 @@ window.DWC = {
     setVal("theme_video_file_url", keep.video_file_url);
     setVal("theme_video_size", keep.video_size);
     setVal("theme_video_align", keep.video_align);
+    setVal("theme_gif_block_url", keep.gif_block_url);
+    setVal("theme_gif_block_position", keep.gif_block_position);
+    setVal("theme_gif_block_size", keep.gif_block_size);
+    setVal("theme_gif_block_align", keep.gif_block_align);
+    document.querySelectorAll("[data-gifblockcenterbtn]").forEach(function (b) { b.classList.toggle("active", (keep.gif_block_align || "center") === "center"); });
     setVal("theme_cover_size", keep.cover_size);
     setVal("theme_cover_name", keep.cover_name);
     setVal("theme_ticker_source", keep.ticker_source);
@@ -11240,32 +11534,35 @@ window.DWC = {
   },
   // GIF field: a pasted Giphy page link is resolved to the direct
   // media URL as the member types, so what they see is what saves.
-  gifChanged: function (input) {
+  // GIF block (2026-11-22) — the GIF link input in the GIF block
+  // section. Same normalizing as the old background-GIF input: a
+  // Giphy page link is pulled out to the direct .gif URL.
+  gifBlockChanged: function (input) {
     var url = resolveGifUrl(input.value);
-    var note = document.getElementById("dwc-gif-note");
+    var note = document.getElementById("dwc-gifblock-note");
     if (input.value.trim() && !url) {
       if (note) note.textContent = "That link didn't look like a GIF — try a Giphy page link or a direct .gif link.";
     } else if (url && url !== input.value.trim()) {
       input.value = url;
       if (note) note.textContent = "Got the GIF from that link — it shows on your page now.";
     } else if (note) {
-      note.textContent = "A GIF wins over a still picture or a preset. If the link is bad it just doesn't show — your page never breaks.";
+      note.textContent = "If the link is bad it just doesn't show — your page never breaks.";
     }
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
-  pickProfileGif: function (url, label) {
+  pickGifBlock: function (url, label) {
     var form = document.querySelector("#dwc-account form");
-    var input = form && form.querySelector('input[name="theme_bg_gif"]');
+    var input = form && form.querySelector('input[name="theme_gif_block_url"]');
     if (input) input.value = url;
-    var note = document.getElementById("dwc-gif-note");
-    if (note) note.textContent = "“" + (label || "GIF") + "” picked — it shows on your page now. Hit Save profile to keep it.";
+    var note = document.getElementById("dwc-gifblock-note");
+    if (note) note.textContent = "“" + (label || "GIF") + "” picked for your GIF block — it shows where you place it below. Hit Save profile to keep it. (Want it as your banner? Tap “Use the picked GIF as my banner instead” below.)";
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
   },
-  clearProfileGif: function () {
+  clearGifBlock: function () {
     var form = document.querySelector("#dwc-account form");
-    var input = form && form.querySelector('input[name="theme_bg_gif"]');
+    var input = form && form.querySelector('input[name="theme_gif_block_url"]');
     if (input) input.value = "";
     DWC.profileFormDirty();
     DWC.refreshLayoutPreviewSoon();
@@ -11405,6 +11702,22 @@ window.DWC = {
     var v = (align === "center" && cur !== "center") ? "center" : "";
     if (hidden) hidden.value = v;
     document.querySelectorAll("[data-videocenterbtn]").forEach(function (b) {
+      b.classList.toggle("active", v === "center");
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // GIF block Center button (2026-11-22) — mirrors the video Center
+  // button. "center" is the default: the GIF sits in the middle of
+  // its spot. Tapping it again releases it to the left. The preview
+  // shows it.
+  applyGifBlockAlign: function (align) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('[name="theme_gif_block_align"]');
+    var cur = hidden ? hidden.value : "center";
+    var v = (align === "center" && cur !== "center") ? "center" : "left";
+    if (hidden) hidden.value = v;
+    document.querySelectorAll("[data-gifblockcenterbtn]").forEach(function (b) {
       b.classList.toggle("active", v === "center");
     });
     DWC.profileFormDirty();
@@ -11551,7 +11864,9 @@ window.DWC = {
     var note = $("dwc-unsaved-note");
     if (note) note.hidden = false;
     var sticky = $("dwc-sticky-dirty");
-    if (sticky) sticky.hidden = false;
+    // Visibility, not hidden: the span keeps its space in the row, so the
+    // Save button never jumps left when "Unsaved changes" appears.
+    if (sticky) sticky.style.visibility = "visible";
   },
   // ---------- v3.10 Taffy profile builder ----------
   // Plain-words profile setup: keyword/phrase matching over the known
@@ -11712,8 +12027,20 @@ window.DWC = {
     th.bg_color = fd.get("theme_bg_use") ? hexOk(get("theme_bg_color")) : "";
     var bgImg = get("theme_bg_image").trim().slice(0, 500);
     th.bg_image_url = /^https:\/\//i.test(bgImg) ? bgImg : "";
-    th.bg_gif_url = resolveGifUrl(get("theme_bg_gif"));
-    th.bg_gif_size = get("theme_bg_gif_size") === "medium" ? "medium" : "small";
+    // GIF block (2026-11-22) — same fields saveProfile reads, so the
+    // preview and the save can never drift. The block owns the GIF now:
+    // bg_gif_url is cleared here (mirroring the save) so the old
+    // either/or wipe below can never hide the background picture in
+    // the preview. Stale-form guard: a cached editor still has the old
+    // theme_bg_gif input — its value feeds the block too.
+    var blockGif2 = resolveGifUrl(get("theme_gif_block_url")) || resolveGifUrl(get("theme_bg_gif"));
+    th.gif_block_url = blockGif2;
+    th.bg_gif_url = "";
+    var gPos2 = get("theme_gif_block_position");
+    th.gif_block_position = (gPos2 !== "top" && GIF_BLOCK_POSITIONS.some(function (pp) { return pp[0] === gPos2; })) ? gPos2 : "";
+    var gSize2 = get("theme_gif_block_size");
+    th.gif_block_size = (gSize2 === "small" || gSize2 === "medium" || gSize2 === "large") ? gSize2 : "";
+    th.gif_block_align = (get("theme_gif_block_align") === "left") ? "left" : "center";
     var scPick2 = get("theme_soundscape");
     th.soundscape = (scPick2 === "radio" || SOUNDSCAPES.some(function (s) { return s.id === scPick2; })) ? scPick2 : "";
     var skinPick2 = get("theme_player_skin");
@@ -11749,16 +12076,16 @@ window.DWC = {
     var pageOp = parseInt(String(get("theme_page_opacity") || "100"), 10);
     th.page_opacity = (pageOp >= 40 && pageOp < 100) ? Math.round(pageOp) / 100 : "";
     // Same either/or rule as saveProfile, so the live preview and the
-    // save can never disagree.
+    // save can never disagree: one background at a time.
     if (th.effects.indexOf("animated-bg") >= 0) {
       th.bg_preset = "";
       th.bg_image_url = "";
-      th.bg_gif_url = "";
-    } else if (th.bg_gif_url) {
-      th.bg_preset = "";
-      th.bg_image_url = "";
+      th.bg_color = "";
     } else if (th.bg_image_url) {
       th.bg_preset = "";
+      th.bg_color = "";
+    } else if (th.bg_preset) {
+      th.bg_color = "";
     }
     if (th.effects.indexOf("rgb-comment-border") >= 0) th.comment_border_color = "";
     else if (fd.get("theme_comment_border_use")) th.comment_border_color = hexOk(get("theme_comment_border_color")) || "#000000";
@@ -12362,6 +12689,17 @@ window.DWC = {
     var input = $("dwc-banner-url-input");
     if (input) input.value = url;
     DWC.bannerUrlApply();
+  },
+  // From the GIF gallery: the picked GIF block GIF becomes the
+  // banner instead — same flow as the banner section's own button.
+  gifAsBanner: function () {
+    var form = document.querySelector("#dwc-account form");
+    var input = form && form.querySelector('input[name="theme_gif_block_url"]');
+    var note = document.getElementById("dwc-gif-banner-note");
+    var url = input ? resolveGifUrl(input.value) : "";
+    if (!url) { if (note) note.textContent = "Pick a GIF first — tap one below, then use this button."; return; }
+    if (note) note.textContent = "Setting it as your banner…";
+    DWC.useGifAsBanner(url, "GIF");
   },
   // Soundscape play/pause + the real analyser visualizer.
   toggleSoundscape: function (uid, el) {

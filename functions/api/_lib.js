@@ -1456,6 +1456,9 @@ export const PLAYER_SKIN_IDS = ["cassette-pink", "cassette-cyan", "cassette-gold
 // position / frame, comment-picture border color. All live in the theme
 // JSON (validated by parseTheme, same as the other theme fields).
 export const PRESET_BG_IDS = ["", "vaporwave", "rgb-gradient", "midnight-neon", "sunset-drive", "cotton-candy", "blackout"];
+// GIF block (2026-11-22) — the real anchors a GIF block can sit at.
+// "top" is the default (centered top of profile) and parses to "".
+export const GIF_BLOCK_POSITION_IDS = ["top", "above-topfriends", "below-topfriends", "above-video", "below-video", "above-comments", "below-comments", "above-sell", "below-sell"];
 export const PIC_SIZE_IDS = ["bigger", "smaller"];
 export const PIC_POSITION_IDS = ["normal", "top"];
 export const PIC_FRAME_IDS = ["none", "neon", "rgb", "rgb-rotating", "gold", "black", "wooden", "gothic", "blood", "gb", "gba", "vita-nova"];
@@ -1888,7 +1891,7 @@ export function extractYouTubeId(str) {
   return m ? m[1] : "";
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -1908,6 +1911,18 @@ export function parseTheme(stored) {
   // GIF size (2026-11-22) — small or medium; medium is capped at a
   // quarter of the page, so a GIF can never blow the page out.
   out.bg_gif_size = obj.bg_gif_size === "medium" ? "medium" : "small";
+  // GIF block (2026-11-22) — one placeable GIF: the URL (https only,
+  // same rule as the background picture), the spot (a real anchor,
+  // "" = centered top of profile), the size ("" = actual size, the
+  // GIF's true size), and the centering ("center" default, "left" to
+  // release it). bg_gif_url is still parsed (old saves) so the block
+  // can carry it over until the member saves — the client save is
+  // what clears it, not the parser.
+  const gbu = String(obj.gif_block_url || "").trim().slice(0, 500);
+  out.gif_block_url = /^https:\/\//i.test(gbu) ? gbu : "";
+  out.gif_block_position = (obj.gif_block_position !== "top" && GIF_BLOCK_POSITION_IDS.includes(String(obj.gif_block_position || ""))) ? String(obj.gif_block_position) : "";
+  out.gif_block_size = ["small", "medium", "large"].includes(String(obj.gif_block_size || "")) ? String(obj.gif_block_size) : "";
+  out.gif_block_align = (String(obj.gif_block_align || "") === "left") ? "left" : "center";
   // Profile audio (2026-11-22) — one pick: a soundscape, the radio
   // player, or nothing. Player look is a separate pick.
   out.soundscape = obj.soundscape === "radio" || SOUNDSCAPE_IDS.includes(obj.soundscape) ? obj.soundscape : "";
@@ -1931,11 +1946,12 @@ export function parseTheme(stored) {
   out.effects = eff.filter((e) => MYSPACE_EFFECT_IDS.includes(e)).slice(0, 8);
   // Preset background (v3.9) — one of the fixed preset ids, or "" for none.
   out.bg_preset = PRESET_BG_IDS.includes(String(obj.bg_preset || "")) ? String(obj.bg_preset || "") : "";
-  // Background choices are either/or (v3.20): a custom picture and a
-  // preset can never both be on — the picture wins, so a preset can
-  // never silently sit on top of it again. The form enforces the same
-  // rule live; this is the backstop for stale or forged saves.
-  if (out.bg_image_url) out.bg_preset = "";
+  // Background choices are either/or (2026-11-22): one background at
+  // a time — a picture wins over a preset and a color, and a preset
+  // wins over a color. The form enforces the same rule live; this is
+  // the backstop for stale or forged saves.
+  if (out.bg_image_url) { out.bg_preset = ""; out.bg_color = ""; }
+  else if (out.bg_preset) { out.bg_color = ""; }
   // A GIF is the background: it wins over a still picture or a preset.
   if (out.bg_gif_url) { out.bg_preset = ""; out.bg_image_url = ""; }
   // Comment-picture border color (v3.9) — any #rrggbb the member picks.
@@ -1944,9 +1960,13 @@ export function parseTheme(stored) {
   out.comment_border_color = hex(obj.comment_border_color);
   if (out.effects.includes("rgb-comment-border")) out.comment_border_color = "";
   // Animated rainbow background (v3.20) — the effect IS the background,
-  // so it wins over a picture or a preset. The form says so when the
-  // effect is ticked; this is the backstop for stale or forged saves.
-  if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_gif_url = ""; }
+  // so it wins over a picture, a preset, AND a color. The form says so
+  // when the effect is ticked; this is the backstop for stale or
+  // forged saves.
+  // It no longer clears bg_gif_url: the GIF is a placeable block now,
+  // not a background, so it survives the effect and still carries over
+  // until the member saves (the save is what clears bg_gif_url).
+  if (out.effects.includes("animated-bg")) { out.bg_preset = ""; out.bg_image_url = ""; out.bg_color = ""; }
   // Page opacity (2026-11-22) — how see-through the page is over its
   // background, 0.4–1. "" = solid (the default); anything outside the
   // range is dropped so a forged value can't hide the page.
@@ -2042,7 +2062,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

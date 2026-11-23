@@ -1040,7 +1040,7 @@ function fileDownloadUrl(url) {
 
 // ---------- routing ----------
 var NAV = [
-  ["street", "🏠 YourSpace"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
+  ["street", "💗 Heart Rise"], ["chat", "💬 Live Chat"], ["market", "Flea Market"],
   // ["trade", "⇄ Up for Trade"], // HIDDEN 2026-11-21 — trade system not built yet; re-add this line to bring the button back.
   ["flea", "🔨 Auction House"], ["cardcheck", "🔍 Card Check"],
   ["adult", "🌙 After Dark 18+"], ["find", "✨ Find Seller / Buyer"], ["headlines", "🔥 Headlines"], ["receipts", "🧾 My receipts"], ["orders", "📦 My Orders"], ["payouts", "💰 Payouts"],
@@ -1206,6 +1206,17 @@ function renderAccount() {
       '<p class="dwc-form-err" data-err hidden></p>' +
       '<p style="margin:10px 0 0;text-align:center"><button class="btn" type="submit">Sign in →</button></p>' +
       '<p style="margin:8px 0 0;font-size:13px;text-align:center"><a href="forgot-password.html">Forgot your password?</a></p></form>' +
+      '<div class="dwc-recovery-box"><h4 style="margin:0 0 4px">🔑 Got a recovery code from Chris?</h4>' +
+      '<p style="margin:0 0 10px;font-size:13px;color:var(--muted)">If Chris sent you a one-time recovery code, use it right here — it works once, for 24 hours.</p>' +
+      '<form onsubmit="DWC.useRecoveryCode(this); return false;">' +
+      '<label style="font-size:13px">Recovery code</label>' +
+      '<input name="code" required autocomplete="off" spellcheck="false" placeholder="e.g. RCR-XXXX-XXXX-XXXX">' +
+      '<label style="font-size:13px">New password (at least 8 characters, with a letter and a number)</label>' +
+      '<div style="display:flex;gap:6px;align-items:center"><input name="new_password" type="password" required minlength="8" autocomplete="new-password" placeholder="New password" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
+      '<label style="font-size:13px">New password again</label>' +
+      '<div style="display:flex;gap:6px;align-items:center"><input name="new_password_confirm" type="password" required minlength="8" autocomplete="new-password" placeholder="Same password again" style="flex:1;min-width:0">' + DWC.pwEyeBtn() + '</div>' +
+      '<p class="dwc-form-err" data-err hidden></p>' +
+      '<p style="margin:10px 0 0;text-align:center"><button class="btn" type="submit">Use my recovery code →</button></p></form></div>' +
       (savedId
         ? '<p style="margin-top:12px"><button type="button" class="btn" onclick="DWC.signBackIn()">Sign back in →</button></p><p style="font-size:13px;color:var(--muted);margin:4px 0 0">You signed out on this browser — one tap brings your account back.</p>'
         : '') +
@@ -1381,8 +1392,8 @@ function copyTextToClipboard(text) {
 // computes what was earned. Earning: post 10, listing 10, new profile
 // 10, comment 10, heart 5, completed transaction 40, suggestion 40,
 // friend/favorite 5, share 5, song 10, first radio listen 10, fully
-// set up profile 10, weekly check-in 5, 7th consecutive weekly
-// check-in +50. One award per action, enforced by the ledger's unique
+// set up profile 10, daily check-in 1, 7th consecutive daily
+// check-in +5. One award per action, enforced by the ledger's unique
 // key — a double-tap or retry can never pay twice.
 var LUCRE_SYMBOL = "◈";
 function lucreFmt(n) { return LUCRE_SYMBOL + " " + (Number(n) || 0); }
@@ -2074,7 +2085,7 @@ function storeLayoutName(id) {
 // layout and stay exactly as the member set them: Top Friends, feed
 // privacy, divider, buttons, video, ticker. The item's custom page
 // wins when it has one; otherwise the member's own page stays.
-var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "gif_block_url", "gif_block_position", "gif_block_size", "gif_block_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url", "page_opacity", "font_fx", "overlay_items", "pad_page", "pad_cards", "pad_header", "bio_size", "bio_color", "bio_underline", "header_fit", "header_ratio", "header_use_default", "page_image_fit"];
+var LAYOUT_STRUCTURAL_FIELDS = ["topfriends_count", "topfriends_side", "feed_privacy", "divider", "divider_color", "divider_unlocks", "website_buttons", "video_url", "video_file_url", "video_size", "video_align", "gif_block_url", "gif_block_position", "gif_block_size", "gif_block_align", "cover_size", "cover_name", "ticker_source", "buttons_side", "buttons_show", "button_size", "buttons_visible", "pro_button_side", "pro_button_color", "display_badges", "soundscape", "player_skin", "player_image_url", "spotify_url", "soundcloud_url", "page_opacity", "font_fx", "overlay_items", "pad_page", "pad_cards", "pad_header", "bio_size", "bio_color", "bio_underline", "header_fit", "header_ratio", "header_use_default", "page_image_fit", "page_format", "header_border_width", "header_radius", "header_border_color", "header_crop", "hide_avatar", "header_links_pos", "links_side", "links_stack", "links_top", "header_side", "buttons_order", "reveal_sections"];
 function storeMergedTheme(item) {
   var cur = state.profile ? parseThemeClient(state.profile.profile_theme) : {};
   var merged = Object.assign({}, item.theme || {});
@@ -2303,12 +2314,11 @@ function lucreCheckinLabel() {
   var c = state.lucre && state.lucre.checkin;
   if (!c) return "";
   if (c.can_check_in) {
-    return (c.streak > 0 ? "🔥 Streak: " + c.streak + "/7 — " : "") + "50 " + LUCRE_SYMBOL + " bonus at 7 weeks in a row";
+    return (c.streak > 0 ? "🔥 Streak: " + c.streak + "/7 — " : "") + "5 " + LUCRE_SYMBOL + " bonus on day 7 in a row";
   }
-  var days = Math.max(1, Math.ceil(((c.next_checkin_at || 0) - Date.now()) / 86400000));
-  return "✓ Checked in — next check-in in " + days + " day" + (days === 1 ? "" : "s") + (c.streak > 0 ? " · 🔥 Streak: " + c.streak + "/7" : "");
+  return "✓ Checked in — come back tomorrow for +1 " + LUCRE_SYMBOL + (c.streak > 0 ? " · 🔥 Streak: " + c.streak + "/7" : "");
 }
-// The wallet + weekly check-in on the member home page, right under the
+// The wallet + daily check-in on the member home page, right under the
 // profile row and next to the Edit Profile buttons. Small, centered,
 // classy — one look tells you your balance, your streak, and how to earn.
 function lucreWalletHTML() {
@@ -2320,9 +2330,9 @@ function lucreWalletHTML() {
   return '<div id="dwc-lucre-wallet" class="dwc-lucre-wallet">' +
     '<div class="dwc-lucre-top"><span class="dwc-lucre-balance">' + LUCRE_SYMBOL + ' <strong>' + (balance === null ? "…" : balance) + '</strong> Lucre</span>' +
     '<span class="dwc-lucre-note">site only currency — not real money, not crypto, can’t cash out</span></div>' +
-    '<div class="dwc-lucre-checkin"><span class="dwc-lucre-streak">' + esc(lucreCheckinLabel() || "Weekly check-in — 5 " + LUCRE_SYMBOL + " a week, 50 " + LUCRE_SYMBOL + " bonus every 7th week") + '</span>' +
-    (can ? ' <button type="button" class="btn small" onclick="DWC.lucreCheckin()">Check in · +5 ' + LUCRE_SYMBOL + '</button>' : "") + '</div>' +
-    '<div class="dwc-lucre-earn">Earn: post 10 · comment 10 · heart 5 · listing 10 · check in weekly · <button type="button" class="dwc-linklike" onclick="DWC.phoneGo(\'store\')">🛍️ Spend it in the Layout Store →</button></div>' +
+    '<div class="dwc-lucre-checkin"><span class="dwc-lucre-streak">' + esc(lucreCheckinLabel() || "Daily check-in — 1 " + LUCRE_SYMBOL + " a day, 5 " + LUCRE_SYMBOL + " bonus every 7th day in a row") + '</span>' +
+    (can ? ' <button type="button" class="btn small" onclick="DWC.lucreCheckin()">Check in · +1 ' + LUCRE_SYMBOL + '</button>' : "") + '</div>' +
+    '<div class="dwc-lucre-earn">Earn: post 10 · comment 10 · heart 5 · listing 10 · check in daily · <button type="button" class="dwc-linklike" onclick="DWC.phoneGo(\'store\')">🛍️ Spend it in the Layout Store →</button></div>' +
     '</div>';
 }
 // ---------- Layout Store (Taffy Phone app) ----------
@@ -2601,11 +2611,11 @@ function taffyReply(raw) {
   // ---- Lucre + Layout Store (v3.11) — Taffy points at real features,
   // never claims to understand arbitrary language or to write code. ----
   if (has(/\blucre\b/) || has(/\b(site )?currenc(y|ies)\b/) || has(/\bhow (do|can) i (earn|get|make).*lucre\b/) || has(/\bwhat is lucre\b/))
-    return { text: "Lucre ◈ is the site's own play money — not real money, not crypto, and you can't cash it out. You earn it by being here: 10 for a post, 10 for a comment, 5 for a heart, 10 for a listing, and a weekly check-in on your home page. Spend it in my Layout Store on Taffy's phone — layouts and frames, about 20 ◈ each. Your wallet lives on your home page.", emoji: "◈", working: false };
+    return { text: "Lucre ◈ is the site's own play money — not real money, not crypto, and you can't cash it out. You earn it by being here: 10 for a post, 10 for a comment, 5 for a heart, 10 for a listing, and a daily check-in on your home page. Spend it in my Layout Store on Taffy's phone — layouts and frames, about 20 ◈ each. Your wallet lives on your home page.", emoji: "◈", working: false };
   if (has(/\blayout store\b/) || has(/\bbuy (a )?layout\b/) || has(/\bpre.?made layouts?\b/))
-    return { text: "The Layout Store lives on my phone — tap the 🛍️ Layout Store app. Fourteen pre-made layouts are free (rainy night, professional, Facebook-style, Instagram-style, 80s arcade, kitsune shrine, horror, vaporwave sunset, retro terminal, candy pop, midnight garden, and a few surprises), and two fancy ones cost 20 ◈ each. Every layout has a short code you can copy — paste a code in the store's code box to use it. Members can publish their own layouts there too, free, with their name on them. Tap Preview to see one on your page first, then Apply — one tap and it's live.", emoji: "🛍️", working: false };
-  if (has(/\bcheck ?in\b/) || has(/\bweekly check/) || has(/\bstreak\b/))
-    return { text: "Weekly check-in: once a week, on your home page near the Edit Profile buttons — 5 ◈ each time, and every 7th week in a row pays a 50 ◈ bonus. Miss more than two weeks and the streak starts over.", emoji: "🔥", working: false };
+    return { text: "The Layout Store lives on my phone — tap the 🛍️ Layout Store app. Fourteen pre-made layouts are free (rainy night, professional, Facebook-style, Instagram-style, 80s arcade, kitsune shrine, horror, vaporwave sunset, retro terminal, candy pop, midnight garden, and a few surprises), and two fancy ones cost 20 ◈ each. You earn Lucre just by logging in and checking in every day — 1 ◈ a day, with a 5 ◈ bonus every 7th day in a row. Every layout has a short code you can copy — paste a code in the store's code box to use it. Members can publish their own layouts there too, free, with their name on them. Tap Preview to see one on your page first, then Apply — one tap and it's live.", emoji: "🛍️", working: false };
+  if (has(/\bcheck ?in\b/) || has(/\bweekly check/) || has(/\bdaily check/) || has(/\bstreak\b/))
+    return { text: "Daily check-in: once a day, on your home page near the Edit Profile buttons — 1 ◈ each time, and every 7th day in a row pays a 5 ◈ bonus. Go more than 2 days without checking in and the streak starts over.", emoji: "🔥", working: false };
   if (has(/\bachievements?\b/) || has(/\bunlockables?\b/) || has(/\bwhat.*(unlocked|earned)\b/) || has(/\bmy badges\b/))
     return { text: "Your badges, frames, and Lucre all live in the Badges app on my phone — unlocked ones on top, locked ones with what earns them. Fully setting up your profile unlocks the VITA NOVA frame and a rare-candy badge, too.", emoji: "🏅", working: false };
   // ---- Creator menu + My stuff (2026-11-21) — placed before the
@@ -2664,7 +2674,7 @@ function taffyReply(raw) {
     return { text: "More breathing room — this pads your cards out to 28px. Lower the number for tighter, raise it for roomier.", css: ".dwc-myprofile .card{padding:28px;}", emoji: "📐", working: false };
   // sparkle
   if (has(/sparkle|glitter|twinkle|stars/))
-    return { text: "Sparkle! Apply this and your page gets a twinkling star field over it. There's also a Starfield drift checkbox in Edit Profile under MySpace effects.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", working: true };
+    return { text: "Sparkle! Some layouts in Taffy’s Layout Store have a twinkling star field built in — Paris Streets and Für Elise both sparkle, and there’s a Starfield drift layout too. If your page already has the starfield, it stays — it’s just not a checkbox in Edit Profile anymore. Or tap “Add to my code” and I’ll put the sparkle CSS in your About Me box.", css: ".dwc-myprofile{position:relative;}.dwc-myprofile::before{content:'';position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(2px 2px at 20% 30%,#fff,transparent),radial-gradient(2px 2px at 70% 60%,#ffe27a,transparent),radial-gradient(2px 2px at 85% 20%,#ff2d95,transparent);animation:dwcSparkleTwinkle 2.4s ease-in-out infinite;}", emoji: "✨", working: true };
   // animated background
   if (has(/animated background|moving background|rainbow background|animated.*bg/))
     return { text: "Animated rainbow background — it slowly shifts through pink, purple, blue and green. Apply it and watch it move. There's a toggle for it in Edit Profile too.", css: ".dwc-myprofile{background:linear-gradient(135deg,#ff2d95,#7c4dff,#00e5ff,#39ff88);background-size:400% 400%;animation:dwcBgShift 12s ease infinite;}", emoji: "🌈", working: true };
@@ -3119,7 +3129,7 @@ function phoneBadgesHTML() {
       '<h4 style="margin:12px 0 4px">🖼️ Picture frames</h4><ul class="dwc-list">' + frameRows + "</ul>" +
       '<h4 style="margin:12px 0 4px">' + LUCRE_SYMBOL + ' Lucre — site only currency</h4>' +
       '<p class="tp-note" style="margin:0 0 4px">Balance: <strong>' + (l ? l.balance : "…") + " " + LUCRE_SYMBOL + '</strong> · not real money, not crypto, can’t cash out.</p>' +
-      (recent ? '<ul class="dwc-list">' + recent + "</ul>" : '<p class="tp-note">No earnings yet — post, comment, heart, or check in weekly to start earning.</p>');
+      (recent ? '<ul class="dwc-list">' + recent + "</ul>" : '<p class="tp-note">No earnings yet — post, comment, heart, or check in daily to start earning.</p>');
   }
   return phoneTopbarHTML("Badges") + '<div class="tp-appview">' + body + '</div>';
 }
@@ -3571,11 +3581,7 @@ function overlayEditorHTML(th) {
   var rows = items.map(function (it, i) { return overlayRowHTML(it, i); }).join("");
   return '<h4 id="dwc-sec-overlay" style="margin:0 0 6px">🖼️ Make it one picture — buttons, links and words on your background</h4>' +
     "<p style=\"margin:0 0 8px\">Your background picture is the whole page — put the buttons, links and words ON it, instead of in a block underneath. Tap a row below, then tap anywhere on the preview above to drop it there. On phones the items stack in a column instead (see the note at the bottom).</p>" +
-    '<label>How your picture fills the page</label><select name="theme_page_image_fit">' +
-    [["", "Cover — fill the page, crop the overflow"], ["cover", "Cover — fill the page, crop the overflow"], ["stretch", "Stretch — fill exactly, even if it squashes"], ["contain", "Contain — whole picture, letterboxed"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.page_image_fit || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
-    '<label>Your page picture — one image for the whole page</label>' +
-    '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url) + '" placeholder="https://…" oninput="DWC.bgImageChanged(this)">' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: your picture is your page background. It turns the preset and your background colour off. Off (blank): no picture — your preset, colour, or layout shows instead.</p>' +
+    '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Your page picture lives in Page background now — set it there, then place buttons, links and words on it here.</p>' +
     '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.useBannerAsBackground()">🖼️ Use my banner as the background</button></p>' +
     '<div id="dwc-ov-rows" style="margin-top:10px">' + rows + "</div>" +
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" id="dwc-ov-add" onclick="DWC.ovAddRow()"' + (items.length >= 8 ? " disabled" : "") + '>＋ Add a button / link / words</button> <span style="color:var(--muted);font-size:13px">Up to 8. Hit Save profile to keep them.</span></p>' +
@@ -3650,8 +3656,8 @@ function profileFormHTML(p) {
     // arrives from Step 3's "Make it yours later". Shown once;
     // renderAccount clears the flag right after this render.
     (state.signupFirstEditor ? '<p class="note" id="dwc-editor-first-run" style="margin:0 0 12px">👋 This is the full editor — everything is optional, and nothing saves until you hit Save profile. Use “Find a setting…” to jump to anything. <button type="button" class="dwc-linklike" onclick="DWC.dismissEditorBanner()">Got it ✕</button></p>' : "") +
-    '<div class="dwc-sticky-save" id="dwc-sticky-save"><span id="dwc-sticky-dirty" style="visibility:hidden">✏️ Unsaved changes</span><button type="submit" class="btn small dwc-sticky-save-btn">Save profile</button></div>' +
-    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-about">About you</a> · <a href="#dwc-sec-name">Name &amp; display</a> · <a href="#dwc-sec-account">Account &amp; payouts</a> · <a href="#dwc-sec-picture-h">Picture</a> · <a href="#dwc-sec-ticker">Ticker</a> · <a href="#dwc-sec-links">Links</a> · <a href="#dwc-sec-top8">Top Friends</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-video">Video</a> · <a href="#dwc-sec-gifblock">GIF block</a> · <a href="#dwc-sec-show">What shows</a> · <a href="#dwc-sec-pageurl">Page URL</a> · <a href="#dwc-sec-selling">Selling</a> · <a href="#dwc-sec-content-sales">Content sales</a> · <a href="#dwc-sec-menu">Menu</a> · <a href="#dwc-sec-radio">Page sound</a> · <a href="#dwc-sec-look">Page look</a> · <a href="#dwc-sec-bg">Background</a> · <a href="#dwc-sec-taffy">Layouts</a> · <a href="#dwc-sec-badges">Badges</a> · <a href="#dwc-sec-style">Page style</a></p>' +
+    '<div class="dwc-sticky-save" id="dwc-sticky-save"><span id="dwc-sticky-dirty" style="visibility:hidden">✏️ Unsaved changes</span><button type="submit" class="btn small dwc-sticky-save-btn">Save profile</button> <button type="button" class="btn ghost small" onclick="DWC.previewProfile()">👀 Preview</button></div>' +
+    '<p class="dwc-editnav" style="margin:0 0 12px;color:var(--muted);font-size:13px">Jump to: <a href="#dwc-sec-about" onclick="DWC.editorJump(\'dwc-sec-about\');return false;">About Me</a> · <a href="#dwc-sec-name" onclick="DWC.editorJump(\'dwc-sec-name\');return false;">Name &amp; display</a> · <a href="#dwc-sec-picture-h" onclick="DWC.editorJump(\'dwc-sec-picture-h\');return false;">Picture &amp; banner</a> · <a href="#dwc-sec-buttons" onclick="DWC.editorJump(\'dwc-sec-buttons\');return false;">Buttons</a> · <a href="#dwc-sec-links" onclick="DWC.editorJump(\'dwc-sec-links\');return false;">My links</a> · <a href="#dwc-sec-top8" onclick="DWC.editorJump(\'dwc-sec-top8\');return false;">Top Friends</a> · <a href="#dwc-sec-video" onclick="DWC.editorJump(\'dwc-sec-video\');return false;">Video</a> · <a href="#dwc-sec-gifblock" onclick="DWC.editorJump(\'dwc-sec-gifblock\');return false;">GIF block</a> · <a href="#dwc-sec-bg" onclick="DWC.editorJump(\'dwc-sec-bg\');return false;">Page background</a> · <a href="#dwc-sec-taffy" onclick="DWC.editorJump(\'dwc-sec-taffy\');return false;">Layouts</a> · <a href="#dwc-sec-radio" onclick="DWC.editorJump(\'dwc-sec-radio\');return false;">Music</a> · <a href="#dwc-sec-style" onclick="DWC.editorJump(\'dwc-sec-style\');return false;">Page style</a> · <a href="#dwc-sec-badges" onclick="DWC.editorJump(\'dwc-sec-badges\');return false;">Badges</a> · <a href="#dwc-sec-ticker" onclick="DWC.editorJump(\'dwc-sec-ticker\');return false;">Ticker</a> · <a href="#dwc-sec-show" onclick="DWC.editorJump(\'dwc-sec-show\');return false;">What shows</a> · <a href="#dwc-sec-selling" onclick="DWC.editorJump(\'dwc-sec-selling\');return false;">Selling</a> · <a href="#dwc-sec-account" onclick="DWC.editorJump(\'dwc-sec-account\');return false;">Account &amp; payouts</a> · <a href="#dwc-sec-pageurl" onclick="DWC.editorJump(\'dwc-sec-pageurl\');return false;">Page URL</a> · <a href="#dwc-sec-overlay" onclick="DWC.editorJump(\'dwc-sec-overlay\');return false;">Overlays</a></p>' +
     '<p id="dwc-unsaved-note" class="dwc-unsaved" hidden>✏️ You have unsaved changes — hit <strong>Save profile</strong> (top right, always visible) to keep them. Nothing saves until you do.</p>' +
     // Build 5 — operator editing a member's page: say so plainly, and
     // name what never changes from here (the server enforces it too).
@@ -3664,7 +3670,8 @@ function profileFormHTML(p) {
     (isNew ? "" :
     '<div class="note" style="margin:0 0 12px"><strong>🔑 Password &amp; recovery</strong>' +
     '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and verify your email in the “Account &amp; payouts” box near the top of this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>') +
-    '<h3 class="dwc-edit-group-h" id="dwc-sec-about" style="margin-top:14px">👤 About you — username, name, and bio</h3>' +
+    pageFormatPickerHTML(p, th) +
+    '<div class="dwc-edit-cols">' +'<div class="dwc-edit-sec dwc-edit-about">' +'<h3 class="dwc-edit-group-h" id="dwc-sec-about" style="margin-top:14px">👤 About Me</h3>' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
     '<input name="username" required minlength="2" maxlength="24" value="' + v("username") + '" placeholder="Your shop name / username">' +
     // Basic account: new signups only see the essentials. Everything
@@ -3675,14 +3682,14 @@ function profileFormHTML(p) {
     '<input name="chat_name" maxlength="24" value="' + v("chat_name") + '" placeholder="What should chat call you?">' +
     '<label>Occupation (optional)</label>' +
     '<input name="occupation" maxlength="60" value="' + v("occupation") + '" placeholder="What do you do?">' +
-    '<label>About you / your shop</label>' +
-    '<textarea name="bio" rows="6" maxlength="500" placeholder="What do you collect and sell?">' + v("bio") + "</textarea>" +
     '<label>Bio size</label><select name="theme_bio_size">' +
     '<option value="s"' + (th.bio_size === "s" ? " selected" : "") + '>Small</option>' +
     '<option value=""' + (th.bio_size !== "s" && th.bio_size !== "l" ? " selected" : "") + '>Medium (current)</option>' +
     '<option value="l"' + (th.bio_size === "l" ? " selected" : "") + '>Large</option></select>' +
     '<label>Bio colour</label><input type="color" name="theme_bio_color" value="' + (th.bio_color || "#f2f2f8") + '" style="width:64px;height:40px;padding:2px">' +
-    '<label><input type="checkbox" name="theme_bio_underline" style="width:auto"' + (th.bio_underline ? " checked" : "") + '> Underline my bio</label>' +
+    '<label><input type="checkbox" name="theme_bio_underline" style="width:auto"' + (th.bio_underline ? " checked" : "") + '> Underline my bio</label>' +    '<h4 style="margin:14px 0 6px">💬 About Me — your words + your code, one box</h4>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">The code at the top of this box styles your whole page — colours, borders, spacing, everything. The words underneath it are your bio, the bit visitors read about you. Paste a MySpace layout in here and we translate it to our page for you — what changed shows below the box.</p>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">What gets stripped, and why: scripts, click/hover actions, iframes, forms, @import and @font-face (outside stylesheets and fonts), and pictures that aren’t https://. position:fixed becomes absolute so it can’t cover the site. Rules that don’t already say .dwc-myprofile are re-scoped to your page only. That’s a safety rule, not a missing feature — one member’s code must never run on another member’s page.</p>' +
     '<table class="dwc-bio-codes"><thead><tr><th>Code</th><th>What it does</th><th>Colour?</th></tr></thead><tbody>' +
     '<tr><td><code>&lt;b&gt;bold&lt;/b&gt;</code></td><td>Makes the words <b>bold</b></td><td>No — use the Bio colour box above</td></tr>' +
     '<tr><td><code>&lt;i&gt;italic&lt;/i&gt;</code></td><td>Makes the words <i>italic</i></td><td>No</td></tr>' +
@@ -3696,9 +3703,29 @@ function profileFormHTML(p) {
     '<tr><td><code>&lt;a href="https://…"&gt;link words&lt;/a&gt;</code></td><td>Makes a clickable link — needs a real https:// address. A link with no address goes nowhere, so type the address in.</td><td>Links use your page’s link colour</td></tr>' +
     '<tr><td><i>(Bio colour box above)</i></td><td>Changes the bio’s colour</td><td>—</td></tr>' +
     '<tr><td><i>(Font effects → Apply to Bio section)</i></td><td>Glow / Neon / Rainbow / etc. on the bio only</td><td>§4</td></tr>' +
-    '</tbody></table>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Type the codes straight into your bio — they work as soon as you save. Anything else that looks like code just shows as plain words, so you can’t break your page.</p>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Try this welcome (copy-paste, works first try):<br><code>&lt;font size="5"&gt;Welcome to my page&lt;/font&gt;&lt;br&gt;and if you have any questions just feel free to message me and ask me what you need to know! I’ll be around time to time!</code><br>With a link on “message me”: <code>&lt;font size="5"&gt;Welcome to my page&lt;/font&gt;&lt;br&gt;and if you have any questions just &lt;a href="https://rarecandyreserve.org"&gt;message me&lt;/a&gt; and ask me what you need to know! I’ll be around time to time!</code></p>') +
+    '</tbody></table>' +    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Type the codes straight into your bio — they work as soon as you save. Anything else that looks like code just shows as plain words, so you can’t break your page.</p>' +    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Try this welcome (copy-paste, works first try):<br><code>&lt;font size="5"&gt;Welcome to my page&lt;/font&gt;&lt;br&gt;and if you have any questions just feel free to message me and ask me what you need to know! I’ll be around time to time!</code><br>With a link on “message me”: <code>&lt;font size="5"&gt;Welcome to my page&lt;/font&gt;&lt;br&gt;and if you have any questions just &lt;a href="https://rarecandyreserve.org"&gt;message me&lt;/a&gt; and ask me what you need to know! I’ll be around time to time!</code></p>' +    '<p style="margin:6px 0 0"><button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(1)">1 Header</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(2)">2 Name + Bio</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(3)">3 About</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(4)">4 Links</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(5)">5 Top Friends</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(6)">6 Buttons</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(7)">7 Comments</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(8)">8 Sound</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(9)">9 Whole page</button></p>' +
+    '<textarea name="about_me" id="dwc-about-me" rows="14" maxlength="8500" placeholder="Put your code in the &lt;style&gt; block at the top, then write about yourself underneath." oninput="DWC.aboutMeEdited(this)" onpaste="DWC.aboutMePasted(event, this)">' + aboutMeValue(p) + '</textarea>' +
+    '<textarea name="bio" id="dwc-bio-mirror" hidden>' + esc(p ? (p.bio || "") : "") + '</textarea>' +
+    '<textarea name="layout_css" id="dwc-layout-css-mirror" hidden>' + esc(p ? (p.layout_css || "") : "") + '</textarea>' +
+    '<p style="margin:6px 0 0"><span id="dwc-aboutme-biocount" style="color:var(--muted);font-size:13px"></span> · <span id="dwc-aboutme-csscount" style="color:var(--muted);font-size:13px"></span> <span id="dwc-mycode-note" style="color:var(--muted);font-size:13px"></span> <button type="button" class="btn ghost small" onclick="DWC.copyMyCode()">📋 Copy my code</button></p>' +
+    '<div id="dwc-mycode-changes" style="margin:6px 0 0;color:var(--muted);font-size:13px"></div>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Want to style this page with code? Put it in the &lt;style&gt; block at the top of this box.</p>' +
+    '<div class="dwc-layoutbox" style="margin-top:10px"><h4 style="margin:0 0 6px">📣 Share it as a layout</h4>' +
+    "<p style=\"margin:0 0 8px\">Publish the CSS in this box as a free layout in Taffy’s Layout Store, with your name on it. Other members can grab it with a code. It stays free — priced layouts are the shop’s only.</p>" +
+    '<input id="dwc-publish-name" maxlength="40" placeholder="Layout name — e.g. Midnight Bubblegum">' +
+    '<input id="dwc-publish-desc" maxlength="120" placeholder="One line about it (optional)" style="margin-top:6px">' +
+    '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.publishLayout()">📣 Publish as a layout</button> <span style="color:var(--muted);font-size:13px">Publishes this box’s CSS with the look in this form right now — even changes you haven’t saved yet. You can take it down from the store later.</span></p></div>' +
+    '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
+    "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
+    '<label>Your button code (CSS) — changes your page’s buttons only</label>' +
+    '<textarea name="theme_button_css" rows="4" maxlength="4000" placeholder="e.g. .dwc-myprofile .btn{background:url(https://example.com/my.gif);background-size:cover;box-shadow:0 0 16px #ff2d95;}">' + esc(th.button_css || "") + "</textarea>" +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Targets the buttons on your page only. Images in url() must be https:// — a GIF URL works as a button background. CSS only, same limits as the layout box.</p>' +
+    '<details style="margin-top:10px"><summary>What your pickers made — read-only</summary>' +
+    '<p style="margin:4px 0 6px;color:var(--muted);font-size:13px">This is the CSS your colours, fonts, effects and background picks generate. To change it, use the pickers above; to override it, write in My Code with !important.</p>' +
+    '<textarea id="dwc-generated-css" rows="6" readonly></textarea></details>' +
+    '<p style="margin:10px 0 0">Bio colour: <input type="color" id="dwc-bio-color-src" value="' + (th.bio_color || "#f2f2f8") + '" style="width:44px;height:44px;padding:2px;border-radius:50%" oninput="DWC.bioColorFooter(this)"></p>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Pasted a MySpace layout? Its rules aimed at the whole page now target <code>.dwc-myprofile</code>, so they stay on your page. On phones, anything you position by hand needs <code>@media (max-width:640px)</code> — without it a positioned thing can cover the page.</p>') +'</div>' +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary>🎨 Name &amp; display</summary>' +
     (isNew ? "" :
     '<h3 class="dwc-edit-group-h" id="dwc-sec-name">🎨 Name &amp; display — your name’s color, font, and glow</h3>' +
     '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This is where your name lives. Color, font, glow — all in one place, so you never have to hunt for them.</p>' +
@@ -3739,13 +3766,10 @@ function profileFormHTML(p) {
 '<p style="margin:8px 0 6px"><button type="button" class="btn ghost small" onclick="DWC.applyQuickColor(\'buttons\')">Apply to all buttons</button> <button type="button" class="btn ghost small" onclick="DWC.applyQuickColor(\'links\')">Apply to links</button> <button type="button" class="btn ghost small" onclick="DWC.applyQuickColor(\'bio\')">Apply to bio</button></p>' +
 '<p id="dwc-quick-color-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
 '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Links, headings and your name all use this colour.</p>' +
-["all", "name", "comments", "bio"].map(function (tg) { var fx = (th.font_fx && th.font_fx[tg]) || { effect: "", color: "", outline: "" }; return '<input type="hidden" name="font_fx_' + tg + '_effect" value="' + esc(fx.effect || "") + '"><input type="hidden" name="font_fx_' + tg + '_color" value="' + esc(fx.color || "") + '"><input type="hidden" name="font_fx_' + tg + '_outline" value="' + esc(fx.outline || "") + '">'; }).join("") ) +
-    (isNew ? "" : accountSectionHTML(p)) +
-    '<label>Birthday — month / day only shows publicly, never the year' + (isNew ? " (required — one account per person)" : "") + "</label>" +
-    '<input name="birthday" type="date" value="' + (p && p.birthday ? esc(p.birthday) : "") + '"' + (isNew ? " required" : "") + ">" +
-    (isNew ? "" :
+["all", "name", "comments", "bio"].map(function (tg) { var fx = (th.font_fx && th.font_fx[tg]) || { effect: "", color: "", outline: "" }; return '<input type="hidden" name="font_fx_' + tg + '_effect" value="' + esc(fx.effect || "") + '"><input type="hidden" name="font_fx_' + tg + '_color" value="' + esc(fx.color || "") + '"><input type="hidden" name="font_fx_' + tg + '_outline" value="' + esc(fx.outline || "") + '">'; }).join("") ) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>📸 Picture &amp; banner</summary>' +
+        (isNew ? "" :
 
-    '<div class="dwc-layoutbox dwc-box" id="dwc-sec-header"><h3 style="margin:0 0 6px">📦 BOX 1 — Header — your picture, your banner, your name at the top</h3>' +
+    '<div class="dwc-layoutbox dwc-box" id="dwc-sec-header"><h3 style="margin:0 0 6px">📸 Header — your picture, your banner, your name at the top</h3>' +
     '<label>Header source — the top of your page, as code</label>' +
     '<textarea id="dwc-header-source" rows="10" onblur="DWC.headerSourceBlur(this)">' + esc(headerSourceHTML(p, th)) + '</textarea>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Replace “Insert image url here” with your picture link — or upload below and this fills itself in.</p>' +
@@ -3818,29 +3842,13 @@ function profileFormHTML(p) {
     [["auto", "Auto — cover at the default height"], ["16:9", "16:9 — wide"], ["21:9", "21:9 — extra wide"], ["4:3", "4:3 — squarer"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.header_ratio || "auto") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Header spacing lives in Spacing, near the bottom of the Body box.</p>' +
     '<label><input type="checkbox" name="theme_header_use_default" value="off" style="width:auto"' + (th.header_use_default === false ? " checked" : "") + '> Hide the Rare Candy Reserve header (no default picture — name only)</label>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only when you have no custom banner. Uploading a banner wins over the default; removing it brings the default back (unless you ticked this box).</p></div>' +
-    '<h4 id="dwc-sec-ticker" style="margin:14px 0 6px">📜 Ticker — optional scrolling text above your page</h4>' +
-    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page — or pick Bitcoin and it shows the live price instead, updating every minute. Your name stays put — it never scrolls.</p>' +
-    '<label>What the ticker shows</label><select name="theme_ticker_source">' +
-    '<option value=""' + (th.ticker_source !== "btc" ? " selected" : "") + '>My own words</option>' +
-    '<option value="btc"' + (th.ticker_source === "btc" ? " selected" : "") + '>₿ Live Bitcoin price (updates every minute — needs CoinGecko to answer; if it can’t, your own words show instead)</option></select>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On (Bitcoin): visitors see the live Bitcoin price, refreshed every minute. If the price cannot load, your own words show instead. Off (My own words): visitors see the words you typed.</p>' +
-    '<label>My own words — what the ticker says</label>' +
-    '<input name="ticker_text" maxlength="200" value="' + esc(p ? (p.ticker_text || "") : "") + '" placeholder="e.g. New drops every Friday — check the Flea Market!">' +
-    '<label><input type="checkbox" name="ticker_enabled" style="width:auto"' + (p && p.ticker_enabled ? " checked" : "") + '> Show the ticker on my page</label>' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: a scrolling line shows above your page — tick this AND type your own words above, or pick Bitcoin above for the live price. Off: no ticker shows at all. Your words stay saved — tick the box again to bring them back.</p>' +
-    '<label>Ticker colour</label>' +
-    '<input name="ticker_color" type="color" value="' + esc((p && /^#[0-9a-fA-F]{6}$/.test(p.ticker_color || "")) ? p.ticker_color : "#00e5ff") + '" style="width:64px;height:36px;padding:2px">' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the scrolling ticker text uses this colour. Off: this colour does nothing until you tick “Show the ticker” above. (Picking a colour does not turn the ticker on.)</p>') +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Only when you have no custom banner. Uploading a banner wins over the default; removing it brings the default back (unless you ticked this box).</p>' + '<h4 style="margin:12px 0 6px">🖼️ Main overlay — where your picture &amp; name sit</h4>' + headerLayoutHTML(th) + websiteHeaderHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔘 Buttons &amp; links</summary>' +
+    (isNew ? "" : '<h3 class="dwc-edit-group-h">🔘 Buttons &amp; links — what visitors tap</h3>' + profileButtonsSectionHTML(p) + '<input type="hidden" name="theme_buttons_order" id="dwc-buttons-order-value" value="' + esc(JSON.stringify(th.buttons_order || [])) + '">') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔗 My links</summary>' +
     (isNew ? "" :
     '<div class="dwc-layoutbox" id="dwc-sec-links"><h4 style="margin:0 0 6px">🔗 My links — buttons on your page</h4>' +
     "<p style=\"margin:0 0 8px\">Add links that show as buttons on your member page — your shop, Instagram, whatever. Up to 6. A label, a full link starting with http:// or https://, and a button style just for that link. A link’s own style wins over your page’s button style — but your My Code CSS can still override it with !important (may cause a link’s button style to not work properly).</p>" +
     '<div id="dwc-links-list">' + myLinksRowsHTML(p ? (p.my_links || []) : []) + '</div>' +
-    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/6</span></p></div>') +
-    (isNew ? "" :
-      '<div class="dwc-layoutbox" id="dwc-sec-order"><h4 style="margin:0 0 6px">↕️ Page section order — the order your page shows its sections</h4>' +
-      '<p style="margin:0 0 8px">The left-hand column of your page: About, What I sell, and the Steady Wave player. Use the arrows or the Position number to put them in the order you want — no dragging needed. A hidden section stays hidden, wherever it sits in this list.</p>' +
-      sectionOrderRowsHTML(th) + '</div>') +
+    '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.addLinkRow()">+ Add a link</button> <span id="dwc-links-count" style="color:var(--muted);font-size:13px">' + ((p && p.my_links || []).length) + '/6</span></p>' + linksPlacementHTML(th) + revealSectionsHTML(th) + '</div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🌟 Top Friends</summary>' +
     (isNew ? "" :
       '<div class="dwc-layoutbox" id="dwc-sec-top8"><h4 style="margin:0 0 6px">🌟 Top Friends — your Top Friends</h4>' +
       "<p style=\"margin:0 0 8px\">MySpace-style: pick up to 10 friends to show on your page. Thanks for the add — now show it off. They sit in the right-hand column of your page by default, above your page comments. They don’t show in Website look — your page is a website then, not a MySpace page.</p>" +
@@ -3852,50 +3860,9 @@ function profileFormHTML(p) {
       "</select>" +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
       '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">On (ticked): this friend shows in your Top Friends box on your page. Off (unticked): they do not show there. Unticking never unfriends anyone — it only takes them off the box.</p>' +
-      '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') +
-    (isNew ? "" : '<h3 class="dwc-edit-group-h">🔘 Buttons &amp; links — what visitors tap</h3>' + profileButtonsSectionHTML(p)) +
-    (isNew ? "" : '<h3 class="dwc-edit-group-h" id="dwc-sec-pieces">🧩 Page pieces — video, GIF, what shows, and your page URL</h3>' + profileVideoSectionHTML(p, th)) +
-    (isNew ? "" : profileGifBlockSectionHTML(p, th)) +
-    (isNew ? "" : profileHideSectionsHTML(p, th)) +
-    (isNew ? "" : pageSlugSectionHTML(p)) +
-    (isNew ? "" :
-    '<h3 class="dwc-edit-group-h" id="dwc-sec-selling">🛍️ Selling — your shop, your buyers, getting paid</h3>' +
-'<div class="dwc-layoutbox" id="dwc-sec-sell"><h4 style="margin:0 0 6px">🛍️ What I sell — your creator card</h4>' +
-    "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
-    '<label>Shop name — your shop / brand page name (up to 60 characters)</label>' +
-    '<input name="shop_name" maxlength="60" value="' + esc(p ? (p.shop_name || "") : "") + '" placeholder="e.g. Rare Candy Reserve">' +
-    '<label>Shop tagline — one line under your shop name (up to 140 characters)</label>' +
-    '<input name="shop_tagline" maxlength="140" value="' + esc(p ? (p.shop_tagline || "") : "") + '" placeholder="e.g. Cards, customs, and curiosities — shipped with care">' +
-    '<label>Content types I sell — tick every kind you sell</label><p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: each ticked type shows on your seller card (“Sells: …”) on your page. Off: that type does not show on your card. If nothing is set on the card at all — no types, no tags, no “Open to…” line — the whole “What I sell” card hides.</p><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
-      return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
-    }).join("") + "</div>" +
-    '<label>My seller tags (comma separated, up to 8 — buyers find you by these)</label>' +
-    '<input name="seller_tags" maxlength="240" value="' + esc(p ? (p.seller_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, custom">' +
-    '<label>Open to… (one line, up to 140 characters)</label>' +
-    '<input name="seller_open_to" maxlength="140" value="' + v("seller_open_to") + '" placeholder="e.g. custom sets on request">' +
-    '<div class="dwc-rowform"><label style="flex:1">My price from ($)<input name="seller_price_min" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_min_cents) || 0) / 100) + '"></label>' +
-    '<label style="flex:1">My price to ($)<input name="seller_price_max" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_max_cents) || 0) / 100) + '"></label></div>' +
-    '</div>' + (p && p.age_verified ? '<div class="dwc-layoutbox" id="dwc-sec-content-sales-group"><h4 style="margin:0 0 6px">🔞 Selling content</h4>' : "") + contentSalesToggleHTML(p) + contentMenuEditorHostHTML(p) + (p && p.age_verified ? "</div>" : "") +
-    '<div class="dwc-layoutbox" id="dwc-sec-buy"><h4 style="margin:0 0 6px">🔍 What I’m after — as a buyer</h4>' +
-    "<p style=\"margin:0 0 8px\">Powers Find a Buyer. Same deal — only these fields are shown.</p>" +
-    '<label>Content types I want — tick every kind you are after</label><p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: buyers can find you when they search for that type. Off: you do not show up for that type. These do not show on your page — they only help people find you.</p><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
-      return '<label><input type="checkbox" name="buyer_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.buyer_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
-    }).join("") + "</div>" +
-    '<label>Tags I’m after (comma separated, up to 8)</label>' +
-    '<input name="buyer_tags" maxlength="240" value="' + esc(p ? (p.buyer_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, amateur">' +
-    '<label>My budget — up to ($)</label>' +
-    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') +
-    (isNew ? "" :
-    dividerHTML("double", "#9a9ab0") +
-    '<h3 class="dwc-edit-group-h" id="dwc-sec-look">📦 BOX 2 — Body — how your page looks</h3>' +
-    '<div class="dwc-layoutbox dwc-box" id="dwc-sec-body">' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This is the styling area — everything here changes how YOUR page looks. Use the pickers, or paste CSS in Your body code at the bottom, or pick a ready-made layout from Taffy’s scroll.</p>' +
-    '<p style="margin:0 0 12px;color:var(--muted);font-size:13px">Groups: <a href="#dwc-sec-overlay">One picture</a> · <a href="#dwc-sec-bg">Background</a> · <a href="#dwc-sec-buttons">Buttons</a> · <a href="#dwc-sec-radio">Music</a> · <a href="#dwc-sec-taffy">Layouts</a> · <a href="#dwc-sec-badges">Badges</a> · <a href="#dwc-sec-style">Page style</a> · <a href="#dwc-sec-bodycode">Body code</a></p>' +
-    '<details class="dwc-edit-group" open><summary>🖼️ Make it one picture — ' + ((th.overlay_items && th.overlay_items.length) ? th.overlay_items.length + (th.overlay_items.length === 1 ? " item placed" : " items placed") : "no overlays yet") + '</summary>' +
-    overlayEditorHTML(th) +
-    '</details>' +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>🖼️ Background — ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset" : th.bg_color ? "your colour" : "layout default") + '</summary>' +
+      '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🎬 Video</summary>' +
+    (isNew ? "" : '<h3 class="dwc-edit-group-h" id="dwc-sec-pieces">🧩 Page pieces — video, GIF, what shows, and your page URL</h3>' + profileVideoSectionHTML(p, th)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🎞️ GIF block</summary>' +
+    (isNew ? "" : profileGifBlockSectionHTML(p, th)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="bg">🖼️ Background — ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset" : th.bg_color ? "your colour" : "layout default") + '</summary>' +
     '<h4 id="dwc-sec-bg" style="margin:14px 0 6px">🖼️ Page background — pick ONE: a preset, your own picture, or None</h4>' +
     "<p style=\"margin:0 0 8px\">Preset and picture are either/or — picking one turns the other off, so a preset can never sit on top of your picture again. Your background color below is either/or with both of them — pick a picture or a preset and the color turns off; tick the color and the picture and preset turn off.</p>" +
     '<p id="dwc-bg-now" style="margin:0 0 4px;font-size:13px"><strong>Showing now:</strong> ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset “" + esc((PRESET_BACKGROUNDS.filter(function (pr) { return pr.id === th.bg_preset; })[0] || {}).name || th.bg_preset) + "”" : "no picture or preset — your background color / vibe shows") + '</p>' +
@@ -3903,7 +3870,20 @@ function profileFormHTML(p) {
     '<label>Preset background — one tap, a whole background</label><select name="theme_bg_preset" onchange="DWC.applyBgPreset(this.value)">' +
     '<option value=""' + (th.bg_preset ? "" : " selected") + '>None — no preset</option>' + presetBackgroundsHTML(th) + "</select>" +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: this preset is your page background. It turns your picture and your background colour off. Off (None): no preset — your picture shows if you have one, otherwise your background colour or layout.</p>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your page picture is set in “Make it one picture” at the top — this group changes the same background.</p>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Upload a picture, paste a link, or pick one from the library below — any of the three sets your whole page background.</p>' +
+    '<label>Your own background picture — upload one</label>' +
+    '<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onchange="DWC.backgroundFilePicked(this)">' +
+    '<p id="dwc-bg-upload-note" style="margin:4px 0 0;color:var(--muted);font-size:13px"></p>' +
+    '<label>Background picture URL — paste an image link</label>' +
+    '<input name="theme_bg_image" maxlength="500" value="' + esc(th.bg_image_url || "") + '" placeholder="https://…jpg / …png / …webp" onchange="DWC.bgImageChanged(this)">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">A picture you upload or paste here is your whole page background — not just one section. It turns the preset and the background colour off.</p>' +
+    '<label>How the picture fits</label><select name="theme_page_image_fit" onchange="DWC.pageImageFitChanged(this.value)">' +
+    '<option value=""' + ((th.page_image_fit || "") === "" ? " selected" : "") + '>Cover — fill the background, crop the overflow</option>' +
+    '<option value="stretch"' + (th.page_image_fit === "stretch" ? " selected" : "") + '>Stretch to fit — fill exactly, even if it squashes</option>' +
+    '<option value="contain"' + (th.page_image_fit === "contain" ? " selected" : "") + '>Contain — whole picture, letterboxed</option>' +
+    '<option value="tile"' + (th.page_image_fit === "tile" ? " selected" : "") + '>Repeatable — tile it across the background</option></select>' +
+    '<label>Background library — pick one of ours</label>' +
+    bgLibraryHTML(th) +
     '<label>Page opacity — how see-through your page is over its background</label>' +
     '<div style="display:flex;gap:10px;align-items:center"><input type="range" name="theme_page_opacity" min="40" max="100" step="5" value="' + Math.round((th.page_opacity || 1) * 100) + '" style="flex:1" oninput="DWC.pageOpacityChanged(this)"><span id="dwc-page-opacity-val" style="min-width:44px;text-align:right;font-weight:700">' + Math.round((th.page_opacity || 1) * 100) + '%</span></div>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">100% is solid. Lower lets the background behind your page show through — but your words fade too, so keep it above 70% to stay readable. The live preview above shows it as you slide.</p>' +
@@ -3920,37 +3900,21 @@ function profileFormHTML(p) {
 
 
     '</details>' +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>➗ Divider — ' + (th.divider || "none") + '</summary>' +
-    '<h4 style="margin:14px 0 6px">➗ Divider — the line between Top Friends and comments</h4>' +
-    "<p style=\"margin:0 0 8px\">Pick the divider that sits between your Top Friends and your page comments. It only draws when Top Friends AND comments both show — hide either one and there’s no line to draw. The free designs are yours now — more unlock with Lucre or achievements later. Pick a color to match your page.</p>" +
-    '<label>Divider — the line between Top Friends and comments</label><select name="theme_divider" onchange="DWC.applyDivider(this.value)">' +
-    '<option value="">None — no line</option>' +
-    Object.keys(DIVIDERS).map(function (id) {
-      var d = DIVIDERS[id];
-      var locked = !d.free;
-      return '<option value="' + id + '"' + ((th.divider || "") === id ? " selected" : "") + (locked ? " disabled" : "") + ">" + (locked ? "🔒 " : "") + esc(d.name) + (locked ? " · " + esc(d.unlock) : "") + "</option>";
-    }).join("") + "</select>" +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: this design draws between Top Friends and page comments — only when both show. Off (None): no line draws.</p>' +
-    '<label>Divider colour</label>' +
-    '<input type="color" name="theme_divider_color" value="' + esc(dividerColorFor(th, th.divider || "")) + '" data-custom="' + (th.divider_color ? "1" : "0") + '" style="width:64px;height:40px;padding:2px" oninput="this.setAttribute(\'data-custom\',\'1\');DWC.refreshDividerPreview()">' +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the line between Top Friends and page comments uses this colour. Off (no divider picked): this colour does nothing until you pick a divider above.</p>' +
-    '<div id="dwc-divider-preview" style="margin-top:8px">' + dividerHTML(th.divider || "", dividerColorFor(th, th.divider || "")) + "</div>" +
-    "</div>" +
-    '</details>' +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>🔘 Buttons — ' + (th.buttons_visible ? th.buttons_visible.length : 4) + ' showing</summary>' +
-    '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
-    "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime. A style here overrides your vibe's buttons.</p>" +
-    '<label>Button style — one style for all the buttons on your page</label><select name="theme_button_style" onchange="DWC.applyButtonStyle(this.value, null)">' +
-    '<option value=""' + (!th.button_style ? " selected" : "") + '>Default</option>' +
-    Object.keys(BUTTON_STYLES).map(function (k) {
-      return '<option value="' + k + '"' + (th.button_style === k ? " selected" : "") + ">" + esc(BUTTON_STYLES[k].label) + "</option>";
-    }).join("") + "</select>" +
-    '</details>' +
-    editorDividerHTML() +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="layouts">🎨 Layouts — ' + (th.vibe || "no layout") + '</summary>' +
+    '<div class="dwc-layoutbox dwc-bot dwc-scrollbox" id="dwc-sec-taffy"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h3 style="margin:0 0 6px">🎨 Taffy’s layout scroll — pick your look</h3>' +
+    "<p style=\"margin:0\">Hi, I'm Taffy! I hold the scroll — pick a layout and I'll show you what it looks like. Some layouts are free, and some cost Lucre — you earn Lucre just by logging in and checking in every day: 1 Lucre a day, with a 5 Lucre bonus every 7th day in a row. Posting, listing, and commenting earn Lucre too.</p></div></div>" +
+    '<input type="hidden" name="theme_vibe" value="' + esc(th.vibe || "") + '">' +
+    '<label>📜 The scroll — pick a layout (your Lucre: <strong id="dwc-scroll-lucre">' + (state.lucre && typeof state.lucre.balance === "number" ? state.lucre.balance + " " + LUCRE_SYMBOL : "…") + '</strong>)</label>' +
+    '<select id="dwc-layout-scroll" onchange="DWC.layoutScrollPicked(this)">' + layoutScrollOptionsHTML(p) + '</select>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Picking one shows a preview underneath. Nothing changes on your page until you hit Apply — and nothing saves until you hit Save profile.</p>' +
+    '<div id="dwc-scroll-preview" style="margin-top:10px"></div>' +
+    '<p id="dwc-scroll-apply-row" style="margin:10px 0 0" hidden><button type="button" class="btn" onclick="DWC.layoutScrollApply()">Buy &amp; apply →</button> <span id="dwc-scroll-note" style="color:var(--muted);font-size:13px"></span></p>' +
+    '<label style="margin-top:14px">Atmosphere — rain over your page</label>' +
+    '<select id="dwc-atmosphere" onchange="DWC.atmospherePicked(this)"><option value="">None — no rain</option><option value="peaceful-rain"' + ((th.effects || []).indexOf("peaceful-rain") >= 0 ? " selected" : "") + '>Peaceful Rain — rain on the window, woods outside</option><option value="rainy-city"' + ((th.effects || []).indexOf("rainy-city") >= 0 ? " selected" : "") + '>Rainy city streets — city rain, dim neon</option></select>' +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">On: rain falls over your page, over any layout. It stays on when you change layouts. Off (None): no rain. Only one rain at a time — picking one turns the other off.</p>' +
+    '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Open the full Layout Store →</button> <span style="color:var(--muted);font-size:13px">Same layouts, bigger view, on Taffy’s phone.</span></p>' + mixerHTML(p, th) + layoutConverterHTML() + layoutBotHTML() + '</div></details>' +
     (isNew ? "" :
-      '<details class="dwc-edit-group"><summary>🎵 Music — ' + audioPickLabel(th, p) + '</summary><div class="dwc-layoutbox" id="dwc-sec-radio"><h4 style="margin:0 0 6px">🎵 Music on my page — everything about sound, one spot</h4>' +
+      '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="music">🎵 Music — ' + audioPickLabel(th, p) + '</summary><div class="dwc-layoutbox" id="dwc-sec-radio"><h4 style="margin:0 0 6px">🎵 Music on my page — everything about sound, one spot</h4>' +
       "<p style=\"margin:0 0 8px\">Everything about sound on your page, in one place. Pick what plays, how the player looks, and whether it shows at all.</p>" +
       '<label>What plays on my page</label><select name="theme_soundscape" onchange="DWC.audioPicked(this)">' +
       '<option value=""' + (audioPickValue(th, p) === "" ? " selected" : "") + '>Nothing — no sound on my page</option>' +
@@ -3980,16 +3944,49 @@ function profileFormHTML(p) {
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: sound starts by itself — but only after the visitor taps something on your page first. Browsers will not start sound on their own. Off: nothing plays until the visitor taps play. (Covers the radio and soundscapes alike.)</p>' +
       '<label><input type="checkbox" name="theme_hide_sections" value="radio" style="width:auto"' + (((th.hide_sections || []).indexOf("radio") >= 0) ? " checked" : "") + '> Hide the player from my page</label>' +
       '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Tick to hide the whole player box from visitors. Your sound pick stays saved — untick to bring it back.</p></div></details>') +
-    '<details class="dwc-edit-group"><summary>✨ Effects — ' + ((th.effects || []).length ? th.effects.length + " on" : "none yet") + '</summary>' +
+    (isNew ? "" : '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="style">🌐 Page style — ' + (p && p.website_mode ? "Website look" : "MySpace look") + '</summary><h3 class="dwc-edit-group-h" id="dwc-sec-style">🌐 Page style — MySpace or professional (website look)</h3>' + websiteFieldsHTML(p) + '</details>') +
+    (isNew ? "" :
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="badges">🏅 Badges — ' + ((p && p.badges) || []).length + ' unlocked</summary>' +
+    '<h4 id="dwc-sec-badges" style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
+    "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
+    badgeDisplayListHTML(p ? p.badges : []) +
+    badgeSlotPickerHTML(p) + '</details>') +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="divider">➗ Divider — ' + (th.divider || "none") + '</summary>' +
+    '<h4 style="margin:14px 0 6px">➗ Divider — the line between Top Friends and comments</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick the divider that sits between your Top Friends and your page comments. It only draws when Top Friends AND comments both show — hide either one and there’s no line to draw. The free designs are yours now — more unlock with Lucre or achievements later. Pick a color to match your page.</p>" +
+    '<label>Divider — the line between Top Friends and comments</label><select name="theme_divider" onchange="DWC.applyDivider(this.value)">' +
+    '<option value="">None — no line</option>' +
+    Object.keys(DIVIDERS).map(function (id) {
+      var d = DIVIDERS[id];
+      var locked = !d.free;
+      return '<option value="' + id + '"' + ((th.divider || "") === id ? " selected" : "") + (locked ? " disabled" : "") + ">" + (locked ? "🔒 " : "") + esc(d.name) + (locked ? " · " + esc(d.unlock) : "") + "</option>";
+    }).join("") + "</select>" +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: this design draws between Top Friends and page comments — only when both show. Off (None): no line draws.</p>' +
+    '<label>Divider colour</label>' +
+    '<input type="color" name="theme_divider_color" value="' + esc(dividerColorFor(th, th.divider || "")) + '" data-custom="' + (th.divider_color ? "1" : "0") + '" style="width:64px;height:40px;padding:2px" oninput="this.setAttribute(\'data-custom\',\'1\');DWC.refreshDividerPreview()">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the line between Top Friends and page comments uses this colour. Off (no divider picked): this colour does nothing until you pick a divider above.</p>' +
+    '<div id="dwc-divider-preview" style="margin-top:8px">' + dividerHTML(th.divider || "", dividerColorFor(th, th.divider || "")) + "</div>" +
+    "</div>" +
+    '</details>' +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="buttonsmenu">🔘 Buttons — ' + (th.buttons_visible ? th.buttons_visible.length : 4) + ' showing</summary>' +
+    '<h4 style="margin:14px 0 6px">🔘 Menu buttons — make them yours</h4>' +
+    "<p style=\"margin:0 0 8px\">Pick a button style for the buttons on YOUR page (Subscribe, message, links — all of them). Or leave it blank and write your own below. Presets are interchangeable — swap them anytime. A style here overrides your vibe's buttons.</p>" +
+    '<label>Button style — one style for all the buttons on your page</label><select name="theme_button_style" onchange="DWC.applyButtonStyle(this.value, null)">' +
+    '<option value=""' + (!th.button_style ? " selected" : "") + '>Default</option>' +
+    Object.keys(BUTTON_STYLES).map(function (k) {
+      return '<option value="' + k + '"' + (th.button_style === k ? " selected" : "") + ">" + esc(BUTTON_STYLES[k].label) + "</option>";
+    }).join("") + "</select>" +
+    '</details>' +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="effects">✨ Effects — ' + ((th.effects || []).length ? th.effects.length + " on" : "none yet") + '</summary>' +
     '<h4 style="margin:14px 0 6px">✨ MySpace effects — Give it those oldschool effects</h4>' +
     "<p style=\"margin:0 0 8px\">Tick what you want on your page. These sit on top of everything else. A GIF on your page goes in the GIF block above (after My video) — pick a GIF, choose where it sits, and how big it shows.</p>" +
     '<div hidden>' +
-    ["peaceful-rain", "rainy-city"].map(function (k) {
+    ["peaceful-rain", "rainy-city", "starfield-drift"].map(function (k) {
       var fx = MYSPACE_EFFECTS[k];
       return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong></label>";
     }).join("") + "</div>" +
     '<div class="dwc-checkgrid">' +
-    Object.keys(MYSPACE_EFFECTS).filter(function (k) { return ["peaceful-rain", "rainy-city"].indexOf(k) < 0; }).map(function (k) {
+    Object.keys(MYSPACE_EFFECTS).filter(function (k) { return ["peaceful-rain", "rainy-city", "starfield-drift"].indexOf(k) < 0; }).map(function (k) {
       var fx = MYSPACE_EFFECTS[k];
       return '<label><input type="checkbox" name="theme_effects" value="' + k + '" style="width:auto" onchange="DWC.bgEffectChanged(this)"' + ((th.effects || []).indexOf(k) >= 0 ? " checked" : "") + "> <strong>" + esc(fx.label) + "</strong>" + (fx.desc ? ' <span style="color:var(--muted);font-size:12px">— ' + esc(fx.desc) + "</span>" : "") + "</label>";
     }).join("") + "</div>" +
@@ -3998,31 +3995,7 @@ function profileFormHTML(p) {
     '<input name="theme_comment_border_color" type="color" value="' + esc(/^#[0-9a-fA-F]{6}$/.test(th.comment_border_color || "") ? th.comment_border_color : "#000000") + '" style="width:64px;height:36px;padding:2px">' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the little pictures next to page comments get a border in this colour. It turns the RGB border effect above off. Off: comment pictures use the RGB border effect (if ticked) or the normal border.</p>' +
     '</details>' +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>🎨 Layouts — ' + (th.vibe || "no layout") + '</summary>' +
-    '<div class="dwc-layoutbox dwc-bot dwc-scrollbox" id="dwc-sec-taffy"><div class="taffy-row"><div id="dwc-taffy">' + taffySVG("taffy", "bot") + '</div><div><h3 style="margin:0 0 6px">🎨 Taffy’s layout scroll — pick your look</h3>' +
-    "<p style=\"margin:0\">Hi, I'm Taffy! I hold the scroll — pick a layout and I'll show you what it looks like. Free ones are free; the fancy ones cost Lucre, which you earn by posting, listing, commenting, and checking in.</p></div></div>" +
-    '<input type="hidden" name="theme_vibe" value="' + esc(th.vibe || "") + '">' +
-    '<label>📜 The scroll — pick a layout (your Lucre: <strong id="dwc-scroll-lucre">' + (state.lucre && typeof state.lucre.balance === "number" ? state.lucre.balance + " " + LUCRE_SYMBOL : "…") + '</strong>)</label>' +
-    '<select id="dwc-layout-scroll" onchange="DWC.layoutScrollPicked(this)">' + layoutScrollOptionsHTML(p) + '</select>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Picking one shows a preview underneath. Nothing changes on your page until you hit Apply — and nothing saves until you hit Save profile.</p>' +
-    '<div id="dwc-scroll-preview" style="margin-top:10px"></div>' +
-    '<p id="dwc-scroll-apply-row" style="margin:10px 0 0" hidden><button type="button" class="btn" onclick="DWC.layoutScrollApply()">Buy &amp; apply →</button> <span id="dwc-scroll-note" style="color:var(--muted);font-size:13px"></span></p>' +
-    '<label style="margin-top:14px">Atmosphere — rain over your page</label>' +
-    '<select id="dwc-atmosphere" onchange="DWC.atmospherePicked(this)"><option value="">None — no rain</option><option value="peaceful-rain"' + ((th.effects || []).indexOf("peaceful-rain") >= 0 ? " selected" : "") + '>Peaceful Rain — rain on the window, woods outside</option><option value="rainy-city"' + ((th.effects || []).indexOf("rainy-city") >= 0 ? " selected" : "") + '>Rainy city streets — city rain, dim neon</option></select>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">On: rain falls over your page, over any layout. It stays on when you change layouts. Off (None): no rain. Only one rain at a time — picking one turns the other off.</p>' +
-    '<p style="margin:12px 0 0"><button type="button" class="btn ghost" onclick="DWC.layoutStoreSoon()">🛍️ Open the full Layout Store →</button> <span style="color:var(--muted);font-size:13px">Same layouts, bigger view, on Taffy’s phone.</span></p>' + mixerHTML(p, th) + '</div></details>' +
-    editorDividerHTML() +
-    (isNew ? "" :
-    '<details class="dwc-edit-group"><summary>🏅 Badges — ' + ((p && p.badges) || []).length + ' unlocked</summary>' +
-    '<h4 id="dwc-sec-badges" style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
-    "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
-    badgeDisplayListHTML(p ? p.badges : []) +
-    badgeSlotPickerHTML(p) + '</details>') +
-    editorDividerHTML() +
-    (isNew ? "" : '<details class="dwc-edit-group"><summary>🌐 Page style — ' + (p && p.website_mode ? "Website look" : "MySpace look") + '</summary><h3 class="dwc-edit-group-h" id="dwc-sec-style">🌐 Page style — MySpace or professional (website look)</h3>' + websiteFieldsHTML(p) + '</details>') +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>↔️ Spacing — ' + ((th.pad_page || th.pad_cards || th.pad_header) ? "custom" : "Normal") + '</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="spacing">↔️ Spacing — ' + ((th.pad_page || th.pad_cards || th.pad_header) ? "custom" : "Normal") + '</summary>' +
     '<h4 style="margin:0 0 6px">↔️ Spacing — how much breathing room your page has</h4>' +
     '<div class="dwc-rowform">' +
     '<label style="flex:1">Page<select name="theme_pad_page">' + [["", "Normal (current)"], ["none", "None"], ["tight", "Tight"], ["roomy", "Roomy"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.pad_page || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
@@ -4030,32 +4003,60 @@ function profileFormHTML(p) {
     '<label style="flex:1">Header<select name="theme_pad_header">' + [["", "Normal (current)"], ["none", "None"], ["tight", "Tight"], ["roomy", "Roomy"]].map(function (o) { return '<option value="' + o[0] + '"' + ((th.pad_header || "") === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label>" +
     '</div>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">None 0 · Tight 8 px · Normal 18 px · Roomy 28 px (24 px on the header). On phones the big values shrink so nothing breaks.</p></details>' +
-    editorDividerHTML() +
-    '<details class="dwc-edit-group"><summary>💻 Your body code — ' + (v("layout_css") ? "has code" : "empty") + '</summary>' +
-    '<h4 id="dwc-sec-bodycode" style="margin:0 0 6px">💻 Your body code</h4>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">This box is YOUR code — it styles your whole page (colours, borders, spacing, everything). Paste a MySpace layout’s CSS here, or write your own. Rules only ever restyle YOUR page. Your pickers still win over this CSS — add !important to force it. CSS only: no scripts, no @import, no outside fonts; pictures inside url() must be https://.</p>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Pasting a whole MySpace layout? Paste the entire page here — we keep the CSS from its first &lt;style&gt; block and leave out the rest: the page HTML, scripts, click/hover actions (event handlers), iframes, forms, @import and @font-face (outside stylesheets and fonts), and position:fixed becomes absolute so it can’t cover the site. That’s a safety rule, not a missing feature — one member’s code must never run on another member’s page. Rules that don’t already say .dwc-myprofile are re-scoped to your page only, so they can’t restyle the rest of the site. Limit: 8,000 characters — the count under the box says when you’re at it, and anything past it won’t save.</p>' +
-    '<p style="margin:0 0 6px"><button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(1)">1 Header</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(2)">2 Name + Bio</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(3)">3 About</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(4)">4 Links</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(5)">5 Top Friends</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(6)">6 Buttons</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(7)">7 Comments</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(8)">8 Sound</button> <button type="button" class="btn ghost small" onclick="DWC.jumpMyCode(9)">9 Whole page</button></p>' +
-    '<textarea name="layout_css" rows="6" maxlength="8000" placeholder="e.g. .dwc-myprofile{background:#003399;} .dwc-myprofile .card{border:2px solid #fff;}" oninput="DWC.layoutCssEdited(this)" onpaste="DWC.myCodePasted(event, this)">' + (v("layout_css") || MYCODE_TEMPLATE) + "</textarea>" +
-    '<p style="margin:6px 0 0"><span id="dwc-mycode-count" style="color:var(--muted);font-size:13px"></span> <span id="dwc-mycode-note" style="color:var(--muted);font-size:13px"></span> <button type="button" class="btn ghost small" onclick="DWC.copyMyCode()">📋 Copy my code</button></p>' +
-    '<div class="dwc-layoutbox" style="margin-top:10px"><h4 style="margin:0 0 6px">📣 Share it as a layout</h4>' +
-    "<p style=\"margin:0 0 8px\">Publish the CSS in this box as a free layout in Taffy’s Layout Store, with your name on it. Other members can grab it with a code. It stays free — priced layouts are the shop’s only.</p>" +
-    '<input id="dwc-publish-name" maxlength="40" placeholder="Layout name — e.g. Midnight Bubblegum">' +
-    '<input id="dwc-publish-desc" maxlength="120" placeholder="One line about it (optional)" style="margin-top:6px">' +
-    '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.publishLayout()">📣 Publish as a layout</button> <span style="color:var(--muted);font-size:13px">Publishes this box’s CSS with the look in this form right now — even changes you haven’t saved yet. You can take it down from the store later.</span></p></div>' +
-    '<input type="hidden" name="layout_preset" value="' + v("layout_preset") + '">' +
-    "<p class=\"dwc-limits\">Limits, plain and simple: <strong>CSS only</strong> — no &lt;script&gt;, no @import, no external stylesheets or fonts. Images inside url() must be https://. position:fixed is treated as absolute so a layout can't cover the site. An old MySpace layout's CSS works as far as plain CSS goes — anything that needs scripts or outside files won't. Your layout targets the hooks <code>.dwc-myprofile</code>, <code>.card</code>, <code>h2/h3</code>, <code>a</code>, <code>.dwc-avatar</code>, <code>.btn</code>, <code>.dwc-topfriend</code>.</p>" +
-    '<label>Your button code (CSS) — changes your page’s buttons only</label>' +
-    '<textarea name="theme_button_css" rows="4" maxlength="4000" placeholder="e.g. .dwc-myprofile .btn{background:url(https://example.com/my.gif);background-size:cover;box-shadow:0 0 16px #ff2d95;}">' + esc(th.button_css || "") + "</textarea>" +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Targets the buttons on your page only. Images in url() must be https:// — a GIF URL works as a button background. CSS only, same limits as the layout box.</p>' +
-    '<details style="margin-top:10px"><summary>What your pickers made — read-only</summary>' +
-    '<p style="margin:4px 0 6px;color:var(--muted);font-size:13px">This is the CSS your colours, fonts, effects and background picks generate. To change it, use the pickers above; to override it, write in My Code with !important.</p>' +
-    '<textarea id="dwc-generated-css" rows="6" readonly></textarea></details>' +
-    '<p style="margin:10px 0 0">Bio colour: <input type="color" id="dwc-bio-color-src" value="' + (th.bio_color || "#f2f2f8") + '" style="width:44px;height:44px;padding:2px;border-radius:50%" oninput="DWC.bioColorFooter(this)"></p>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Pasted a MySpace layout? Its rules aimed at the whole page now target <code>.dwc-myprofile</code>, so they stay on your page. On phones, anything you position by hand needs <code>@media (max-width:640px)</code> — without it a positioned thing can cover the page.</p></details>' +
-    dividerHTML("double", "#9a9ab0") +
-    "</div>") +
-    // (The old single-form signup tail — full name / password / recovery
+    '<details class="dwc-edit-group dwc-edit-cat"><summary>📜 Ticker</summary>' +
+    (isNew ? "" : '<h4 id="dwc-sec-ticker" style="margin:14px 0 6px">📜 Ticker — optional scrolling text above your page</h4>' +
+    '<p style="margin:0 0 4px;color:var(--muted);font-size:13px">Type your own text (up to 200 characters) and it scrolls above your page — or pick Bitcoin and it shows the live price instead, updating every minute. Your name stays put — it never scrolls.</p>' +
+    '<label>What the ticker shows</label><select name="theme_ticker_source">' +
+    '<option value=""' + (th.ticker_source !== "btc" ? " selected" : "") + '>My own words</option>' +
+    '<option value="btc"' + (th.ticker_source === "btc" ? " selected" : "") + '>₿ Live Bitcoin price (updates every minute — needs CoinGecko to answer; if it can’t, your own words show instead)</option></select>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On (Bitcoin): visitors see the live Bitcoin price, refreshed every minute. If the price cannot load, your own words show instead. Off (My own words): visitors see the words you typed.</p>' +
+    '<label>My own words — what the ticker says</label>' +
+    '<input name="ticker_text" maxlength="200" value="' + esc(p ? (p.ticker_text || "") : "") + '" placeholder="e.g. New drops every Friday — check the Flea Market!">' +
+    '<label><input type="checkbox" name="ticker_enabled" style="width:auto"' + (p && p.ticker_enabled ? " checked" : "") + '> Show the ticker on my page</label>' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: a scrolling line shows above your page — tick this AND type your own words above, or pick Bitcoin above for the live price. Off: no ticker shows at all. Your words stay saved — tick the box again to bring them back.</p>' +
+    '<label>Ticker colour</label>' +
+    '<input name="ticker_color" type="color" value="' + esc((p && /^#[0-9a-fA-F]{6}$/.test(p.ticker_color || "")) ? p.ticker_color : "#00e5ff") + '" style="width:64px;height:36px;padding:2px">' +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: the scrolling ticker text uses this colour. Off: this colour does nothing until you tick “Show the ticker” above. (Picking a colour does not turn the ticker on.)</p>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>👁️ What shows — hide sections &amp; their order</summary>' +
+    (isNew ? "" :
+      '<div class="dwc-layoutbox" id="dwc-sec-order"><h4 style="margin:0 0 6px">↕️ Page section order — the order your page shows its sections</h4>' +
+      '<p style="margin:0 0 8px">The left-hand column of your page: About, What I sell, and the Steady Wave player. Use the arrows or the Position number to put them in the order you want — no dragging needed. A hidden section stays hidden, wherever it sits in this list.</p>' +
+      sectionOrderRowsHTML(th) + '</div>') +
+    (isNew ? "" : profileHideSectionsHTML(p, th)) +
+    '</details>' +'</div>' +'<div class="dwc-edit-below">' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🛍️ Selling</summary>' +
+    (isNew ? "" :
+    '<h3 class="dwc-edit-group-h" id="dwc-sec-selling">🛍️ Selling — your shop, your buyers, getting paid</h3>' +
+'<div class="dwc-layoutbox" id="dwc-sec-sell"><h4 style="margin:0 0 6px">🛍️ What I sell — your creator card</h4>' +
+    "<p style=\"margin:0 0 8px\">This shows on your member page as a seller card, and powers Find a Seller. Only these fields are shown — never your payout handle or real name.</p>" +
+    '<label>Shop name — your shop / brand page name (up to 60 characters)</label>' +
+    '<input name="shop_name" maxlength="60" value="' + esc(p ? (p.shop_name || "") : "") + '" placeholder="e.g. Rare Candy Reserve">' +
+    '<label>Shop tagline — one line under your shop name (up to 140 characters)</label>' +
+    '<input name="shop_tagline" maxlength="140" value="' + esc(p ? (p.shop_tagline || "") : "") + '" placeholder="e.g. Cards, customs, and curiosities — shipped with care">' +
+    '<label>Content types I sell — tick every kind you sell</label><p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: each ticked type shows on your seller card (“Sells: …”) on your page. Off: that type does not show on your card. If nothing is set on the card at all — no types, no tags, no “Open to…” line — the whole “What I sell” card hides.</p><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="seller_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.seller_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>My seller tags (comma separated, up to 8 — buyers find you by these)</label>' +
+    '<input name="seller_tags" maxlength="240" value="' + esc(p ? (p.seller_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, custom">' +
+    '<label>Open to… (one line, up to 140 characters)</label>' +
+    '<input name="seller_open_to" maxlength="140" value="' + v("seller_open_to") + '" placeholder="e.g. custom sets on request">' +
+    '<div class="dwc-rowform"><label style="flex:1">My price from ($)<input name="seller_price_min" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_min_cents) || 0) / 100) + '"></label>' +
+    '<label style="flex:1">My price to ($)<input name="seller_price_max" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.seller_price_max_cents) || 0) / 100) + '"></label></div>' +
+    '</div>' + (p && p.age_verified ? '<div class="dwc-layoutbox" id="dwc-sec-content-sales-group"><h4 style="margin:0 0 6px">🔞 Selling content</h4>' : "") + contentSalesToggleHTML(p) + contentMenuEditorHostHTML(p) + (p && p.age_verified ? "</div>" : "") +
+    '<div class="dwc-layoutbox" id="dwc-sec-buy"><h4 style="margin:0 0 6px">🔍 What I’m after — as a buyer</h4>' +
+    "<p style=\"margin:0 0 8px\">Powers Find a Buyer. Same deal — only these fields are shown.</p>" +
+    '<label>Content types I want — tick every kind you are after</label><p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: buyers can find you when they search for that type. Off: you do not show up for that type. These do not show on your page — they only help people find you.</p><div class="dwc-checkgrid">' + CREATOR_GENRES.map(function (g) {
+      return '<label><input type="checkbox" name="buyer_types" value="' + esc(g) + '" style="width:auto"' + ((p && p.buyer_types || []).includes(g) ? " checked" : "") + "> " + esc(g) + "</label>";
+    }).join("") + "</div>" +
+    '<label>Tags I’m after (comma separated, up to 8)</label>' +
+    '<input name="buyer_tags" maxlength="240" value="' + esc(p ? (p.buyer_tags || []).join(", ") : "") + '" placeholder="e.g. cosplay, amateur">' +
+    '<label>My budget — up to ($)</label>' +
+    '<input name="buyer_budget" type="number" step="1" min="0" max="100000" value="' + Math.round(((p && p.buyer_budget_max_cents) || 0) / 100) + '"></div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔑 Account &amp; payouts</summary>' +
+        (isNew ? "" : accountSectionHTML(p)) +
+    '<label>Birthday — month / day only shows publicly, never the year' + (isNew ? " (required — one account per person)" : "") + "</label>" +
+    '<input name="birthday" type="date" value="' + (p && p.birthday ? esc(p.birthday) : "") + '"' + (isNew ? " required" : "") + ">" + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🔗 Page URL</summary>' +
+    (isNew ? "" : pageSlugSectionHTML(p)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="overlay">🖼️ Make it one picture — ' + ((th.overlay_items && th.overlay_items.length) ? th.overlay_items.length + (th.overlay_items.length === 1 ? " item placed" : " items placed") : "no overlays yet") + '</summary>' +
+    overlayEditorHTML(th) +
+    '</details>' +
+    '</div>' +    // (The old single-form signup tail — full name / password / recovery
     // email / human check / terms at the bottom — lived here. It is
     // deleted: signup is the 3-step flow above now.)
     '<p class="dwc-form-err" data-err hidden></p>' +
@@ -4321,9 +4322,8 @@ function syncLinkRows() {
 function initLayoutEditor() {
   // First render of the Live preview: build it from the form values
   // (vibe, accent, website look, everything), not just the saved CSS.
-  var count = document.getElementById("dwc-mycode-count");
-  var ta0 = document.querySelector('textarea[name="layout_css"]');
-  if (count && ta0 && typeof DWC !== "undefined" && DWC.myCodeCount) DWC.myCodeCount(ta0);
+  var ta0 = document.querySelector('textarea[name="about_me"]');
+  if (ta0) { var _s0 = aboutMeSync(ta0); if (_s0 && _s0.css) applyPreviewCSS(_s0.css); }
   if (typeof DWC !== "undefined" && DWC.refreshLayoutPreview) DWC.refreshLayoutPreview();
   // Member-published layouts in the scroll picker: load them lazily
   // the first time the editor opens (the store loads them the same
@@ -4343,8 +4343,8 @@ function initLayoutEditor() {
   var cta = document.querySelector('textarea[name="custom_page_html"]');
   if (cta && typeof DWC !== "undefined" && DWC.customPagePreview) DWC.customPagePreview(cta);
   else {
-    var ta = document.querySelector('textarea[name="layout_css"]');
-    if (ta) applyPreviewCSS(ta.value);
+    var ta = document.querySelector('textarea[name="about_me"]');
+    if (ta) { var _s1 = aboutMeSync(ta); if (_s1 && _s1.css) applyPreviewCSS(_s1.css); }
   }
 }
 
@@ -4922,6 +4922,33 @@ function parseThemeClient(stored) {
   out.divider_unlocks = du.map(function (k) { return String(k || ""); }).filter(function (k) { return DIVIDERS[k]; });
   // Custom page (v3.20) — sanitized HTML, renders only in website mode.
   out.custom_page_html = sanitizeCustomPageHtml(obj.custom_page_html);
+  // Page format (2026-11-23) — one of the five kinds, "" = never picked.
+  out.page_format = PAGE_FORMAT_IDS.indexOf(String(obj.page_format || "")) >= 0 ? String(obj.page_format) : "";
+  // Website-format header (2026-11-23) — border, corners, crop, and
+  // whether the profile picture shows at all. All ride in the theme
+  // JSON, so no migration.
+  var hbw = String(obj.header_border_width || "");
+  out.header_border_width = ["2", "6"].indexOf(hbw) >= 0 ? hbw : "";
+  var hrad = String(obj.header_radius || "");
+  out.header_radius = ["8", "24"].indexOf(hrad) >= 0 ? hrad : "";
+  out.header_border_color = hex(obj.header_border_color);
+  out.header_crop = ["top", "bottom"].indexOf(String(obj.header_crop || "")) >= 0 ? String(obj.header_crop) : "";
+  out.hide_avatar = obj.hide_avatar === true;
+  out.header_links_pos = ["below", "bottom"].indexOf(String(obj.header_links_pos || "")) >= 0 ? String(obj.header_links_pos) : "";
+  // Links-block placement (2026-11-23) — see server _lib.js. No image
+  // color-detection anywhere; the member nudges links_top by eye.
+  out.links_side = ["left", "right"].indexOf(String(obj.links_side || "")) >= 0 ? String(obj.links_side) : "";
+  out.links_stack = (String(obj.links_stack || "") === "column") ? "column" : "";
+  var lt2 = parseInt(String(obj.links_top || ""), 10);
+  out.links_top = (!isNaN(lt2) && lt2 >= 0 && lt2 <= 120) ? String(lt2) : "";
+  out.header_side = ["left", "right"].indexOf(String(obj.header_side || "")) >= 0 ? String(obj.header_side) : "";
+  var bo2 = Array.isArray(obj.buttons_order) ? obj.buttons_order : [];
+  out.buttons_order = bo2.map(function (k) { return String(k || ""); }).filter(function (k, i, a) { return ["add", "message", "favorite", "group"].indexOf(k) >= 0 && a.indexOf(k) === i; }).slice(0, 4);
+  var REVEAL_SECTIONS = ["products", "about", "seller", "radio", "top8", "posts"];
+  var rv2 = Array.isArray(obj.reveal_sections) ? obj.reveal_sections : [];
+  out.reveal_sections = rv2.filter(function (r) { return r && typeof r === "object"; }).map(function (r) {
+    return { id: String(r.id || "").slice(0, 24), label: String(r.label || "").slice(0, 40), section: String(r.section || "") };
+  }).filter(function (r) { return r.id && r.label && REVEAL_SECTIONS.indexOf(r.section) >= 0; }).slice(0, 4);
   out.button_style = (typeof BUTTON_STYLES !== "undefined" && BUTTON_STYLES[obj.button_style]) ? obj.button_style : "";
   // Vibe (Taffy Layout Builder) — a full look, stored as one theme key.
   out.vibe = (typeof LAYOUT_VIBES !== "undefined" && LAYOUT_VIBES[obj.vibe]) ? String(obj.vibe) : "";
@@ -5048,7 +5075,7 @@ function parseThemeClient(stored) {
   out.header_fit = ["cover", "stretch", "contain"].indexOf(String(obj.header_fit || "")) >= 0 ? String(obj.header_fit) : "cover";
   out.header_ratio = ["16:9", "21:9", "4:3", "auto"].indexOf(String(obj.header_ratio || "")) >= 0 ? String(obj.header_ratio) : "auto";
   out.header_use_default = obj.header_use_default === false ? false : true;
-  out.page_image_fit = ["cover", "stretch", "contain"].indexOf(String(obj.page_image_fit || "")) >= 0 ? String(obj.page_image_fit) : "";
+  out.page_image_fit = ["cover", "stretch", "contain", "tile"].indexOf(String(obj.page_image_fit || "")) >= 0 ? String(obj.page_image_fit) : "";
   return out;
 }
 // Section keys a member can hide on their page (v3.10).
@@ -5235,7 +5262,37 @@ function readTwoBoxThemeFromForm(get, hexOk) {
   out.header_ratio = ["16:9", "21:9", "4:3", "auto"].indexOf(hr) >= 0 ? hr : "auto";
   out.header_use_default = get("theme_header_use_default") === "off" ? false : true;
   var pif = String(get("theme_page_image_fit") || "");
-  out.page_image_fit = ["cover", "stretch", "contain"].indexOf(pif) >= 0 ? pif : "";
+  out.page_image_fit = ["cover", "stretch", "contain", "tile"].indexOf(pif) >= 0 ? pif : "";
+  var pf = String(get("theme_page_format") || "");
+  out.page_format = PAGE_FORMAT_IDS.indexOf(pf) >= 0 ? pf : "";
+  var hbw2 = String(get("theme_header_border_width") || "");
+  out.header_border_width = ["2", "6"].indexOf(hbw2) >= 0 ? hbw2 : "";
+  var hrad2 = String(get("theme_header_radius") || "");
+  out.header_radius = ["8", "24"].indexOf(hrad2) >= 0 ? hrad2 : "";
+  out.header_border_color = hexOk(get("theme_header_border_color"));
+  out.header_crop = ["top", "bottom"].indexOf(String(get("theme_header_crop") || "")) >= 0 ? String(get("theme_header_crop")) : "";
+  out.hide_avatar = !!get("theme_hide_avatar");
+  out.header_links_pos = ["below", "bottom"].indexOf(String(get("theme_header_links_pos") || "")) >= 0 ? String(get("theme_header_links_pos")) : "";
+  out.links_side = ["left", "right"].indexOf(String(get("theme_links_side") || "")) >= 0 ? String(get("theme_links_side")) : "";
+  out.links_stack = (String(get("theme_links_stack") || "") === "column") ? "column" : "";
+  var lt3 = parseInt(String(get("theme_links_top") || ""), 10);
+  out.links_top = (!isNaN(lt3) && lt3 >= 0 && lt3 <= 120) ? String(lt3) : "";
+  out.header_side = ["left", "right"].indexOf(String(get("theme_header_side") || "")) >= 0 ? String(get("theme_header_side")) : "";
+  // buttons_order + reveal_sections ride as JSON in hidden inputs
+  // (written by the editor controls / the Layout Bot). A bad value
+  // falls back to empty, never to a made-up order.
+  out.buttons_order = [];
+  try {
+    var bo3 = JSON.parse(String(get("theme_buttons_order") || "[]"));
+    if (Array.isArray(bo3)) out.buttons_order = bo3.map(function (k) { return String(k || ""); }).filter(function (k, i, a) { return ["add", "message", "favorite", "group"].indexOf(k) >= 0 && a.indexOf(k) === i; }).slice(0, 4);
+  } catch (e) { out.buttons_order = []; }
+  out.reveal_sections = [];
+  try {
+    var rv3 = JSON.parse(String(get("theme_reveal_sections") || "[]"));
+    if (Array.isArray(rv3)) out.reveal_sections = rv3.filter(function (r) { return r && typeof r === "object"; }).map(function (r) {
+      return { id: String(r.id || "").slice(0, 24), label: String(r.label || "").slice(0, 40), section: String(r.section || "") };
+    }).filter(function (r) { return r.id && r.label && ["products", "about", "seller", "radio", "top8", "posts"].indexOf(r.section) >= 0; }).slice(0, 4);
+  } catch (e) { out.reveal_sections = []; }
   return out;
 }
 function themeCSS(theme, pageFill) {
@@ -5260,7 +5317,7 @@ function themeCSS(theme, pageFill) {
       ".dwc-myprofile .dwc-topfriend{border-color:" + acc + ";}";
   }
   if (t.bg_color) css += ".dwc-myprofile{background-color:" + t.bg_color + ";}";
-  if (t.bg_image_url) { var bgFit = t.page_image_fit === "stretch" ? "100% 100%" : (t.page_image_fit === "contain" ? "contain" : "cover"); css += '.dwc-myprofile{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:' + bgFit + ';background-position:center;background-repeat:no-repeat;}'; }
+  if (t.bg_image_url) { var bgFit = t.page_image_fit === "stretch" ? "100% 100%" : (t.page_image_fit === "contain" ? "contain" : (t.page_image_fit === "tile" ? "auto" : "cover")); var bgRep = t.page_image_fit === "tile" ? "repeat" : "no-repeat"; css += '.dwc-myprofile{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:' + bgFit + ';background-position:center;background-repeat:' + bgRep + ';}'; }
   // Moving GIF background — NOT a container background any more
   // (2026-11-22): painting it on .dwc-myprofile at "center top" put
   // it exactly where the banner goes, behind the ticker, so it read
@@ -5291,7 +5348,7 @@ function themeCSS(theme, pageFill) {
     if (t.bg_preset) PRESET_BACKGROUNDS.forEach(function (p) { if (p.id === t.bg_preset) fillPreset = p; });
     var fillVibe = (t.vibe && LAYOUT_VIBES[t.vibe]) ? LAYOUT_VIBES[t.vibe] : null;
     if (fillPreset && fillPreset.css) css += fillPreset.css.replace(/\.dwc-myprofile/g, "body.dwc-profile-bg");
-    else if (t.bg_image_url) css += 'body.dwc-profile-bg{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:cover;background-position:center;background-repeat:no-repeat;}';
+    else if (t.bg_image_url) css += 'body.dwc-profile-bg{background-image:url("' + t.bg_image_url.replace(/"/g, "") + '");background-size:' + (t.page_image_fit === "tile" ? "auto" : "cover") + ';background-position:center;background-repeat:' + (t.page_image_fit === "tile" ? "repeat" : "no-repeat") + ';}';
     else if (fillVibe) css += "body.dwc-profile-bg{background:linear-gradient(160deg," + fillVibe.bg + " 0%," + fillVibe.bg2 + " 100%);}";
     else if (t.bg_color) css += "body.dwc-profile-bg{background-color:" + t.bg_color + ";}";
   }
@@ -5354,6 +5411,17 @@ function themeCSS(theme, pageFill) {
   }
   if (t.header_ratio && t.header_ratio !== "auto") {
     css += ".dwc-myprofile .dwc-banner{aspect-ratio:" + t.header_ratio.replace(":", " / ") + ";}";
+  }
+  // Header crop (2026-11-23) — which part of a cropped banner shows.
+  if (t.header_crop === "top" || t.header_crop === "bottom") {
+    css += ".dwc-myprofile .dwc-banner img{object-position:center " + t.header_crop + ";}";
+  }
+  // Header border (2026-11-23) — a border around the banner, with
+  // rounded corners. Width "" = no border at all.
+  if (t.header_border_width) {
+    var hbCol = t.header_border_color || "#ffffff";
+    var hbRad = t.header_radius ? t.header_radius + "px" : "0";
+    css += ".dwc-myprofile .dwc-banner{border:" + t.header_border_width + "px solid " + hbCol + ";border-radius:" + hbRad + ";overflow:hidden;}";
   }
   // Buttons: preset first, then the member's own button CSS on top.
   if (t.button_style && BUTTON_STYLES[t.button_style]) css += BUTTON_STYLES[t.button_style].css;
@@ -5568,6 +5636,12 @@ function sanitizeLayoutCssClient(css) {
   out = out.replace(/@import[^;{}]*;?/gi, "");
   out = out.replace(/@font-face[\s\S]*?}/gi, "");
   out = out.replace(/@charset[^;{}]*;?/gi, "");
+  // Drop whole declarations that carry code-execution payloads, instead
+  // of neutering the token and leaving the payload text behind
+  // (url(javascript:alert(1)) used to survive as url(alert(1))).
+  out = out.replace(/[a-z-]+\s*:[^;{}]*(?:javascript|vbscript)\s*:[^;{}]*;?/gi, "");
+  out = out.replace(/[a-z-]+\s*:[^;{}]*expression\s*\([^;{}]*;?/gi, "");
+  out = out.replace(/(?:^|[;{])\s*behavior\s*:[^;{}]*;?/gi, "$1");
   out = out.replace(/javascript\s*:/gi, "");
   out = out.replace(/vbscript\s*:/gi, "");
   out = out.replace(/expression\s*\(/gi, "nope(");
@@ -5654,6 +5728,693 @@ function scopeProfileCss(css) {
     i = j + 1;
   }
   return out;
+}
+
+// ---------- MySpace layout translation (2026-11-23) ----------
+// ONE engine, two doors: the About Me box's paste handler and the
+// Layout Converter both call convertMySpaceLayout(), so the converted
+// code they show is byte-identical for the same input. MySpace's
+// one-box simplicity + our hooks + our safety rules + plain-words
+// readouts — that is the spin. The sanitizer (sanitizeLayoutCssClient)
+// is still the security boundary; this only translates the old
+// MySpace hooks into ours before it runs.
+function translateMySpaceSelector(sel) {
+  var out = String(sel || ""), n = 0;
+  out = out.replace(/table\s+table\s+table/gi, function () { n++; return ".card"; });
+  out = out.replace(/\.contactTable\b/g, function () { n++; return "#dwc-action-buttons"; });
+  out = out.replace(/\.nametext\b/g, function () { n++; return ".dwc-cover-name h2"; });
+  // body / html -> the whole page. The leading-character guard keeps
+  // .body-text (a class) and somebody (a word) untouched.
+  out = out.replace(/(^|[\s>+~,(])(html|body)(?![\w-])/gi, function (m, pre) { n++; return pre + ".dwc-myprofile"; });
+  return { sel: out, count: n };
+}
+function normalizeBareHex(body) {
+  var n = 0;
+  var out = String(body || "");
+  out = out.replace(/(color|background-color|border-color|outline-color)\s*:\s*([0-9a-fA-F]{6})(?=\s*[;!}]|$)/g, function (m, p1, p2) { n++; return p1 + ": #" + p2; });
+  out = out.replace(/(background)\s*:\s*([0-9a-fA-F]{6})(?=\s*[;!}]|$)/g, function (m, p1, p2) { n++; return p1 + ": #" + p2; });
+  out = out.replace(/(border|outline)\s*:\s*([^;{}]*?)\b([0-9a-fA-F]{6})(?=\s*[;!}]|$)/g, function (m, p1, p2, p3) {
+    if (p2.slice(-1) === "#") return m; // already #rrggbb — leave it
+    n++; return p1 + ": " + p2 + "#" + p3;
+  });
+  return { body: out, count: n };
+}
+// Old MySpace selectors that have no match on our page. They are kept
+// (dead CSS hurts nothing) but reported, so the member knows they do
+// nothing here instead of wondering why their layout "did nothing".
+var MYSPACE_UNMATCHED_TOKENS = ["table", ".contactTable", ".nametext", ".whitetext12", ".blacktext10", ".btext", ".itext", ".extendedNetwork", ".friendSpace", "#header", ".interestsAndDetails"];
+function translateMySpaceCss(css) {
+  var src = String(css || "").replace(/\/\*[\s\S]*?\*\//g, "");
+  var counts = { body: 0, table: 0, contact: 0, name: 0, hex: 0, fixed: 0 };
+  var out = "";
+  var i = 0, n = src.length;
+  var walk = function (s) {
+    var res = "", j = 0, m = s.length;
+    while (j < m) {
+      while (j < m && /\s/.test(s[j])) j++;
+      if (j >= m) break;
+      var start = j;
+      while (j < m && s[j] !== "{" && s[j] !== ";") j++;
+      var head = s.slice(start, j).trim();
+      if (j < m && s[j] === ";") { res += head + ";"; j++; continue; }
+      if (j >= m) { if (head) res += head; break; }
+      var depth = 0, k = j;
+      while (k < m) {
+        if (s[k] === "{") depth++;
+        else if (s[k] === "}") { depth--; if (depth === 0) break; }
+        k++;
+      }
+      var body = s.slice(j + 1, k);
+      var close = (k < m) ? "}" : "";
+      if (/^@keyframes\b/i.test(head) || /^@font-face\b/i.test(head)) {
+        res += head + "{" + body + close;
+      } else if (/^@media\b/i.test(head) || /^@supports\b/i.test(head)) {
+        res += head + "{" + walk(body) + close;
+      } else if (head) {
+        var sels = head.split(",").map(function (x) { return x.trim(); }).filter(Boolean).map(function (x) {
+          var t = translateMySpaceSelector(x);
+          if (t.count) {
+            if (/table\s+table\s+table/i.test(x)) counts.table++;
+            if (/\.contactTable\b/.test(x)) counts.contact++;
+            if (/\.nametext\b/.test(x)) counts.name++;
+            if (/(^|[\s>+~,(])(html|body)(?![\w-])/i.test(x)) counts.body++;
+          }
+          return t.sel;
+        });
+        var nb = normalizeBareHex(body);
+        counts.hex += nb.count;
+        var nbBody = nb.body;
+        var fixed = (nbBody.match(/position\s*:\s*fixed/gi) || []).length;
+        if (fixed) { counts.fixed += fixed; nbBody = nbBody.replace(/position\s*:\s*fixed/gi, "position:absolute"); }
+        res += sels.join(", ") + "{" + nbBody + close;
+      }
+      j = k + 1;
+    }
+    return res;
+  };
+  var translated = walk(src);
+  var notes = [];
+  if (counts.body) notes.push("the old body rules now style the whole page (" + counts.body + " rule" + (counts.body === 1 ? "" : "s") + ")");
+  if (counts.table) notes.push("table table table now styles the boxes (" + counts.table + " rule" + (counts.table === 1 ? "" : "s") + ")");
+  if (counts.contact) notes.push("the old contact box (.contactTable) now styles the buttons (" + counts.contact + " rule" + (counts.contact === 1 ? "" : "s") + ")");
+  if (counts.name) notes.push("the old name (.nametext) now styles your display name (" + counts.name + " rule" + (counts.name === 1 ? "" : "s") + ")");
+  if (counts.hex) notes.push("bare colours got their # back (" + counts.hex + " fixed)");
+  if (counts.fixed) notes.push("position:fixed now sits still inside your page (position:absolute, " + counts.fixed + " rule" + (counts.fixed === 1 ? "" : "s") + ")");
+  var unmatched = [];
+  MYSPACE_UNMATCHED_TOKENS.forEach(function (tok) {
+    var re = tok.charAt(0) === "." || tok.charAt(0) === "#" ? new RegExp(tok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b") : new RegExp("\\b" + tok + "\\b");
+    if (re.test(translated) && unmatched.indexOf(tok) < 0) unmatched.push(tok);
+  });
+  return { css: translated, notes: notes, unmatched: unmatched.slice(0, 6) };
+}
+// What the safety rules left out of a paste, in plain words — only the
+// bits that were actually in the paste.
+function layoutDroppedNotes(raw) {
+  var out = [];
+  if (/<script[\s>]/i.test(raw) || /<\/script\s*>/i.test(raw)) out.push("Script tags were left out — code can't run scripts on a profile page.");
+  if (/<iframe[\s>]/i.test(raw) || /<object[\s>]/i.test(raw) || /<embed[\s>]/i.test(raw)) out.push("Frames and embeds were left out — they can't sit inside a profile style.");
+  if (/@import\b/i.test(raw)) out.push("@import was left out — outside stylesheets can't be pulled in.");
+  if (/@font-face\b/i.test(raw)) out.push("@font-face was left out — only the site's own fonts can be used.");
+  if (/\son\w+\s*=/i.test(raw)) out.push("Click/hover handlers (on…) were left out — they can run code, so they're not allowed in a style.");
+  if (/javascript\s*:/i.test(raw)) out.push("javascript: links were left out.");
+  if (/expression\s*\(/i.test(raw)) out.push("expression() was left out — it can run code.");
+  if (/url\(\s*["']?http:\/\//i.test(raw)) out.push("Pictures from http:// (not https://) were emptied — pictures must come over a safe connection.");
+  if (/<form[\s>]/i.test(raw) || /<input[\s>]/i.test(raw)) out.push("Forms and inputs were left out — only the style carries over.");
+  if (/<style\b/i.test(raw) && /<(div|table|body|html|head)\b/i.test(raw)) out.push("The rest of the page (the HTML around the style) was left out — only the style carries over.");
+  return out;
+}
+// The one converter. The About Me paste handler and the Layout
+// Converter both call this, so they can never disagree: same input,
+// byte-identical output.
+function convertMySpaceLayout(input) {
+  var raw = String(input || "");
+  if (!raw.trim()) return { ok: false, css: "", reason: "empty", translated: [], dropped: [], unmatched: [], note: "Paste a MySpace layout first — the whole page or just the CSS." };
+  var css = extractStyleBlockCss(raw);
+  if (css === null) {
+    if (raw.indexOf("{") >= 0) css = raw; // plain CSS, no <style> wrapper
+    else return { ok: false, css: "", reason: "no-style", translated: [], dropped: [], unmatched: [], note: "That layout has no style block I can use — paste just the CSS, the part between <style> and </style>, or pick a layout from Taffy's store." };
+  }
+  var t = translateMySpaceCss(css);
+  var dropped = layoutDroppedNotes(raw);
+  // The sanitizer slices to 8,000 FIRST, so measure the cut BEFORE it
+  // runs — otherwise the cut is silent and the member is never warned.
+  var cut = t.css.length > 8000;
+  var clean = sanitizeLayoutCssClient(t.css);
+  if (clean.length > 8000) { clean = clean.slice(0, 8000); cut = true; }
+  if (!clean.trim()) return { ok: false, css: "", reason: "no-css", translated: t.notes, dropped: dropped, unmatched: t.unmatched, note: "That layout has no usable CSS left after the safety rules — paste just the CSS, or pick a layout from Taffy's store." };
+  if (cut) dropped.push("It was over 8,000 characters, so the end was cut off — your code can be 8,000 characters at most.");
+  return { ok: true, css: clean, translated: t.notes, dropped: dropped, unmatched: t.unmatched, note: "" };
+}
+// The plain-words "what changed / what was dropped and why" readout,
+// shared by the paste handler and the converter.
+function mySpaceChangesHTML(res) {
+  var bits = [];
+  if (res.translated && res.translated.length) bits.push("<p style=\"margin:0 0 4px\"><strong>Changed to fit this site:</strong> " + esc(res.translated.join("; ")) + ".</p>");
+  if (res.unmatched && res.unmatched.length) bits.push("<p style=\"margin:0 0 4px\"><strong>Left as-is, but they do nothing here:</strong> " + esc(res.unmatched.join(", ")) + " — those old MySpace bits have no match on our page.</p>");
+  if (res.dropped && res.dropped.length) bits.push("<p style=\"margin:0 0 4px\"><strong>Left out:</strong> " + esc(res.dropped.join(" ")) + "</p>");
+  if (!bits.length) bits.push("<p style=\"margin:0\">Nothing needed changing — it already fits this site.</p>");
+  return bits.join("");
+}
+
+// ---------- Merged About Me box (2026-11-23) ----------
+// MySpace's formula: ONE box holds the code at the top (inside a
+// <style> block) and the bio words underneath. Storage is unchanged —
+// the <style> content is layout_css (8,000-char cap on the code part),
+// the rest is bio (500-char cap on the text part). The box shows both;
+// the hidden bio / layout_css inputs carry them to save.
+function aboutMeSplit(text) {
+  var src = String(text || "");
+  var cssParts = [];
+  var bio = src.replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, function (_m, inner) { cssParts.push(inner); return ""; });
+  return { css: cssParts.join("\n").trim(), bio: bio.replace(/^\s+|\s+$/g, "") };
+}
+function aboutMeValue(p) {
+  var css = (p && p.layout_css) || "";
+  var bio = (p && p.bio) || "";
+  // Code at the top, bio underneath. No CSS yet: an empty <style> slot
+  // so the member sees where code goes (the full template only shows
+  // on a totally fresh box, with no bio either).
+  var head;
+  if (css) head = "<style>\n" + css + "\n</style>";
+  else if (bio) head = "<style>\n</style>";
+  else head = "<style>\n" + MYCODE_TEMPLATE + "\n</style>";
+  return bio ? head + "\n\n" + bio : head;
+}
+function aboutMeCss() {
+  var ta = document.querySelector('textarea[name="about_me"]');
+  if (!ta) return "";
+  return aboutMeSplit(ta.value).css;
+}
+function aboutMeSync(ta) {
+  if (!ta) ta = document.querySelector('textarea[name="about_me"]');
+  if (!ta) return { css: "", bio: "" };
+  var split = aboutMeSplit(ta.value);
+  var form = ta.form || document.querySelector("#dwc-profile-form");
+  if (form) {
+    var bioEl = form.querySelector('[name="bio"]');
+    var cssEl = form.querySelector('[name="layout_css"]');
+    if (bioEl) bioEl.value = split.bio;
+    if (cssEl) cssEl.value = split.css;
+  }
+  var cc = document.getElementById("dwc-aboutme-csscount");
+  if (cc) cc.textContent = split.css.length.toLocaleString("en-US") + " / 8,000 characters of code";
+  var bc = document.getElementById("dwc-aboutme-biocount");
+  if (bc) bc.textContent = split.bio.length.toLocaleString("en-US") + " / 500 characters of bio";
+  return split;
+}
+// Replace the <style> block in the merged box (keeps the bio words).
+function aboutMeSetCss(css) {
+  var ta = document.querySelector('textarea[name="about_me"]');
+  if (!ta) return false;
+  var split = aboutMeSplit(ta.value);
+  var block = "<style>\n" + String(css || "") + "\n</style>";
+  ta.value = split.bio ? block + "\n\n" + split.bio : block;
+  var out = aboutMeSync(ta);
+  applyPreviewCSS(out.css);
+  return true;
+}
+// Append CSS inside the <style> block (Taffy's "add to My Code" path).
+function aboutMeAppendCss(css) {
+  var ta = document.querySelector('textarea[name="about_me"]');
+  if (!ta) return false;
+  var split = aboutMeSplit(ta.value);
+  var merged = (split.css ? split.css.replace(/\s+$/, "") + "\n" : "") + String(css || "");
+  return aboutMeSetCss(merged);
+}
+
+// ---------- Page formats (2026-11-23) ----------
+// One click picks what kind of page this is. A format is a preset in
+// the profile theme JSON (page_format) — no D1 column. "" = never
+// picked: the member keeps their current look (Social for MySpace
+// look, Website for Website look). Switching formats never deletes
+// or loses saved settings; it only changes which sections show, their
+// order, and the arrangement.
+var PAGE_FORMATS = [
+  { id: "social", name: "Social", icon: "👥", desc: "Heart Rise — a social profile: about, feed, friends, photos. The modernized default. Built for you to grow, to thrive — so you can finally be set free and make a future for yourself, no matter your circumstances." },
+  { id: "seller", name: "Seller", icon: "🛒", desc: "Your page as a shop — what you sell and your ratings first, like an eBay profile." },
+  { id: "website", name: "Website", icon: "🌐", desc: "Your page as a personal website — your own content first, links, about." },
+  { id: "blog", name: "Blog", icon: "📝", desc: "Your page as a blog — your posts first, in order, about and links after." },
+  { id: "musician", name: "Musician", icon: "🎵", desc: "Your page as a musician profile — your music first, about and links after." }
+];
+var PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician"];
+function pageFormatFor(th, p) {
+  var f = th && th.page_format;
+  if (PAGE_FORMAT_IDS.indexOf(f) >= 0) return f;
+  return (p && p.website_mode) ? "website" : "social";
+}
+// The info-column order on the live page, per format. The member's
+// own section order (if they ever changed it from the default) still
+// wins — the format only sets the starting order.
+var FORMAT_INFO_ORDER = {
+  social: ["about", "seller", "radio"],
+  seller: ["seller", "about", "radio"],
+  website: ["about", "seller", "radio"],
+  blog: ["about", "seller", "radio"],
+  musician: ["radio", "about", "seller"]
+};
+// Which editor category opens by default for each format (the About
+// Me box is always open at the top; this is the second open one).
+var FORMAT_KEY_SECTION = { social: "", seller: "selling", website: "style", blog: "", musician: "music" };
+
+// ---------- Background library (2026-11-23) ----------
+// The 18 generated backgrounds (14 new + 4 existing), wired in as the
+// starting library — all FREE (Chris hasn't priced any). Files live in
+// images/; the binaries go live with the next image push (PR route).
+// "tile" files are seamless patterns (repeat); "cover" files are
+// full-bleed scenes (no-repeat). Suggested names come from the
+// manifest (hidden_files/new-backgrounds-manifest-2026-11-22.md).
+var BG_LIBRARY = [
+  { file: "bg-baroque-gold-1.jpg", name: "Baroque Gold Damask", fit: "tile" },
+  { file: "bg-baroque-gold-2.jpg", name: "Crimson Baroque Hall", fit: "cover" },
+  { file: "bg-goth-roses-1.jpg", name: "Black Rose Filigree", fit: "tile" },
+  { file: "bg-goth-roses-2.jpg", name: "Gothic Cathedral Night", fit: "cover" },
+  { file: "bg-neojapan-neon-1.jpg", name: "Neon Torii Street", fit: "cover" },
+  { file: "bg-neojapan-neon-2.jpg", name: "Neo Koi Nights", fit: "tile" },
+  { file: "bg-sakura-petals-1.jpg", name: "Sakura Dusk", fit: "cover" },
+  { file: "bg-sakura-petals-2.jpg", name: "Sakura Night Bloom", fit: "tile" },
+  { file: "bg-forest-mist-1.jpg", name: "Misty Forest Dawn", fit: "cover" },
+  { file: "bg-forest-mist-2.jpg", name: "Forest Floor", fit: "tile" },
+  { file: "bg-gaming-neon-1.jpg", name: "Neon Arcade Room", fit: "cover" },
+  { file: "bg-gaming-neon-2.jpg", name: "Pixel Party", fit: "tile" },
+  { file: "bg-retro-arcade-1.jpg", name: "Chrome Sun Grid", fit: "cover" },
+  { file: "bg-retro-arcade-2.jpg", name: "Retro Cassette Grid", fit: "tile" },
+  { file: "bg-shop-tile-v1.jpg", name: "Gilded Woods Tile", fit: "tile" },
+  { file: "bg-shop-tile-v2.jpg", name: "Vaporwave Baroque Tile", fit: "tile" },
+  { file: "retro-arcade-80s-bg.jpg", name: "Retro Arcade '85 Skyline", fit: "cover" },
+  { file: "vapor-bg.jpg", name: "Vaporwave Grid", fit: "cover" }
+];
+function bgLibraryHTML(th) {
+  var origin = (typeof location !== "undefined" && location.origin) ? location.origin : "https://rarecandyreserve.org";
+  var cur = (th && th.bg_image_url) || "";
+  return '<div class="dwc-bg-lib">' + BG_LIBRARY.map(function (b) {
+    var url = origin + "/images/" + b.file;
+    var picked = cur === url;
+    return '<button type="button" class="dwc-bg-lib-item' + (picked ? " picked" : "") + '" data-bg-url="' + esc(url) + '" data-bg-fit="' + b.fit + '" onclick="DWC.bgLibraryPick(this)" title="' + esc(b.name) + (b.fit === "tile" ? " — repeats like a tile" : " — one big picture") + '">' +
+      '<img src="' + esc(url) + '" alt="' + esc(b.name) + '" loading="lazy">' +
+      '<span>' + esc(b.name) + (picked ? " ✓" : "") + '</span></button>';
+  }).join("") + "</div>" +
+  '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">All 18 are free. They go live with the next picture upload — if one shows blank here, it isn\'t uploaded yet. Tap one and it becomes your background (picture wins over preset and colour).</p>';
+}
+// Header layout — where the picture and the name sit at the top, like
+// MySpace's main overlay. Reuses the settings that already exist:
+// pic_position ("" = picture on the left, "top" = centered on top)
+// and cover_name ("" = name under the picture, "right" = beside it).
+function headerLayoutValue(th) {
+  if (th && th.pic_position === "top") return "center";
+  if (th && th.cover_name === "right") return "right";
+  return "left";
+}
+function headerLayoutHTML(th) {
+  var cur = headerLayoutValue(th);
+  var choices = [
+    ["left", "⬅️ Top left", "Picture top left, name under it — the classic MySpace look"],
+    ["center", "⬆️ Middle centered", "Picture centered on top, name under it"],
+    ["right", "➡️ Right", "Picture on the left, name beside it on the right"]
+  ];
+  return '<div class="dwc-format-pills" role="group" aria-label="Header layout">' +
+    choices.map(function (o) {
+      return '<button type="button" class="dwc-pill' + (cur === o[0] ? " active" : "") + '" data-headerlayout="' + o[0] + '" onclick="DWC.setHeaderLayout(\'' + o[0] + '\')" title="' + esc(o[2]) + '">' + o[1] + '</button>';
+    }).join("") + "</div>" +
+    '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">Where your picture and name sit at the top of your page. Your name font, colour, and glow live in “Name &amp; display”.</p>';
+}
+
+
+// ---------- Page format picker (2026-11-23) ----------
+// One click picks what kind of page this is. The hidden input carries
+// the EXPLICIT pick ("" = never picked — the member keeps their current
+// look); the active pill shows the EFFECTIVE format (pageFormatFor).
+function pageFormatPickerHTML(p, th) {
+  var fmt = pageFormatFor(th, p);
+  var picked = (th && th.page_format) || "";
+  var cur = PAGE_FORMATS.filter(function (f) { return f.id === fmt; })[0] || PAGE_FORMATS[0];
+  return '<div class="dwc-format-picker" id="dwc-format-picker"><h4 style="margin:0 0 6px">📄 Page format — what kind of page is this?</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">One click picks the kind of page — a social page to customize, or a shop to sell your stuff. It only changes which sections show, in what order, and how they’re arranged. Nothing you saved is ever lost, and a member who never picks keeps their current page exactly as it is.</p>' +
+  '<div class="dwc-presets" role="group" aria-label="Page format">' +
+  PAGE_FORMATS.map(function (f) { return '<button type="button" class="dwc-pill dwc-format-pill' + (fmt === f.id ? " active" : "") + '" data-format="' + f.id + '" onclick="DWC.applyPageFormat(\'' + f.id + '\')">' + f.icon + " " + f.name + "</button>"; }).join("") +
+  '</div>' +
+  '<p id="dwc-format-desc" style="margin:6px 0 0;color:var(--muted);font-size:13px">' + esc(cur.desc) + '</p>' +
+  '<input type="hidden" name="theme_page_format" id="dwc-format-value" value="' + esc(picked) + '">' +
+  '</div>';
+}
+
+// ---------- Layout Converter (2026-11-23) ----------
+// The same translation engine as the About Me paste handler, as a
+// visible tool: paste a MySpace layout, get the converted code. The
+// converted code is byte-identical to what pasting the same layout
+// into the About Me box produces (one shared convertMySpaceLayout).
+function layoutConverterHTML() {
+  return '<div class="dwc-layout-converter" id="dwc-converter"><h4 style="margin:14px 0 6px">🔄 Layout Converter — bring a MySpace layout here</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Paste a MySpace layout — the whole page, or just the CSS — and we translate it to this site’s hooks, with the same safety rules as the About Me box. Same engine, same result: what you get here is byte-for-byte what pasting it into About Me would give you.</p>' +
+  '<textarea id="dwc-converter-in" rows="6" placeholder="Paste the MySpace layout here — the whole page, or just the CSS between &lt;style&gt; and &lt;/style&gt;…"></textarea>' +
+  '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="DWC.convertLayout()">Convert it →</button> <button type="button" class="btn ghost small" onclick="DWC.applyConverted()">Apply it to my page</button> <button type="button" class="btn ghost small" onclick="DWC.copyConverted()">📋 Copy the converted code</button></p>' +
+  '<p id="dwc-converter-note" style="margin:6px 0 0;color:var(--muted);font-size:13px"></p>' +
+  '<div id="dwc-converter-changes" style="margin:6px 0 0;color:var(--muted);font-size:13px"></div>' +
+  '<textarea id="dwc-converter-out" rows="8" readonly placeholder="The converted code shows here — ready to copy or apply."></textarea></div>';
+}
+
+// ---------- Layout Bot (2026-11-23) ----------
+// Client-side pattern matching ONLY, built like Taffy — never real AI,
+// never claimed to be. Coding questions and layout commands only.
+// Placement: in the editor, with the layout tips, so people see it
+// while they work on their layout.
+
+// The Layout Bot's answer engine — plain pattern matching over a
+// defined command set, each mapped to the real setting it changes.
+// The simple editor pills and the bot both drive the same settings,
+// so either path gives the same result. Returns HTML for
+// #dwc-layout-bot-out. Never claims to understand what it doesn't.
+var LAYOUT_BOT_COLORS = {
+  green: "#22c55e", pink: "#ff2d95", blue: "#2563eb", red: "#dc2626",
+  purple: "#7c3aed", black: "#111111", white: "#ffffff", gold: "#d4af37",
+  cyan: "#00e5ff", orange: "#f97316", yellow: "#eab308", teal: "#14b8a6"
+};
+var LAYOUT_BOT_BUTTON_NAMES = {
+  "add me": "add", "add": "add", "contact me": "message", "message me": "message",
+  "message": "message", "favorite": "favorite", "favourite": "favorite",
+  "add to favorites": "favorite", "add to favourites": "favorite",
+  "group up": "group", "add to group": "group", "group": "group"
+};
+function layoutBotAnswer(text) {
+  var raw = String(text || "");
+  var t = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  var done = [];
+  var missed = [];
+  var form = document.querySelector("#dwc-account form");
+  var setInput = function (name, value) {
+    if (!form) return false;
+    var el = form.querySelector('[name="' + name + '"]');
+    if (!el) return false;
+    if (el.type === "checkbox") el.checked = !!value;
+    else el.value = value;
+    return true;
+  };
+  var setColor = function (target, hex) {
+    // target: which colour setting. Ticks the matching "use my own"
+    // box so the colour actually applies.
+    if (target === "background") {
+      setInput("theme_bg_use", true);
+      setInput("theme_bg_color", hex);
+      setInput("theme_bg_preset", "");
+      var img = form && form.querySelector('input[name="theme_bg_image"]');
+      if (img) img.value = "";
+      DWC.clearBgColorPick && DWC.clearBgColorPick();
+      setInput("theme_bg_use", true);
+      return "background colour";
+    }
+    if (target === "name") {
+      setInput("theme_accent_use", true);
+      setInput("theme_accent_color", hex);
+      return "name colour";
+    }
+    if (target === "text") {
+      setInput("theme_text_use", true);
+      setInput("theme_text_color", hex);
+      return "page text colour";
+    }
+    if (target === "bio") {
+      setInput("theme_bio_color", hex);
+      return "bio colour";
+    }
+    if (target === "header") {
+      setInput("theme_header_border_color", hex);
+      setInput("theme_header_border_width", "6");
+      return "header border colour";
+    }
+    if (target === "buttons" || target === "links") {
+      var qc = document.getElementById("dwc-quick-color");
+      if (qc) qc.value = hex;
+      DWC.applyQuickColor(target);
+      return target + " colour";
+    }
+    return "";
+  };
+  var colorWord = function () {
+    for (var c in LAYOUT_BOT_COLORS) if (t.indexOf(c) >= 0) return c;
+    return "";
+  };
+  // ---- 1. The links-block sentence (the rich example) ----
+  // "make my page have the links on the left hand side, where the
+  // uploaded background starts to turn green from white, so the green
+  // part holds the links one below the other stacked on top of each
+  // other, in this order 'contact me' 'add me' 'look at my stuff'"
+  if (t.indexOf("link") >= 0 && (t.indexOf("left") >= 0 || t.indexOf("right") >= 0 || t.indexOf("stack") >= 0 || t.indexOf("order") >= 0 || /'[^']+'/.test(raw))) {
+    var side = /\bright[\s-]?hand side|\bright side|on the right\b/.test(t) ? "right" : /\bleft[\s-]?hand side|\bleft side|on the left\b/.test(t) ? "left" : "";
+    var stack = /stacked|one below (the )?other|one on top of (the )?other|vertical/.test(t) ? "column" : /side by side|in a row|horizontal/.test(t) ? "" : null;
+    var greenNote = /green/.test(t) && /background|turn/.test(t);
+    if (side) {
+      setInput("theme_links_side", side);
+      var hlp = form && form.querySelector('input[name="theme_header_links_pos"]');
+      if (hlp) hlp.value = "";
+      done.push("links block moved to the " + side + " side");
+    }
+    if (stack !== null) {
+      setInput("theme_links_stack", stack);
+      done.push(stack === "column" ? "links stacked one below the other" : "links side by side");
+    }
+    // The quoted order list, in order.
+    var quoted = [];
+    var qm;
+    var qre = /'([^']+)'|"([^"]+)"/g;
+    while ((qm = qre.exec(raw)) !== null) quoted.push((qm[1] || qm[2] || "").trim().toLowerCase());
+    if (quoted.length) {
+      var linkRows = form ? Array.prototype.slice.call(form.querySelectorAll("#dwc-links-list .dwc-linkrow")) : [];
+      var btnOrder = [];
+      var linkOrder = [];
+      quoted.forEach(function (name) {
+        if (LAYOUT_BOT_BUTTON_NAMES[name]) { btnOrder.push(LAYOUT_BOT_BUTTON_NAMES[name]); return; }
+        var hit = null;
+        linkRows.forEach(function (row) {
+          var lab = row.querySelector('input[name="link_label"]');
+          var v = lab ? String(lab.value || "").trim().toLowerCase() : "";
+          if (v && (v === name || v.indexOf(name) >= 0 || name.indexOf(v) >= 0)) hit = row;
+        });
+        if (hit) linkOrder.push(hit);
+        else missed.push("“" + name + "” — I couldn’t find a link or button with that name");
+      });
+      if (btnOrder.length) {
+        var allBtns = ["add", "message", "favorite", "group"];
+        var full = btnOrder.concat(allBtns.filter(function (k) { return btnOrder.indexOf(k) < 0; }));
+        var hidden = document.getElementById("dwc-buttons-order-value");
+        if (!hidden && form) {
+          hidden = document.createElement("input");
+          hidden.type = "hidden";
+          hidden.name = "theme_buttons_order";
+          hidden.id = "dwc-buttons-order-value";
+          form.appendChild(hidden);
+        }
+        if (hidden) hidden.value = JSON.stringify(full);
+        done.push("buttons in this order: " + btnOrder.join(", "));
+      }
+      if (linkOrder.length) {
+        var list = document.getElementById("dwc-links-list");
+        linkOrder.forEach(function (row) { if (list) list.appendChild(row); });
+        done.push("links reordered to match your list");
+      }
+    }
+    if (greenNote) done.push("about the green part: I can’t see where your background turns green — the links are on the " + (side || "left") + " at the top. Nudge them up or down with the “Height” slider under My links until they sit on the green part");
+    if (done.length || missed.length) {
+      return layoutBotDoneHTML(done, missed);
+    }
+  }
+  // ---- 2. Colour commands: "make my X <colour>" ----
+  var cw = colorWord();
+  if (cw) {
+    var hex = LAYOUT_BOT_COLORS[cw];
+    var target = /background/.test(t) ? "background" : /name/.test(t) ? "name" : /button/.test(t) ? "buttons" : /link/.test(t) ? "links" : /bio/.test(t) ? "bio" : /header/.test(t) ? "header" : /text/.test(t) ? "text" : "";
+    if (target) {
+      var what = setColor(target, hex);
+      if (what) {
+        done.push("set your " + what + " to " + cw + " (" + hex + ")");
+        if (target === "header") done.push("that’s the border around your header — if you meant the page background, say “make my background " + cw + "”");
+        return layoutBotDoneHTML(done, missed);
+      }
+    }
+  }
+  // ---- 3. Positions ----
+  if (/hide (my )?picture|hide (my )?avatar/.test(t)) {
+    setInput("theme_hide_avatar", true);
+    done.push("profile picture hidden");
+    return layoutBotDoneHTML(done, missed);
+  }
+  if (/show (my )?picture|show (my )?avatar/.test(t)) {
+    setInput("theme_hide_avatar", false);
+    done.push("profile picture showing again");
+    return layoutBotDoneHTML(done, missed);
+  }
+  if (/picture (on )?top|picture first/.test(t)) {
+    setInput("theme_pic_position", "top");
+    done.push("picture moved to the top (banner below it)");
+    return layoutBotDoneHTML(done, missed);
+  }
+  if (/header (on the )?left/.test(t)) { setInput("theme_header_side", "left"); done.push("header moved to the left side"); return layoutBotDoneHTML(done, missed); }
+  if (/header (on the )?right/.test(t)) { setInput("theme_header_side", "right"); done.push("header moved to the right side"); return layoutBotDoneHTML(done, missed); }
+  if (/header (on )?top/.test(t)) { setInput("theme_header_side", ""); done.push("header back on top"); return layoutBotDoneHTML(done, missed); }
+  if (/name (on the )?left/.test(t)) { setInput("theme_cover_name", "left"); done.push("name moved to the left of the picture"); return layoutBotDoneHTML(done, missed); }
+  if (/name (on the )?right/.test(t)) { setInput("theme_cover_name", "right"); done.push("name moved to the right of the picture"); return layoutBotDoneHTML(done, missed); }
+  // ---- 4. Formats ----
+  var fmt = /seller|shop|ebay/.test(t) ? "seller" : /blog/.test(t) ? "blog" : /musician|music/.test(t) ? "musician" : /website/.test(t) ? "website" : /social/.test(t) ? "social" : "";
+  if (fmt && /format|page|make my/.test(t)) {
+    DWC.applyPageFormat(fmt);
+    done.push("switched your page to the " + fmt + " format");
+    return layoutBotDoneHTML(done, missed);
+  }
+  // ---- 5. Background library pick ----
+  if (/background|wallpaper/.test(t)) {
+    var hit = null;
+    BG_LIBRARY.forEach(function (b) {
+      if (t.indexOf(b.name.toLowerCase()) >= 0) hit = b;
+    });
+    if (hit) {
+      var origin = (typeof location !== "undefined" && location.origin) ? location.origin : "https://rarecandyreserve.org";
+      var fake = { getAttribute: function (k) { return k === "data-bg-url" ? origin + "/images/" + hit.file : hit.fit; } };
+      DWC.bgLibraryPick(fake);
+      done.push("background set to “" + hit.name + "”");
+      return layoutBotDoneHTML(done, missed);
+    }
+  }
+  // ---- 6. Layout by name ----
+  if (/layout/.test(t)) {
+    var lname = t.replace(/.*layout\s*/, "").replace(/[^a-z0-9 ]/g, "").trim();
+    var found = null;
+    (LAYOUT_PRESETS || []).forEach(function (pr) {
+      if (pr.name && pr.name.toLowerCase().indexOf(lname) >= 0) found = pr;
+    });
+    if (found) {
+      DWC.applyLayoutPreset(found.id);
+      done.push("applied the “" + found.name + "” layout");
+      return layoutBotDoneHTML(done, missed);
+    }
+    missed.push("I couldn’t find a layout called that — pick one from Taffy’s layout scroll");
+    return layoutBotDoneHTML(done, missed);
+  }
+  // ---- 7. Coding Q&A (from the quick reference material) ----
+  if (/how (do|can) i/.test(t) || /\?/.test(t) || /what (is|does)/.test(t)) {
+    if (/background/.test(t)) return "To set a background: Edit Profile → Page background. Upload a picture, paste an image link, or pick one from the library. Fit modes: stretch to fit, static (cover), or repeatable (tile). It covers the whole background, not just one section.";
+    if (/code box|about me|my code/.test(t)) return "The About Me box (top of Edit Profile) holds two things: code in the <style> block at the top, and your bio words underneath. The code styles your whole page. Paste a MySpace layout in there and it gets translated to this site for you.";
+    if (/link/.test(t)) return "To add a link: Edit Profile → My links → “+ Add a link”. A label, a full link starting with http:// or https://, and a button style just for that link. Up to 6.";
+    if (/publish.*layout|share.*layout/.test(t)) return "To publish a layout: write or paste CSS in the About Me box, then “📣 Publish as a layout” under it. Give it a name — it goes in Taffy’s Layout Store, free, with your name on it.";
+    if (/top friend/.test(t)) return "Top Friends: Edit Profile → Top Friends. Tick up to 10 friends, pick how many show, and which side they sit on. Unticking never unfriends anyone.";
+    if (/music|song|spotify|soundcloud/.test(t)) return "Music on my page: Edit Profile → Music. Pick Nothing, SteadyWave Radio, a soundscape, or a Spotify / SoundCloud song (paste the Share link). Spotify plays the full song only for visitors signed into Spotify; SoundCloud needs no sign-in.";
+    if (/format/.test(t)) return "Page formats: Edit Profile → “Page format” (right under the live preview). One click picks Social, Seller, Website, Blog, or Musician. It only changes which sections show and in what order — nothing you saved is lost.";
+    return "I only know layout and coding things — colours, positions, fonts, backgrounds, links, formats, and how the code box works. Ask me one of those, or tap a section header in the editor to see its options.";
+  }
+  // ---- 8. Fallback: plain words + what it CAN do ----
+  return "I don’t know that one yet — I only understand layout and coding requests, and I won’t guess. Here’s what I can do:<br>· “make my background green” / “make my name pink” / “make my buttons blue”<br>· “put my links on the left, stacked, in this order ‘contact me’ ‘add me’ ‘look at my stuff’”<br>· “hide my picture” / “move my picture to the top” / “header on the left side”<br>· “make my page a shop” (or blog / musician / website / social)<br>· “use the Neon Torii Street background”<br>· “how do I add a background?” / “how does the code box work?”";
+}
+function layoutBotDoneHTML(done, missed) {
+  var out = "<strong>Done:</strong><ul style=\"margin:4px 0\">" + done.map(function (d) { return "<li>" + esc(d) + "</li>"; }).join("") + "</ul>";
+  if (missed && missed.length) out += "<p style=\"margin:4px 0 0\">Couldn’t do: " + missed.map(function (m) { return esc(m); }).join("; ") + ".</p>";
+  out += "<p style=\"margin:6px 0 0\">Hit <strong>Save profile</strong> to keep it.</p>";
+  return out;
+}
+
+function layoutBotHTML() {
+  return '<div class="dwc-layout-bot" id="dwc-layout-bot"><h4 style="margin:14px 0 6px">🤖 Layout Bot — tell it what you want, in plain words</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Not a real AI — it matches your words against a list of things it knows how to do (colours, positions, fonts, backgrounds, links). If it doesn’t understand, it says so and shows what it can do. Coding questions and layout changes only.</p>' +
+  '<div style="display:flex;gap:6px"><input id="dwc-layout-bot-in" maxlength="500" placeholder="e.g. make my links sit on the left, stacked, in this order…" style="flex:1;min-width:0"><button type="button" class="btn small" onclick="DWC.layoutBotAsk()">Ask</button></div>' +
+  '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Try: “make my header green” · “put my links on the left” · “how do I add a background?”</p>' +
+  '<div id="dwc-layout-bot-out" style="margin:8px 0 0;color:var(--muted);font-size:13px"></div></div>';
+}
+
+// ---------- Links placement (2026-11-23) ----------
+// Where the links block sits and how it stacks. The simple choices
+// and the Layout Bot both drive these same settings (theme fields
+// links_side / links_stack / links_top + header_links_pos), so either
+// path gives the same result. "Under the header" / "Bottom of the
+// header" are the header_links_pos picks, not a side.
+function linksPlacementHTML(th) {
+  var side = (th && th.links_side) || "";
+  var stack = (th && th.links_stack) || "";
+  var top = (th && th.links_top) || "";
+  var hlp = (th && th.header_links_pos) || "";
+  var active = side === "left" ? "left" : side === "right" ? "right" : hlp === "below" ? "header-below" : hlp === "bottom" ? "header-bottom" : "";
+  return '<h4 style="margin:14px 0 6px">↔️ Where the links sit</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Where the links block goes on your page, and how it stacks. Same settings the Layout Bot uses — change it here or ask the bot, same result.</p>' +
+  '<label>Links placement</label><div class="dwc-presets">' +
+  '<button type="button" class="dwc-pill' + (active === "" ? " active" : "") + '" onclick="DWC.applyLinksSide(\'\')">With the buttons</button>' +
+  '<button type="button" class="dwc-pill' + (active === "left" ? " active" : "") + '" onclick="DWC.applyLinksSide(\'left\')">Left side</button>' +
+  '<button type="button" class="dwc-pill' + (active === "right" ? " active" : "") + '" onclick="DWC.applyLinksSide(\'right\')">Right side</button>' +
+  '<button type="button" class="dwc-pill' + (active === "header-below" ? " active" : "") + '" onclick="DWC.applyLinksSide(\'header-below\')">Under the header</button>' +
+  '<button type="button" class="dwc-pill' + (active === "header-bottom" ? " active" : "") + '" onclick="DWC.applyLinksSide(\'header-bottom\')">Bottom of the header</button>' +
+  '</div>' +
+  '<input type="hidden" name="theme_links_side" value="' + esc(side) + '">' +
+  '<label>How they stack</label><div class="dwc-presets">' +
+  '<button type="button" class="dwc-pill' + (stack === "" ? " active" : "") + '" onclick="DWC.applyLinksStack(\'\')">Side by side</button>' +
+  '<button type="button" class="dwc-pill' + (stack === "column" ? " active" : "") + '" onclick="DWC.applyLinksStack(\'column\')">Stacked, one below the other</button>' +
+  '</div>' +
+  '<input type="hidden" name="theme_links_stack" value="' + esc(stack) + '">' +
+  '<label>Height — nudge the links up or down</label>' +
+  '<div style="display:flex;gap:10px;align-items:center"><input type="range" name="theme_links_top" min="0" max="120" step="5" value="' + (top === "" ? 0 : parseInt(top, 10)) + '" style="flex:1" oninput="DWC.applyLinksTop(this.value)"><span id="dwc-links-top-val" style="min-width:44px;text-align:right;font-weight:700">' + (top === "" ? "Top" : top + "px") + '</span></div>' +
+  '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">0 is the top. Slide it down to line the links up with a part of your background — for example, where it turns green. The Layout Bot can’t see your background, so nudge it by eye.</p>';
+}
+
+// ---------- Reveal sections / "fake pages" (2026-11-23) ----------
+// A reveal link is a button that hides the current page and unveils a
+// hidden section — it feels like going to a different page, but it is
+// the same page showing and hiding sections. The "products" section
+// auto-fills from the member's shop listings (no hand-linking). Up to
+// 4, stored in the theme JSON (reveal_sections) — no D1 column.
+var REVEAL_SECTION_OPTIONS = [
+  ["products", "My products (auto-filled from my listings)"],
+  ["about", "About Me"],
+  ["seller", "What I sell"],
+  ["radio", "Music player"],
+  ["top8", "Top Friends"],
+  ["posts", "My posts"]
+];
+function revealRowHTML(r) {
+  return '<div class="dwc-reveal-row" data-reveal-id="' + esc(r.id) + '" style="display:flex;gap:6px;align-items:center;margin-bottom:6px">' +
+  '<input maxlength="40" value="' + esc(r.label) + '" placeholder="Button label — e.g. View my products" style="flex:1;min-width:0" oninput="DWC.revealChanged()">' +
+  '<select onchange="DWC.revealChanged()" style="flex:1;min-width:0">' + REVEAL_SECTION_OPTIONS.map(function (o) { return '<option value="' + o[0] + '"' + (r.section === o[0] ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + '</select>' +
+  '<button type="button" class="btn ghost small" onclick="DWC.revealRemove(this)">✕</button></div>';
+}
+function revealSectionsHTML(th) {
+  var list = (th && th.reveal_sections) || [];
+  return '<h4 style="margin:14px 0 6px">🚪 Reveal sections — links that feel like new pages</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Add a button that, when a visitor taps it, hides this page and unveils a hidden section — it feels like going to a different page, but it’s the same page showing and hiding sections. “View my products” fills itself from your shop listings — no hand-linking every item.</p>' +
+  '<div id="dwc-reveal-list">' + list.map(function (r) { return revealRowHTML(r); }).join("") + '</div>' +
+  '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.revealAdd()">+ Add a reveal link</button> <span id="dwc-reveal-count" style="color:var(--muted);font-size:13px">' + list.length + '/4</span></p>' +
+  '<input type="hidden" name="theme_reveal_sections" id="dwc-reveal-value" value=\'' + esc(JSON.stringify(list)) + '\'>';
+}
+
+// ---------- Website-format header (2026-11-23) ----------
+// Header/banner FIRST: position (top or down the side), border,
+// corners, crop, and the option to hide the profile picture entirely.
+// The GIF-header option already exists (Banner URL + "Use this link as
+// my banner") — this only points at it. A picture beside the site
+// content goes in the About Me code box (CSS), not the bio words — the
+// bio allowlist has no <img>, so the guidance says so plainly.
+function websiteHeaderHTML(th) {
+  var side = (th && th.header_side) || "";
+  return '<h4 style="margin:14px 0 6px">🌐 Website header — first thing visitors see</h4>' +
+  '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your header can sit on top like a normal page, or down the side. Same settings the Layout Bot uses.</p>' +
+  '<label>Header position</label><div class="dwc-presets">' +
+  '<button type="button" class="dwc-pill' + (side === "" ? " active" : "") + '" onclick="DWC.applyHeaderSide(\'\')">Top</button>' +
+  '<button type="button" class="dwc-pill' + (side === "left" ? " active" : "") + '" onclick="DWC.applyHeaderSide(\'left\')">Left side</button>' +
+  '<button type="button" class="dwc-pill' + (side === "right" ? " active" : "") + '" onclick="DWC.applyHeaderSide(\'right\')">Right side</button>' +
+  '</div>' +
+  '<input type="hidden" name="theme_header_side" value="' + esc(side) + '">' +
+  '<label>Header border</label><div class="dwc-presets">' +
+  '<button type="button" class="dwc-pill' + ((th.header_border_width || "") === "" ? " active" : "") + '" onclick="DWC.applyHeaderBorder(\'\')">No border</button>' +
+  '<button type="button" class="dwc-pill' + (th.header_border_width === "2" ? " active" : "") + '" onclick="DWC.applyHeaderBorder(\'2\')">Thin (2px)</button>' +
+  '<button type="button" class="dwc-pill' + (th.header_border_width === "6" ? " active" : "") + '" onclick="DWC.applyHeaderBorder(\'6\')">Thick (6px)</button>' +
+  '</div>' +
+  '<input type="hidden" name="theme_header_border_width" value="' + esc(th.header_border_width || "") + '">' +
+  '<label>Corner roundness</label><div class="dwc-presets">' +
+  '<button type="button" class="dwc-pill' + ((th.header_radius || "") === "" ? " active" : "") + '" onclick="DWC.applyHeaderRadius(\'\')">Square</button>' +
+  '<button type="button" class="dwc-pill' + (th.header_radius === "8" ? " active" : "") + '" onclick="DWC.applyHeaderRadius(\'8\')">Slightly round</button>' +
+  '<button type="button" class="dwc-pill' + (th.header_radius === "24" ? " active" : "") + '" onclick="DWC.applyHeaderRadius(\'24\')">Very round</button>' +
+  '</div>' +
+  '<input type="hidden" name="theme_header_radius" value="' + esc(th.header_radius || "") + '">' +
+  '<label>Border colour</label><input type="color" name="theme_header_border_color" value="' + (th.header_border_color || "#ffffff") + '" style="width:64px;height:40px;padding:2px">' +
+  '<label>Header crop — which part of the picture shows</label><select name="theme_header_crop">' +
+  '<option value=""' + ((th.header_crop || "") === "" ? " selected" : "") + '>Middle (current)</option>' +
+  '<option value="top"' + (th.header_crop === "top" ? " selected" : "") + '>Top of the picture</option>' +
+  '<option value="bottom"' + (th.header_crop === "bottom" ? " selected" : "") + '>Bottom of the picture</option></select>' +
+  '<label><input type="checkbox" name="theme_hide_avatar" style="width:auto"' + (th.hide_avatar ? " checked" : "") + '> Hide my profile picture entirely</label>' +
+  '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: no profile picture shows on your page at all. Off: your picture shows (top left, middle, or right — pick that in the Name placement above).</p>' +
+  '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">A picture of yourself beside your site content goes in the code at the top of the About Me box — the bio words can’t hold a picture. For example, in the &lt;style&gt; block: <code>.dwc-myprofile .card{background-image:url(https://…);}</code> — or ask the Layout Bot for the snippet.</p>' +
+  '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">GIF as a header: paste a GIF link in the Banner URL box above and hit “Use this link as my banner” — the GIF becomes your header.</p>';
 }
 
 // My links editor rows (v3.4, button system v3.12) — one row per link:
@@ -5813,14 +6574,18 @@ function layoutPreviewInnerHTML(p) {
   var gifBelowTop = gpos === "below-topfriends" ? gifBlock : "";
   var gifAboveComments = gpos === "above-comments" ? gifBlock : "";
   var gifBelowComments = gpos === "below-comments" ? gifBlock : "";
+  // Page format (2026-11-23) — the Musician format puts the player
+  // first in the preview, like on the live page.
+  var fmtPrev = pageFormatFor(th, p);
+  var actionsDiv = '<div style="pointer-events:none">' + actionsBlock + "</div>";
+  var audioDiv = audioSectionHTML(p, th, { noAutoplay: true });
   return '<div class="dwc-myprofile dwc-onebox dwc-previewbox' + btnSizeCls + '">' +
     ((p && p.website_mode) ? "" : pageOverlayHTML(th, p)) +
     tickerHTML(p, th) + (p && th.ticker_source !== "btc" ? vibeTickerHTML(p, th) : "") + gifTop +
-    '<div class="dwc-mypage-head">' + (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : rcrAvatarHTML("", "width:64px;height:64px")) + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + (p ? " " + badgeHTML(p) + achBadgeIconsHTML((th.display_badges || []).map(function (k) { return { key: k }; })) : "") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
+    '<div class="dwc-mypage-head">' + (th.hide_avatar ? "" : (p && p.avatar_url ? '<img class="dwc-avatar" src="' + esc(p.avatar_url) + '" alt="" style="width:64px;height:64px">' : rcrAvatarHTML("", "width:64px;height:64px"))) + '<div><h3 style="margin:0">@' + esc(p ? (p.username || "yourname") : "yourname") + (p ? " " + badgeHTML(p) + achBadgeIconsHTML((th.display_badges || []).map(function (k) { return { key: k }; })) : "") + '</h3><p class="dwc-meta">' + esc(!hidden("occupation") && p && p.occupation ? p.occupation : "your vibe here") + "</p></div></div>" +
     gifAboveVideo +
-    '<div style="pointer-events:none">' + actionsBlock + "</div>" +
-    gifBelowVideo +
-    audioSectionHTML(p, th, { noAutoplay: true }) +
+    (fmtPrev === "musician" ? audioDiv + actionsDiv + gifBelowVideo : actionsDiv + gifBelowVideo + audioDiv) +
+    ((fmtPrev === "website" && p && p.my_links && p.my_links.length && (th.hide_sections || []).indexOf("links") < 0) ? '<div class="dwc-links-row dwc-header-links">' + myLinksButtonsHTML(p.my_links) + "</div>" : "") +
     website + gifAboveSell +
     gifAboveTop + top8 + gifBelowTop + gifAboveComments + gifBelowSell +
     hiddenNote + gifBelowComments +
@@ -6333,8 +7098,8 @@ function renderView() {
   viewStreet(el);
 }
 
-// ---------- YourSpace (The Street) ----------
-// ---------- YourSpace (The Street) ----------
+// ---------- Heart Rise (The Street) ----------
+// ---------- Heart Rise (The Street) ----------
 // Feed redesign (v3.14) — the feed sits directly below the profile
 // card: profile at the top, feed right underneath, composer at the top
 // of the feed. The big hero stays on the page shell (compact), and the
@@ -6368,9 +7133,9 @@ async function viewStreet(el) {
     "</div></div>" +
     '<div id="dwc-feed"><p style="color:var(--muted)">Loading posts…</p></div>' +
     '<div id="dwc-tags"><p style="color:var(--muted)">Loading tags…</p></div>' +
-    '<details class="card dwc-how"><summary><strong>How YourSpace works — read this first</strong></summary><ul class="dwc-rules-list">' +
+    '<details class="card dwc-how"><summary><strong>How Heart Rise works — read this first</strong></summary><p style="margin:8px 0 0">Built for you to grow, to thrive — so you can finally be set free and make a future for yourself, no matter your circumstances.</p><ul class="dwc-rules-list">' +
     "<li><strong>List it free, sell it fair</strong> — listing costs nothing; a fair 6% cut on a sale keeps the street running.</li>" +
-    "<li><strong>Sell anything legal</strong> — not just cards. Adult content lives in its own separate 18+ area (🌙 After Dark), never mixed into YourSpace — and only if you’ve proved your age (see Rules &amp; After Dark).</li>" +
+    "<li><strong>Sell anything legal</strong> — not just cards. Adult content lives in its own separate 18+ area (🌙 After Dark), never mixed into Heart Rise — and only if you’ve proved your age (see Rules &amp; After Dark).</li>" +
     "<li><strong>Ask &amp; learn</strong> — post on any topic, tag it so people can find it, and heart the good stuff (❤️ hearts only — no downvotes here).</li>" +
     "<li><strong>One account per person</strong>, and 🚩 Report on any post sends an alert to the owner.</li></ul>" +
     '<p><button type="button" class="btn ghost small" onclick="DWC.go(\'rules\')">Read the full rules →</button></p></details>' +
@@ -6426,7 +7191,7 @@ async function viewStreet(el) {
 // The Community's own most eye-catching posts, ranked by engagement
 // (hearts × 2 + comments). Community posts only — no outside news.
 // Adult posts are NEVER in Headlines — the 18+ area is separate from
-// YourSpace (the endpoint excludes kind=adult entirely).
+// Heart Rise (the endpoint excludes kind=adult entirely).
 function headlineCardHTML(h) {
   return '<article class="card dwc-headline" onclick="DWC.go(\'post/' + h.id + '\')" style="cursor:pointer" role="link" tabindex="0" onkeydown="if(event.key===\'Enter\')DWC.go(\'post/' + h.id + '\')">' +
     '<div class="dwc-headline-eng">🔥 ' + (h.engagement || 0) + ' · ❤️ ' + (h.score || 0) + ' · 💬 ' + (h.comment_count || 0) + "</div>" +
@@ -6451,7 +7216,7 @@ async function loadHeadlinesStrip() {
     '<p style="margin:8px 0 0"><button type="button" class="btn ghost small" onclick="DWC.go(\'headlines\')">See all headlines →</button></p></section>';
 }
 async function viewHeadlines(el) {
-  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2><p style="color:var(--muted)">YourSpace’s own most eye-catching posts — ranked by hearts and comments. No outside news, just what the street is shouting about.</p></section><div id="dwc-headlines-list"><p style="color:var(--muted)">Loading headlines…</p></div>';
+  el.innerHTML = '<section class="card"><h2 class="dwc-neon-head" style="margin-top:0">🔥 Headlines</h2><p style="color:var(--muted)">Heart Rise’s own most eye-catching posts — ranked by hearts and comments. No outside news, just what the street is shouting about.</p></section><div id="dwc-headlines-list"><p style="color:var(--muted)">Loading headlines…</p></div>';
   var data = await apiGet("/headlines?device_id=" + encodeURIComponent(deviceId()) + "&limit=10");
   var list = (data && data.headlines) || [];
   state.headlines = list;
@@ -6510,7 +7275,7 @@ function renderComposer(context) {
     '<div class="dwc-composer-mini" id="dwc-composer-mini"' + (state.composerOpen ? " hidden" : "") + ">" +
       (state.profile ? '<a href="#/member/' + state.profile.id + '">' + (state.profile.avatar_url ? '<img class="dwc-avatar dwc-avatar-sm" src="' + esc(state.profile.avatar_url) + '" alt="">' : rcrAvatarHTML(" dwc-avatar-sm")) + '</a>' : rcrAvatarHTML(" dwc-avatar-sm")) +
       '<button type="button" class="dwc-composer-prompt" onclick="DWC.toggleComposer(true)">' + esc(prompt) + "</button>" +
-      '<button type="button" class="btn small" onclick="DWC.toggleComposer(true)">Post</button>' +
+      '<button type="button" class="btn" onclick="DWC.toggleComposer(true)">Post</button>' +
     "</div>" +
     '<div class="dwc-composer-full" id="dwc-composer-full"' + (state.composerOpen ? "" : " hidden") + ">" +
     '<div class="dwc-composer-head"><h3 style="margin:0">' + (isAuth ? "Card Check — real or fake?" : "New post") + "</h3>" +
@@ -6713,7 +7478,7 @@ async function viewThread(el, postId) {
   var data = await apiGet("/posts/" + postId + "?device_id=" + encodeURIComponent(deviceId()));
   var p = data && data.post;
   if (!p) {
-    el.innerHTML = '<div class="note">That post is gone, or it’s in the 18+ area and this account isn’t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to YourSpace</button></p>';
+    el.innerHTML = '<div class="note">That post is gone, or it’s in the 18+ area and this account isn’t age-verified.</div><p><button type="button" class="btn ghost" onclick="DWC.go(\'street\')">← Back to Heart Rise</button></p>';
     return;
   }
   window.__dwcThreadKind = p.kind;
@@ -7686,6 +8451,34 @@ function buttonTextFor(hex) {
   var lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
   return lum < 0.5 ? "#ffffff" : "#0b0b14";
 }
+// One action button by key ("add" / "message" / "favorite" /
+// "group"), or "" when it is hidden. The order the buttons render in
+// is buttons_order (Edit Profile > Buttons, via the Layout Bot) —
+// actionButtonsHTML iterates that order, missing keys fall back to
+// the built-in order, and buttons_visible still filters which show.
+function actionButtonHTML(m, preview, th, key, ctx) {
+  var def = null;
+  ACTION_BUTTON_DEFS.forEach(function (d) { if (d.key === key) def = d; });
+  if (!def || !ctx.showBtn(key)) return "";
+  if (key === "add") {
+    return '<button type="button" class="btn small" data-action-btn="add"' + ctx.dis + ' onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(ctx.pb, "add") + ">" +
+      (ctx.isFriend ? def.friendIcon : def.icon) + " " + esc(actionButtonLabel(ctx.pb, "add", ctx.isFriend ? def.friendLabel : def.label)) + "</button>";
+  }
+  if (key === "message") {
+    return '<button type="button" class="btn small" data-action-btn="message"' + ctx.dis + ' onclick="DWC.imMember(' + m.id + ", '" + ctx.uname + "')\"" + actionButtonStyle(ctx.pb, "message") + ">" +
+      def.icon + " " + esc(actionButtonLabel(ctx.pb, "message", def.label)) + "</button>";
+  }
+  if (key === "favorite") {
+    return '<button type="button" class="btn small' + (ctx.isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite"' + ctx.dis + ' onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(ctx.pb, "favorite") + ">" +
+      '<span class="dwc-fav-star' + (ctx.isFav ? " on" : "") + '">' + (ctx.isFav ? def.favIcon : def.icon) + "</span> " +
+      esc(actionButtonLabel(ctx.pb, "favorite", ctx.isFav ? def.favLabel : def.label)) + "</button>";
+  }
+  if (key === "group") {
+    return '<button type="button" class="btn small" data-action-btn="group"' + ctx.dis + ' onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(ctx.pb, "group") + ">" +
+      def.icon + " " + esc(actionButtonLabel(ctx.pb, "group", def.label)) + "</button>";
+  }
+  return "";
+}
 function actionButtonsHTML(m, preview, th) {
   var pb = m.profile_buttons || null;
   var blockStyle = "";
@@ -7704,39 +8497,23 @@ function actionButtonsHTML(m, preview, th) {
   var th2 = th || parseThemeClient(m.profile_theme);
   var visSet = th2.buttons_visible;
   var showBtn = function (k) { return !visSet || visSet.indexOf(k) >= 0; };
-  var anyBtn = false;
   // Preview mode (your own page): buttons are disabled so you can't
   // friend/message yourself — they only show how visitors see them.
   var dis = preview ? " disabled" : "";
   var html = (preview ? '<p style="color:var(--muted);font-size:13px;margin:0 0 8px">👀 Preview — this is what visitors see on your page.</p>' : "");
   var body = '<div id="dwc-action-buttons" class="' + blockClass + '"' + blockStyle + ">";
-  // Add me / Unfriend
-  if (showBtn("add")) {
-    anyBtn = true;
-    var addDef = ACTION_BUTTON_DEFS[0];
-    body += '<button type="button" class="btn small" data-action-btn="add"' + dis + ' onclick="DWC.toggleFriend(' + m.id + ')"' + actionButtonStyle(pb, "add") + ">" +
-      (isFriend ? addDef.friendIcon : addDef.icon) + " " + esc(actionButtonLabel(pb, "add", isFriend ? addDef.friendLabel : addDef.label)) + "</button>";
+  var order = ["add", "message", "favorite", "group"];
+  var saved = th2.buttons_order;
+  if (Array.isArray(saved) && saved.length) {
+    var known = saved.filter(function (k) { return order.indexOf(k) >= 0; });
+    if (known.length) order = known.concat(order.filter(function (k) { return known.indexOf(k) < 0; }));
   }
-  // Message me
-  if (showBtn("message")) {
-    anyBtn = true;
-    body += '<button type="button" class="btn small" data-action-btn="message"' + dis + ' onclick="DWC.imMember(' + m.id + ", '" + uname + "')\"" + actionButtonStyle(pb, "message") + ">" +
-      ACTION_BUTTON_DEFS[1].icon + " " + esc(actionButtonLabel(pb, "message", ACTION_BUTTON_DEFS[1].label)) + "</button>";
-  }
-  // Add to Favorites — star next to the wording: ☆ unfilled/uncolored
-  // before, ★ filled gold when already favorited.
-  if (showBtn("favorite")) {
-    anyBtn = true;
-    body += '<button type="button" class="btn small' + (isFav ? " dwc-fav-on" : "") + '" data-action-btn="favorite"' + dis + ' onclick="DWC.toggleFavorite(' + m.id + ')"' + actionButtonStyle(pb, "favorite") + ">" +
-      '<span class="dwc-fav-star' + (isFav ? " on" : "") + '">' + (isFav ? ACTION_BUTTON_DEFS[2].favIcon : ACTION_BUTTON_DEFS[2].icon) + "</span> " +
-      esc(actionButtonLabel(pb, "favorite", isFav ? ACTION_BUTTON_DEFS[2].favLabel : ACTION_BUTTON_DEFS[2].label)) + "</button>";
-  }
-  // Add to group
-  if (showBtn("group")) {
-    anyBtn = true;
-    body += '<button type="button" class="btn small" data-action-btn="group"' + dis + ' onclick="DWC.toggleGroupPanel(' + m.id + ')"' + actionButtonStyle(pb, "group") + ">" +
-      ACTION_BUTTON_DEFS[3].icon + " " + esc(actionButtonLabel(pb, "group", ACTION_BUTTON_DEFS[3].label)) + "</button>";
-  }
+  var ctx = { isFriend: isFriend, isFav: isFav, uname: uname, dis: dis, pb: pb, showBtn: showBtn };
+  var anyBtn = false;
+  order.forEach(function (key) {
+    var h = actionButtonHTML(m, preview, th2, key, ctx);
+    if (h) { anyBtn = true; body += h; }
+  });
   if (!anyBtn) return preview ? html + '<p style="color:var(--muted);font-size:13px;margin:0">No action buttons selected — pick some in Edit Profile &gt; Buttons.</p>' : "";
   return html + body + "</div>";
 }
@@ -7808,7 +8585,7 @@ function profileVideoHTML(m, th) {
 // The buttons + video side row: 2×2 button grid on one side, the video
 // on the other. Buttons hidden → the video takes the whole row. Neither
 // set → no row at all.
-function profileSideRowHTML(m, th) {
+function profileSideRowHTML(m, th, opts) {
   if (!m) return ""; // new-signup preview has no member yet — no buttons/video/links to show
   var showButtons = !th || th.buttons_show !== false;
   var side = (th && th.buttons_side === "right") ? "right" : "left";
@@ -7820,7 +8597,14 @@ function profileSideRowHTML(m, th) {
   // 2×2 button block. "Hide My links" hides them here too.
   var linksHidden = !!(th && (th.hide_sections || []).indexOf("links") >= 0);
   var links = linksHidden ? "" : myLinksButtonsHTML(m.my_links);
-  var linksRow = links ? '<div class="dwc-links-row">' + links + "</div>" : "";
+  // Links placement (2026-11-23) — on the LIVE page, a left/right
+  // links_side docks the links block in that page column instead of
+  // here (viewMember renders the docked block); the preview keeps the
+  // links in place. Either way the stack + top nudge apply.
+  var docked = !!(opts && opts.dock && th && (th.links_side === "left" || th.links_side === "right"));
+  var linksCls = "dwc-links-row" + ((th && th.links_stack === "column") ? " dwc-links-stack-col" : "");
+  var linksStyle = (th && th.links_top) ? ' style="margin-top:' + (+th.links_top) + 'px"' : "";
+  var linksRow = (links && !docked) ? '<div class="' + linksCls + '"' + linksStyle + ">" + links + "</div>" : "";
   // Video size (v3.22) — Big gives the video cell most of the row;
   // Stretch gives it the whole row; Small keeps it narrow.
   var vidRowCls = (th && th.video_size === "s") ? " dwc-side-vid-s" : (th && th.video_size === "l") ? " dwc-side-vid-l" : (th && th.video_size === "stretch") ? " dwc-side-vid-stretch" : "";
@@ -7892,7 +8676,9 @@ function profileHeadInnerHTML(m, th) {
   // picture, the head card keeps the picture + bio + meta but hides its
   // own name line, so the name shows exactly once.
   var nameBeside = !!(m && m.banner_url && th && (th.cover_name === "left" || th.cover_name === "right"));
-  return '<div class="dwc-profile-row">' + picAvatarHTML(m, th) +
+  // Website format (2026-11-23) — the profile picture is optional:
+  // hide_avatar drops it entirely (the placeholder goes with it).
+  return '<div class="dwc-profile-row">' + ((th && th.hide_avatar) ? "" : picAvatarHTML(m, th)) +
     '<div>' + (nameBeside ? "" : '<h2 style="margin:0">@' + esc(m.username) + " " + presenceDot(m) + " " + badgeHTML(m) + achBadgeIconsHTML(m.badges) + "</h2>") +
     (!hideOcc && m.occupation ? "<p style=\"margin:4px 0\">" + esc(m.occupation) + "</p>" : "") +
     (m.bio ? '<p class="dwc-bio-text" style="margin:4px 0;white-space:pre-wrap">' + formatBioHTML(m.bio) + "</p>" : "") +
@@ -7938,7 +8724,7 @@ function profilePhotoUploadHTML() {
 // website_buttons). Standard mode shows the buttons + video side row
 // (the nav row lives in profileNavRowHTML now, in the page header).
 // On your own page the buttons are a disabled preview.
-function profileActionsHTML(m, websiteMode, th) {
+function profileActionsHTML(m, websiteMode, th, dockLinks) {
   var uname = esc(m.username.replace(/'/g, ""));
   var pb = m.profile_buttons || null;
   if (websiteMode) {
@@ -7970,7 +8756,7 @@ function profileActionsHTML(m, websiteMode, th) {
   // card now, instead of a loose floating row, so visitors (and the
   // owner) can find them at a glance. The vanity URL + group picker
   // stay outside the card.
-  var row = profileSideRowHTML(m, th);
+  var row = profileSideRowHTML(m, th, { dock: !!dockLinks });
   var connect = row ? '<section class="card dwc-connect-card"><h3 style="margin-top:0">💬 Connect</h3>' + row + "</section>" : "";
   // v3.22 — the page URL rides under the video when there is one, so
   // only show it here (after the Connect card) when there is no video.
@@ -8088,7 +8874,11 @@ async function viewMember(el, memberId, previewOp) {
   ensureProfileFonts(m.profile_theme);
   // v3.9 — website look + picture position drive the layout.
   var mth = parseThemeClient(m.profile_theme);
-  var isWebsite = !!m.website_mode;
+  // Page format (2026-11-23) — the format is the source of truth for
+  // what kind of page this is; website_mode follows it (the picker
+  // saves both together, so they stay in sync).
+  var fmt = pageFormatFor(mth, m);
+  var isWebsite = !!m.website_mode || fmt === "website";
   var picOnTop = mth.pic_position === "top";
   var hidden = function (key) { return (mth.hide_sections || []).indexOf(key) >= 0; };
   // v3.20 — MySpace three columns: LEFT = info (website sections,
@@ -8101,10 +8891,29 @@ async function viewMember(el, memberId, previewOp) {
   var tfSideLeft = mth.topfriends_side === "left";
   var topFriends = (m.top_friends || []).slice(0, tfCount);
   var navRow = isWebsite ? "" : profileNavRowHTML(m);
-  var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
+  // Website format (2026-11-23) — the header links (My links) sit
+  // under the header: right below it, or tucked at the bottom of the
+  // header card. Other formats keep their links in the Connect card.
+  var headerLinks = "";
+  if (fmt === "website" && !hidden("links") && m.my_links && m.my_links.length) {
+    headerLinks = '<div class="dwc-links-row dwc-header-links">' + myLinksButtonsHTML(m.my_links) + "</div>";
+  }
+  var headCard = '<section class="card dwc-mypage-head">' + profileHeadInnerHTML(m, mth) + navRow + (headerLinks && mth.header_links_pos === "bottom" ? headerLinks : "") + "</section>";
   var headTop = '<section class="dwc-mypage-top">' + profileHeadInnerHTML(m, mth) + navRow + "</section>";
   var isBtcTicker = mth.ticker_source === "btc";
-  var topBanner = (isWebsite ? websiteBannerHTML(m, mth) : coverBannerHTML(m, mth)) + tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
+  var bannerOnly = isWebsite ? websiteBannerHTML(m, mth) : coverBannerHTML(m, mth);
+  var tickerPart = tickerHTML(m, mth) + (isBtcTicker ? "" : vibeTickerHTML(m, mth));
+  var topBanner = bannerOnly + tickerPart;
+  // Header on the side (2026-11-23) — the banner + head sit in a side
+  // column; the ticker stays full-width below them.
+  var headerSide = (mth.header_side === "left" || mth.header_side === "right") ? mth.header_side : "";
+  // Links docked in a page column (2026-11-23) — the links block moves
+  // out of the Connect card to the top of the info (left) or side
+  // (right) column, stacked + nudged per the member's picks.
+  var linksDocked = !hidden("links") && (mth.links_side === "left" || mth.links_side === "right") && m.my_links && m.my_links.length;
+  var dockedLinksHTML = linksDocked
+    ? '<div class="dwc-links-dock dwc-links-dock-' + mth.links_side + ((mth.links_stack === "column") ? " dwc-links-stack-col" : "") + '"' + (mth.links_top ? ' style="margin-top:' + (+mth.links_top) + 'px"' : "") + ">" + myLinksButtonsHTML(m.my_links) + "</div>"
+    : "";
   // LEFT — info.
   // v3.21 — the Subscribe button can be hidden from Edit Profile >
   // Buttons ("Which buttons show"). buttons_visible null = all show.
@@ -8154,11 +8963,16 @@ async function viewMember(el, memberId, previewOp) {
       // Steady Wave). Hidden sections already render as "" above, so
       // ordering never resurrects one. The menu mount point stays last.
       var blocks = { about: websiteSectionsHTML(m, mth), seller: gifAboveSell + sellerSection + gifBelowSell, radio: radioSection };
-      var order = (mth.section_order && mth.section_order.length === 3) ? mth.section_order : ["about", "seller", "radio"];
+      // Page formats (2026-11-23) — the format sets the starting order
+      // of the info blocks (Seller: shop first; Musician: player
+      // first). The member's own order, if they ever changed it from
+      // the default, still wins.
+      var fmtOrder = FORMAT_INFO_ORDER[fmt] || ["about", "seller", "radio"];
+      var order = (mth.section_order && mth.section_order.length === 3 && mth.section_order.join(",") !== "about,seller,radio") ? mth.section_order : fmtOrder;
       return order.map(function (k) { return blocks[k] || ""; }).join("") + '<div id="dwc-profile-menu"></div>';
     })();
   // MIDDLE — goods on top, then the post feed scrolling endlessly below.
-  var mainCol = gifAboveVideo + profileActionsHTML(m, isWebsite, mth) + gifBelowVideo +
+  var mainCol = gifAboveVideo + profileActionsHTML(m, isWebsite, mth, true) + gifBelowVideo +
     '<section class="card dwc-member-feed"><h3 style="margin-top:0">📝 Posts</h3>' +
     '<div class="dwc-member-feed-list" id="dwc-member-feed-list"><p style="color:var(--muted)">Loading posts…</p></div>' +
     '<div id="dwc-member-feed-more" style="margin-top:10px"></div></section>';
@@ -8207,23 +9021,57 @@ async function viewMember(el, memberId, previewOp) {
   // Operator preview banner (Build 5) — read-only: nothing on this page
   // edits their page. The edit buttons already stay hidden (is_mine is
   // false for the operator); the banner says so plainly.
+  // Reveal sections ("fake pages", 2026-11-23) — a link/button that
+  // unveils a hidden section and hides the current page. The buttons
+  // sit under the header; each container holds its section, with a
+  // Back link. Products auto-fills from the member's shop listings.
+  var revealBtns = "";
+  var revealHost = "";
+  if (mth.reveal_sections && mth.reveal_sections.length) {
+    var rlist = mth.reveal_sections.filter(function (x) { return x && x.label && x.section && REVEAL_SECTION_OPTIONS.indexOf(x.section) >= 0; }).slice(0, 4);
+    if (rlist.length) {
+      revealBtns = '<div class="dwc-reveal-btns">' + rlist.map(function (x) {
+        return '<button type="button" class="btn ghost small" onclick="DWC.showReveal(\'' + esc(x.id) + '\')">' + esc(x.label) + "</button>";
+      }).join(" ") + "</div>";
+      revealHost = '<div id="dwc-reveal-host" hidden>' + rlist.map(function (x) {
+        var inner = "";
+        if (x.section === "products") inner = '<div id="dwc-reveal-products-list"><p style="color:var(--muted)">Loading listings…</p></div>';
+        else if (x.section === "about") inner = websiteSectionsHTML(m, mth);
+        else if (x.section === "seller") inner = sellerSection;
+        else if (x.section === "radio") inner = radioSection;
+        else if (x.section === "top8") inner = top8Section;
+        else if (x.section === "posts") inner = '<section class="card dwc-member-feed"><h3 style="margin-top:0">📝 Posts</h3><div class="dwc-member-feed-list" id="dwc-reveal-posts-list"><p style="color:var(--muted)">Loading posts…</p></div></section>';
+        return '<section class="card dwc-reveal-sec" data-reveal-sec="' + esc(x.id) + '" data-reveal-kind="' + esc(x.section) + '" hidden><p style="margin:0 0 10px"><button type="button" class="btn ghost small" onclick="DWC.hideReveal()">← Back to my page</button></p>' + inner + "</section>";
+      }).join("") + "</div>";
+    }
+  }
+  if (mth.links_side === "left" && dockedLinksHTML) infoCol = dockedLinksHTML + infoCol;
+  if (mth.links_side === "right" && dockedLinksHTML) sideCol = dockedLinksHTML + sideCol;
   var previewBanner = isPreview
     ? '<div class="card" style="border:2px solid var(--amber,#ffb020);margin-bottom:12px"><p style="margin:0"><strong>👁️ Operator preview</strong> — you are seeing @' + esc(m.username) + '’s page exactly as a visitor sees it. Read-only: nothing here changes their page. To change anything, use “Edit this member’s page” in the Admin panel. <a href="#/member/' + m.id + '">View normally →</a></p></div>'
     : "";
   el.innerHTML =
-    '<div class="dwc-myprofile dwc-onebox' + (isWebsite ? " dwc-website" : "") + btnSizeCls + '">' +
+    '<div class="dwc-myprofile dwc-onebox dwc-format-' + fmt + (isWebsite ? " dwc-website" : "") + btnSizeCls + '">' +
     previewBanner +
     (hasCustomPage
-      ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth) + listingsSection + websiteBack
-      : overlayLayer + (picOnTop ? headTop + topBanner + gifTop : topBanner + gifTop + headCard) +
+      ? '<div class="dwc-custom-page">' + sanitizeCustomPageHtml(mth.custom_page_html) + "</div>" + profileActionsHTML(m, true, mth, true) + listingsSection + websiteBack
+      : overlayLayer + (headerSide
+          ? '<div class="dwc-side-header-layout dwc-side-header-' + headerSide + '">' + (picOnTop ? headTop + bannerOnly : bannerOnly + headCard) + "</div>" + tickerPart + gifTop
+          : (picOnTop ? headTop + topBanner + gifTop : topBanner + gifTop + headCard)) +
+        (headerLinks && mth.header_links_pos !== "bottom" ? headerLinks : "") + revealBtns +
         '<div id="dwc-photo-upload-host"></div>' +
         '<div id="dwc-seller-rating" data-seller="' + m.id + '"></div>' +
         '<div id="dwc-seller-reviews"></div>' +
         '<div class="dwc-member-cols' + (tfSideLeft ? " dwc-member-cols-flip" : "") + '">' +
-        '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>" +
-        '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>" +
+        // Blog format — the posts come first, then the info column.
+        (fmt === "blog"
+          ? '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>" +
+            '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>"
+          : '<div class="dwc-member-col dwc-member-col-info">' + infoCol + "</div>" +
+            '<div class="dwc-member-col dwc-member-col-main">' + mainCol + "</div>") +
         '<div class="dwc-member-col dwc-member-col-side">' + sideCol + "</div>" +
         "</div>" +
+        revealHost +
         listingsSection + websiteBack) +
     "</div>";
   // Rain drops on the live page too (the CSS rain alone reads as
@@ -9208,7 +10056,7 @@ function renderAdminMembers() {
           }
           return '<div class="dwc-admin-row">' +
             (m.avatar_url ? '<a href="#/member/' + m.id + '"><img class="dwc-avatar" src="' + esc(m.avatar_url) + '" alt="" style="width:36px;height:36px"></a>' : '<a href="#/member/' + m.id + '">' + rcrAvatarHTML("", "width:36px;height:36px") + '</a>') +
-            '<div style="flex:1;min-width:0"><a href="#/member/' + m.id + '"><strong>@' + esc(m.username) + "</strong></a> " + presenceDot(m) + " " + badgeHTML(m) +
+            '<div style="flex:1 1 240px;min-width:240px"><a href="#/member/' + m.id + '"><strong>@' + esc(m.username) + "</strong></a> " + presenceDot(m) + " " + badgeHTML(m) +
             '<div style="color:var(--muted);font-size:12px">Joined ' + fmtDate(m.created_at) + (m.age_verified ? " · Age verified ✓" : "") + (m.is_test ? ' · <span style="color:#00e5ff">TEST MEMBER</span>' : "") + (m.banned ? ' · <span style="color:#ff3b30">BANNED' + (m.banned_until ? " until " + fmtMuteDate(m.banned_until) : " permanently") + (m.banned_reason ? " — " + esc(m.banned_reason) : "") + "</span>" : "") + ((m.disputes_filed || 0) ? " · Disputes: " + m.disputes_filed + " filed" + ((m.disputes_false || 0) ? ", " + m.disputes_false + " found false" + ((m.disputes_false || 0) >= 2 ? " — cannot file disputes" : "") : "") : "") + "</div>" +
             (sells.length ? '<div style="font-size:12px">Sells: ' + sells.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
             (wants.length ? '<div style="font-size:12px">Wants: ' + wants.map(function (t) { return esc(t); }).join(", ") + "</div>" : "") +
@@ -9539,7 +10387,7 @@ async function viewAdult(el) {
         ? '<img src="' + esc(wimg) + '" alt="Welcome to the 18+ area" class="dwc-welcome-img">'
         : '<div class="dwc-welcome-slot"><p>🌙</p><p><strong>Welcome picture slot</strong></p><p style="font-size:13px;color:var(--muted)">Chris uploads his own welcome picture here. The slot is empty until he does — no stock photo.</p></div>') +
       '<p>This area is for age-verified members only. A typed birthday alone is never enough — a real photo ID check is what opens the door.</p>' +
-      '<p class="dwc-review-note">🔒 <strong>Your ID is safe here.</strong> Joining YourSpace is free, and selling regular stuff never needs an ID — ID is only for adult content and digital assets. When you do verify, your ID photo goes into a private vault for Chris to check, and it is permanently deleted the moment he approves or rejects it. Nothing is stored — no photo, no ID number, no birthdate. The only thing kept is a simple ‘age verified’ mark on your account.</p>' +
+      '<p class="dwc-review-note">🔒 <strong>Your ID is safe here.</strong> Joining Heart Rise is free, and selling regular stuff never needs an ID — ID is only for adult content and digital assets. When you do verify, your ID photo goes into a private vault for Chris to check, and it is permanently deleted the moment he approves or rejects it. Nothing is stored — no photo, no ID number, no birthdate. The only thing kept is a simple ‘age verified’ mark on your account.</p>' +
       (st && st.pending ? '<p class="dwc-info">🕐 Your ID is waiting for review — Chris reviews every ID himself.</p>' : "") +
       "</section>" +
       DFM_HTML +
@@ -10168,6 +11016,26 @@ window.DWC = {
     else return formErr(form, "Signed in, but that account didn't load — try refreshing the page.");
     return false;
   },
+  // Recovery code on the sign-in card (2026-11-23) — the box sits right
+  // under the password field so a locked-out member sees it without
+  // hunting for the forgot-password page. Same endpoint as
+  // forgot-password.html's box: code + new password, once, 24 hours.
+  useRecoveryCode: async function (form) {
+    var fd = new FormData(form);
+    var next = String(fd.get("new_password") || "");
+    if (!next) return formErr(form, "Type a new password first.");
+    if (next !== String(fd.get("new_password_confirm") || "")) return formErr(form, "Those two new passwords don't match — type the same one twice.");
+    var code = String(fd.get("code") || "").trim();
+    if (!code) return formErr(form, "Paste the recovery code Chris sent you first.");
+    var data = await apiPost("/auth", { action: "use-recovery", code: code, new_password: next });
+    if (!data || !data.ok || !data.device_id) return formErr(form, (data && data.error) || "That recovery code didn't work.");
+    try { localStorage.setItem(DEVICE_KEY, data.device_id); } catch (e) {}
+    formErr(form, "");
+    await refreshProfile();
+    if (state.profile) { setNotice("You're back in, @" + state.profile.username + "."); render(); }
+    else return formErr(form, "Password set, but that account didn't load — try refreshing the page.");
+    return false;
+  },
   // Set / change password from Edit profile ("Account & payouts" box).
   savePassword: async function (form) {
     var fd = new FormData(form);
@@ -10673,6 +11541,9 @@ window.DWC = {
   },
 
   saveProfile: async function (form) {
+    // The merged About Me box splits into bio + layout_css on save —
+    // sync the mirrors first so the gather below can never read stale.
+    aboutMeSync(document.querySelector('textarea[name="about_me"]'));
     var isNew = !state.profile;
     var fd = new FormData(form);
     // Rare Candy loading bar — the save (photo shrinking + upload +
@@ -11159,7 +12030,7 @@ window.DWC = {
         "The shop is still running a quick database update; try saving again later." + avatarNote + bannerNote + videoNote + pwNote + recNote);
     } else {
       // Build 5 — an operator edit names the member whose page saved.
-      setNotice((state.adminEditingMemberId ? "Saved @" + data.profile.username + "’s page." : (isNew ? "Welcome to YourSpace, @" + data.profile.username + " — you're on." : "Profile saved.")) + avatarNote + bannerNote + videoNote + pwNote + recNote);
+      setNotice((state.adminEditingMemberId ? "Saved @" + data.profile.username + "’s page." : (isNew ? "Welcome to Heart Rise, @" + data.profile.username + " — you're on." : "Profile saved.")) + avatarNote + bannerNote + videoNote + pwNote + recNote);
     }
     if (state.signupStep) {
       // Stepped signup — stay in the flow: advance one step and
@@ -12376,9 +13247,8 @@ window.DWC = {
     var pr = null;
     if (id) { for (var i = 0; i < LAYOUT_PRESETS.length; i++) if (LAYOUT_PRESETS[i].id === id) pr = LAYOUT_PRESETS[i]; }
     var form = document.querySelector("#dwc-account form");
-    var ta = form && form.querySelector('textarea[name="layout_css"]');
     var hidden = form && form.querySelector('input[name="layout_preset"]');
-    if (ta) ta.value = pr ? pr.css : "";
+    aboutMeSetCss(pr ? pr.css : "");
     if (hidden) hidden.value = id || "";
     // Reset the theme pickers to the preset's theme (v3.20 root fix) —
     // the old neon look (vibe, glow, effects, custom button CSS) must
@@ -12390,7 +13260,7 @@ window.DWC = {
     // background shows instead).
     if (pr) DWC.bgNote("Preset “" + pr.name + "” is on — your old background picture and preset are off; the preset’s own look is showing.");
     else DWC.bgNote("Preset off — your page is back to your own picks.");
-    applyPreviewCSS(ta ? ta.value : "");
+    applyPreviewCSS(aboutMeCss());
     document.querySelectorAll("[data-presetbtn]").forEach(function (b) {
       b.classList.toggle("active", b.getAttribute("data-presetbtn") === id);
     });
@@ -12778,59 +13648,415 @@ window.DWC = {
     DWC.refreshLayoutPreviewSoon();
   },
   layoutCssEdited: function (ta) {
-    var form = ta.closest("form");
-    var hidden = form && form.querySelector('input[name="layout_preset"]');
-    if (hidden) hidden.value = "custom";
-    DWC.myCodeCount(ta);
-    applyPreviewCSS(ta.value);
-    document.querySelectorAll("[data-presetbtn]").forEach(function (b) { b.classList.remove("active"); });
-    DWC.refreshLayoutPreviewSoon();
+    // Old My Code box is gone — the merged About Me box owns the code
+    // now. Keep this as a shim: anything that still calls it lands here.
+    DWC.aboutMeEdited(document.querySelector('textarea[name="about_me"]') || ta);
   },
   // Pasting a whole MySpace layout into My Code: keep the CSS from its
   // first <style> block, leave the rest out, and say so in plain words
   // under the box. A plain CSS paste (no <style> tag) goes through
   // untouched; the count below still reports the 8,000-char cap.
   myCodePasted: function (ev, ta) {
-    var clip = ev && ev.clipboardData && ev.clipboardData.getData ? ev.clipboardData.getData("text") : "";
-    if (!clip || !/<style[\s>]/i.test(clip)) {
-      // No style block: let the paste happen, then report the count —
-      // maxlength=8000 would otherwise cut it off silently.
-      setTimeout(function () { DWC.myCodeCount(ta); }, 0);
-      return;
-    }
-    if (ev.preventDefault) ev.preventDefault();
-    var css = extractStyleBlockCss(clip) || "";
-    // Name what was left out, in plain words — only the bits that
-    // were actually in the paste.
-    var leftOut = [];
-    if (/<script[\s>]/i.test(clip)) leftOut.push("scripts");
-    if (/\son\w+\s*=/i.test(clip)) leftOut.push("click/hover actions (event handlers)");
-    if (/<iframe[\s>]/i.test(clip)) leftOut.push("iframes");
-    if (/<form[\s>]/i.test(clip)) leftOut.push("forms");
-    if (/@import/i.test(clip)) leftOut.push("@import (outside stylesheets)");
-    if (/@font-face/i.test(clip)) leftOut.push("@font-face (outside fonts)");
-    if (/position\s*:\s*fixed/i.test(css)) leftOut.push("position:fixed (it becomes absolute so it can't cover the site)");
-    var start = ta.selectionStart != null ? ta.selectionStart : (ta.value || "").length;
-    var end = ta.selectionEnd != null ? ta.selectionEnd : start;
-    var next = (ta.value || "").slice(0, start) + css + (ta.value || "").slice(end);
-    var cut = false;
-    if (next.length > 8000) { next = next.slice(0, 8000); cut = true; }
-    ta.value = next;
-    var note = document.getElementById("dwc-mycode-note");
-    if (note) {
-      note.textContent = css
-        ? "Kept the CSS from your layout's <style> block (" + css.length + " characters). Left out: " + (leftOut.length ? leftOut.join(", ") : "the page HTML around it") + ". Your rules only ever restyle your own page." + (cut ? " That's over the 8,000-character limit — cut off at 8,000, the rest didn't fit." : "")
-        : "That paste had a <style> block but no CSS inside it — nothing was kept.";
-    }
-    DWC.layoutCssEdited(ta);
+    // Old My Code box is gone — the merged About Me box owns pastes now.
+    DWC.aboutMePasted(ev, document.querySelector('textarea[name="about_me"]') || ta);
   },
   // Character count under the My Code box, in plain words — the
   // 8,000-character cap is stated here, never applied silently.
   myCodeCount: function (ta) {
-    var count = document.getElementById("dwc-mycode-count");
-    var len = ta ? (ta.value || "").length : 0;
-    if (count) count.textContent = len.toLocaleString("en-US") + " / 8,000 characters" + (len >= 8000 ? " — that's the limit, anything past it won't save." : "");
+    // Counts now live on the merged box (aboutMeSync updates the bio +
+    // code counts). Keep the name so old callers don't break.
+    aboutMeSync(document.querySelector('textarea[name="about_me"]') || ta);
   },
+  // ---------- About Me merged box (2026-11-23) ----------
+  // The box holds code (<style> at the top) + bio words underneath.
+  // Every keystroke syncs the hidden bio / layout_css mirrors, so the
+  // existing save + preview gather (which read those fields) keep
+  // working unchanged, and the live preview updates as you type.
+  aboutMeEdited: function (ta) {
+    if (!ta) ta = document.querySelector('textarea[name="about_me"]');
+    if (!ta) return;
+    var split = aboutMeSync(ta);
+    var form = ta.closest("form");
+    var hidden = form && form.querySelector('input[name="layout_preset"]');
+    if (hidden) hidden.value = "custom";
+    // The 8,000-char code cap and the 500-char bio cap are enforced on
+    // the PARTS, not the whole box — warn before cutting, never silent.
+    var note = document.getElementById("dwc-mycode-note");
+    if (split.css.length >= 8000 && note) note.textContent = "That’s the 8,000-character code limit — anything past it won’t save.";
+    if (split.bio.length >= 500 && note) note.textContent = "That’s the 500-character bio limit — anything past it won’t save.";
+    applyPreviewCSS(split.css);
+    document.querySelectorAll("[data-presetbtn]").forEach(function (b) { b.classList.remove("active"); });
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Pasting into the merged box: the ONE translation engine
+  // (convertMySpaceLayout) extracts the first <style> block, translates
+  // the old MySpace hooks, normalizes bare hex, and applies the safety
+  // rules. Never fails silently: a paste with no usable CSS gets a
+  // plain-words note by the box, and every paste gets a "what changed /
+  // what was dropped and why" readout that stays until the next save.
+  aboutMePasted: function (ev, ta) {
+    var clip = ev && ev.clipboardData && ev.clipboardData.getData ? ev.clipboardData.getData("text") : "";
+    var note = document.getElementById("dwc-mycode-note");
+    var changes = document.getElementById("dwc-mycode-changes");
+    if (!clip) return;
+    if (!/<style[\s>]/i.test(clip) && !/\{[^}]*\}/.test(clip)) {
+      if (note) note.textContent = "That layout has no style block I can use — paste just the CSS, the part between <style> and </style>, or pick a layout from Taffy’s store.";
+      return;
+    }
+    if (ev.preventDefault) ev.preventDefault();
+    var out = convertMySpaceLayout(clip);
+    if (!out.ok) {
+      if (note) note.textContent = out.note;
+      return;
+    }
+    var css = out.css;
+    // Insert the converted CSS into the <style> block at the cursor if
+    // the cursor is in it, otherwise at the end of the block.
+    var val = ta.value || "";
+    var start = (typeof ta.selectionStart === "number") ? ta.selectionStart : val.length;
+    var end = (typeof ta.selectionEnd === "number") ? ta.selectionEnd : start;
+    var m = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/i.exec(val);
+    if (m) {
+      var innerStart = m.index + m[0].indexOf(">") + 1;
+      var innerEnd = m.index + m[0].lastIndexOf("<");
+      var at = Math.max(innerStart, Math.min(start, innerEnd));
+      var atEnd = Math.max(innerStart, Math.min(end, innerEnd));
+      var inner = val.slice(innerStart, innerEnd);
+      var before = inner.slice(0, at - innerStart);
+      var after = inner.slice(atEnd - innerStart);
+      var joiner = (before && before.slice(-1) !== "\n") ? "\n" : "";
+      ta.value = val.slice(0, innerStart) + before + joiner + css + after + val.slice(innerEnd);
+    } else {
+      var block = "<style>\n" + css + "\n</style>\n\n";
+      ta.value = val.slice(0, start) + block + val.slice(end);
+    }
+    if (note) note.textContent = "Kept the CSS from your layout’s <style> block (" + css.length + " characters).";
+    if (changes) changes.innerHTML = mySpaceChangesHTML(out);
+    DWC.aboutMeEdited(ta);
+  },
+  // ---------- Page formats (2026-11-23) ----------
+  // One click switches the format. It writes the EXPLICIT pick (the
+  // hidden input), marks the pill, opens the format's key section in
+  // the editor, and refreshes the live preview in the new format — the
+  // preview IS the profile page render. The editor's own section order
+  // stays fixed on purpose: re-rendering or moving form sections on
+  // click would lose unsaved edits, and every section is already one
+  // tap away on its accordion header.
+  applyPageFormat: function (id) {
+    if (PAGE_FORMAT_IDS.indexOf(id) < 0) return;
+    var form = document.querySelector("#dwc-account form");
+    var hidden = document.getElementById("dwc-format-value");
+    if (hidden) hidden.value = id;
+    document.querySelectorAll(".dwc-format-pill").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-format") === id);
+    });
+    var desc = document.getElementById("dwc-format-desc");
+    var f = PAGE_FORMATS.filter(function (x) { return x.id === id; })[0];
+    if (desc && f) desc.textContent = f.desc;
+    var key = FORMAT_KEY_SECTION[id];
+    if (key) {
+      var map = { selling: "dwc-sec-selling", style: "dwc-sec-style", music: "dwc-sec-radio" };
+      var el = document.getElementById(map[key] || "");
+      if (el) DWC.editorJump(map[key]);
+    }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // The sticky bar's Preview: scroll to the live preview at the top of
+  // the editor and flash it, so the member sees what visitors see.
+  previewProfile: function () {
+    var host = document.getElementById("dwc-layout-preview");
+    if (!host) return;
+    host.scrollIntoView({ behavior: "smooth", block: "start" });
+    host.classList.add("dwc-preview-flash");
+    setTimeout(function () { host.classList.remove("dwc-preview-flash"); }, 1200);
+  },
+  // Jump-to nav: open the accordion section that holds the target id,
+  // then scroll to it. (A plain #hash link can't land inside a closed
+  // <details>, so the nav calls this instead.)
+  editorJump: function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    var det = el.closest ? el.closest("details.dwc-edit-cat") : null;
+    if (det && !det.open) det.open = true;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+  },
+  // ---------- Header layout + Website header pills (2026-11-23) ----------
+  // Header layout (Social format): where the picture + name sit.
+  // "left" = picture top left, name under it; "center" = picture
+  // centered on top; "right" = picture on the left, name beside it.
+  // It drives the existing pic_position + cover_name settings.
+  setHeaderLayout: function (pos) {
+    var form = document.querySelector("#dwc-account form");
+    if (!form) return;
+    var picSel = form.querySelector('select[name="theme_pic_position"]');
+    var nameHidden = form.querySelector('input[name="theme_cover_name"]');
+    if (pos === "left") {
+      if (picSel) picSel.value = "normal";
+      if (nameHidden) nameHidden.value = "";
+      DWC.applyPicPosition("normal");
+      DWC.applyCoverName("under");
+    } else if (pos === "center") {
+      if (picSel) picSel.value = "top";
+      if (nameHidden) nameHidden.value = "";
+      DWC.applyPicPosition("top");
+      DWC.applyCoverName("under");
+    } else if (pos === "right") {
+      if (picSel) picSel.value = "normal";
+      if (nameHidden) nameHidden.value = "left";
+      DWC.applyPicPosition("normal");
+      DWC.applyCoverName("left");
+    }
+    document.querySelectorAll("[data-headerlayout]").forEach(function (b) {
+      b.classList.toggle("active", b.getAttribute("data-headerlayout") === pos);
+    });
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Generic pill setter for the Website header + links pills: set the
+  // hidden input, mark the pill in its group, refresh the preview.
+  _pillSet: function (inputName, value, btn) {
+    var form = document.querySelector("#dwc-account form");
+    var hidden = form && form.querySelector('input[name="' + inputName + '"]');
+    if (hidden) hidden.value = value;
+    if (btn && btn.parentElement) {
+      btn.parentElement.querySelectorAll(".dwc-pill").forEach(function (b) { b.classList.remove("active"); });
+      btn.classList.add("active");
+    }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  applyHeaderSide: function (v) { DWC._pillSet("theme_header_side", v || "", event && event.currentTarget); },
+  applyHeaderBorder: function (v) { DWC._pillSet("theme_header_border_width", v || "", event && event.currentTarget); },
+  applyHeaderRadius: function (v) { DWC._pillSet("theme_header_radius", v || "", event && event.currentTarget); },
+  // Links placement: "" = with the buttons (default); "left"/"right" =
+  // the links block moves into that page column; "header-below" /
+  // "header-bottom" = under the header / at the bottom of the header
+  // (those set header_links_pos, not a side).
+  applyLinksSide: function (v) {
+    var form = document.querySelector("#dwc-account form");
+    var btn = event && event.currentTarget;
+    if (v === "header-below" || v === "header-bottom") {
+      DWC._pillSet("theme_links_side", "", btn);
+      var hlp = form && form.querySelector('input[name="theme_header_links_pos"]');
+      if (hlp) hlp.value = v === "header-below" ? "below" : "bottom";
+      // The header_links_pos hidden input lives in the About box area's
+      // readTwoBox gather; keep the select in sync if one is present.
+      var hlpSel = form && form.querySelector('select[name="theme_header_links_pos"]');
+      if (hlpSel) hlpSel.value = v === "header-below" ? "below" : "bottom";
+    } else {
+      DWC._pillSet("theme_links_side", v || "", btn);
+      var hlp2 = form && form.querySelector('input[name="theme_header_links_pos"]');
+      if (hlp2) hlp2.value = "";
+    }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  applyLinksStack: function (v) { DWC._pillSet("theme_links_stack", v || "", event && event.currentTarget); },
+  applyLinksTop: function (v) {
+    var el = document.getElementById("dwc-links-top-val");
+    if (el) el.textContent = (!v || +v === 0) ? "Top" : v + "px";
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // ---------- Background picker (2026-11-23) ----------
+  // Library pick: set the picture URL + fit, turn the preset and the
+  // background colour off (same either/or rule as the other pickers).
+  bgLibraryPick: function (btn) {
+    var form = document.querySelector("#dwc-account form");
+    var url = btn && btn.getAttribute("data-bg-url");
+    var fit = (btn && btn.getAttribute("data-bg-fit")) || "cover";
+    if (!url) return;
+    var img = form && form.querySelector('input[name="theme_bg_image"]');
+    if (img) img.value = url;
+    var fitSel = form && form.querySelector('select[name="theme_page_image_fit"]');
+    if (fitSel) fitSel.value = fit === "tile" ? "tile" : "";
+    var preset = form && form.querySelector('[name="theme_bg_preset"]');
+    if (preset) preset.value = "";
+    DWC.clearBgColorPick();
+    document.querySelectorAll(".dwc-bg-lib-item").forEach(function (b) { b.classList.toggle("picked", b === btn); });
+    DWC.bgNote("Background set — the library picture is showing now. It turns the preset and the background colour off.");
+    DWC.refreshBgNow();
+    DWC.refreshLayoutPreviewSoon();
+    DWC.profileFormDirty();
+  },
+  // Upload a picture as the background: POSTs to /api/background
+  // (sign-in only, 2.5 MB cap, R2), then sets the URL like a paste.
+  backgroundFilePicked: async function (input) {
+    var note = document.getElementById("dwc-bg-upload-note");
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    if (note) note.textContent = "Uploading…";
+    try {
+      var fd = new FormData();
+      fd.append("image", file);
+      var res = await fetch("/api/background", { method: "POST", body: fd, credentials: "same-origin" });
+      var data = await res.json().catch(function () { return null; });
+      if (!res.ok || !data || !data.ok || !data.url) throw new Error((data && data.error) || ("Upload failed (" + res.status + ")"));
+      var form = document.querySelector("#dwc-account form");
+      var img = form && form.querySelector('input[name="theme_bg_image"]');
+      if (img) img.value = data.url;
+      DWC.bgImageChanged(img);
+      if (note) note.textContent = "Uploaded — your picture is your background now.";
+    } catch (e) {
+      if (note) note.textContent = "That upload didn’t work — " + (e && e.message ? e.message : "try again") + ".";
+      if (input) input.value = "";
+    }
+  },
+  pageImageFitChanged: function (v) {
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // ---------- Layout Converter (2026-11-23) ----------
+  convertLayout: function () {
+    var inp = document.getElementById("dwc-converter-in");
+    var out = document.getElementById("dwc-converter-out");
+    var note = document.getElementById("dwc-converter-note");
+    var changes = document.getElementById("dwc-converter-changes");
+    if (!inp || !out) return;
+    var res = convertMySpaceLayout(inp.value || "");
+    if (!res.ok) {
+      out.value = "";
+      if (note) note.textContent = res.note;
+      if (changes) changes.innerHTML = "";
+      return;
+    }
+    out.value = res.css;
+    if (note) note.textContent = "Converted — " + res.css.length + " characters of code. Same engine as the About Me box, so this is byte-for-byte what pasting it there would give you.";
+    if (changes) changes.innerHTML = mySpaceChangesHTML(res);
+  },
+  applyConverted: function () {
+    var out = document.getElementById("dwc-converter-out");
+    if (!out || !out.value.trim()) { setNotice("Convert a layout first — there’s nothing to apply yet."); return; }
+    if (!aboutMeSetCss(out.value)) { setNotice("Open Edit profile first — the About Me box isn’t on this page."); return; }
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+    setNotice("Applied to your page — hit Save profile to keep it.");
+  },
+  copyConverted: function () {
+    var out = document.getElementById("dwc-converter-out");
+    var css = out ? out.value : "";
+    if (!css.trim()) { setNotice("Convert a layout first — there’s nothing to copy yet."); return; }
+    DWC.copyText(css, "Copied the converted code — paste it anywhere, it’s yours.");
+  },
+  copyText: function (text, okMsg) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { setNotice(okMsg); }, function () { setNotice("Copy didn’t work — select the text and copy it by hand."); });
+    } else {
+      setNotice("Copy didn’t work here — select the text and copy it by hand.");
+    }
+  },
+  // ---------- Layout Bot (2026-11-23) ----------
+  // Client-side pattern matching ONLY — never real AI, never claimed
+  // to be. Coding questions and layout commands only. When it can't
+  // parse a request it says so in plain words and shows what it CAN
+  // do — never a silent failure, never a hallucinated answer.
+  layoutBotAsk: function () {
+    var inp = document.getElementById("dwc-layout-bot-in");
+    var out = document.getElementById("dwc-layout-bot-out");
+    if (!inp || !out) return;
+    var text = (inp.value || "").trim();
+    if (!text) { out.innerHTML = "Type what you want first — for example, “make my links sit on the left, stacked”.";
+      return; }
+    out.innerHTML = layoutBotAnswer(text);
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // ---------- Reveal sections (2026-11-23) ----------
+  revealAdd: function () {
+    var list = document.getElementById("dwc-reveal-list");
+    var count = document.getElementById("dwc-reveal-count");
+    if (!list) return;
+    var rows = list.querySelectorAll(".dwc-reveal-row");
+    if (rows.length >= 4) { setNotice("Four reveal links is the most — take one off to add another."); return; }
+    var id = "rv" + Date.now().toString(36);
+    var wrap = document.createElement("div");
+    wrap.innerHTML = revealRowHTML({ id: id, label: "View my products", section: "products" });
+    list.appendChild(wrap.firstChild);
+    if (count) count.textContent = list.querySelectorAll(".dwc-reveal-row").length + "/4";
+    DWC.revealChanged();
+  },
+  revealRemove: function (btn) {
+    var row = btn && btn.closest ? btn.closest(".dwc-reveal-row") : null;
+    if (row) row.remove();
+    var list = document.getElementById("dwc-reveal-list");
+    var count = document.getElementById("dwc-reveal-count");
+    if (list && count) count.textContent = list.querySelectorAll(".dwc-reveal-row").length + "/4";
+    DWC.revealChanged();
+  },
+  revealChanged: function () {
+    var list = document.getElementById("dwc-reveal-list");
+    var hidden = document.getElementById("dwc-reveal-value");
+    if (!list || !hidden) return;
+    var rows = list.querySelectorAll(".dwc-reveal-row");
+    var out = [];
+    rows.forEach(function (row) {
+      var label = (row.querySelector("input") || {}).value || "";
+      var section = (row.querySelector("select") || {}).value || "";
+      var id = row.getAttribute("data-reveal-id") || ("rv" + out.length);
+      if (label.trim() && section) out.push({ id: id, label: label.trim().slice(0, 40), section: section });
+    });
+    hidden.value = JSON.stringify(out.slice(0, 4));
+    DWC.profileFormDirty();
+    DWC.refreshLayoutPreviewSoon();
+  },
+  // Show a revealed section (a "fake page"): hide the page columns and
+  // unveil the target section. The Back link brings the page back.
+  // The reveal buttons stay visible above it — they are the nav bar
+  // between the fake pages. Products + posts load on first show.
+  showReveal: function (id) {
+    var host = document.getElementById("dwc-reveal-host");
+    if (!host) return;
+    var page = document.querySelector(".dwc-myprofile .dwc-member-cols, .dwc-myprofile #dwc-member-cols");
+    var secs = host.querySelectorAll(".dwc-reveal-sec");
+    var target = null;
+    secs.forEach(function (s) {
+      var on = s.getAttribute("data-reveal-sec") === id;
+      s.hidden = !on;
+      if (on) target = s;
+    });
+    host.hidden = false;
+    if (page) page.style.display = "none";
+    var head = document.querySelector(".dwc-myprofile .dwc-mypage-head");
+    if (head) head.style.display = "none";
+    host.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (target) {
+      var kind = target.getAttribute("data-reveal-kind");
+      if (kind === "products") DWC.loadRevealProducts();
+      if (kind === "posts") DWC.loadRevealPosts();
+    }
+  },
+  // The posts reveal section: the member's feed, first page only,
+  // straight from the same /posts endpoint as the page's own feed.
+  loadRevealPosts: async function () {
+    var host = document.getElementById("dwc-reveal-posts-list");
+    if (!host || !state.viewingMember) return;
+    var data = await apiGet("/posts?profile_id=" + state.viewingMember.id + "&limit=10&device_id=" + encodeURIComponent(deviceId()));
+    var posts = (data && data.posts) || [];
+    host.innerHTML = posts.length ? posts.map(postCardHTML).join("") : '<p style="color:var(--muted)">No posts yet.</p>';
+  },
+  hideReveal: function () {
+    var host = document.getElementById("dwc-reveal-host");
+    if (host) host.hidden = true;
+    var page = document.querySelector(".dwc-myprofile .dwc-member-cols, .dwc-myprofile #dwc-member-cols");
+    if (page) page.style.display = "";
+    var head = document.querySelector(".dwc-myprofile .dwc-mypage-head");
+    if (head) head.style.display = "";
+  },
+  // The products reveal section auto-fills from the member's shop
+  // listings — the same endpoint as the page's own listings section.
+  loadRevealProducts: async function () {
+    var host = document.getElementById("dwc-reveal-products-list");
+    if (!host || !state.viewingMember) return;
+    var data = await apiGet("/listings?profile_id=" + state.viewingMember.id + "&limit=12&device_id=" + encodeURIComponent(deviceId()));
+    var items = (data && data.listings) || [];
+    if (!items.length) {
+      host.innerHTML = '<p style="color:var(--muted)">Nothing listed yet — check back soon.</p>';
+      return;
+    }
+    host.innerHTML = '<div class="dwc-member-listings-grid">' + items.map(listingCardHTML).join("") + "</div>";
+  },
+
   // ---------- v3.10 Taffy Layout Builder (no code generation) ----------
   // The vibe dropdown + accent color are REAL theme settings: they map
   // to theme.vibe / theme.accent_color, change the live preview at once,
@@ -12951,8 +14177,7 @@ window.DWC = {
       }
       DWC.applyThemeToForm(merged);
       DWC.restoreFormStructural(form, keep);
-      var cssTa = form && form.querySelector('textarea[name="layout_css"]');
-      if (cssTa) cssTa.value = item.css || "";
+      aboutMeSetCss(item.css || "");
       var lp = form && form.querySelector('input[name="layout_preset"]');
       if (lp) lp.value = item.id;
       if (item.website) DWC.pageModePicked({ value: "website" });
@@ -13464,17 +14689,23 @@ window.DWC = {
     DWC.profileFormDirty(); DWC.refreshLayoutPreviewSoon();
   },
   jumpMyCode: function (n) {
-    var ta = document.querySelector('#dwc-account textarea[name="layout_css"]');
+    var ta = document.querySelector('textarea[name="about_me"]');
     if (!ta) return;
     var labels = { 1: "HEADER — the top picture + your name", 2: "NAME + BIO — display name, bio, meta line", 3: "ABOUT — hobbies, work, sign, accomplishments", 4: "LINKS — your link buttons", 5: "TOP FRIENDS — the Top Friends box", 6: "BUTTONS — Add me / Message me / Favorites / group", 7: "COMMENTS — page comments + comment pictures", 8: "SOUND — the player box", 9: "WHOLE PAGE — background, cards, anything else" };
     var needle = "/* ===== " + n + ".";
     var idx = ta.value.indexOf(needle);
     if (idx < 0) {
       var insert = "/* ===== " + n + ". " + (labels[n] || "") + " ===== */\n\n";
+      // Markers are CSS, so they live inside the <style> block: at the
+      // cursor if it's in the block, otherwise just before </style>.
+      var m = /<\/style\s*>/i.exec(ta.value);
       var at = (typeof ta.selectionStart === "number") ? ta.selectionStart : ta.value.length;
+      if (m && at > m.index) at = m.index;
+      if (!m) at = ta.value.length;
       ta.value = ta.value.slice(0, at) + insert + ta.value.slice(at);
       idx = at;
       DWC.profileFormDirty();
+      aboutMeSync(ta);
     }
     ta.focus({ preventScroll: true });
     ta.selectionStart = ta.selectionEnd = idx;
@@ -14032,26 +15263,32 @@ window.DWC = {
   // layout CSS first, then the theme (pickers win), so the preview shows
   // exactly what visitors will see after Save.
   refreshEditorSummaries: function (th, form) {
-    var host = document.getElementById("dwc-sec-body");
-    if (!host) return;
-    var sums = host.querySelectorAll("details.dwc-edit-group > summary");
-    if (!sums.length) return;
+    // The editor is an accordion now: each section is a
+    // <details class="dwc-edit-cat">, and the ones whose label is live
+    // (background, music, ...) carry a <summary data-sum="key">.
+    // Static sections keep the label written in the form HTML.
+    // The old #dwc-sec-body host is gone — find the sections in the
+    // form instead of indexing into a dropped list.
+    var f = form || document.querySelector("#dwc-account form");
+    if (!f) return;
     var p = state.profile || {};
     var ov = (th.overlay_items || []).length;
-    var labels = [
-      "🖼️ Make it one picture — " + (ov ? ov + (ov === 1 ? " item placed" : " items placed") : "no overlays yet"),
-      "🖼️ Background — " + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset" : th.bg_color ? "your colour" : "layout default"),
-      "➗ Divider — " + (th.divider || "none"),
-      "🔘 Buttons — " + (th.buttons_visible ? th.buttons_visible.length : 4) + " showing",
-      "🎵 Music — " + audioPickLabel(th, p),
-      "✨ Effects — " + ((th.effects || []).length ? th.effects.length + " on" : "none yet"),
-      "🎨 Layouts — " + (th.vibe || "no layout"),
-      "🏅 Badges — " + ((p.badges || []).length) + " unlocked",
-      "🌐 Page style — " + (p.website_mode ? "Website look" : "MySpace look"),
-      "↔️ Spacing — " + ((th.pad_page || th.pad_cards || th.pad_header) ? "custom" : "Normal"),
-      "💻 Your body code — " + (form && form.querySelector('textarea[name="layout_css"]') && form.querySelector('textarea[name="layout_css"]').value.trim() ? "has code" : "empty")
-    ];
-    sums.forEach(function (sm, i) { if (labels[i]) sm.textContent = labels[i]; });
+    var labels = {
+      overlay: "🖼️ Make it one picture — " + (ov ? ov + (ov === 1 ? " item placed" : " items placed") : "no overlays yet"),
+      bg: "🖼️ Background — " + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset" : th.bg_color ? "your colour" : "layout default"),
+      divider: "➗ Divider — " + (th.divider || "none"),
+      buttonsmenu: "🔘 Buttons — " + (th.buttons_visible ? th.buttons_visible.length : 4) + " showing",
+      music: "🎵 Music — " + audioPickLabel(th, p),
+      effects: "✨ Effects — " + ((th.effects || []).length ? th.effects.length + " on" : "none yet"),
+      layouts: "🎨 Layouts — " + (th.vibe || "no layout"),
+      badges: "🏅 Badges — " + ((p.badges || []).length) + " unlocked",
+      style: "🌐 Page style — " + (p.website_mode ? "Website look" : "MySpace look"),
+      spacing: "↔️ Spacing — " + ((th.pad_page || th.pad_cards || th.pad_header) ? "custom" : "Normal")
+    };
+    f.querySelectorAll("details.dwc-edit-cat > summary[data-sum]").forEach(function (sm) {
+      var key = sm.getAttribute("data-sum");
+      if (labels[key]) sm.textContent = labels[key];
+    });
   },
   refreshLayoutPreview: function () {
     var host = $("dwc-layout-preview");
@@ -14612,8 +15849,7 @@ window.DWC = {
   },
   // My Code — copy the member's own hand-written CSS out of the box.
   copyMyCode: function () {
-    var ta = document.querySelector('textarea[name="layout_css"]');
-    var css = ta ? ta.value : "";
+    var css = aboutMeCss();
     if (!css.trim()) { setNotice("Your My Code box is empty — nothing to copy yet."); return; }
     var done = function () { setNotice("Copied your code — paste it anywhere, it's yours."); };
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -14892,14 +16128,14 @@ window.DWC = {
     if (app === "mystuff") loadMyStuff();
     renderPhone();
   },
-  // Lucre (v3.11) — weekly check-in from the wallet on the home page.
+  // Lucre (v3.11) — daily check-in from the wallet on the home page.
   lucreCheckin: async function () {
     if (!state.profile) return;
     var data = await apiPost("/lucre", { device_id: deviceId(), action: "checkin" });
     if (!data) return;
     if (!data.ok) { setNotice(data.error || "Check-in didn't go through — try again."); return; }
     await loadLucre();
-    setNotice(data.bonus_paid ? "Checked in! +5 " + LUCRE_SYMBOL + " — and a 50 " + LUCRE_SYMBOL + " streak bonus for 7 weeks in a row! 🔥" : "Checked in! +5 " + LUCRE_SYMBOL + " — see you next week.");
+    setNotice(data.bonus_paid ? "Checked in! +1 " + LUCRE_SYMBOL + " — and a 5 " + LUCRE_SYMBOL + " streak bonus for 7 days in a row! 🔥" : "Checked in! +1 " + LUCRE_SYMBOL + " — see you tomorrow.");
   },
   // Layout Store (v3.11) — filter, preview, apply, buy, revert.
   storeFilter: function (f) {
@@ -14950,8 +16186,7 @@ window.DWC = {
       }
       DWC.applyThemeToForm(merged);
       DWC.restoreFormStructural(form, keep);
-      var cssTa = form && form.querySelector('textarea[name="layout_css"]');
-      if (cssTa) cssTa.value = item.css || "";
+      aboutMeSetCss(item.css || "");
       var lp = form && form.querySelector('input[name="layout_preset"]');
       if (lp) lp.value = item.id;
       if (item.website) DWC.pageModePicked({ value: "website" });
@@ -14994,8 +16229,7 @@ window.DWC = {
     var form = document.querySelector("#dwc-account form");
     if (form) {
       DWC.applyThemeToForm(parseThemeClient(saved.theme));
-      var cssTa = form.querySelector('textarea[name="layout_css"]');
-      if (cssTa) cssTa.value = saved.css;
+      aboutMeSetCss(saved.css);
       var lp = form.querySelector('input[name="layout_preset"]');
       if (lp) lp.value = saved.preset;
     }
@@ -15089,8 +16323,7 @@ window.DWC = {
   // CSS is whatever is in the box right now.
   publishLayout: async function () {
     if (!state.profile) return;
-    var ta = document.querySelector('textarea[name="layout_css"]');
-    var css = ta ? ta.value : "";
+    var css = aboutMeCss();
     var nameEl = document.getElementById("dwc-publish-name");
     var descEl = document.getElementById("dwc-publish-desc");
     var name = (nameEl ? nameEl.value : "").trim();
@@ -15262,14 +16495,9 @@ window.DWC = {
     DWC.phoneMinimize();
     DWC.editProfile();
     setTimeout(function () {
-      var ta = document.querySelector('textarea[name="layout_css"]');
-      if (!ta) { setNotice("Open Edit profile and paste this into My Code."); return; }
-      var cur = ta.value || "";
-      if (cur && cur.slice(-1) !== "\n") cur += "\n";
-      ta.value = cur + css + "\n";
-      if (typeof DWC.layoutCssEdited === "function") DWC.layoutCssEdited(ta);
-      ta.scrollIntoView({ behavior: "smooth", block: "center" });
-      ta.focus();
+      if (!aboutMeAppendCss(css)) { setNotice("Open Edit profile and paste this into the About Me box."); return; }
+      var ta = document.querySelector('textarea[name="about_me"]');
+      if (ta) { ta.scrollIntoView({ behavior: "smooth", block: "center" }); ta.focus(); }
       setNotice("Added to your My Code — hit Save profile to keep it.");
     }, 150);
   },
@@ -15288,7 +16516,7 @@ window.DWC = {
     DWC.editProfile();
     // Land on the source code editor (My Code), not the top of the form.
     setTimeout(function () {
-      var ta = document.querySelector('textarea[name="layout_css"]');
+      var ta = document.querySelector('textarea[name="about_me"]');
       if (ta) { ta.scrollIntoView({ behavior: "smooth", block: "center" }); ta.focus(); }
     }, 80);
   },

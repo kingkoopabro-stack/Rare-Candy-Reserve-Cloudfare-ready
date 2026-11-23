@@ -730,6 +730,12 @@ export function sanitizeLayoutCss(input) {
   css = css.replace(/@import[^;{}]*;?/gi, "");
   css = css.replace(/@font-face[\s\S]*?}/gi, "");
   css = css.replace(/@charset[^;{}]*;?/gi, "");
+  // Drop whole declarations that carry code-execution payloads, instead
+  // of neutering the token and leaving the payload text behind
+  // (client mirror — same rule as sanitizeLayoutCssClient).
+  css = css.replace(/[a-z-]+\s*:[^;{}]*(?:javascript|vbscript)\s*:[^;{}]*;?/gi, "");
+  css = css.replace(/[a-z-]+\s*:[^;{}]*expression\s*\([^;{}]*;?/gi, "");
+  css = css.replace(/(?:^|[;{])\s*behavior\s*:[^;{}]*;?/gi, "$1");
   css = css.replace(/javascript\s*:/gi, "");
   css = css.replace(/vbscript\s*:/gi, "");
   css = css.replace(/expression\s*\(/gi, "nope(");
@@ -1830,7 +1836,7 @@ export const LUCRE_SYMBOL = "◈";
 export const LUCRE_AWARDS = {
   post: 10, listing: 10, profile: 10, comment: 10, heart: 5,
   transaction: 40, suggestion: 40, friend: 5, favorite: 5, share: 5,
-  song: 10, radio_first: 10, profile_complete: 10, checkin: 5, checkin_bonus: 50,
+  song: 10, radio_first: 10, profile_complete: 10, checkin: 1, checkin_bonus: 5,
 };
 // Priced Layout Store items (server-side source of truth for purchase —
 // the client catalog must match these ids and prices; the client never
@@ -1860,9 +1866,9 @@ export const LUCRE_STORE_PRICES = {
   // ("That item isn't for sale with Lucre"). 50 matches the client.
   "store:gilded-scarab": 50,
 };
-export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive weekly check-in pays the bonus
-export const LUCRE_CHECKIN_MIN_MS = 7 * 86400000; // one check-in per week, rolling 7-day window
-export const LUCRE_CHECKIN_STREAK_MS = 14 * 86400000; // check in within 14 days to keep the streak
+export const LUCRE_CHECKIN_BONUS_STREAK = 7; // 7th consecutive daily check-in pays the bonus
+export const LUCRE_CHECKIN_MIN_MS = 86400000; // one check-in per day, rolling 24-hour window
+export const LUCRE_CHECKIN_STREAK_MS = 2 * 86400000; // check in within 2 days to keep the streak
 
 export async function lucreBalance(db, profileId) {
   if (!profileId) return 0;
@@ -1901,9 +1907,9 @@ export async function lucreOwned(db, profileId) {
     return (results || []).map((r) => r.item_id);
   } catch { return []; }
 }
-// Weekly check-in state. A check-in is allowed once per rolling 7 days.
-// The streak counts consecutive weekly check-ins; a gap over 14 days
-// resets it. The 7th consecutive check-in pays the 50 Lucre bonus and
+// Daily check-in state. A check-in is allowed once per rolling 24 hours.
+// The streak counts consecutive daily check-ins; a gap over 2 days
+// resets it. The 7th consecutive check-in pays the 5 Lucre bonus and
 // the streak starts over.
 export async function lucreCheckinState(db, profileId) {
   const empty = { streak: 0, total_checkins: 0, last_checkin_at: 0, can_check_in: true, next_checkin_at: 0, bonus_at_streak: LUCRE_CHECKIN_BONUS_STREAK };
@@ -1922,7 +1928,7 @@ export async function lucreCheckinState(db, profileId) {
 }
 export async function lucreDoCheckin(db, profileId) {
   const state = await lucreCheckinState(db, profileId);
-  if (!state.can_check_in) return { ok: false, error: "Already checked in this week — come back after 7 days.", state };
+  if (!state.can_check_in) return { ok: false, error: "Already checked in today — come back tomorrow.", state };
   const now = nowMs();
   let streak = 1;
   if (state.last_checkin_at > 0 && (now - state.last_checkin_at) <= LUCRE_CHECKIN_STREAK_MS) streak = state.streak + 1;
@@ -1935,7 +1941,7 @@ export async function lucreDoCheckin(db, profileId) {
   } catch { return { ok: false, error: "Check-ins aren't switched on yet — the shop is still running a quick database update. Try again later.", state }; }
   const base = await awardLucre(db, profileId, LUCRE_AWARDS.checkin, "checkin", String(Math.floor(now / LUCRE_CHECKIN_MIN_MS)));
   let bonus = { awarded: false, balance: base.balance };
-  // Bonus ref includes the week number, so the next 7-week cycle pays
+  // Bonus ref includes the day number, so the next 7-day cycle pays
   // again — a bare "streak-7" ref would collide and block it forever.
   if (paysBonus) bonus = await awardLucre(db, profileId, LUCRE_AWARDS.checkin_bonus, "checkin_bonus", "streak-" + streak + ":" + String(Math.floor(now / LUCRE_CHECKIN_MIN_MS)));
   return { ok: true, error: null, streak: newStreak, bonus_paid: paysBonus, awarded: base.awarded, balance: bonus.balance, state: await lucreCheckinState(db, profileId) };
@@ -1961,6 +1967,13 @@ export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments",
 // What I sell, Steady Wave radio. Rides in the theme JSON, so no
 // migration. Any other order is dropped on parse; missing = default.
 export const SECTION_ORDER_IDS = ["about", "seller", "radio"];
+// Page formats (2026-11-23) — one-click page kinds: a shop (Seller),
+// a social profile (Social, the modernized default), a personal
+// website (Website, the old Website look), a blog (Blog), or a
+// musician page (Musician). Stored in the theme JSON, no D1 column.
+// "" = never picked: the member keeps their current look (Social for
+// MySpace look, Website for Website look).
+export const PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician"];
 const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
 export function extractYouTubeId(str) {
   if (!str) return "";
@@ -2002,7 +2015,7 @@ export function parseSoundCloudUrl(str) {
   return "https://soundcloud.com/" + m[1] + "/" + m[3];
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "" };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [] };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -2041,6 +2054,49 @@ export function parseTheme(stored) {
   // embed replaces the built-in player. The link itself is validated
   // below; a bad link stores as "" and the player renders nothing.
   out.soundscape = obj.soundscape === "radio" || obj.soundscape === "spotify" || obj.soundscape === "soundcloud" || SOUNDSCAPE_IDS.includes(obj.soundscape) ? obj.soundscape : "";
+  // Page format (2026-11-23) — one of the five kinds, "" = never
+  // picked (the member keeps their current look). Unknown values
+  // fall back to "", never to a made-up format.
+  out.page_format = PAGE_FORMAT_IDS.includes(String(obj.page_format || "")) ? String(obj.page_format) : "";
+  // Website-format header (2026-11-23) — border, corners, crop, and
+  // whether the profile picture shows at all.
+  out.header_border_width = ["2", "6"].includes(String(obj.header_border_width || "")) ? String(obj.header_border_width) : "";
+  out.header_radius = ["8", "24"].includes(String(obj.header_radius || "")) ? String(obj.header_radius) : "";
+  out.header_border_color = hex(obj.header_border_color);
+  out.header_crop = ["top", "bottom"].includes(String(obj.header_crop || "")) ? String(obj.header_crop) : "";
+  out.hide_avatar = obj.hide_avatar === true;
+  out.header_links_pos = ["below", "bottom"].includes(String(obj.header_links_pos || "")) ? String(obj.header_links_pos) : "";
+  // Links-block placement (2026-11-23) — where the links block sits
+  // and how it stacks. "" = default (inside the Connect card, in a
+  // row). "left"/"right" moves the block into that page column;
+  // "column" stacks the links one below the other; links_top is a
+  // 0-120px nudge down, so the member can line the block up with a
+  // region of their background (e.g. where it turns green). No image
+  // color-detection is done anywhere — the member nudges by eye.
+  out.links_side = ["left", "right"].includes(String(obj.links_side || "")) ? String(obj.links_side) : "";
+  out.links_stack = (String(obj.links_stack || "") === "column") ? "column" : "";
+  const lt = parseInt(String(obj.links_top || ""), 10);
+  out.links_top = (!isNaN(lt) && lt >= 0 && lt <= 120) ? String(lt) : "";
+  // Header on the side (2026-11-23) — "" = header on top (default);
+  // "left"/"right" puts the banner + head in a side column.
+  out.header_side = ["left", "right"].includes(String(obj.header_side || "")) ? String(obj.header_side) : "";
+  // Action-button order (2026-11-23) — the display order of the four
+  // buttons; [] = the built-in order (add, message, favorite, group).
+  // The bot and the simple editor both write this; render falls back
+  // to the built-in order for any missing key.
+  const bo = Array.isArray(obj.buttons_order) ? obj.buttons_order : [];
+  out.buttons_order = [...new Set(bo.map((k) => String(k || "")))].filter((k) => ["add", "message", "favorite", "group"].includes(k)).slice(0, 4);
+  // Reveal sections / "fake pages" (2026-11-23) — up to 4 buttons that
+  // hide the current page and unveil a hidden section. section is one
+  // of the page sections or "products" (auto-filled from the member's
+  // shop listings). id is a short stable key, label is the button text.
+  const REVEAL_SECTIONS = ["products", "about", "seller", "radio", "top8", "posts"];
+  const rv = Array.isArray(obj.reveal_sections) ? obj.reveal_sections : [];
+  out.reveal_sections = rv.filter((r) => r && typeof r === "object").map((r) => ({
+    id: String(r.id || "").slice(0, 24),
+    label: String(r.label || "").slice(0, 40),
+    section: String(r.section || ""),
+  })).filter((r) => r.id && r.label && REVEAL_SECTIONS.includes(r.section)).slice(0, 4);
   out.spotify_url = spotifyCanonicalUrl(obj.spotify_url);
   out.soundcloud_url = parseSoundCloudUrl(obj.soundcloud_url);
   out.player_skin = PLAYER_SKIN_IDS.includes(obj.player_skin) ? obj.player_skin : "";
@@ -2223,14 +2279,14 @@ export function parseTheme(stored) {
   out.header_fit = ["cover", "stretch", "contain"].indexOf(String(obj.header_fit || "")) >= 0 ? String(obj.header_fit) : "cover";
   out.header_ratio = ["16:9", "21:9", "4:3", "auto"].indexOf(String(obj.header_ratio || "")) >= 0 ? String(obj.header_ratio) : "auto";
   out.header_use_default = obj.header_use_default === false ? false : true;
-  out.page_image_fit = ["cover", "stretch", "contain"].indexOf(String(obj.page_image_fit || "")) >= 0 ? String(obj.page_image_fit) : "";
+  out.page_image_fit = ["cover", "stretch", "contain", "tile"].indexOf(String(obj.page_image_fit || "")) >= 0 ? String(obj.page_image_fit) : "";
   return out;
 }
 // Validate + normalize a theme from a client save. Returns the JSON string
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

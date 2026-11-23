@@ -1,6 +1,6 @@
 // GET /api/lucre?device_id= — the member's Lucre wallet: balance,
-// recent earnings, weekly check-in state, owned store items.
-// POST /api/lucre — actions: checkin (weekly, once per 7 days),
+// recent earnings, daily check-in state, owned store items.
+// POST /api/lucre — actions: checkin (daily, once per 24 hours),
 // purchase (a priced Layout Store item), radio-first (first radio
 // listen, once ever), share (once per post/listing shared), song
 // (once per song ref — wired when song uploads land), grant
@@ -22,7 +22,7 @@ const REASON_LABELS = {
   suggestion: "Suggestion accepted", friend: "Added a friend",
   favorite: "Favorited a member", share: "Shared a post", song: "Uploaded a song",
   radio_first: "First radio listen", profile_complete: "Finished setting up your profile",
-  checkin: "Weekly check-in", checkin_bonus: "7-week check-in bonus",
+  checkin: "Daily check-in", checkin_bonus: "7-day check-in bonus",
   purchase: "Bought in the Layout Store",
 };
 function labelFor(reason) { return REASON_LABELS[reason] || reason; }
@@ -53,7 +53,7 @@ export async function onRequestPost({ env, request }) {
   if (!me) return fail("Create your profile first — your Lucre wallet lives on it.");
   const action = String(a.action || "");
 
-  // Weekly check-in — once per rolling 7 days, server-enforced.
+  // Daily check-in — once per rolling 24 hours, server-enforced.
   if (action === "checkin") {
     const res = await lucreDoCheckin(db, me.id);
     if (!res.ok) return json({ ok: false, error: res.error, balance: await lucreBalance(db, me.id), checkin: res.state });
@@ -71,7 +71,7 @@ export async function onRequestPost({ env, request }) {
     const owned = await lucreOwned(db, me.id);
     if (owned.includes(itemId)) return json({ ok: true, error: null, already_owned: true, balance: await lucreBalance(db, me.id), owned });
     const balance = await lucreBalance(db, me.id);
-    if (balance < price) return fail("Not enough Lucre yet — earn more by posting, commenting, and checking in weekly.");
+    if (balance < price) return fail("Not enough Lucre yet — earn more by posting, commenting, and checking in daily.");
     const paid = await awardLucre(db, me.id, -price, "purchase", itemId);
     if (!paid.awarded) return fail("That purchase already went through — check your owned layouts.");
     try {

@@ -1300,9 +1300,17 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-page-comment:last-of-type{border-bottom:0}
 .dwc-page-comment>div{flex:1;min-width:0}
 .dwc-admin-list{display:flex;flex-direction:column;gap:4px}
-.dwc-admin-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.dwc-admin-row{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
 .dwc-admin-row:last-of-type{border-bottom:0}
 .dwc-admin-row select{max-width:110px}
+.dwc-admin-row>a{flex-shrink:0}
+.dwc-admin-row .btn,.dwc-admin-row select{white-space:nowrap}
+/* Recovery-code box on the sign-in card — amber border so a locked-out
+   member spots it right under the password field (2026-11-23). */
+.dwc-recovery-box{max-width:340px;margin:14px auto 0;text-align:left;border:2px solid var(--amber,#ffb020);border-radius:14px;padding:14px 16px;background:rgba(255,176,32,.07)}
+.dwc-recovery-box h4{margin:0 0 4px}
+.dwc-recovery-box label{font-size:13px}
+.dwc-recovery-box input[name="code"]{width:100%;box-sizing:border-box;font-family:ui-monospace,Menlo,Consolas,monospace}
 
 /* Horizontal-overflow hardening (base, 2026-11-23 — moved out of the
    ≤640px query so long words / wide images can't overflow on desktop
@@ -1584,10 +1592,10 @@ img { max-width: 100%; height: auto; }
 
 /* Composer — collapsed by default: one compact line. Expanded: the
    full composer, with a Minimize button (RGB/neon border) top-right. */
-.dwc-composer{margin-bottom:12px}
-.dwc-composer-mini{display:flex;align-items:center;gap:10px}
+.dwc-composer{margin-bottom:14px;border:2px solid var(--violet);box-shadow:0 0 18px rgba(255,45,149,.35),0 0 34px rgba(0,229,255,.25)}
+.dwc-composer-mini{display:flex;align-items:center;gap:12px}
 .dwc-composer-mini[hidden],.dwc-composer-full[hidden]{display:none}
-.dwc-composer-prompt{flex:1;min-width:0;text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:999px;color:var(--muted);padding:10px 14px;font-size:14.5px;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwc-composer-prompt{flex:1;min-width:0;text-align:left;background:var(--panel2);border:2px solid var(--line);border-radius:999px;color:var(--ink);padding:14px 18px;font-size:16px;font-weight:600;cursor:text;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dwc-composer-prompt:hover{border-color:var(--violet);color:var(--ink)}
 .dwc-composer-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .dwc-composer-hint{margin:4px 0 0;color:var(--muted);font-size:13.5px}
@@ -1829,3 +1837,57 @@ span.dwc-cassette-tape{cursor:default}
 .dwc-spotify-login:hover{background:#1ed760}
 .dwc-embed-player{margin:8px 0}
 .dwc-embed-player iframe{display:block;width:100%;border:0;border-radius:12px}
+
+/* ---------- Editor redo (2026-11-23) — two columns, accordion, formats ---------- */
+/* Balanced two-column editor: the sections flow into two columns and
+   the browser balances them, so there is no big empty patch under the
+   shorter side — open a section and the columns re-balance. About Me
+   is first in the flow, so it stays at the top of the first column.
+   Each section keeps itself whole (break-inside:avoid) and never
+   splits across columns. Stacks to one column on phones. */
+.dwc-edit-cols{columns:2;column-gap:18px;column-fill:balance}
+.dwc-edit-cols > .dwc-edit-sec,.dwc-edit-cols > .dwc-edit-cat{break-inside:avoid}
+@media (max-width:640px){.dwc-edit-cols{columns:1}}
+/* Accordion categories: the section header is the whole affordance —
+   tap it to open, tap again to close. Only the About Me box (top of
+   the left column) is open on load; everything else starts closed,
+   which is what gets the editor down to ~1–2 scrolls. */
+.dwc-edit-cat{margin:10px 0}
+.dwc-edit-cat > summary{list-style:none}
+.dwc-edit-cat > summary::-webkit-details-marker{display:none}
+.dwc-edit-cat > summary::before{content:"▸ ";color:var(--pink)}
+.dwc-edit-cat[open] > summary::before{content:"▾ ";color:var(--pink)}
+/* About Me merged box: code at the top, bio underneath, one textarea. */
+#dwc-about-me{width:100%;min-height:260px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.5;resize:vertical}
+/* Page format picker — one click, five formats. */
+.dwc-format-picker{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.dwc-format-pill{border:2px solid var(--line);background:rgba(255,255,255,.05);color:var(--ink);border-radius:999px;padding:9px 15px;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em}
+.dwc-format-pill.active{border-color:var(--pink);background:rgba(255,45,149,.15);color:#ffd7ef;box-shadow:0 0 14px rgba(255,45,149,.45)}
+.dwc-format-pill:hover{border-color:var(--cyan)}
+/* Layout Converter: input + converted output, side by side on desktop. */
+.dwc-layout-converter textarea{width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;resize:vertical}
+#dwc-converter-out{background:rgba(255,255,255,.04)}
+/* Background library: a grid of small previews; the picked one is
+   ringed pink. */
+.dwc-bg-lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin:8px 0}
+.dwc-bg-lib-item{border:2px solid var(--line);border-radius:8px;padding:0;overflow:hidden;cursor:pointer;background:var(--panel);color:var(--ink);font-family:inherit;text-align:left}
+.dwc-bg-lib-item img{display:block;width:100%;height:64px;object-fit:cover}
+.dwc-bg-lib-item span{display:block;font-size:12px;padding:4px 6px}
+.dwc-bg-lib-item.picked{border-color:var(--pink);box-shadow:0 0 12px rgba(255,45,149,.5)}
+/* Links placement: stacked = one below the other, not a row. */
+.dwc-links-stack-col .dwc-links{flex-direction:column;align-items:flex-start}
+.dwc-links-dock{margin:0 0 12px}
+.dwc-links-dock-left,.dwc-links-dock-right{margin-top:0}
+/* Header on the side: banner + head in a narrow side column, the rest
+   of the page beside it. */
+.dwc-side-header-layout{display:grid;gap:12px;margin-bottom:12px}
+.dwc-side-header-left{grid-template-columns:260px 1fr}
+.dwc-side-header-right{grid-template-columns:1fr 260px}
+@media (max-width:640px){.dwc-side-header-left,.dwc-side-header-right{grid-template-columns:1fr}}
+/* Reveal sections ("fake pages"): the buttons under the header are the
+   nav bar between the fake pages. */
+.dwc-reveal-btns{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.dwc-reveal-sec{margin:12px 0}
+/* Preview flash: the sticky bar's Preview button scrolls to the live
+   preview and flashes it once, so the member sees what visitors see. */
+.dwc-preview-flash{outline:3px solid var(--pink);outline-offset:4px;border-radius:12px;transition:outline-color 1.2s}

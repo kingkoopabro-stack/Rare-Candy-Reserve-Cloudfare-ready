@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Maker — Rare Candy Reserve</title>
+<meta name="description" content="Make your own retro 16-bit RPG in the browser — no coding needed. Paint tiles, place NPCs, chests and slimes, then play it.">
+<link rel="stylesheet" href="assets/css/style.css?v=profilefeed1">
+<style>
+/* Game Maker editor layout only — site chrome comes from style.css. */
+.gm-layout{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.gm-main{flex:1 1 560px;min-width:0}
+.gm-side{flex:0 1 300px;min-width:260px}
+.gm-panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.gm-panel h3{margin:.2em 0 .6em}
+#gm-host{position:relative;display:inline-block;max-width:100%;overflow:auto;border:2px solid var(--line);border-radius:10px;background:#0b0b14}
+#gm-canvas{display:block;image-rendering:pixelated;touch-action:none;cursor:crosshair;max-width:100%;height:auto}
+.gm-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.gm-tool{border:2px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;text-transform:capitalize}
+.gm-tool:hover{border-color:var(--cyan)}
+.gm-tool.active{background:var(--grad);color:#0b0b14;border-color:transparent}
+.gm-tool.small{padding:5px 10px;font-size:12px}
+.gm-tool.danger{border-color:var(--pink);color:var(--pink)}
+.gm-tool.danger:hover{background:var(--pink);color:#fff}
+.gm-kindwrap{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.gm-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.gm-row label{font-size:13px;color:var(--muted);font-weight:700}
+.gm-row input[type=text]{flex:1 1 180px}
+.gm-row input[type=number]{width:64px}
+.gm-row input,.gm-field input,.gm-field textarea,.gm-field select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:8px;padding:8px 10px;font-size:14px;font-family:inherit}
+.gm-field{display:block;margin:10px 0}
+.gm-field span{display:block;font-size:13px;color:var(--muted);font-weight:700;margin-bottom:4px}
+.gm-field input,.gm-field textarea,.gm-field select{width:100%}
+.gm-hint{color:var(--muted);font-size:13.5px}
+#gm-saves{list-style:none;padding:0;margin:8px 0}
+#gm-saves li{display:flex;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+#gm-saves li span{flex:1}
+#gm-status{font-size:13.5px;color:var(--muted)}
+.gm-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+/* --- Engine overlays (shared with play-game.html) --- */
+.rcrgm-hud{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-weight:800;font-size:14px}
+.rcrgm-hud .rcrgm-goal{margin-left:auto;color:var(--cyan)}
+.rcrgm-dlg{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(20,20,36,.97);border:2px solid var(--cyan);border-radius:10px;padding:12px 14px;cursor:pointer;z-index:5}
+.rcrgm-dlg-title{color:var(--cyan);font-weight:900;font-size:14px;margin-bottom:4px}
+.rcrgm-dlg-body{font-size:15px}
+.rcrgm-dlg-hint{text-align:right;font-size:12px;color:var(--muted);margin-top:6px}
+.rcrgm-battle{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--pink);border-radius:12px;padding:16px;z-index:6;text-align:center}
+.rcrgm-battle h3{margin:.1em 0;color:var(--pink)}
+.rcrgm-battle-log{color:var(--muted);font-size:14px;min-height:20px}
+.rcrgm-battle-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px}
+.rcrgm-btn{border:0;cursor:pointer;font-weight:800;border-radius:999px;padding:10px 18px;font-size:14px;background:var(--grad);color:#0b0b14}
+.rcrgm-btn:disabled{opacity:.45;cursor:not-allowed}
+.rcrgm-toast{position:absolute;left:50%;top:10px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--cyan);border-radius:999px;padding:6px 14px;font-size:13.5px;font-weight:700;z-index:5;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+.rcrgm-end{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92%);background:rgba(20,20,36,.98);border:2px solid var(--green);border-radius:12px;padding:20px;z-index:7;text-align:center}
+.rcrgm-end h2{margin:.1em 0}
+.rcrgm-dpad{display:flex;gap:6px;justify-content:center;align-items:center;margin-top:10px;flex-wrap:wrap}
+.rcrgm-dpad button{width:48px;height:48px;font-size:20px;border-radius:12px;border:2px solid var(--line);background:var(--panel2);color:var(--ink);cursor:pointer;font-weight:900}
+.rcrgm-dpad button:active{background:var(--cyan);color:#0b0b14}
+.rcrgm-dpad .rcrgm-talkbtn{width:auto;padding:0 18px;font-size:14px}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="wrap navrow">
+    <a class="logo" href="index.html">Rare Candy <b>Reserve</b></a>
+    <nav class="main" id="mainNav">
+      <a href="index.html">Home</a>
+      <a href="shop.html">Shop</a>
+      <a href="merch.html">Merch</a>
+      <a href="community.html">Community</a>
+      <a href="game-maker.html" class="active">Game Maker</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <p class="kicker">Rare Candy Reserve · Make &amp; Play</p>
+    <h1><span class="grad-text">Retro Game Maker</span></h1>
+    <p class="lede">Build your own 16-bit RPG right here — paint the map, drop in villagers, chests and slimes, then hit play-test. No coding, no downloads. Your games save on this device, or share them with a link.</p>
+  </div>
+
+  <div class="gm-layout">
+    <div class="gm-main">
+      <div class="gm-row">
+        <label for="gm-name">Game name</label>
+        <input type="text" id="gm-name" value="My Adventure" maxlength="80">
+        <label for="gm-width">Width</label>
+        <input type="number" id="gm-width" min="10" max="30" value="20">
+        <label for="gm-height">Height</label>
+        <input type="number" id="gm-height" min="10" max="30" value="15">
+        <label for="gm-color">Hero color</label>
+        <input type="color" id="gm-color" value="#ff2d95">
+      </div>
+
+      <div id="gm-host">
+        <canvas id="gm-canvas" width="640" height="480"></canvas>
+      </div>
+      <p id="gm-status" role="status">Loading…</p>
+
+      <div class="gm-actions">
+        <button type="button" class="btn" id="gm-play">▶ Play-test</button>
+        <button type="button" class="btn ghost" id="gm-stop">■ Stop testing</button>
+        <button type="button" class="btn ghost" id="gm-new">＋ New map</button>
+      </div>
+
+      <div class="gm-panel">
+        <h3>🎨 Tiles — click / drag to paint</h3>
+        <div class="gm-toolbar" id="gm-palette"></div>
+        <h3>🧩 Objects — click the map to place</h3>
+        <div class="gm-toolbar" id="gm-objects"></div>
+        <p class="gm-hint">Tip: paint water and walls to block the hero. Bridges let the hero cross water. Doors need a key — hide one somewhere on the map. Walk into a slime to fight it. Reach the ★ portal (or collect enough coins) to win.</p>
+      </div>
+    </div>
+
+    <div class="gm-side">
+      <div class="gm-panel" id="gm-inspector">
+        <h3>Edit</h3>
+        <p class="gm-hint">Click an object with the ✎ select tool to edit it here.</p>
+      </div>
+
+      <div class="gm-panel">
+        <h3>💾 Save &amp; share</h3>
+        <p class="gm-hint">Your map autosaves on this device as you work.</p>
+        <div class="gm-row">
+          <input type="text" id="gm-savename" placeholder="Save name (optional)" maxlength="60">
+          <button type="button" class="btn small" id="gm-save">Save</button>
+        </div>
+        <ul id="gm-saves"></ul>
+        <div class="gm-actions">
+          <button type="button" class="btn ghost small" id="gm-download">⬇ Download .rpg.json</button>
+          <label class="btn ghost small" for="gm-loadfile" style="cursor:pointer">⬆ Load from file</label>
+          <input type="file" id="gm-loadfile" accept=".rpg.json,.json" hidden>
+        </div>
+        <div class="gm-actions">
+          <button type="button" class="btn ghost small" id="gm-copylink">🔗 Copy play link</button>
+          <button type="button" class="btn ghost small" id="gm-copycode">📋 Copy game code</button>
+        </div>
+        <p class="gm-hint">The play link opens the game on the play page. Very big maps may be too long for a link — then the game code is copied instead, and players paste it into the code box on the play page.</p>
+      </div>
+
+      <div class="gm-panel">
+        <h3>🕹 How to play</h3>
+        <p class="gm-hint">Move: arrow keys / WASD, or the on-screen d-pad.<br>
+        Talk / read signs: Space or E next to someone, or tap TALK.<br>
+        Chests &amp; items: walk onto them.<br>
+        Battles: walk into an enemy — Attack, use a potion, or Run.<br>
+        Win: reach the portal, or collect the coins your goal asks for.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/game-maker.js"></script>
+<script>
+(function () {
+  if (!window.RCRGame) {
+    document.getElementById('gm-status').textContent =
+      'Could not load the game engine (assets/js/game-maker.js). Please reload the page.';
+    return;
+  }
+  window.RCRGame.initEditor({});
+})();
+</script>
+</body>
+</html>

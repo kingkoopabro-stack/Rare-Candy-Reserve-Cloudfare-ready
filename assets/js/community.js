@@ -6851,6 +6851,7 @@ function profileVideoHTML(m, th) {
 // on the other. Buttons hidden → the video takes the whole row. Neither
 // set → no row at all.
 function profileSideRowHTML(m, th) {
+  if (!m) return ""; // new-signup preview has no member yet — no buttons/video/links to show
   var showButtons = !th || th.buttons_show !== false;
   var side = (th && th.buttons_side === "right") ? "right" : "left";
   var buttons = showButtons ? actionButtonsHTML(m, !!m.is_mine, th) : "";

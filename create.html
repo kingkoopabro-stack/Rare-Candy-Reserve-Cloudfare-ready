@@ -82,22 +82,6 @@
 .learn-table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
 .learn-table th,.learn-table td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
 .learn-table th{background:rgba(255,255,255,.06);color:var(--tab-accent,#fff)}
-/* ---- Heartbeat divider (A Steady Heart motif) ---- */
-/* Reusable EKG divider: faint trace + a bright pulse that travels the
-   line, gradient cycling through the site RGB/neon palette, ♥ at the
-   center. HTML/CSS only — no JS. Fixed height so it never shifts layout. */
-.heartbeat-divider{position:relative;width:100%;max-width:860px;height:56px;margin:28px auto;overflow:hidden}
-.heartbeat-divider svg{display:block;width:100%;height:100%}
-.heartbeat-divider .hb-trace{fill:none;stroke:rgba(242,242,248,.14);stroke-width:2;vector-effect:non-scaling-stroke}
-.heartbeat-divider .hb-pulse{fill:none;stroke:url(#hbGrad);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:140 594.4;filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45));animation:hb-travel 3.2s linear infinite,hb-hue 9s linear infinite}
-.heartbeat-divider .hb-heart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg);border:1px solid rgba(255,45,149,.5);color:var(--pink);font-size:22px;line-height:1;text-shadow:0 0 10px rgba(255,45,149,.9),0 0 22px rgba(255,45,149,.5);animation:hb-beat 1.2s ease-in-out infinite}
-@keyframes hb-travel{from{stroke-dashoffset:734.4}to{stroke-dashoffset:0}}
-@keyframes hb-hue{from{filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45)) hue-rotate(0deg)}to{filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45)) hue-rotate(360deg)}}
-@keyframes hb-beat{0%,100%{transform:translate(-50%,-50%) scale(1)}12%{transform:translate(-50%,-50%) scale(1.28)}24%{transform:translate(-50%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1.18)}48%,100%{transform:translate(-50%,-50%) scale(1)}}
-@media (prefers-reduced-motion:reduce){.heartbeat-divider .hb-pulse{animation:none;stroke-dasharray:none}.heartbeat-divider .hb-heart{animation:none}}
-/* Compact variant: same divider, shorter (e.g. between tight sections). */
-.heartbeat-divider--compact{height:36px;margin:18px auto}
-.heartbeat-divider--compact .hb-heart{width:34px;height:34px;font-size:18px}
 </style>
 </head>
 <body data-page="create">
@@ -132,22 +116,6 @@
     <p class="lede">VN-StudioV2 runs right in your browser — learn music production the same way it was learned on FL Studio back in the MySpace days. Make a track, save it as a .rcr project file, and load it back on your PC or phone whenever you want.</p>
   </div>
 
-<div class="heartbeat-divider" role="separator" aria-label="A steady heart">
-  <svg viewBox="0 0 600 60" preserveAspectRatio="none" aria-hidden="true">
-    <defs>
-      <linearGradient id="hbGrad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#ff2d95"/>
-        <stop offset="30%" stop-color="#ff9a00"/>
-        <stop offset="55%" stop-color="#00e5ff"/>
-        <stop offset="80%" stop-color="#7c4dff"/>
-        <stop offset="100%" stop-color="#ff2d95"/>
-      </linearGradient>
-    </defs>
-    <path class="hb-trace" d="M0 30 H90 L105 22 L120 30 H165 L175 36 L185 4 L195 42 L205 30 H240 L255 23 L270 30 H390 L405 22 L420 30 H465 L475 36 L485 4 L495 42 L505 30 H540 L555 23 L570 30 H600"/>
-    <path class="hb-pulse" d="M0 30 H90 L105 22 L120 30 H165 L175 36 L185 4 L195 42 L205 30 H240 L255 23 L270 30 H390 L405 22 L420 30 H465 L475 36 L485 4 L495 42 L505 30 H540 L555 23 L570 30 H600"/>
-  </svg>
-  <span class="hb-heart" aria-hidden="true">♥</span>
-</div>
 <div class="heartbeat-divider" role="separator" aria-label="A steady heart">
   <svg viewBox="0 0 600 60" preserveAspectRatio="none" aria-hidden="true">
     <defs>

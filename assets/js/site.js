@@ -7,6 +7,9 @@ const STRIPE_PUBLISHABLE_KEY = "pk_live_51U2qoIQpMlvNGy77xhL3IChHqa8IbKKalGIkIkd
 const SHOP_CONTACT_EMAIL = "asteadyheartmusic@gmail.com"; // shop contact email
 // PAYPAL: set this to the PayPal Business email once Ash gives it — then PayPal cart checkout is fully automated (buyer pays on PayPal, PayPal notifies the shop, no invoice from Ash). Do NOT put a password or secret here.
 const PAYPAL_EMAIL = "7acrewoodnursery@gmail.com"; // PayPal Business email, given by Chris 2026-11-10 — automated PayPal cart checkout
+// STRIPE DOWN (2026-11-24): Stripe ID verification pending — hide all "Buy with Stripe" buttons and show a short note instead. Flip to false the moment Stripe is verified to bring the buttons back.
+const STRIPE_DOWN = true;
+const STRIPE_DOWN_NOTE = '<span style="font-size:12px;color:var(--muted)">💳 Stripe buttons will be back up and fully operational shortly.</span>';
 const ALLMYLINKS_URL = "https://allmylinks.com/Ashmusic";
 
 /* Verified music/social links (from Ash's AllMyLinks page, 2026-11-06).
@@ -412,7 +415,7 @@ function updateOptPrice(id){
   const item = findItem(id); if(!item || !item.options) return;
   const o = optPrice(item);
   document.querySelectorAll('[data-opt-price="' + id + '"]').forEach(el => { el.textContent = money(o.total); });
-  const showStripe = !!item.stripe && o.total === item.price;
+  const showStripe = !STRIPE_DOWN && !!item.stripe && o.total === item.price;
   document.querySelectorAll('[data-stripe-btn="' + id + '"]').forEach(el => { el.style.display = showStripe ? "" : "none"; });
 }
 function refreshOptPrices(){
@@ -511,11 +514,32 @@ async function rcrSubscribe(ev, form){
   return false;
 }
 
-/* ---------- cart (localStorage) ---------- */
+/* ---------- cart (localStorage) ----------
+   The cart is scoped to the signed-in account (device id) so one
+   member's cart never leaks into another member's session on a shared
+   browser. Guests share one "guest" cart. The key is read fresh on
+   every save/load, so a sign-in switch picks up the new account's
+   cart (reloadCartForAccount re-reads it after a sign-in/out). */
+function cartKey(){
+  try {
+    var did = localStorage.getItem("dwc-device-id") || "";
+    return "rcr-cart:" + (did ? did : "guest");
+  } catch(e){ return "rcr-cart:guest"; }
+}
 let cart = [];
-try { cart = JSON.parse(localStorage.getItem("rcr-cart") || "[]"); } catch(e){ cart = []; }
+try { cart = JSON.parse(localStorage.getItem(cartKey()) || "[]"); } catch(e){ cart = []; }
 if(!Array.isArray(cart)) cart = [];
-function saveCart(){ try { localStorage.setItem("rcr-cart", JSON.stringify(cart)); } catch(e){} updateCount(); }
+function saveCart(){ try { localStorage.setItem(cartKey(), JSON.stringify(cart)); } catch(e){} updateCount(); }
+/* Re-read the cart for the account that is signed in right now.
+   Call after a sign-in / sign-out so the drawer and the count switch
+   to that account's cart instead of keeping the previous one. */
+function reloadCartForAccount(){
+  try { cart = JSON.parse(localStorage.getItem(cartKey()) || "[]"); } catch(e){ cart = []; }
+  if(!Array.isArray(cart)) cart = [];
+  updateCount();
+  if (typeof renderCart === "function") { try { renderCart(); } catch(e){} }
+}
+window.rcrReloadCart = reloadCartForAccount;
 function updateCount(){
   const el = document.getElementById("cartCount");
   if(el) el.textContent = cart.reduce((n,i)=>n+(i && (i.qty||0)),0);
@@ -741,7 +765,7 @@ function productCard(p){
     <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>${piracyNoteHTML(p)}
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
     ${priceLine}
-    <p class="card-actions">${buyBtn}${p.stripe ? `<a class="btn ghost" data-stripe-btn="${p.id}" href="${p.stripe}" target="_blank" rel="noopener"${(p.options && optDefaultTotal(p) !== p.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
+    <p class="card-actions">${buyBtn}${p.stripe ? (STRIPE_DOWN ? STRIPE_DOWN_NOTE : `<a class="btn ghost" data-stripe-btn="${p.id}" href="${p.stripe}" target="_blank" rel="noopener"${(p.options && optDefaultTotal(p) !== p.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>`) : ""}<button class="btn ghost" onclick="buyWithPayPal('${p.id}')">Buy with PayPal →</button></p>
   </div>`;
 }
 function catalogCard(c){
@@ -792,7 +816,7 @@ function catalogCard(c){
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p>${piracyNoteHTML(c)}<p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
     ${priceLine}
-    <p class="card-actions">${buyBtn}${c.stripe ? `<a class="btn ghost" data-stripe-btn="${c.id}" href="${c.stripe}" target="_blank" rel="noopener"${(c.options && optDefaultTotal(c) !== c.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>` : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
+    <p class="card-actions">${buyBtn}${c.stripe ? (STRIPE_DOWN ? STRIPE_DOWN_NOTE : `<a class="btn ghost" data-stripe-btn="${c.id}" href="${c.stripe}" target="_blank" rel="noopener"${(c.options && optDefaultTotal(c) !== c.price) ? ' style="display:none"' : ''}>Buy with Stripe →</a>`) : ""}${!(c.outOfStock||c.draft||c.comingSoon) ? `<button class="btn ghost" onclick="buyWithPayPal('${c.id}')">Buy with PayPal →</button>` : ""}${ebayLink}</p>
   </div>`;
 }
 function renderPageSections(){
@@ -1062,8 +1086,35 @@ function submitSiteForm(e, subject){
 }
 
 /* ---------- boot ---------- */
+/* Mobile nav (M9): on small screens the header nav collapses behind a
+   hamburger so the header is one compact row instead of a tall two-row
+   nav. The button is injected here (shared script, all pages) so no
+   HTML file needs editing. */
+function setupMobileNav(){
+  var header = document.querySelector("header.site");
+  var nav = document.getElementById("mainNav");
+  if(!header || !nav || document.getElementById("dwc-nav-toggle")) return;
+  var btn = document.createElement("button");
+  btn.id = "dwc-nav-toggle";
+  btn.type = "button";
+  btn.className = "dwc-nav-toggle";
+  btn.setAttribute("aria-label", "Menu");
+  btn.setAttribute("aria-expanded", "false");
+  btn.setAttribute("aria-controls", "mainNav");
+  btn.textContent = "☰";
+  btn.onclick = function(){
+    var open = header.classList.toggle("nav-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.textContent = open ? "✕" : "☰";
+  };
+  nav.parentNode.insertBefore(btn, nav);
+  nav.addEventListener("click", function(e){
+    if(e.target && e.target.tagName === "A"){ header.classList.remove("nav-open"); btn.setAttribute("aria-expanded","false"); btn.textContent = "☰"; }
+  });
+}
 async function boot(){
   injectChrome();
+  setupMobileNav();
   syncProfileButton();
   await loadShopOverrides();
   const page = document.body.dataset.page || "";

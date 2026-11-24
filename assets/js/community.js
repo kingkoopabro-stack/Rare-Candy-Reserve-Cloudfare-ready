@@ -121,7 +121,7 @@ var PROFILE_GIFS = [
   { id: "ThuqhqvRggdtC", label: "The Mighty Boosh — Naboo", group: "Mighty Boosh", pageUrl: "https://giphy.com/gifs/tmb-the-mighty-boosh-naboo-ThuqhqvRggdtC" },
   { id: "Z7DZmcdbfiVoc", label: "Mighty Boosh", group: "Mighty Boosh", pageUrl: "https://giphy.com/gifs/mighty-boosh-Z7DZmcdbfiVoc" },
   { id: "2eMiymEdhSTTi", label: "Mighty Boosh — The Hitcher", group: "", pageUrl: "https://giphy.com/gifs/boosh-hitcher-raysoccultbooks-2eMiymEdhSTTi" },
-  { id: "137XhGMjSAmVY4", label: "Mighty Boosh — The Hitcher", group: "", pageUrl: "https://giphy.com/gifs/mighty-boosh-hitcher-137XhGMjSAmVY4" },
+  { id: "137XhGMjSAmVY4", label: "Mighty Boosh — The Hitcher (alt)", group: "", pageUrl: "https://giphy.com/gifs/mighty-boosh-hitcher-137XhGMjSAmVY4" },
   { id: "VCritSc9Jpz6UnBNwQ", label: "Click me, buy good stuff — 點我買好物", group: "Shop", pageUrl: "https://giphy.com/gifs/VCritSc9Jpz6UnBNwQ" },
 ];
 function profileGifUrl(g) { return (g && g.url) || gifMediaUrl(g.id); }
@@ -1268,7 +1268,7 @@ function renderAccount() {
       '<h3 style="margin:18px 0 0">New here?</h3>' +
       '<p style="max-width:520px;margin:0 auto">One free account — buyer and seller in one. Username, your full name, date of birth, a password, one tiny sum to prove you’re human, agree to the rules below. That’s it — then post, ask, chat, buy, and sell.</p>' +
       '<p style="margin-top:14px"><button type="button" class="btn" onclick="DWC.openSignup()">Create Account — it’s free</button></p>' +
-      '<p style="margin-top:12px;font-size:13px"><a href="link-device.html">Locked out? Ask Chris for account recovery →</a></p>' +
+      '<p style="margin-top:12px;font-size:13px"><a href="link-device.html">Locked out? Request one time login code from Operator →</a></p>' +
       '<div class="dwc-coin-row"><span class="dwc-insert-coin">⬇ Insert coin ⬇</span><span class="dwc-coin" aria-hidden="true">¢</span></div>' +
       '<p style="font-size:13px">Just looking? The chat window works as a guest, too — guests are auto-censored, members aren’t.</p></section>';
     return;
@@ -2487,7 +2487,7 @@ function phoneStoreHTML() {
       '<p class="tp-note" style="text-align:center;margin:0 0 4px"><strong>' + LUCRE_SYMBOL + ' ' + (balance === null ? "…" : balance) + ' Lucre</strong> · site only currency — not real money, not crypto, can’t cash out.</p>' +
       '<p class="tp-note" style="text-align:center;margin:0 0 8px">Pre-made layouts, like an old MySpace layout site. Tap Full preview to see one on a demo page, then apply it — one tap. Got a code from a friend? Paste it below.</p>' +
       '<div class="dwc-store-filters">' + filters + '</div>' +
-      '<div class="dwc-store-codebox"><input id="dwc-layout-code" maxlength="20" placeholder="Got a layout code? Paste it here — e.g. RAINY" autocomplete="off">' +
+      '<div class="dwc-store-codebox"><input id="dwc-layout-code" maxlength="20" placeholder="Got a layout code?" autocomplete="off">' +
       ' <button type="button" class="btn small" onclick="DWC.applyLayoutCode()">Use this code</button></div>' +
       (currentItem ? '<p class="tp-note" style="text-align:center">You’re wearing <strong>' + esc(currentItem.name) + '</strong> right now. <button type="button" class="dwc-linklike" onclick="DWC.storeRevert()">← Back to my own look</button></p>' : "") +
       (previewItem ? '<div class="dwc-store-preview-modal" role="dialog" aria-label="Layout preview"><div class="dwc-store-preview-modal-inner">' + storePreviewHTML(previewItem) + '<p style="margin:10px 0 4px;text-align:center"><button type="button" class="btn" onclick="DWC.storeApply(\'' + previewItem.id + '\')">Apply “' + esc(previewItem.name) + '”' + (previewItem.price > 0 && owned.indexOf(previewItem.id) < 0 ? ' · ' + previewItem.price + ' ' + LUCRE_SYMBOL : "") + '</button> <button type="button" class="btn ghost" onclick="DWC.storeTry(\'' + previewItem.id + '\')">Try it on my page →</button> <button type="button" class="btn ghost" onclick="DWC.storePreview(null)">Close preview</button></p></div></div>' : "") +
@@ -2669,9 +2669,9 @@ function taffyReply(raw) {
   if (has(/\bmy stuff\b/) || has(/\bwhere.*(my )?(purchases|bought|content)\b/) || has(/\bmy purchases\b/))
     return { text: "Your bought stuff lives in My stuff — the 🍬 app on Taffy's phone. Purchased content and bought items, what you paid and when, with a green dot when it's paid. Tap one to view it full screen, download your watermarked copy, or delete the stored copy to free room — your receipt stays, so you can download it again. You've got 5 GB of room in there.", emoji: "🍬", working: false };
   if (has(/\bwhat is on sale\b/) || has(/\bcreator menu\b/) || has(/\badd menu\b/) || has(/\bset up (a )?menu\b/))
-    return { text: "The menu is the “What is on sale, click to buy” bit on an age-verified creator's page — up to 4 items, each with a price. To set yours up: flip “Content sales enabled” on near the top of Edit Profile, then fill in Add menu under What I sell. Buyers tap an item and pay by card — or with a manual method if the creator ticks one. Custom items send the creator a Request in Messages first.", emoji: "🛒", working: false };
+    return { text: "The menu is the “What is on sale, click to buy” bit on an age-verified creator's page — up to 4 items, each with a price. To set yours up: flip “Content sales enabled” on in the Selling section of Edit Profile, then fill in Add menu under What I sell. Buyers tap an item and pay by card — or with a manual method if the creator ticks one. Custom items send the creator a Request in Messages first.", emoji: "🛒", working: false };
   if (has(/\bcontent sales\b/) || has(/\bcontent sales enabled\b/))
-    return { text: "“Content sales enabled” is the switch near the top of Edit Profile — age-verified members only. On means you can sell: your menu, your private staging spot, and your vault all open up. Off hides the whole lot and stops new sales. Flip it on, save, and Add menu shows up under What I sell.", emoji: "🔞", working: false };
+    return { text: "“Content sales enabled” is the switch in the Selling section of Edit Profile — age-verified members only. On means you can sell: your menu, your private staging spot, and your vault all open up. Off hides the whole lot and stops new sales. Flip it on, save, and Add menu shows up under What I sell.", emoji: "🔞", working: false };
   // ---- "Make me a whole profile" — Taffy can't write a layout from
   // words, and she says so plainly. The real path is Edit Profile →
   // Taffy Layout Builder: pick a vibe + an accent color and watch the
@@ -2892,7 +2892,7 @@ function phoneChatBubbleHTML(m, idx) {
   if (m.who === "taffy" && (m.css || m.html || m.human)) {
     apply = '<div style="margin-top:8px">';
     if (m.css) apply += '<button type="button" class="btn small" onclick="DWC.taffyApplyCSS(' + idx + ')">✨ Apply this to my layout</button>';
-    if (m.css) apply += '<div style="font-size:11px;color:var(--muted);margin-top:4px;word-break:break-all"><code>' + esc(m.css) + '</code></div>';
+    if (m.css) apply += '<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow-wrap:break-word;white-space:pre-wrap"><code>' + esc(m.css) + '</code></div>';
     if (m.human) apply += '<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"><button type="button" class="btn small" onclick="DWC.imMember(1, \'RareCandyReserve\')">💬 Contact support</button><a class="btn ghost small" href="mailto:TheRarecandyreserve@proton.me?subject=Community%20%E2%80%94%20contact%20an%20admin%20or%20mod">✉️ Email an admin / mod</a><button type="button" class="btn ghost small" onclick="DWC.go(\'reports\')">🚩 File a report</button></div>';
     apply += '</div>';
   }
@@ -3196,7 +3196,7 @@ function phoneScreenHTML() {
   else inner = phoneHomeHTML();
   return '<div class="tp-screen" style="background:' + phoneWallpaperBg(state.phone.wallpaper) + '">' +
     '<div class="tp-statuswrap"><div class="tp-island"></div>' +
-    '<div class="tp-status"><span id="tp-clock">' + phoneClockText() + '</span><span class="tp-status-right"><span class="tp-carrier">VNR Wireless ' + TP_SIGNAL_BARS + '</span><span class="tp-status-icons">' + TP_STATUS_ICONS + '</span></span></div></div>' +
+    '<div class="tp-status"><span id="tp-clock">' + phoneClockText() + '</span><span class="tp-status-right"><span class="tp-carrier">VNR ' + TP_SIGNAL_BARS + '</span><span class="tp-status-icons">' + TP_STATUS_ICONS + '</span></span></div></div>' +
     '<div class="tp-body">' + inner + '</div>' +
     '<div class="tp-homebar" onclick="DWC.phoneGo(\'home\')" title="Home"></div>' +
     '</div>';
@@ -3528,7 +3528,7 @@ function websiteFieldsHTML(p) {
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On (Website look): your page becomes a clean standalone site — banner, Message button, and listings only. Your Top Friends and the five personal lines below stay hidden. Off (MySpace look): everything shows, arranged like a MySpace page.</p>' +
     '<div class="dwc-website-only dwc-extra-btns"><label class="dwc-enable-toggle"><input type="checkbox" name="theme_website_buttons" style="width:auto"' + (th.website_buttons ? " checked" : "") + '> <span>Show the Add me / Favorite / Add to group buttons too (Website look only)</span></label>' +
     '<p style="margin:4px 0 0;color:var(--muted);font-size:13px">On: visitors in Website look see your full button block as well as the Message button. Off: visitors just get the Message button.</p></div>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your email lives in <strong>Account &amp; payouts</strong> near the top of this page — one address for contact, password resets, and Stripe. Tick Show there and it appears on your page.</p>' +
+    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">Your email lives in <strong>Account &amp; payouts</strong> further down this page — one address for contact, password resets, and Stripe. Tick Show there and it appears on your page.</p>' +
     '<div class="dwc-myspace-only"><label><input type="checkbox" name="website_show_hobbies" style="width:auto"' + chk("hobbies") + '> Show my Hobbies on my page</label>' +
     '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">On: visitors see this line on your page (MySpace look only — in Website look this line stays hidden whatever the box says). Off: this line does not appear on your page at all. Your words stay saved here — tick the box and save to bring them back.</p>' +
     '<label>Hobbies</label><input name="hobbies" maxlength="200" value="' + val("hobbies") + '" placeholder="e.g. collecting, 3D printing, making music">' +
@@ -3758,7 +3758,7 @@ function profileFormHTML(p) {
     '<div id="dwc-page-drawer" class="dwc-drawer" hidden><div class="dwc-drawer-backdrop" onclick="DWC.closePagePreview()"></div><div class="dwc-drawer-panel" role="dialog" aria-label="Your page preview"><div class="dwc-drawer-head"><img src="/images/heart-rise-official.webp" alt="" class="dwc-drawer-banner"><div class="dwc-drawer-title">Your page — live preview</div><button type="button" class="dwc-drawer-close" onclick="DWC.closePagePreview()" aria-label="Close preview">✕</button></div><div id="dwc-drawer-preview" class="dwc-drawer-body"></div><div class="dwc-drawer-foot"><button type="button" class="btn" onclick="DWC.closePagePreview()">Close preview</button></div></div></div>' +
     (isNew ? "" :
     '<div class="note" style="margin:0 0 12px"><strong>🔑 Password &amp; recovery</strong>' +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and verify your email in the “Account &amp; payouts” box near the top of this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>') +
+    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Your password is how you sign in anywhere — change it and verify your email in the “Account &amp; payouts” section further down this page. Your password is stored scrambled — nobody at the shop, not even Chris, can see it.</p></div>') +
     pageFormatPickerHTML(p, th) +
     '<div class="dwc-edit-cols">' +'<div class="dwc-edit-sec dwc-edit-about">' +'<h3 class="dwc-edit-group-h" id="dwc-sec-about" style="margin-top:14px">👤 About Me</h3>' +
     '<label>Username (2–24 letters, numbers, _ . -)</label>' +
@@ -3949,7 +3949,7 @@ function profileFormHTML(p) {
       "</select>" +
       '<div id="dwc-topfriends-picker"><p style="color:var(--muted)">Loading members…</p></div>' +
       '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">On (ticked): this friend shows in your Top Friends box on your page. Off (unticked): they do not show there. Unticking never unfriends anyone — it only takes them off the box.</p>' +
-      '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">0</span>/10</p></div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🎬 Video</summary>' +
+      '<p class="dwc-minihead" style="text-align:center">Picked: <span id="dwc-top8-count">' + ((p && p.top_friend_ids || []).length) + '</span>/10</p></div>') + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🎬 Video</summary>' +
     (isNew ? "" : '<h3 class="dwc-edit-group-h" id="dwc-sec-pieces">🧩 Page pieces — video, GIF, what shows, and your page URL</h3>' + profileVideoSectionHTML(p, th)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary>🎞️ GIF block</summary>' +
     (isNew ? "" : profileGifBlockSectionHTML(p, th)) + '</details>' +'<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="bg">🖼️ Background — ' + (th.bg_image_url ? "your picture" : th.bg_preset ? "preset" : th.bg_color ? "your colour" : "layout default") + '</summary>' +
     '<h4 id="dwc-sec-bg" style="margin:14px 0 6px">🖼️ Page background — pick ONE: a preset, your own picture, or None</h4>' +
@@ -4063,7 +4063,7 @@ function profileFormHTML(p) {
     '</div></details>' +
     (isNew ? "" : '<details class="dwc-edit-group dwc-edit-cat"><summary data-sum="style">🌐 Page style — ' + (p && p.website_mode ? "Website look" : "MySpace look") + '</summary><h3 class="dwc-edit-group-h" id="dwc-sec-style">🌐 Page style — MySpace look or Website look</h3>' + websiteFieldsHTML(p) + '</details>') +
     (isNew ? "" :
-    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary data-sum="badges">🏅 Badges — ' + ((p && p.badges) || []).length + ' unlocked</summary>' +
+    '<details class="dwc-edit-group dwc-edit-cat" data-fmt="social blog musician creator"><summary data-sum="badges">🏅 Badges — ' + ((p && p.badges) || []).filter(function(b){return b && b.earned;}).length + ' unlocked</summary>' +
     '<h4 id="dwc-sec-badges" style="margin:14px 0 6px">🏅 Badge display — your unlocked badges</h4>' +
     "<p style=\"margin:0 0 8px\">Your badges show next to your name everywhere you post, comment, and chat. Pick which ones show below — locked ones are greyed out until you earn them.</p>" +
     badgeDisplayListHTML(p ? p.badges : []) +
@@ -8422,6 +8422,13 @@ async function viewDesignEditor(el) {
   designRender();
   designSetStylePanel(false); // CSS contract: sheet starts CLOSED on phones
   designFitCanvas();
+  // M12: the editor sits far down the community page — land the user at
+  // it on route entry instead of the top of a long page (on desktop this
+  // also fixes "Design my page doesn't take you to the editor").
+  try {
+    var top = el.getBoundingClientRect().top + window.scrollY - 150;
+    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+  } catch (e) {}
 }
 // --- Style panel visibility (CSS contract — see header) ---
 function designSetStylePanel(open) {
@@ -12249,6 +12256,7 @@ window.DWC = {
     state.signupFirstEditor = false;
     setNotice("Signed out on this device.");
     render();
+    if (window.rcrReloadCart) window.rcrReloadCart(); // cart switches to the guest cart
   },
   // Sign back in (2026-11-21 fix) — restores the account signed out on
   // this browser from the stash signOut saved. Passwords are the sign-in
@@ -12271,7 +12279,7 @@ window.DWC = {
     if (!data || !data.ok || !data.device_id) return formErr(form, (data && data.error) || "Couldn't sign in — try again.");
     try { localStorage.setItem(DEVICE_KEY, data.device_id); } catch (e) {}
     await refreshProfile();
-    if (state.profile) { setNotice("Welcome back, @" + state.profile.username + "."); render(); }
+    if (state.profile) { setNotice("Welcome back, @" + state.profile.username + "."); render(); if (window.rcrReloadCart) window.rcrReloadCart(); }
     else return formErr(form, "Signed in, but that account didn't load — try refreshing the page.");
     return false;
   },
@@ -12291,7 +12299,7 @@ window.DWC = {
     try { localStorage.setItem(DEVICE_KEY, data.device_id); } catch (e) {}
     formErr(form, "");
     await refreshProfile();
-    if (state.profile) { setNotice("You're back in, @" + state.profile.username + "."); render(); }
+    if (state.profile) { setNotice("You're back in, @" + state.profile.username + "."); render(); if (window.rcrReloadCart) window.rcrReloadCart(); }
     else return formErr(form, "Password set, but that account didn't load — try refreshing the page.");
     return false;
   },
@@ -12367,19 +12375,20 @@ window.DWC = {
     }
   },
   // Operator only — issue a one-time recovery code for a locked-out
-  // member. The code shows once, in this panel; send it privately.
+  // member. The code shows once, in this panel, and is also messaged
+  // to the member privately (DM + alert) automatically.
   issueRecoveryCode: async function (requestId, btn) {
-    if (!confirm("Issue a one-time recovery code for this member? Only do this once you've checked who they are (DM, text, in person). The code works once, for 24 hours — send it to them privately, never in public.")) return;
+    if (!confirm("Issue a one-time recovery code for this member? Only do this once you've checked who they are (DM, text, in person). The code works once, for 24 hours — the member is messaged privately with it automatically, so you don't have to send it by hand.")) return;
     var data = await apiPost("/auth", { action: "issue-recovery", device_id: deviceId(), request_id: requestId });
     var card = btn ? btn.closest("div") : null;
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't issue a code."); return; }
     if (card) {
       var slot = card.querySelector(".dwc-recovery-code");
-      if (slot) slot.innerHTML = "Code for @" + esc(data.username) + ": <strong style=\"font-family:ui-monospace,Menlo,Consolas,monospace\">" + esc(data.code) + "</strong> — send it privately. It works once, for 24 hours.";
+      if (slot) slot.innerHTML = "Code for @" + esc(data.username) + ": <strong style=\"font-family:ui-monospace,Menlo,Consolas,monospace\">" + esc(data.code) + "</strong> — the member was messaged privately with it. It works once, for 24 hours.";
       btn.disabled = true;
       btn.textContent = "Code issued ✓";
     }
-    setNotice("Recovery code issued for @" + data.username + " — send it to them privately.");
+    setNotice("Recovery code issued for @" + data.username + " — they were messaged privately with it.");
   },
   // Mail queue drain (2026-11-22) — operator only. Sends what's still
   // fresh, expires anything past its life. Never blasts old codes.
@@ -16764,7 +16773,7 @@ window.DWC = {
       music: "🎵 Music — " + audioPickLabel(th, p),
       effects: "✨ Effects — " + ((th.effects || []).length ? th.effects.length + " on" : "none yet"),
       layouts: "🎨 Layouts — " + (th.vibe || "no layout"),
-      badges: "🏅 Badges — " + ((p.badges || []).length) + " unlocked",
+      badges: "🏅 Badges — " + ((p.badges || []).filter(function(b){return b && b.earned;}).length) + " unlocked",
       style: "🌐 Page style — " + (p.website_mode ? "Website look" : "MySpace look"),
       spacing: "↔️ Spacing — " + ((th.pad_page || th.pad_cards || th.pad_header) ? "custom" : "Normal")
     };

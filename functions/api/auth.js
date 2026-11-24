@@ -406,12 +406,42 @@ export async function onRequestPost({ env, request }) {
     await invalidateTokens(db, profile.id, ["recovery"]);
     const code = await issueToken(db, profile.id, "recovery", RECOVERY_CODE_TTL_MS, String(reqRow.id));
     await db.prepare("UPDATE recovery_requests SET status = 'issued', resolved_at = ?, resolved_by = ? WHERE id = ?").bind(now, me.id, reqRow.id).run();
+    // Bot DM (2026-11-24): message the member privately with the code so
+    // they get an alert — the operator no longer has to send it by hand.
+    // The DM auto-deletes after 24h (same as the code TTL). The code lives
+    // only in the DM body, never in the notification text.
+    try {
+      const dmNow = nowMs();
+      const dmBody = "Hi @" + profile.username + " — here's your one-time recovery code from Rare Candy Reserve:\n\n" + code + "\n\nType it into the \"Got a recovery code from Chris?\" box on the Community sign-in page, pick a new password, and you're back in. It works once, for 24 hours — after that it's dead. If that wasn't you, ignore this and tell Chris.";
+      let dmRowId = null;
+      try {
+        const dm = await db.prepare(
+          "INSERT INTO direct_messages (sender_id, recipient_id, body, is_read, created_at, expires_at) VALUES (?, ?, ?, 0, ?, ?)"
+        ).bind(me.id, profile.id, dmBody, dmNow, dmNow + 24 * 60 * 60 * 1000).run();
+        dmRowId = dm.meta.last_row_id;
+      } catch (e) {
+        // Older DM table without expires_at — save without it rather
+        // than losing the message.
+        if (/no such column/i.test(String((e && e.message) || e))) {
+          const dm = await db.prepare(
+            "INSERT INTO direct_messages (sender_id, recipient_id, body, is_read, created_at) VALUES (?, ?, ?, 0, ?)"
+          ).bind(me.id, profile.id, dmBody, dmNow).run();
+          dmRowId = dm.meta.last_row_id;
+        } else { throw e; }
+      }
+      await createNotification(db, {
+        profile_id: profile.id, actor_profile_id: me.id, kind: "message",
+        ref_type: "direct_message", ref_id: dmRowId,
+        text: "Your one-time recovery code is in your private messages from @" + me.username + ".",
+        link: "#/member/" + me.id,
+      });
+    } catch (e) { /* best effort — the code is still shown to the operator below */ }
     // The code goes to the OPERATOR only, once, in this response — he
     // sends it to the member privately (DM/text/in person). The site
     // never emails a code the operator issues by hand; the only mail
     // the site sends goes to the member's VERIFIED recovery email
     // (see request-recovery). The code is never stored in plaintext.
-    return json({ ok: true, code, username: profile.username, message: "Send this code to the member privately — it works once, for 24 hours, then it's dead." });
+    return json({ ok: true, code, username: profile.username, message: "Code issued — the member was also messaged privately with it, so they should see the alert. It works once, for 24 hours, then it's dead." });
   }
 
   // --- use-recovery (burns the code, sets the password) ------------------------

@@ -117,14 +117,16 @@ section{margin-top:24px}
 .heartbeat-divider svg{display:block;width:100%;height:100%}
 .heartbeat-divider .hb-trace{fill:none;stroke:rgba(242,242,248,.14);stroke-width:2;vector-effect:non-scaling-stroke}
 .heartbeat-divider .hb-pulse{fill:none;stroke:url(#hbGrad);stroke-width:2.5;vector-effect:non-scaling-stroke;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:140 594.4;filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45));animation:hb-travel 3.2s linear infinite,hb-hue 9s linear infinite}
-.heartbeat-divider .hb-heart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg);border:1px solid rgba(255,45,149,.5);color:var(--pink);font-size:22px;line-height:1;text-shadow:0 0 10px rgba(255,45,149,.9),0 0 22px rgba(255,45,149,.5);animation:hb-beat 1.2s ease-in-out infinite}
+.heartbeat-divider .hb-heart{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:var(--bg);border:1px solid rgba(255,45,149,.5);animation:hb-beat 1.2s ease-in-out infinite}
+.heartbeat-divider .hb-heart img{display:block;width:26px;height:24px}
 @keyframes hb-travel{from{stroke-dashoffset:734.4}to{stroke-dashoffset:0}}
 @keyframes hb-hue{from{filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45)) hue-rotate(0deg)}to{filter:drop-shadow(0 0 5px rgba(255,45,149,.75)) drop-shadow(0 0 12px rgba(0,229,255,.45)) hue-rotate(360deg)}}
 @keyframes hb-beat{0%,100%{transform:translate(-50%,-50%) scale(1)}12%{transform:translate(-50%,-50%) scale(1.28)}24%{transform:translate(-50%,-50%) scale(1)}36%{transform:translate(-50%,-50%) scale(1.18)}48%,100%{transform:translate(-50%,-50%) scale(1)}}
 @media (prefers-reduced-motion:reduce){.heartbeat-divider .hb-pulse{animation:none;stroke-dasharray:none}.heartbeat-divider .hb-heart{animation:none}}
 /* Compact variant: same divider, shorter (e.g. between tight sections). */
 .heartbeat-divider--compact{height:36px;margin:18px auto}
-.heartbeat-divider--compact .hb-heart{width:34px;height:34px;font-size:18px}
+.heartbeat-divider--compact .hb-heart{width:34px;height:34px}
+.heartbeat-divider--compact .hb-heart img{width:20px;height:18px}
 /* Shop cards: short preview only (3 lines, ellipsis) so every card stays
    the same length and the buy buttons line up at the bottom. The full
    description + all photos live on the item detail page ("Read more"). */

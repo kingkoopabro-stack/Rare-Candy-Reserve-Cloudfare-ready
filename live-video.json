@@ -1,14 +1,1 @@
-{
-  "mode": "live",
-  "src": "",
-  "title": "No stream scheduled right now",
-  "type": "off",
-  "schedule": [
-    {
-      "date": "2026-12-18",
-      "start": "8:00 PM",
-      "end": "11:00 PM",
-      "title": "Celebratory launch show and stream + guest appearance!"
-    }
-  ]
-}
+{"mode":"live","schedule":[{"date":"2026-12-18","end":"11:00 PM","start":"8:00 PM","title":"Celebratory launch show and stream + guest appearance!"}],"src":"https://www.youtube.com/watch?v=Q89Dzox4jAE","title":"Lofi Work Space — Deep Focus Study/Work Concentration (chill lo-fi hip hop beats)","type":"youtube"}

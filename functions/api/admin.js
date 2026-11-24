@@ -210,20 +210,42 @@ export async function onRequestPost({ env, request }) {
   if (action === "reset-layout") {
     if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can reset a member's layout." });
     // The default MySpace look: classic preset, no custom CSS, the
-    // default theme JSON. Top Friends / links / bio are untouched —
-    // only the look resets. Graceful when the v2/v3 columns aren't
-    // there yet: the preset + theme just don't stick, and the client
-    // is told via layout_pending.
+    // default theme JSON. Top Friends / links / bio are untouched — and
+    // the member's video stays too (it's content, not look). Only the
+    // look resets. Graceful when the v2/v3 columns aren't there yet: the
+    // preset + theme just don't stick, and the client is told via
+    // layout_pending.
     const noCol = (e) => /no such column|no column named/i.test(String((e && e.message) || e));
+    // Keep the video: read the current theme first and carry the video
+    // fields forward into the default theme.
+    let keepVideo = {};
+    try {
+      const cur = await db.prepare("SELECT profile_theme FROM profiles WHERE id = ?").bind(targetId).first();
+      let th = null;
+      try { th = cur && cur.profile_theme ? JSON.parse(cur.profile_theme) : null; } catch { th = null; }
+      if (th && typeof th === "object") {
+        if (typeof th.video_url === "string" && th.video_url.trim()) keepVideo.video_url = th.video_url.trim();
+        if (typeof th.video_file_url === "string" && th.video_file_url.trim()) keepVideo.video_file_url = th.video_file_url.trim();
+        if (typeof th.video_size === "string" && th.video_size.trim()) keepVideo.video_size = th.video_size.trim();
+        if (typeof th.video_align === "string" && th.video_align.trim()) keepVideo.video_align = th.video_align.trim();
+      }
+    } catch { /* no current theme to keep a video from — reset plain */ }
+    let resetTheme = DEFAULT_LAYOUT_THEME;
+    if (Object.keys(keepVideo).length) {
+      try {
+        const base = JSON.parse(DEFAULT_LAYOUT_THEME || "{}");
+        resetTheme = cleanTheme(Object.assign({}, base, keepVideo));
+      } catch { /* fall back to the plain default theme */ }
+    }
     try {
       await db.prepare("UPDATE profiles SET layout_preset = 'classic', layout_css = '', profile_theme = ?, updated_at = ? WHERE id = ?")
-        .bind(DEFAULT_LAYOUT_THEME, nowMs(), targetId).run();
+        .bind(resetTheme, nowMs(), targetId).run();
     } catch (e) {
       if (!noCol(e)) throw e;
       return json({ ok: false, error: "Layout reset needs the database update — the shop is still running it. Try again later.", layout_pending: true });
     }
-    await recordAuditLog(db, { actorId: me.id, action: "reset-layout", targetId, detail: "layout reset to the default MySpace look" });
-    return json({ ok: true, error: null, reset: true });
+    await recordAuditLog(db, { actorId: me.id, action: "reset-layout", targetId, detail: "layout reset to the default MySpace look" + (Object.keys(keepVideo).length ? " (video kept)" : "") });
+    return json({ ok: true, error: null, reset: true, video_kept: Object.keys(keepVideo).length > 0 });
   }
   if (action === "delete-profile") {
     if (!needOperator(env, me)) return json({ ok: false, error: "Only the operator can delete profiles." });

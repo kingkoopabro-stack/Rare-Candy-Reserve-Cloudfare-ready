@@ -14239,7 +14239,7 @@ window.DWC = {
   // Build 5 — layout reset (operator only): the member's look goes back
   // to the default MySpace look. Bio, links, and Top Friends stay.
   adminResetLayout: async function (profileId, username) {
-    if (!confirm("Reset @" + username + "’s layout to the default MySpace look? Their bio, links, and Top Friends stay — only the look resets.")) return;
+    if (!confirm("Reset @" + username + "’s layout to the default MySpace look? Their bio, links, Top Friends, and video stay — only the look resets.")) return;
     var data = await apiPost("/admin", { device_id: deviceId(), action: "reset-layout", profile_id: profileId });
     if (!data || !data.ok) { setNotice((data && data.error) || "Couldn't reset that layout."); return; }
     setNotice("Layout reset to the default MySpace look.");

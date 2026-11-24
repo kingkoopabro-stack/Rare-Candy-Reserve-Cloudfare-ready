@@ -590,6 +590,12 @@
         <div class="learn-tile"><div class="t-ico">🧠</div><div class="t-name">Mental Health</div></div>
         <p style="color:var(--muted)">Learn how to look after your head — coping skills, routines, and how burnout and stress actually work. This is about getting better and helping others do the same, including peer support and coaching work from home.</p>
         <div class="learn-block">
+          <h3>🧠 Mind Tools — find what helps</h3>
+          <p style="color:var(--muted)">Pick what's going on — panic, anxiety, burnout, sleep, grief, and more — and get plain-language steps, breathing tools, pressure points, natural approaches, and when to get professional help. Not a diagnosis, not a treatment — just things that actually help.</p>
+          <div class="daw-slot"><div class="daw-slot-inner" style="padding:0;min-height:0;display:block">
+            <iframe id="mentalToolFrame" title="Mind Tools — mental health support tool" allow="microphone" loading="lazy" class="daw-frame" style="height:900px"></iframe>
+          </div></div>
+          <p class="learn-note" style="margin-top:8px">In crisis? Call or text <b>988</b> (Suicide &amp; Crisis Lifeline, 24/7, free) or text HOME to 741741. The tool above repeats that at the top of every screen.</p>
           <h3>Free tools + help right now</h3>
           <ul>
             <li><a href="https://insighttimer.com/" target="_blank" rel="noopener">Insight Timer — free meditation app</a> — thousands of free guided meditations, breathing exercises, and sleep tracks. Free to download; there's an optional paid upgrade you don't need to start.</li>
@@ -1145,6 +1151,10 @@ function showLearnTab(id, btn){
   if(id==='graphic'){
     var p=document.getElementById('pixelArtFrame');
     if(p && !p.getAttribute('src')){ p.src='pixel-art.html'; }
+  }
+  if(id==='mental'){
+    var m=document.getElementById('mentalToolFrame');
+    if(m && !m.getAttribute('src')){ m.src='mental-health-tool.html'; }
   }
 }
 function mountCodeEditor(hostId, prefix){

@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mind Tools — Find What Helps · Rare Candy Reserve</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:#0a0714;color:#f2eef7;line-height:1.55}
+  a{color:#00e5ff}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:19px;margin:26px 0 8px;color:#ffd23f}
+  h3{font-size:16px;margin:18px 0 6px;color:#00e5ff}
+  h4{font-size:15px;margin:14px 0 4px;color:#ff8ab8}
+  p{margin:6px 0}
+  ul,ol{margin:6px 0;padding-left:22px}
+  li{margin:3px 0}
+  .wrap{max-width:860px;margin:0 auto;padding:14px 14px 40px}
+  /* Crisis bar — always visible */
+  .crisis{position:sticky;top:0;z-index:20;background:#3d0a1e;border:1px solid #ff2d55;border-radius:0 0 14px 14px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+  .crisis b{font-size:15px}
+  .crisis .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .call-btn{display:inline-block;background:#ff2d55;color:#fff;font-weight:800;text-decoration:none;padding:10px 18px;border-radius:999px;font-size:16px;border:0;cursor:pointer}
+  .call-btn:hover{background:#ff4d6d}
+  .text-btn{display:inline-block;background:#222;color:#fff;font-weight:700;text-decoration:none;padding:10px 14px;border-radius:999px;font-size:14px;border:1px solid #555;cursor:pointer}
+  .disclaimer{border:1px solid rgba(255,210,63,.5);border-left:4px solid #ffd23f;border-radius:12px;padding:12px 14px;background:rgba(255,210,63,.06);margin:14px 0;font-size:14px}
+  .disclaimer b{color:#ffd23f}
+  .intro{color:#cfc6dd}
+  /* Issue picker */
+  .picker{background:#15102a;border:1px solid #2a2145;border-radius:14px;padding:16px;margin:16px 0}
+  .picker label{font-weight:700;display:block;margin-bottom:6px}
+  .picker select{width:100%;padding:12px;font-size:16px;border-radius:10px;border:1px solid #444;background:#0a0714;color:#f2eef7}
+  .picker .hint{font-size:13px;color:#9d93b5;margin-top:6px}
+  /* Issue panel */
+  .issue{display:none;background:#15102a;border:1px solid #2a2145;border-radius:14px;padding:16px;margin:14px 0}
+  .issue.show{display:block}
+  .issue h2{margin-top:0}
+  .tag{display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:999px;background:#2a2145;color:#00e5ff;margin:0 4px 8px 0}
+  .sec{border-top:1px solid #2a2145;padding-top:10px;margin-top:12px}
+  .avoid{background:rgba(255,45,85,.07);border:1px solid rgba(255,45,85,.35);border-radius:10px;padding:10px 12px;margin:10px 0}
+  .avoid b{color:#ff8aa5}
+  .pro{background:rgba(0,229,255,.06);border:1px solid rgba(0,229,255,.3);border-radius:10px;padding:10px 12px;margin:10px 0}
+  .pro b{color:#00e5ff}
+  .res{font-size:14px}
+  .res a{display:block;margin:3px 0}
+  /* Tool tabs */
+  .tabs{display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 0}
+  .tab-btn{padding:9px 14px;border-radius:999px;border:1px solid #444;background:#15102a;color:#f2eef7;font-weight:700;font-size:14px;cursor:pointer}
+  .tab-btn.active{background:#00e5ff;color:#0a0714;border-color:#00e5ff}
+  .tool-pane{display:none;background:#15102a;border:1px solid #2a2145;border-radius:14px;padding:18px;margin-top:10px}
+  .tool-pane.show{display:block}
+  /* Box breathing */
+  .breath-stage{display:flex;flex-direction:column;align-items:center;padding:10px 0}
+  .breath-circle{width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border:6px solid #00e5ff;background:radial-gradient(circle at 35% 35%,#2a2145,#0a0714);transition:transform 4s ease-in-out,border-color 1s,box-shadow 1s;box-shadow:0 0 30px rgba(0,229,255,.35);margin:10px 0}
+  .breath-circle .phase{font-size:18px;font-weight:800}
+  .breath-circle .count{font-size:52px;font-weight:900;line-height:1}
+  .breath-circle .sub{font-size:13px;color:#9d93b5}
+  .breath-controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .btn{padding:10px 18px;border-radius:999px;border:0;font-weight:800;font-size:15px;cursor:pointer;background:#00e5ff;color:#0a0714}
+  .btn.ghost{background:#222;color:#fff;border:1px solid #555}
+  .btn.pink{background:#ff2d95;color:#fff}
+  .rounds{font-size:14px;color:#9d93b5;text-align:center;margin-top:8px}
+  /* Vagus */
+  .vagus-step{border:1px solid #2a2145;border-radius:12px;padding:12px;margin:10px 0;background:#0f0b1e}
+  .vagus-step b{color:#7cffb2}
+  /* Pressure points */
+  .pp-wrap{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+  .pp-svg{flex:1 1 260px;min-width:240px}
+  .pp-detail{flex:1 1 260px;min-width:240px;background:#0f0b1e;border:1px solid #2a2145;border-radius:12px;padding:14px}
+  .pp-dot{cursor:pointer}
+  .pp-dot circle{fill:#ff2d95;stroke:#fff;stroke-width:1.5}
+  .pp-dot:hover circle{fill:#00e5ff}
+  .pp-dot.sel circle{fill:#ffd23f;stroke:#0a0714;stroke-width:2}
+  /* Grounding */
+  .ground-row{display:flex;gap:8px;align-items:center;margin:8px 0}
+  .ground-row input{flex:1;padding:10px;border-radius:10px;border:1px solid #444;background:#0a0714;color:#f2eef7;font-size:15px}
+  .ground-row .done{opacity:.55;text-decoration:line-through}
+  .ground-row button{padding:9px 12px;border-radius:10px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;font-weight:700}
+  /* Meditation */
+  .med-timer{font-size:44px;font-weight:900;text-align:center;margin:8px 0}
+  .med-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:10px 0}
+  .med-card{border:1px solid #2a2145;border-radius:12px;padding:12px;background:#0f0b1e;cursor:pointer}
+  .med-card.sel{border-color:#00e5ff;background:rgba(0,229,255,.08)}
+  .med-card b{display:block}
+  .med-card span{font-size:13px;color:#9d93b5}
+  /* Resources */
+  .res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:10px 0}
+  .res-card{border:1px solid #2a2145;border-radius:12px;padding:12px;background:#0f0b1e}
+  .res-card b{display:block;margin-bottom:4px}
+  .res-card a{font-size:14px}
+  .small{font-size:13px;color:#9d93b5}
+  @media(max-width:560px){.breath-circle{width:170px;height:170px}.breath-circle .count{font-size:44px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="crisis">
+    <div><b>🆘 In crisis right now?</b><br><span class="small">Free, confidential, 24/7 — for you or someone you're worried about.</span></div>
+    <div class="btns">
+      <a class="call-btn" href="tel:988">📞 Call or Text 988</a>
+      <a class="text-btn" href="sms:741741?&body=HOME">💬 Text HOME to 741741</a>
+    </div>
+  </div>
+
+  <h1>🧠 Mind Tools — find what helps</h1>
+  <p class="intro">Pick what's going on, and this tool shows you ways people actually use to feel better — breathing, body-based resets, natural approaches, and when to get professional help. Everything here is in plain language, and nothing here is a diagnosis.</p>
+
+  <div class="disclaimer">
+    <b>Please read this first:</b> This tool is for education and self-help only. It is <b>not meant to diagnose or treat</b> any condition, and it is not a replacement for a doctor, therapist, or counselor. If something feels serious, getting worse, or unsafe, please talk to a healthcare professional. If you ever feel you might act on thoughts of harming yourself, call or text <b>988</b> right now, or call <b>911</b> if someone is in immediate danger. Supplements and herbs can interact with medicines — always check with a doctor or pharmacist first, especially if you take prescription medication, are pregnant, or have a heart, liver, or thyroid condition.
+  </div>
+
+  <div class="picker">
+    <label for="issueSel">What's going on? Pick the closest match:</label>
+    <select id="issueSel">
+      <option value="">— Choose one —</option>
+      <option value="panic">😰 Panic attack — happening right now</option>
+      <option value="anxiety">😟 Anxiety / constant worry</option>
+      <option value="grief">💔 Depression from loss / grief</option>
+      <option value="depression">🌧️ Unexplained depression / low mood</option>
+      <option value="caregiver">🫂 Caregiver burnout</option>
+      <option value="autistic">🧩 Autistic burnout</option>
+      <option value="sleep">😴 Sleep problems / can't fall or stay asleep</option>
+      <option value="pain">🤕 Chronic pain / ongoing health problems</option>
+      <option value="teeth">🦷 Teeth / dental pain &amp; anxiety</option>
+      <option value="stress">😤 Stress / overwhelm</option>
+      <option value="anger">😡 Anger / irritability</option>
+      <option value="lonely">🕳️ Loneliness / feeling isolated</option>
+    </select>
+    <div class="hint">Not sure? Pick the one that feels closest — the tools below work for more than one issue, and you can switch any time.</div>
+  </div>
+
+  <div class="issue" id="issuePanel"></div>
+
+  <h2>🛠️ Tools you can use right now</h2>
+  <p class="intro">These work no matter which issue you picked. Try one — even a minute of slow breathing changes how your body feels.</p>
+
+  <div class="tabs" id="toolTabs">
+    <button class="tab-btn active" data-pane="pane-breathe">🫁 Box Breathing</button>
+    <button class="tab-btn" data-pane="pane-sigh">😮‍💨 Quick Sigh</button>
+    <button class="tab-btn" data-pane="pane-vagus">❄️ Vagus Reset</button>
+    <button class="tab-btn" data-pane="pane-pressure">👆 Pressure Points</button>
+    <button class="tab-btn" data-pane="pane-ground">🌍 Grounding 5-4-3-2-1</button>
+    <button class="tab-btn" data-pane="pane-meditate">🧘 Meditate</button>
+  </div>
+
+  <!-- BOX BREATHING -->
+  <div class="tool-pane show" id="pane-breathe">
+    <h3>Box breathing — 4 in, 4 hold, 4 out, 4 hold</h3>
+    <p>Used by Navy SEALs, nurses, and athletes. Mayo Clinic and Cleveland Clinic both describe it as a simple way to slow your heart rate and clear your mind. Breathe with the circle — it grows as you inhale and shrinks as you exhale, and the colour shifts with each phase.</p>
+    <div class="breath-stage">
+      <div class="breath-circle" id="breathCircle">
+        <div class="phase" id="breathPhase">Ready?</div>
+        <div class="count" id="breathCount">4</div>
+        <div class="sub" id="breathSub">Tap Start when you're ready</div>
+      </div>
+      <div class="breath-controls">
+        <button class="btn" id="breathStart">▶ Start breathing</button>
+        <button class="btn ghost" id="breathStop">■ Stop</button>
+      </div>
+      <div class="rounds" id="breathRounds">Rounds finished: 0 — aim for 3–4 rounds</div>
+      <p class="small" style="text-align:center;max-width:420px">If holding for 4 feels like a strain, shorten it to 3 or even 2 — the slow rhythm matters more than the exact count. Stop if you feel dizzy, and breathe normally.</p>
+    </div>
+  </div>
+
+  <!-- PHYSIOLOGICAL SIGH -->
+  <div class="tool-pane" id="pane-sigh">
+    <h3>The physiological sigh — the fastest calm-down</h3>
+    <p>Stanford researchers point to this as one of the quickest ways to drop anxiety — often within about 30 seconds. It works by fully inflating the lungs, which slows the heart rate through the vagus nerve.</p>
+    <ol>
+      <li><b>Breathe in through your nose</b> — a normal, relaxed inhale.</li>
+      <li><b>Before you exhale, sneak in a second short inhale</b> right on top of the first — a little extra sip of air.</li>
+      <li><b>Exhale slowly through your mouth</b> — make the exhale longer than both inhales put together.</li>
+      <li>Repeat 2–3 times. That's it.</li>
+    </ol>
+    <p class="small">You can also try the extended exhale: breathe in for 4, breathe out for 6–8. Longer out-breaths are what tell your body to calm down.</p>
+  </div>
+
+  <!-- VAGUS RESET -->
+  <div class="tool-pane" id="pane-vagus">
+    <h3>Vagus nerve reset — calm your body from the outside in</h3>
+    <p>The vagus nerve is the main pathway of your "rest and digest" system. These techniques gently stimulate it. Slow breathing is the safest and best-supported place to start — the rest are optional extras. Be careful with cold plunges and breath-holding if you have a heart condition, very low blood pressure, or a seizure disorder — ask a doctor first.</p>
+    <div class="vagus-step"><b>❄️ Cold water on your face (fastest)</b><br>Splash cold water on your face for 20–30 seconds, or hold a cold wet cloth over your forehead and cheeks. This triggers the diving reflex — the same reflex that slows a diver's heart — and your heart rate drops. You don't need ice; cold tap water works.</div>
+    <div class="vagus-step"><b>🫁 Long, slow exhales</b><br>Breathe in for 4 counts, out for 6–8 counts, for about 2 minutes. The long exhale is the part that activates the vagus nerve.</div>
+    <div class="vagus-step"><b>🎵 Hum, sing, or chant</b><br>Hum one steady note for 2–3 minutes and feel the vibration in your throat and chest. Singing along to a song works the same way — the vibration stimulates the nerve through your vocal cords.</div>
+    <div class="vagus-step"><b>🫧 Gargle water</b><br>Gargle water vigorously for 30–60 seconds, once or twice a day. It works the muscles at the back of your throat that the vagus nerve helps control.</div>
+    <div class="vagus-step"><b>🧊 Ice bath / cold shower (slower, stronger)</b><br>Ending your shower with 15–30 seconds of cold water, or a cold plunge at about 50–59°F (10–15°C) for 2–10 minutes, gives a bigger effect: norepinephrine rises sharply and dopamine can rise too, which is why people feel clearer and calmer afterwards. But a full plunge is a stressor first — your heart speeds up before it slows down — so start small, never plunge alone, and get medical clearance first if you have any heart condition, high blood pressure, or arrhythmia.</div>
+    <div class="vagus-step"><b>🚶 Gentle movement</b><br>A slow walk, gentle stretching, or light yoga pairs deep breathing with a calm rhythm and improves vagal tone over time.</div>
+  </div>
+
+  <!-- PRESSURE POINTS -->
+  <div class="tool-pane" id="pane-pressure">
+    <h3>Pressure points — acupressure for anxiety &amp; panic</h3>
+    <p>Acupressure is a traditional Chinese medicine technique: firm, steady pressure on specific points. The evidence is limited — think of it as a quick calming tool, not a treatment — but many people find it helps in the moment. Use steady, moderate pressure for 30 seconds to 2 minutes per point, firm enough to feel, never hard enough to hurt. <b>Skip the hand and shoulder points if you're pregnant</b> (they're traditionally linked to inducing labor).</p>
+    <div class="pp-wrap">
+      <div class="pp-svg">
+        <svg viewBox="0 0 260 420" width="100%" role="img" aria-label="Pressure point diagram">
+          <ellipse cx="130" cy="52" rx="34" ry="40" fill="#1c1533" stroke="#444" stroke-width="1.5"/>
+          <path d="M130 92 L130 200 M130 200 L104 330 M130 200 L156 330 M130 120 L78 200 M130 120 L182 200" stroke="#444" stroke-width="1.5" fill="none"/>
+          <ellipse cx="78" cy="212" rx="12" ry="16" fill="#1c1533" stroke="#444" stroke-width="1.5"/>
+          <ellipse cx="182" cy="212" rx="12" ry="16" fill="#1c1533" stroke="#444" stroke-width="1.5"/>
+          <ellipse cx="104" cy="342" rx="14" ry="18" fill="#1c1533" stroke="#444" stroke-width="1.5"/>
+          <ellipse cx="156" cy="342" rx="14" ry="18" fill="#1c1533" stroke="#444" stroke-width="1.5"/>
+          <g class="pp-dot" data-point="baihui"><circle cx="130" cy="14" r="8"/><text x="146" y="18" fill="#cfc6dd" font-size="12">Baihui</text></g>
+          <g class="pp-dot" data-point="yintang"><circle cx="130" cy="52" r="8"/><text x="146" y="56" fill="#cfc6dd" font-size="12">Yintang</text></g>
+          <g class="pp-dot" data-point="fengchi"><circle cx="104" cy="92" r="7"/><text x="60" y="88" fill="#cfc6dd" font-size="12">Fengchi</text></g>
+          <g class="pp-dot" data-point="jianjing"><circle cx="100" cy="122" r="7"/><text x="30" y="118" fill="#cfc6dd" font-size="12">Jian Jing</text></g>
+          <g class="pp-dot" data-point="shanzhong"><circle cx="130" cy="150" r="7"/><text x="146" y="154" fill="#cfc6dd" font-size="12">Shanzhong</text></g>
+          <g class="pp-dot" data-point="neiguan"><circle cx="80" cy="186" r="7"/><text x="20" y="182" fill="#cfc6dd" font-size="12">Neiguan</text></g>
+          <g class="pp-dot" data-point="shenmen"><circle cx="176" cy="186" r="7"/><text x="188" y="190" fill="#cfc6dd" font-size="12">Shenmen</text></g>
+          <g class="pp-dot" data-point="hegu"><circle cx="76" cy="224" r="7"/><text x="20" y="248" fill="#cfc6dd" font-size="12">Hegu</text></g>
+          <g class="pp-dot" data-point="taichong"><circle cx="104" cy="330" r="7"/><text x="118" y="334" fill="#cfc6dd" font-size="12">Tai Chong</text></g>
+        </svg>
+        <p class="small">Tap a dot to see what it does. This is a guide, not a medical chart — points are approximate.</p>
+      </div>
+      <div class="pp-detail" id="ppDetail">
+        <b>Tap a point on the diagram</b>
+        <p>Each point shows where it is, how to press it, and what people use it for. Start with <b>Yintang</b> (between the eyebrows) and <b>Neiguan</b> (inner wrist) — those are the two most commonly used for anxiety.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUNDING -->
+  <div class="tool-pane" id="pane-ground">
+    <h3>Grounding 5-4-3-2-1 — pull yourself back into the room</h3>
+    <p>When panic or racing thoughts take over, this forces your attention onto your senses and out of your head. Name things you can actually sense right now — type them in or just say them out loud, and tap ✓ as you go.</p>
+    <div id="groundList"></div>
+    <p class="small" id="groundDone" style="display:none">✅ Nice work. You just anchored yourself in the present. If the panic is still strong, try the box breathing tab next.</p>
+  </div>
+
+  <!-- MEDITATION -->
+  <div class="tool-pane" id="pane-meditate">
+    <h3>Meditation — short, proven, no experience needed</h3>
+    <p>Research consistently finds mindfulness meditation reduces anxiety and stress — it doesn't have to be long or perfect. Pick a style, pick a time, and press start. The timer counts down and the circle breathes with you.</p>
+    <div class="med-grid" id="medGrid">
+      <div class="med-card sel" data-med="breath" data-mins="3"><b>🌬️ Mindful breathing</b><span>Follow your breath in and out. When your mind wanders, gently bring it back. 3 min.</span></div>
+      <div class="med-card" data-med="scan" data-mins="5"><b>🧍 Body scan</b><span>Slowly notice each part of your body from head to toe, relaxing as you go. 5 min.</span></div>
+      <div class="med-card" data-med="kind" data-mins="3"><b>💗 Loving-kindness</b><span>Repeat quietly: "May I be safe. May I be calm. May I be well." Then extend it to someone else. 3 min.</span></div>
+      <div class="med-card" data-med="walk" data-mins="5"><b>🚶 Walking meditation</b><span>Walk slowly and feel each step — heel, sole, toe. Notice the ground, the air, the sounds. 5 min.</span></div>
+    </div>
+    <div class="med-timer" id="medTimer">3:00</div>
+    <div style="text-align:center">
+      <button class="btn" id="medStart">▶ Start</button>
+      <button class="btn ghost" id="medStop">■ Stop</button>
+    </div>
+    <p class="small" style="text-align:center" id="medNote">Mindful breathing — 3 minutes. Sit comfortably, shoulders down, eyes soft or closed.</p>
+  </div>
+
+  <h2>🌿 Natural ways — herbs, Ayurveda &amp; body chemistry</h2>
+  <p class="intro">These are approaches people use alongside (not instead of) professional care. The evidence is real but modest — no herb works as well as therapy or prescribed medicine, and some interact with medicines. <b>Always check with a doctor or pharmacist first</b>, especially if you take any prescription, are pregnant, or have liver, thyroid, or heart issues.</p>
+
+  <h3>Herbal supplements with actual trial evidence</h3>
+  <ul>
+    <li><b>Ashwagandha</b> (Ayurvedic root, <i>Withania somnifera</i>) — the best-studied herb for anxiety. A meta-analysis of 12 trials (~1,000 people) found it lowered anxiety and stress scores and morning cortisol, at 300–600 mg/day of standardized root extract. The 2022 WFSBP/CANMAT guideline provisionally recommends it alongside standard care. <b>Cautions:</b> rare liver injury cases, can change thyroid hormone levels, avoid in pregnancy and before surgery.</li>
+    <li><b>Lavender oil capsules (Silexan)</b> — 80–160 mg/day. The strongest disease-level evidence of any supplement here: in a trial of 539 adults with generalized anxiety, it beat placebo and matched the SSRI paroxetine on anxiety scores.</li>
+    <li><b>L-theanine</b> (amino acid from green tea) — 200–400 mg/day. Best for situational stress and sleep, not for a disorder. Small trials show modest calm without sedation.</li>
+    <li><b>Magnesium</b> — helps most when you're actually low in it (common with poor sleep, stress, and some medicines). Evidence is low-grade; a blood test can tell you if you're deficient.</li>
+    <li><b>Saffron</b> — emerging mood data in small trials; promising but early.</li>
+    <li><b>Skip:</b> kava (liver injury risk, failed a 16-week trial), and St John's wort (clashes with many medicines, including antidepressants and birth control).</li>
+  </ul>
+
+  <h3>Ayurvedic approaches</h3>
+  <ul>
+    <li><b>Ashwagandha</b> — the classic Ayurvedic adaptogen for stress and worry (see above for doses and cautions).</li>
+    <li><b>Brahmi (Bacopa monnieri)</b> — traditionally used for memory, focus, and calm. Small trials suggest modest anxiety and memory benefits over 8–12 weeks.</li>
+    <li><b>Tulsi / holy basil</b> — traditionally used as a calming daily tea for stress. Early human studies show modest stress reduction.</li>
+    <li><b>Turmeric (with black pepper)</b> — curcumin has anti-inflammatory effects; some small trials link it to better mood. Needs black pepper or fat to absorb well.</li>
+    <li><b>Abhyanga (warm oil massage)</b> — a slow, warm sesame-oil self-massage before a shower. Traditionally used to calm the nervous system and help sleep; at minimum it's 10 minutes of slow, caring touch, which is calming on its own.</li>
+    <li><b>Pranayama (breathwork)</b> — box breathing above is a form of this. Slow, rhythmic breathing is the heart of Ayurvedic calming practice.</li>
+    <li><b>Dinacharya (steady daily routine)</b> — same wake time, same meals, same wind-down. A predictable rhythm is one of the most underrated tools for anxiety and sleep.</li>
+  </ul>
+  <p class="small">Ayurvedic approaches are traditional medicine, not a replacement for diagnosis or treatment. If you use Ayurvedic herbs, tell your doctor — some interact with prescription medicines.</p>
+
+  <h2>📚 Learn more — trusted sources</h2>
+  <div class="res-grid">
+    <div class="res-card"><b>Mayo Clinic — relaxation techniques</b><a href="https://www.mayoclinic.org/healthy-lifestyle/stress-management/in-depth/relaxation-technique/art-20045368" target="_blank" rel="noopener">mayoclinic.org — breathing, guided imagery &amp; more</a><span class="small">Free, plain-language, medically reviewed.</span></div>
+    <div class="res-card"><b>Mayo Clinic — 5 ways to reduce stress now</b><a href="https://www.mayoclinic.org/connected-care/5-ways-to-reduce-stress-now/cpt-20538247" target="_blank" rel="noopener">mayoclinic.org — box breathing &amp; quick tools</a><span class="small">Includes the 4-4-4-4 box breathing steps.</span></div>
+    <div class="res-card"><b>Cleveland Clinic — box breathing</b><a href="https://health.clevelandclinic.org/box-breathing-benefits" target="_blank" rel="noopener">health.clevelandclinic.org</a><span class="small">How and why it works, step by step.</span></div>
+    <div class="res-card"><b>Healthline — pressure points for anxiety</b><a href="https://www.healthline.com/health/pressure-points-for-anxiety" target="_blank" rel="noopener">healthline.com</a><span class="small">Six points with photos and instructions.</span></div>
+    <div class="res-card"><b>NAMI — National Alliance on Mental Illness</b><a href="https://www.nami.org" target="_blank" rel="noopener">nami.org</a><span class="small">Support groups, helpline, and plain-language guides.</span></div>
+    <div class="res-card"><b>SAMHSA — find treatment</b><a href="https://www.samhsa.gov" target="_blank" rel="noopener">samhsa.gov</a><span class="small">US treatment locator and 24/7 helpline 1-800-662-4357.</span></div>
+    <div class="res-card"><b>988 Suicide &amp; Crisis Lifeline</b><a href="https://988lifeline.org" target="_blank" rel="noopener">988lifeline.org</a><span class="small">Call or text 988, 24/7, free and confidential.</span></div>
+    <div class="res-card"><b>Reddit communities</b><a href="https://www.reddit.com/r/Anxiety/" target="_blank" rel="noopener">r/Anxiety</a> · <a href="https://www.reddit.com/r/depression/" target="_blank" rel="noopener">r/depression</a> · <a href="https://www.reddit.com/r/CaregiverSupport/" target="_blank" rel="noopener">r/CaregiverSupport</a> · <a href="https://www.reddit.com/r/insomnia/" target="_blank" rel="noopener">r/insomnia</a> · <a href="https://www.reddit.com/r/ChronicPain/" target="_blank" rel="noopener">r/ChronicPain</a> · <a href="https://www.reddit.com/r/GriefSupport/" target="_blank" rel="noopener">r/GriefSupport</a><span class="small">Real people sharing what actually helped them. Peer support, not medical advice.</span></div>
+  </div>
+
+  <h2>🎥 Quick video guides</h2>
+  <p class="intro">Search YouTube for a guided version of any tool here — hearing someone walk you through it helps when your brain won't slow down on its own.</p>
+  <ul>
+    <li><a href="https://www.youtube.com/results?search_query=box+breathing+guided+4+4+4+4" target="_blank" rel="noopener">Guided box breathing (4-4-4-4)</a></li>
+    <li><a href="https://www.youtube.com/results?search_query=how+to+stop+a+panic+attack" target="_blank" rel="noopener">How to stop a panic attack</a></li>
+    <li><a href="https://www.youtube.com/results?search_query=vagus+nerve+reset+exercises" target="_blank" rel="noopener">Vagus nerve reset exercises</a></li>
+    <li><a href="https://www.youtube.com/results?search_query=guided+meditation+anxiety+10+minutes" target="_blank" rel="noopener">Guided meditation for anxiety (10 min)</a></li>
+    <li><a href="https://www.youtube.com/results?search_query=cold+water+face+plunge+anxiety" target="_blank" rel="noopener">Cold water face plunge for anxiety</a></li>
+  </ul>
+  <p class="small">Built for Rare Candy Reserve's Learn hub. This tool is educational only — it does not diagnose or treat. If you're struggling, please reach out to a professional, and if you're in crisis, call or text 988.</p>
+</div>
+
+<script>
+/* ================= Issue data ================= */
+var ISSUES = {
+  panic: {
+    title: '😰 Panic attack — happening right now',
+    tags: ['Right now', 'Fast relief', 'Body-based'],
+    what: 'A panic attack is your fight-or-flight system firing at full blast when there is no real danger. Heart racing, chest tight, can\'t breathe, dizzy, shaking, feeling like something terrible is about to happen. It feels awful — and it is not dangerous in itself. It peaks in about 10 minutes and passes.',
+    now: ['<b>Physiological sigh</b> (Quick Sigh tab above): double inhale through the nose, one long slow exhale through the mouth. Repeat 2–3 times — often works in 30 seconds.', '<b>Cold water on your face:</b> splash cold water or hold a cold cloth on your forehead and cheeks for 20–30 seconds. Triggers the diving reflex and slows your heart.', '<b>Grounding 5-4-3-2-1</b> (Grounding tab above): name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste.', '<b>Pressure points:</b> press Neiguan (inner wrist, 3 finger-widths below the crease) and Yintang (between the eyebrows) firmly for 60 seconds each.'],
+    avoid: ['<b>Caffeine</b> — in panic disorder, caffeine is far more likely to trigger an attack. Skip coffee, energy drinks, and pre-workout until things settle.', '<b>Shallow chest breathing</b> — fast, shallow breaths make panic worse. Slow the exhale down on purpose.', '<b>Running away mid-attack</b> — leaving the situation teaches your brain it was dangerous. If you can, stay put and ride it out; it passes.'],
+    natural: ['<b>Box breathing</b> daily (even when calm) trains your nervous system to recover faster.', '<b>Ashwagandha</b> 300–600 mg/day has the best trial evidence for stress and anxiety — check with a doctor first.', '<b>L-theanine</b> 200 mg can take the edge off situational nerves without making you sleepy.'],
+    pro: 'If panic attacks keep happening, or you start avoiding places because of them, that\'s worth a doctor or therapist visit. Panic disorder is very treatable — CBT (cognitive behavioural therapy) is the first-line treatment, and some people also use medication. You don\'t have to white-knuckle it alone.',
+    links: ['<a href="https://www.youtube.com/results?search_query=how+to+stop+a+panic+attack" target="_blank" rel="noopener">YouTube: how to stop a panic attack</a>', '<a href="https://www.reddit.com/r/PanicAttack/" target="_blank" rel="noopener">Reddit: r/PanicAttack</a>', '<a href="https://www.mayoclinic.org/healthy-lifestyle/stress-management/in-depth/relaxation-technique/art-20045368" target="_blank" rel="noopener">Mayo Clinic: relaxation techniques</a>']
+  },
+  anxiety: {
+    title: '😟 Anxiety / constant worry',
+    tags: ['Ongoing', 'Worry', 'Nervous system'],
+    what: 'Anxiety is your brain\'s alarm staying on too long — constant worry, racing thoughts, muscle tension, restlessness, trouble sleeping, stomach issues. It\'s the most common mental health struggle there is, and it\'s treatable.',
+    now: ['<b>Box breathing</b> (Breathe tab above): 4 in, 4 hold, 4 out, 4 hold, for 3–4 rounds. Do it at the same time every day — it works better as a habit than as a one-off.', '<b>Physiological sigh</b> when worry spikes: double inhale, long exhale, 2–3 times.', '<b>Write the worry down.</b> Get it out of your head and onto paper, then write one small thing you can actually do about it — or write "can\'t control this" and let it sit there.', '<b>Move your body:</b> a 10-minute walk is one of the most reliable anxiety reducers there is.'],
+    avoid: ['<b>Too much caffeine</b> — it mimics anxiety (racing heart, jitteriness) and makes real anxiety worse. Try cutting back gradually.', '<b>Doomscrolling news and social media</b> — especially first thing in the morning and right before bed.', '<b>Alcohol to "relax"</b> — it calms you for an hour, then rebounds into worse anxiety and broken sleep.'],
+    natural: ['<b>Ashwagandha</b> 300–600 mg/day — best trial evidence for stress/anxiety. <b>Lavender oil capsules (Silexan)</b> 80–160 mg/day — matched an SSRI in one large trial. <b>L-theanine</b> 200 mg for situational nerves. All need a doctor\'s check first.', '<b>Cold water on the face</b> or a cold shower finish (15–30 sec) to reset a wired nervous system.', '<b>Ayurvedic routine:</b> steady wake/sleep times, warm oil self-massage before a shower, tulsi tea in the evening.'],
+    pro: 'If worry is constant, hard to control, or interfering with work, sleep, or relationships, talk to a doctor or therapist. CBT is the most evidence-backed therapy for anxiety, and medication helps many people too. The 988 line is also there for anxiety, not just crisis — you can call just to talk.',
+    links: ['<a href="https://www.reddit.com/r/Anxiety/" target="_blank" rel="noopener">Reddit: r/Anxiety</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — anxiety support &amp; info</a>', '<a href="https://health.clevelandclinic.org/box-breathing-benefits" target="_blank" rel="noopener">Cleveland Clinic: box breathing</a>']
+  },
+  grief: {
+    title: '💔 Depression from loss / grief',
+    tags: ['Loss', 'Grief', 'Healing takes time'],
+    what: 'Grief after losing someone (or something) that mattered is not a disorder — it\'s love with nowhere to go. It can look like depression: heavy sadness, emptiness, no appetite, can\'t sleep or sleeping too much, no interest in anything, guilt, anger. Grief doesn\'t follow a schedule, and it doesn\'t go away in a straight line.',
+    now: ['<b>Let the wave come.</b> Grief comes in waves — fighting a wave makes it worse. When one hits, sit with it for a few minutes instead of pushing it down.', '<b>Talk to the person you lost</b> — out loud, in a letter, in your head. It sounds strange; it helps.', '<b>One tiny routine a day:</b> get up at the same time, eat one real meal, step outside once. Structure holds you when feelings can\'t.', '<b>Box breathing</b> when the chest tightness and crying won\'t stop.'],
+    avoid: ['<b>Isolating completely</b> — grief makes you want to disappear, but total isolation makes it heavier. Even one person, one text, counts.', '<b>Big decisions in the first months</b> — selling things, moving, quitting — if you can wait, wait.', '<b>Alcohol or pills to numb it</b> — they pause grief, they don\'t process it, and they make depression worse.'],
+    natural: ['<b>Walking in nature</b> — even 10 minutes outside, especially in the morning light, helps mood and sleep.', '<b>Warm routine:</b> warm tea, warm shower, warm blanket — grief lives in the body too, and warmth is soothing.', '<b>Saffron</b> has emerging mood evidence in small trials; <b>ashwagandha</b> may help with the stress side. Check with a doctor first.'],
+    pro: 'Grief is normal, but if it\'s been months and you still can\'t eat, sleep, work, or feel anything at all — or if you\'re thinking about joining the person you lost — please reach out. Call or text 988, or talk to a doctor about grief counselling. Complicated grief is real and treatable, and asking for help is not betraying the person you lost.',
+    links: ['<a href="https://www.reddit.com/r/GriefSupport/" target="_blank" rel="noopener">Reddit: r/GriefSupport</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — grief resources</a>']
+  },
+  depression: {
+    title: '🌧️ Unexplained depression / low mood',
+    tags: ['Low mood', 'No clear cause', 'Get support'],
+    what: 'Sometimes low mood has no clear reason — you\'re not sad about one thing, you\'re just flat, empty, tired, and nothing feels good. That\'s still real, and it\'s still worth taking seriously. Depression can also come from things you can\'t see: low vitamin D, thyroid problems, poor sleep, chronic stress, or brain chemistry.',
+    now: ['<b>Morning light:</b> get outside within an hour of waking, even if it\'s cloudy. Light is one of the strongest mood signals your brain gets.', '<b>Move, even a little:</b> a 10-minute walk counts. Exercise is one of the best-studied natural antidepressants.', '<b>One small win:</b> wash one dish, answer one message, shower. Depression shrinks your world — small wins push it back open.', '<b>Box breathing + cold water on the face</b> when the heaviness feels physical.'],
+    avoid: ['<b>Staying in bed all day</b> — it feels like rest, but it deepens depression. Get up, even if you do nothing else.', '<b>Alcohol</b> — it\'s a depressant, and it wrecks sleep, which wrecks mood.', '<b>Believing the thoughts are facts.</b> "I\'m worthless" is a symptom talking, not the truth. Write the thought down, then write what you\'d say to a friend who thought it.'],
+    natural: ['<b>Vitamin D:</b> get your level checked — low vitamin D is common and linked to low mood, especially in winter.', '<b>Saffron</b> has emerging mood evidence; <b>ashwagandha</b> may help stress-related low mood. Both need a doctor\'s check.', '<b>Omega-3 (fish oil)</b> has modest mood evidence in some trials.', '<b>Ayurvedic:</b> steady daily routine, warm oil massage, brahmi (Bacopa) — traditionally used for mood and focus.'],
+    pro: 'If low mood lasts more than two weeks, or you\'ve lost interest in everything, can\'t sleep or eat properly, or you\'re having thoughts of harming yourself — please talk to a doctor. Depression is one of the most treatable conditions there is: therapy (especially CBT) and medication help most people who get them. Call or text 988 any time, even if you\'re "just" feeling low.',
+    links: ['<a href="https://www.reddit.com/r/depression/" target="_blank" rel="noopener">Reddit: r/depression</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — depression support</a>']
+  },
+  caregiver: {
+    title: '🫂 Caregiver burnout',
+    tags: ['Exhaustion', 'Carrying too much', 'You matter too'],
+    what: 'Caregiver burnout is physical, emotional, and mental exhaustion from caring for someone else for too long without enough rest or help. Signs: waking up tired even after sleeping, snapping at small things, feeling numb or flat, losing interest in things you used to enjoy, guilt whenever you rest, brain fog, getting sick more often, dreading the day. It is not a sign you love them less — it\'s a sign the load is heavier than one person can carry.',
+    now: ['<b>Reduce the load first.</b> This is the most important shift: burnout recovery is structural, not cosmetic. Don\'t add five self-care jobs to an overloaded schedule — instead, find one thing you can drop, delay, or hand to someone else, even imperfectly.', '<b>Ask for help specifically:</b> "Can you sit with them Saturday 2–5 so I can sleep?" works better than "I need help."', '<b>Protect sleep ferociously.</b> If nights are broken, split them with someone — any uninterrupted sleep matters.', '<b>Box breathing</b> in the car, the bathroom, anywhere you get 2 minutes alone.'],
+    avoid: ['<b>Believing no one else can do it right.</b> Imperfect help is still help — a grandparent who doesn\'t follow every routine is still giving you a break.', '<b>Skipping your own medical care.</b> Burnout makes you skip appointments; reverse that first.', '<b>Running on caffeine and no food.</b> It keeps you going for an hour and crashes you harder.'],
+    natural: ['<b>Respite care:</b> family, friends, a paid caregiver, or a respite program through your state\'s disability services. Respite is not a luxury — it\'s what makes caregiving sustainable.', '<b>Ashwagandha</b> 300–600 mg/day for stress (doctor\'s check first).', '<b>Warm routine:</b> warm shower, warm tea, 10 minutes of quiet before the day starts.'],
+    pro: 'If you\'re feeling numb, hopeless, or having thoughts of harming yourself or someone else, please reach out right away — call or text 988, or talk to your doctor. Caregiver support groups (in person or online) help enormously because the people there actually get it. Your doctor can also help sort out whether what you\'re feeling is burnout, depression, or something medical.',
+    links: ['<a href="https://www.reddit.com/r/CaregiverSupport/" target="_blank" rel="noopener">Reddit: r/CaregiverSupport</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — caregiver support</a>']
+  },
+  autistic: {
+    title: '🧩 Autistic burnout',
+    tags: ['Sensory overload', 'Masking', 'Rest is recovery'],
+    what: 'Autistic burnout is a state of deep exhaustion that comes from long-term masking (hiding autistic traits to fit in), sensory overload, and pushing through demands without enough recovery. It can look like: total exhaustion, losing skills you used to have (talking, cooking, working), more meltdowns or shutdowns, intense sensory sensitivity, and needing far more alone time. It\'s not laziness — it\'s a nervous system that has run out of capacity.',
+    now: ['<b>Drop the mask.</b> Stop performing "normal" for a while. Stim, use your comfort items, wear what feels right, don\'t force eye contact.', '<b>Cut sensory input:</b> dark room, noise-cancelling headphones, weighted blanket, no screens. Sensory rest is real rest.', '<b>Low-demand period:</b> cancel what you can, say no to extras, eat the same safe food, keep the routine simple and predictable.', '<b>Box breathing + cold water on the face</b> when the overwhelm spikes.'],
+    avoid: ['<b>Pushing through it.</b> Autistic burnout doesn\'t get better by trying harder — it gets better by resting and reducing demands.', '<b>New social demands or big changes</b> while you\'re burned out. Protect your routine.', '<b>Comparing yourself to non-autistic people.</b> Your capacity is real, and it\'s different — that\'s not a failure.'],
+    natural: ['<b>Stimming freely</b> — rocking, flapping, fidgeting — is regulation, not a problem to fix.', '<b>Sensory tools:</b> weighted blanket, ear defenders, fidget tools, a dark quiet space.', '<b>Magnesium</b> may help sleep and muscle tension if you\'re low (check with a doctor).', '<b>Routine + predictability:</b> same wake time, same meals, same wind-down — a steady rhythm lowers the daily load.'],
+    pro: 'If burnout is severe or lasting months, an autism-informed therapist or doctor can help — ideally one who understands autistic burnout specifically (not all do). If you\'re having thoughts of harming yourself, call or text 988. You deserve support that fits how your brain actually works.',
+    links: ['<a href="https://www.reddit.com/r/AutismTranslated/" target="_blank" rel="noopener">Reddit: r/AutismTranslated</a>', '<a href="https://www.reddit.com/r/aspergers/" target="_blank" rel="noopener">Reddit: r/aspergers</a>']
+  },
+  sleep: {
+    title: '😴 Sleep problems / can\'t fall or stay asleep',
+    tags: ['Insomnia', 'Night waking', 'Sleep hygiene'],
+    what: 'Trouble falling asleep, staying asleep, or waking up exhausted. Poor sleep makes everything else worse — anxiety, mood, pain, focus. And anxiety about not sleeping makes sleep even harder. It\'s a loop, but it can be broken.',
+    now: ['<b>Same wake time every day</b> — even weekends. This is the single most powerful sleep tool there is.', '<b>Wind down 30–60 minutes before bed:</b> dim lights, no screens, warm shower, boring book. Your brain needs a signal that the day is over.', '<b>If you can\'t sleep after ~20 minutes, get up.</b> Go to another room, do something boring and dim, and go back when you feel sleepy. Lying awake trains your brain to associate bed with being awake.', '<b>Box breathing in bed:</b> 4 in, 4 hold, 4 out, 4 hold — it slows your heart and tells your body it\'s safe to sleep.'],
+    avoid: ['<b>Blue light before bed</b> — screens, bright LEDs, and phone scrolling suppress melatonin. No screens for the last 30–60 minutes, or use a warm/night filter and keep the phone out of the bedroom.', '<b>Nicotine / vaping, especially at night</b> — nicotine is a stimulant. It raises your heart rate, fragments sleep, and can trigger sleep paralysis — that terrifying feeling of waking up unable to move. Heavy vaping also causes rebound anxiety as nicotine wears off, which wrecks sleep even more. If you vape, don\'t vape in the hours before bed.', '<b>Caffeine after noon</b> — it stays in your system for 6+ hours.', '<b>Alcohol to fall asleep</b> — it knocks you out, then wakes you up at 3am and blocks deep sleep.', '<b>Big meals, bright lights, and arguments right before bed.</b>'],
+    natural: ['<b>L-theanine</b> 200 mg in the evening may help sleep quality (small trials). <b>Lavender oil capsules (Silexan)</b> 80 mg also helped sleep in trials. <b>Magnesium</b> if you\'re low. All need a doctor\'s check first.', '<b>Morning sunlight</b> within an hour of waking — it sets your body clock for sleep 14–16 hours later.', '<b>Ayurvedic:</b> warm milk with a pinch of nutmeg, warm oil foot massage before bed, same bedtime every night.'],
+    pro: 'If sleep problems last more than a few weeks, or you snore loudly, stop breathing at night, or fall asleep during the day, talk to a doctor — sleep apnea and other sleep disorders are common and treatable. CBT for insomnia (CBT-I) is the most effective treatment for chronic insomnia, better than sleeping pills long-term.',
+    links: ['<a href="https://www.reddit.com/r/insomnia/" target="_blank" rel="noopener">Reddit: r/insomnia</a>', '<a href="https://www.mayoclinic.org/healthy-lifestyle/adult-health/in-depth/sleep/art-20048379" target="_blank" rel="noopener">Mayo Clinic: sleep tips</a>']
+  },
+  pain: {
+    title: '🤕 Chronic pain / ongoing health problems',
+    tags: ['Pain', 'Health stress', 'Body & mind'],
+    what: 'Living with pain or a health condition that won\'t go away is exhausting in a way people who haven\'t lived it don\'t understand. Pain raises stress, stress raises pain, poor sleep makes both worse, and it\'s easy to feel like your body has turned against you. The pain is real — and the stress and low mood that come with it are real too.',
+    now: ['<b>Box breathing + cold water on the face</b> when pain flares — both lower the stress response that amplifies pain.', '<b>Pressure points:</b> Hegu (thumb webbing) for headaches and general pain, Neiguan (inner wrist) for nausea and tension. Firm pressure, 1–2 minutes.', '<b>Gentle movement:</b> slow stretching, a short walk, gentle yoga — moving a little usually helps more than lying still all day, even when it hurts to start.', '<b>Pacing:</b> break tasks into small chunks with rests in between. Doing everything on a good day and crashing for three days is a trap.'],
+    avoid: ['<b>Pushing through a flare</b> — it usually makes the next days worse, not better.', '<b>Isolating because of pain</b> — it deepens depression, which deepens pain. Even a short call or message counts.', '<b>Alcohol for pain</b> — it helps for an hour and makes sleep and pain worse overnight.'],
+    natural: ['<b>Cold water / ice:</b> cold on a painful area reduces inflammation and numbs pain; a cold face splash also calms the nervous system.', '<b>Turmeric (with black pepper)</b> — curcumin has anti-inflammatory effects in trials; modest but real.', '<b>Magnesium</b> may help muscle tension and cramps if you\'re low.', '<b>Warm baths, heat packs, gentle stretching</b> — simple, free, and they work for many people.'],
+    pro: 'If pain is new, getting worse, or you haven\'t had it properly checked, see a doctor — some causes of pain need treatment, not just coping. Pain clinics, physical therapy, and CBT for chronic pain all have good evidence. If pain is making you feel hopeless or you\'re thinking of harming yourself, call or text 988.',
+    links: ['<a href="https://www.reddit.com/r/ChronicPain/" target="_blank" rel="noopener">Reddit: r/ChronicPain</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — chronic illness &amp; mental health</a>']
+  },
+  teeth: {
+    title: '🦷 Teeth / dental pain &amp; anxiety',
+    tags: ['Dental pain', 'Dental anxiety', 'Practical help'],
+    what: 'Tooth pain is one of the worst pains there is — it\'s constant, it\'s in your head, and it messes with eating, sleeping, and thinking straight. Dental anxiety is just as real: fear of the dentist, fear of the bill, fear of being judged. Both together can trap you in a loop where pain makes you avoid the dentist and avoiding the dentist makes the pain worse.',
+    now: ['<b>For pain right now:</b> cold compress on the cheek (15 min on, 15 off), rinse with warm salt water, and over-the-counter pain relief as directed on the packet. If there\'s swelling, fever, or the pain is severe and spreading, that\'s urgent — see a dentist or urgent care the same day.', '<b>For dental anxiety:</b> box breathing before and during the visit. Tell the dentist you\'re anxious — a good dentist will go slower, explain each step, and let you raise a hand to stop.', '<b>Clove oil</b> on a cotton ball held against the tooth is a traditional remedy — eugenol (the active part) is a mild numbing agent, and it\'s in many dental products.'],
+    avoid: ['<b>Putting it off until it\'s an emergency.</b> Small problems are cheaper and less painful to fix than big ones.', '<b>Sugary drinks and sticky sweets</b> while a tooth is hurting — they feed the bacteria making it worse.', '<b>Using alcohol or pills to numb tooth pain</b> — it doesn\'t fix the tooth, and it can mask a serious infection.'],
+    natural: ['<b>Warm salt water rinse</b> (½ tsp salt in a cup of warm water) — reduces bacteria and soothes gums.', '<b>Clove oil</b> — traditional, and the numbing compound eugenol is well documented.', '<b>Cold water / ice pack</b> on the cheek for swelling and pain.'],
+    pro: 'A dental exam is the first step — it tells you what\'s actually wrong and what it will cost, which is usually less scary than guessing. If cost is the barrier, ask the dentist about payment plans, or look into dental schools, community health centers, and Medicaid dental coverage. If tooth pain comes with swelling, fever, or trouble swallowing or breathing, get urgent care the same day — that can be a serious infection.',
+    links: ['<a href="https://www.reddit.com/r/Dentistry/" target="_blank" rel="noopener">Reddit: r/Dentistry</a>']
+  },
+  stress: {
+    title: '😤 Stress / overwhelm',
+    tags: ['Overload', 'Too much at once', 'Reset'],
+    what: 'Stress is your body gearing up to deal with too much at once — tight shoulders, racing mind, snapping at people, can\'t focus, can\'t sleep, stomach in knots. A little stress helps you perform. Chronic stress wears you down: it weakens immunity, raises blood pressure, and burns you out.',
+    now: ['<b>Box breathing</b> — 3–4 rounds, right now. It\'s the fastest reset you have.', '<b>Write the list down.</b> Get everything out of your head onto paper. Circle the ONE thing that matters most today. The rest can wait.', '<b>Cold water on your face</b> or a 10-minute walk — both break the stress loop physically.', '<b>Say one no.</b> Overwhelm usually means too many yeses. Pick one thing to decline or delay today.'],
+    avoid: ['<b>Energy drinks and excess caffeine</b> — they feel like help and act like stress.', '<b>Skipping meals and sleep to "get more done"</b> — it makes you slower and more stressed, not faster.', '<b>Venting without a plan</b> — talking helps, but looping the same complaint without any action keeps you stuck.'],
+    natural: ['<b>Ashwagandha</b> 300–600 mg/day for stress (doctor\'s check first). <b>L-theanine</b> 200 mg for a calmer focus.', '<b>Daily rhythm:</b> same wake time, one walk, one real meal — boring, and it works.', '<b>Warm oil massage, tulsi tea, slow breathing</b> — Ayurvedic calming basics.'],
+    pro: 'If stress is constant and you can\'t recover even on days off, or it\'s turning into panic, depression, or physical symptoms (chest pain, constant headaches, stomach problems), talk to a doctor. Chronic stress is a medical issue, not a character flaw — and therapy, especially CBT, teaches concrete skills for handling it.',
+    links: ['<a href="https://www.mayoclinic.org/connected-care/5-ways-to-reduce-stress-now/cpt-20538247" target="_blank" rel="noopener">Mayo Clinic: 5 ways to reduce stress now</a>', '<a href="https://www.reddit.com/r/Stress/" target="_blank" rel="noopener">Reddit: r/Stress</a>']
+  },
+  anger: {
+    title: '😡 Anger / irritability',
+    tags: ['Short fuse', 'Rage', 'Cooling down'],
+    what: 'Anger is usually stress, pain, exhaustion, or hurt wearing a louder mask. If you\'re snapping at people you love, feeling furious over small things, or your anger is scaring you (or others), that\'s worth paying attention to — not with shame, but with curiosity about what\'s underneath.',
+    now: ['<b>Walk away first.</b> If you feel the surge coming, leave the room for 5 minutes. It\'s not running away — it\'s giving your brain time to come back online.', '<b>Box breathing or the physiological sigh</b> — anger is a sympathetic-nervous-system state, and slow exhales are the fastest way out of it.', '<b>Cold water on your face or wrists</b> — the shock interrupts the anger loop.', '<b>Name it:</b> "I\'m angry because I feel disrespected / overwhelmed / scared." Naming the feeling underneath shrinks it.'],
+    avoid: ['<b>Big conversations when you\'re already angry.</b> Nothing gets solved at peak anger — it just gets worse.', '<b>Alcohol when angry</b> — it removes the brakes and makes everything worse.', '<b>Bottling it up completely.</b> Suppressed anger turns into headaches, stomach problems, and depression.'],
+    natural: ['<b>Regular exercise</b> — the most reliable anger reducer there is. Even a fast walk counts.', '<b>Sleep:</b> most people are far angrier when sleep-deprived. Protect it.', '<b>Magnesium</b> may help muscle tension and irritability if you\'re low (doctor\'s check).'],
+    pro: 'If anger is damaging your relationships, your work, or you\'re worried you might hurt someone, please talk to a doctor or therapist. Anger management therapy (often CBT-based) works well, and sometimes anger is a sign of depression, ADHD, or a thyroid issue that needs treating. If you feel you might act on anger right now, step away and call or text 988.',
+    links: ['<a href="https://www.reddit.com/r/AngerManagement/" target="_blank" rel="noopener">Reddit: r/AngerManagement</a>']
+  },
+  lonely: {
+    title: '🕳️ Loneliness / feeling isolated',
+    tags: ['Isolation', 'Connection', 'You\'re not alone'],
+    what: 'Loneliness isn\'t about being alone — it\'s about feeling unseen and disconnected, even around other people. It raises stress, wrecks sleep, and deepens depression. And it lies to you: it tells you nobody cares, nobody would want to hear from you, and reaching out would be a burden. Those are symptoms, not facts.',
+    now: ['<b>Send one message.</b> Not a big conversation — just "hey, thinking of you" to one person. Most people are glad to hear from you and are lonelier than they let on.', '<b>Go where people are:</b> a library, a park, a game night, a community group, an online community for something you actually like. Connection starts with proximity.', '<b>Talk to someone who listens:</b> 7 Cups (free volunteer listeners), a crisis line (988 — you don\'t have to be in crisis to call), or a support group.', '<b>Box breathing</b> when the loneliness turns into panic or a heavy chest.'],
+    avoid: ['<b>Believing the loneliness voice.</b> "Nobody cares" is a feeling, not a fact. Test it with one small reach-out.', '<b>Replacing connection with scrolling.</b> Social media feels like people, but it usually makes loneliness worse.', '<b>Waiting until you "feel like" reaching out.</b> The feeling comes after the action, not before.'],
+    natural: ['<b>Routine + sunlight + movement:</b> the boring trio that lifts mood and makes connection easier.', '<b>Volunteering or helping someone:</b> one of the fastest ways to feel connected and useful.', '<b>A pet, a plant, a project:</b> caring for something living reminds you that you matter to something.'],
+    pro: 'If loneliness has turned into depression — you can\'t get out of bed, nothing feels good, you\'re thinking about harming yourself — please reach out to a doctor or call/text 988. Loneliness is painful, and it\'s also one of the most fixable feelings there is, once you get one real connection going.',
+    links: ['<a href="https://www.7cups.com" target="_blank" rel="noopener">7 Cups — free listeners</a>', '<a href="https://www.reddit.com/r/lonely/" target="_blank" rel="noopener">Reddit: r/lonely</a>', '<a href="https://www.nami.org" target="_blank" rel="noopener">NAMI — support groups</a>']
+  }
+};
+
+/* Pressure point data */
+var POINTS = {
+  yintang: {name:'Yintang — Hall of Impression (between the eyebrows)', where:'Right between your eyebrows, where the bridge of your nose meets your forehead.', how:'Sit comfortably, close your eyes. Press gently with one finger and rub in small slow circles for 30 seconds to 5 minutes while breathing slowly.', use:'Anxiety, stress, insomnia, racing mind. The most-used point for calming down fast.'},
+  baihui: {name:'Baihui — Crown (top of the head)', where:'Top of your head, on the midline — draw a line up from the top of each ear and meet in the middle.', how:'Press firmly with a fingertip for 30–60 seconds, breathing slowly.', use:'Mental clarity, low mood, headaches, feeling scattered or foggy.'},
+  fengchi: {name:'Fengchi — Wind Pool (base of the skull)', where:'At the base of your skull, in the hollows on either side of the big neck muscles.', how:'Press both sides at once with your thumbs, pushing gently inward and upward, for 1–2 minutes.', use:'Headaches, neck tension, stress. Avoid if you have a neck injury.'},
+  jianjing: {name:'Jian Jing — Shoulder Well', where:'In the shoulder muscle, halfway between the base of your neck and the edge of your shoulder.', how:'Pinch the muscle with thumb and middle finger, hold firm pressure for 1–2 minutes.', use:'Stress, muscle tension, headaches. ⚠️ Skip this point if you are pregnant.'},
+  shanzhong: {name:'Shanzhong — Chest Centre', where:'Centre of your chest, level with your nipples, on the breastbone.', how:'Press firmly with two or three fingers for 1–2 minutes while breathing slowly.', use:'Chest tightness, anxiety, feeling like you can\'t get a full breath.'},
+  neiguan: {name:'Neiguan — Inner Gate (PC6, inner wrist)', where:'Inner forearm, about three finger-widths below the wrist crease, between the two big tendons (clench your fist and they pop out).', how:'Press firmly with your opposite thumb in small circles for 1–2 minutes. Switch wrists.', use:'Anxiety, nausea, palpitations, chest tightness. One of the most studied points — it\'s the same spot sea-sickness bands press.'},
+  shenmen: {name:'Shenmen — Spirit Gate (HT7, wrist crease)', where:'Inner wrist crease, on the pinky-finger side, in the little hollow next to the bone.', how:'Press lightly with your thumb in small circles for 60 seconds, breathing out longer than you breathe in. Switch wrists.', use:'Emotional overwhelm, insomnia, racing heart. A physical anchor when panic hits.'},
+  hegu: {name:'Hegu — Union Valley (LI4, hand)', where:'The fleshy webbing between your thumb and index finger.', how:'Pinch the webbing firmly with your opposite thumb and forefinger for 1–2 minutes.', use:'Stress, tension headaches, neck pain. ⚠️ Skip this point if you are pregnant.'},
+  taichong: {name:'Tai Chong — Great Surge (LV3, foot)', where:'Top of your foot, about two finger-widths below where your big toe and second toe meet, in the hollow just above the bone.', how:'Press firmly with your thumb for 1–2 minutes. It can be tender when you\'re stressed — that\'s normal.', use:'Anxiety, stress, irritability, feeling wound up.'}
+};
+
+/* Grounding items */
+var GROUND = [
+  {n:5, label:'things you can SEE', ph:'e.g. lamp, tree, phone, shoes, window'},
+  {n:4, label:'things you can TOUCH', ph:'e.g. table, shirt, floor, blanket'},
+  {n:3, label:'things you can HEAR', ph:'e.g. fan, birds, music, breathing'},
+  {n:2, label:'things you can SMELL', ph:'e.g. coffee, soap, rain, food'},
+  {n:1, label:'thing you can TASTE', ph:'e.g. water, gum, toothpaste'}
+];
+
+/* ================= Issue picker ================= */
+var sel = document.getElementById('issueSel');
+var panel = document.getElementById('issuePanel');
+sel.addEventListener('change', function(){
+  var k = sel.value;
+  if(!k || !ISSUES[k]){ panel.className='issue'; panel.innerHTML=''; return; }
+  var d = ISSUES[k];
+  var html = '<h2>' + d.title + '</h2>';
+  html += d.tags.map(function(t){ return '<span class="tag">'+t+'</span>'; }).join('');
+  html += '<p>' + d.what + '</p>';
+  html += '<div class="sec"><h3>⚡ Try right now</h3><ul>' + d.now.map(function(x){ return '<li>'+x+'</li>'; }).join('') + '</ul></div>';
+  html += '<div class="avoid"><b>🚫 Things to avoid with this one</b><ul>' + d.avoid.map(function(x){ return '<li>'+x+'</li>'; }).join('') + '</ul></div>';
+  html += '<div class="sec"><h3>🌿 Natural ways that help</h3><ul>' + d.natural.map(function(x){ return '<li>'+x+'</li>'; }).join('') + '</ul></div>';
+  html += '<div class="pro"><b>🩺 When to get professional help</b><p>' + d.pro + '</p></div>';
+  html += '<div class="sec res"><h3>📚 Learn more</h3>' + d.links.join('') + '</div>';
+  panel.innerHTML = html;
+  panel.className = 'issue show';
+  panel.scrollIntoView({behavior:'smooth', block:'nearest'});
+});
+
+/* ================= Tool tabs ================= */
+document.querySelectorAll('.tab-btn').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('.tab-btn').forEach(function(x){ x.classList.remove('active'); });
+    document.querySelectorAll('.tool-pane').forEach(function(x){ x.classList.remove('show'); });
+    b.classList.add('active');
+    document.getElementById(b.dataset.pane).classList.add('show');
+  });
+});
+
+/* ================= Box breathing ================= */
+var PHASES = [
+  {name:'Breathe in', sub:'through your nose', dur:4, scale:1.25, color:'#00e5ff', glow:'rgba(0,229,255,.5)'},
+  {name:'Hold', sub:'keep it in, stay still', dur:4, scale:1.25, color:'#7c4dff', glow:'rgba(124,77,255,.5)'},
+  {name:'Breathe out', sub:'slowly through your mouth', dur:4, scale:0.85, color:'#ff2d95', glow:'rgba(255,45,149,.5)'},
+  {name:'Hold', sub:'empty, stay still', dur:4, scale:0.85, color:'#ffd23f', glow:'rgba(255,210,63,.5)'}
+];
+var bCircle = document.getElementById('breathCircle');
+var bPhase = document.getElementById('breathPhase');
+var bCount = document.getElementById('breathCount');
+var bSub = document.getElementById('breathSub');
+var bRounds = document.getElementById('breathRounds');
+var bTimer = null, bPhaseIdx = 0, bLeft = 4, bRoundCount = 0, bRunning = false;
+function bSetPhase(i){
+  bPhaseIdx = i; bLeft = PHASES[i].dur;
+  var p = PHASES[i];
+  bPhase.textContent = p.name;
+  bSub.textContent = p.sub;
+  bCount.textContent = bLeft;
+  bCircle.style.transform = 'scale(' + p.scale + ')';
+  bCircle.style.borderColor = p.color;
+  bCircle.style.boxShadow = '0 0 40px ' + p.glow;
+}
+function bTick(){
+  bLeft--;
+  if(bLeft <= 0){
+    bPhaseIdx++;
+    if(bPhaseIdx >= PHASES.length){
+      bPhaseIdx = 0; bRoundCount++;
+      bRounds.textContent = 'Rounds finished: ' + bRoundCount + ' — aim for 3–4 rounds';
+    }
+    bSetPhase(bPhaseIdx);
+  } else {
+    bCount.textContent = bLeft;
+  }
+}
+document.getElementById('breathStart').addEventListener('click', function(){
+  if(bRunning) return;
+  bRunning = true;
+  bSetPhase(0);
+  bTimer = setInterval(bTick, 1000);
+});
+document.getElementById('breathStop').addEventListener('click', function(){
+  bRunning = false;
+  clearInterval(bTimer);
+  bPhase.textContent = 'Paused';
+  bSub.textContent = 'Tap Start to go again';
+  bCircle.style.transform = 'scale(1)';
+  bCircle.style.borderColor = '#00e5ff';
+});
+
+/* ================= Pressure points ================= */
+var ppDetail = document.getElementById('ppDetail');
+document.querySelectorAll('.pp-dot').forEach(function(dot){
+  dot.addEventListener('click', function(){
+    document.querySelectorAll('.pp-dot').forEach(function(x){ x.classList.remove('sel'); });
+    dot.classList.add('sel');
+    var p = POINTS[dot.dataset.point];
+    ppDetail.innerHTML = '<b>' + p.name + '</b><p><b>Where:</b> ' + p.where + '</p><p><b>How:</b> ' + p.how + '</p><p><b>Good for:</b> ' + p.use + '</p>';
+  });
+});
+
+/* ================= Grounding ================= */
+var gList = document.getElementById('groundList');
+GROUND.forEach(function(g, gi){
+  var row = document.createElement('div');
+  row.className = 'ground-row';
+  row.innerHTML = '<b style="min-width:26px">' + g.n + '</b><input type="text" placeholder="' + g.ph + '" aria-label="' + g.label + '"><button type="button">✓</button>';
+  var input = row.querySelector('input');
+  var btn = row.querySelector('button');
+  btn.addEventListener('click', function(){
+    input.classList.toggle('done');
+    checkGround();
+  });
+  input.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ input.classList.add('done'); checkGround(); }
+  });
+  gList.appendChild(row);
+  var lbl = document.createElement('div');
+  lbl.className = 'small';
+  lbl.textContent = g.n + ' ' + g.label;
+  gList.appendChild(lbl);
+});
+function checkGround(){
+  var done = document.querySelectorAll('#groundList input.done').length;
+  if(done >= 5) document.getElementById('groundDone').style.display = 'block';
+}
+
+/* ================= Meditation timer ================= */
+var medCards = document.querySelectorAll('.med-card');
+var medTimerEl = document.getElementById('medTimer');
+var medNote = document.getElementById('medNote');
+var medSecs = 180, medLeft = 180, medInt = null, medRunning = false;
+var MED_NOTES = {
+  breath: 'Mindful breathing — sit comfortably, shoulders down, eyes soft or closed. Follow each breath in and out.',
+  scan: 'Body scan — start at the top of your head and slowly move down, noticing each part without judging it.',
+  kind: 'Loving-kindness — repeat quietly: "May I be safe. May I be calm. May I be well." Then extend it to someone else.',
+  walk: 'Walking meditation — walk slowly and feel each step: heel, sole, toe. Notice the ground and the air.'
+};
+medCards.forEach(function(c){
+  c.addEventListener('click', function(){
+    medCards.forEach(function(x){ x.classList.remove('sel'); });
+    c.classList.add('sel');
+    medSecs = parseInt(c.dataset.mins, 10) * 60;
+    medLeft = medSecs;
+    medNote.textContent = MED_NOTES[c.dataset.med] + ' — ' + c.dataset.mins + ' minutes.';
+    updateMed();
+  });
+});
+function fmt(s){ return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+function updateMed(){ medTimerEl.textContent = fmt(medLeft); }
+document.getElementById('medStart').addEventListener('click', function(){
+  if(medRunning) return;
+  medRunning = true;
+  medInt = setInterval(function(){
+    medLeft--;
+    updateMed();
+    if(medLeft <= 0){
+      clearInterval(medInt); medRunning = false;
+      medTimerEl.textContent = 'Done ✓';
+      medNote.textContent = 'Nice work. Take one slow breath before you go back to your day.';
+    }
+  }, 1000);
+});
+document.getElementById('medStop').addEventListener('click', function(){
+  medRunning = false;
+  clearInterval(medInt);
+  medLeft = medSecs;
+  updateMed();
+});
+updateMed();
+</script>
+</body>
+</html>

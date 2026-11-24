@@ -761,8 +761,8 @@ function productCard(p){
     ${photoHTML(p,0)}
     ${galleryHint}
     ${videoHint}
-    ${p.badge ? `<p style="margin:10px 0 0"><span class="hot-badge">${p.badge}</span></p>` : ""}
-    <div class="tag" style="margin-top:12px">${p.tag}</div>
+    ${p.badge ? `<p style="margin:8px 0 0"><span class="hot-badge">${p.badge}</span></p>` : ""}
+    <div class="tag" style="margin-top:8px">${p.tag}</div>
     <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>${piracyNoteHTML(p)}
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
     ${priceLine}
@@ -813,8 +813,8 @@ function catalogCard(c){
     : "";
   return `<div class="card">${photo}
     ${videoHint}
-    ${c.badge ? `<p style="margin:10px 0 0"><span class="hot-badge">${c.badge}</span></p>` : ""}
-    <div class="tag" style="margin-top:12px">${c.tag}</div>
+    ${c.badge ? `<p style="margin:8px 0 0"><span class="hot-badge">${c.badge}</span></p>` : ""}
+    <div class="tag" style="margin-top:8px">${c.tag}</div>
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p>${piracyNoteHTML(c)}<p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}
     ${priceLine}

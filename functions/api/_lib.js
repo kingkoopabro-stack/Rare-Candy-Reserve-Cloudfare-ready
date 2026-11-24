@@ -1999,11 +1999,13 @@ export const SECTION_HIDE_IDS = ["top8", "links", "seller", "about", "comments",
 export const SECTION_ORDER_IDS = ["about", "seller", "radio"];
 // Page formats (2026-11-23) — one-click page kinds: a shop (Seller),
 // a social profile (Social, the modernized default), a personal
-// website (Website, the old Website look), a blog (Blog), or a
-// musician page (Musician). Stored in the theme JSON, no D1 column.
-// "" = never picked: the member keeps their current look (Social for
-// MySpace look, Website for Website look).
-export const PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician"];
+// website (Website, the old Website look), a blog (Blog), a
+// musician page (Musician), a digital shop (Digital Merchant),
+// a creator page (Content Creator), or a streamer page (Streamer).
+// Stored in the theme JSON, no D1 column.
+// FIX 2026-11-23: merchant/creator/streamer were missing here, so the
+// server stripped them back to "" on save (client has all 8).
+export const PAGE_FORMAT_IDS = ["social", "seller", "website", "blog", "musician", "merchant", "creator", "streamer"];
 const YOUTUBE_ID_RE = /(?:youtube\.com\/(?:watch\?[^#\s]*?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/;
 export function extractYouTubeId(str) {
   if (!str) return "";

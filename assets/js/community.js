@@ -7142,6 +7142,7 @@ function postCardHTML(p) {
     (isCreator && p.file_url && state.profile
       ? '<a class="btn ghost small" href="' + esc(fileDownloadUrl(p.file_url)) + '" download>⬇ ' + esc(p.file_name || "Download 3D file") + "</a>" : "") +
     '<span class="dwc-feed-more"><button type="button" class="dwc-linklike" onclick="DWC.report(\'post\', ' + p.id + ')">🚩 Report</button></span>' +
+    (canDeletePost ? '<span class="dwc-feed-more"><button type="button" class="dwc-linklike" onclick="DWC.deletePost(' + p.id + ')">🗑 ' + (isMine ? "Delete my post" : "Delete post") + '</button></span>' : "") +
     "</div>" +
     '<div class="dwc-edit-slot" id="dwc-edit-' + p.id + '" hidden></div>' +
     '<div class="dwc-edit-history" id="dwc-history-' + p.id + '" hidden></div>' +
@@ -8222,7 +8223,9 @@ var designState = null; // live editor state (see viewDesignEditor)
 var designDrag = null; // active pointer drag/resize, or null
 var DESIGN_BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
 var DESIGN_SIGNS = [["", "— pick a sign —"], ["Aries", "♈ Aries"], ["Taurus", "♉ Taurus"], ["Gemini", "♊ Gemini"], ["Cancer", "♋ Cancer"], ["Leo", "♌ Leo"], ["Virgo", "♍ Virgo"], ["Libra", "♎ Libra"], ["Scorpio", "♏ Scorpio"], ["Sagittarius", "♐ Sagittarius"], ["Capricorn", "♑ Capricorn"], ["Aquarius", "♒ Aquarius"], ["Pisces", "♓ Pisces"]];
-var DESIGN_TRAY = [["text", "📝 Text"], ["image", "🖼️ Image"], ["link", "🔗 Link / Button"], ["divider", "➖ Divider"], ["spacer", "↕️ Spacer"], ["gif", "🎞️ GIF"], ["embed", "🎵 Video / Music"]];
+// FIX 2026-11-23: tray now offers all 14 block types (was 7 — tour,
+// catalogue, postlist and chat were missing, so users could not add them).
+var DESIGN_TRAY = [["text", "📝 Text"], ["image", "🖼️ Image"], ["link", "🔗 Link / Button"], ["divider", "➖ Divider"], ["spacer", "↕️ Spacer"], ["gif", "🎞️ GIF"], ["embed", "🎵 Video / Music"], ["tour", "📅 Tour dates"], ["catalogue", "🗂️ Catalogue"], ["postlist", "📰 Latest posts"], ["chat", "💬 Page chat"]];
 function designBlockId() {
   var chars = "abcdefghijklmnopqrstuvwxyz0123456789", s = "b";
   for (var i = 0; i < 8; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -8928,8 +8931,8 @@ function designRender() {
 }
 function designChooserHTML() {
   return '<div class="dwc-design-chooser" style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 12px">' +
-    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer" onclick="designChooseSocialMode(\'generator\')"><strong style="font-size:16px">✨ Generator — answer a few questions, get a finished profile</strong><br><span style="color:var(--muted);font-size:13px">Name, age, sign, handle, links — done in a minute. You can still drag everything around after.</span></button>' +
-    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer" onclick="designChooseSocialMode(\'drag\')"><strong style="font-size:16px">🖱️ Drag &amp; drop — place everything yourself on the live preview</strong><br><span style="color:var(--muted);font-size:13px">Start from your preset\'s arranged page and move things wherever you like.</span></button>' +
+    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer;color:var(--ink)" onclick="designChooseSocialMode(\'generator\')"><strong style="font-size:16px">✨ Generator — answer a few questions, get a finished profile</strong><br><span style="color:var(--muted);font-size:13px">Name, age, sign, handle, links — done in a minute. You can still drag everything around after.</span></button>' +
+    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer;color:var(--ink)" onclick="designChooseSocialMode(\'drag\')"><strong style="font-size:16px">🖱️ Drag &amp; drop — place everything yourself on the live preview</strong><br><span style="color:var(--muted);font-size:13px">Start from your preset\'s arranged page and move things wherever you like.</span></button>' +
     "</div>";
 }
 function designGeneratorHTML() {
@@ -19904,6 +19907,37 @@ async function init() {
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
+
+// FIX 2026-11-23 — the editor was dead because this file is wrapped in an
+// IIFE, so design* lives in the IIFE's scope, NOT the global scope — but
+// the editor's HTML calls them from inline onclick/onpointerdown handlers,
+// which run in global scope. Every click therefore threw a silent
+// ReferenceError and nothing happened (add/select/drag/save/template,
+// and the "Design my page" button too). Expose the handlers on window;
+// they still close over the IIFE's designState, so no state is leaked.
+window.designOpenEditor = designOpenEditor;
+window.designAddBlock = designAddBlock;
+window.designArmPlace = designArmPlace;
+window.designCanvasClick = designCanvasClick;
+window.designPointerDown = designPointerDown;
+window.designResizeDown = designResizeDown;
+window.designUndo = designUndo;
+window.designSave = designSave;
+window.designToggleCode = designToggleCode;
+window.designSaveCode = designSaveCode;
+window.designChooseSocialMode = designChooseSocialMode;
+window.designLiveField = designLiveField;
+window.designSetAlign = designSetAlign;
+window.designToggleFmt = designToggleFmt;
+window.designGenerate = designGenerate;
+window.designAddGenLink = designAddGenLink;
+window.designAddGenHyperlink = designAddGenHyperlink;
+window.designRemoveGenLink = designRemoveGenLink;
+window.designMoveSelected = designMoveSelected;
+window.designDuplicateSelected = designDuplicateSelected;
+window.designDeleteSelected = designDeleteSelected;
+window.designDeselect = designDeselect;
+window.designSetCreatorToggle = designSetCreatorToggle;
 
 })();
 

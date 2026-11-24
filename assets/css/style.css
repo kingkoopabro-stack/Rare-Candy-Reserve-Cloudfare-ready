@@ -1775,7 +1775,12 @@ img { max-width: 100%; height: auto; }
 /* Sticky save bar — always visible at the top of the form, far right,
    small type. It sticks at the viewport top (above the site header
    while you scroll) so Save is never a scroll away. */
-.dwc-sticky-save{position:sticky;top:0;z-index:60;display:flex;justify-content:flex-end;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 12px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.dwc-sticky-save{position:sticky;top:147px;z-index:60;display:flex;justify-content:flex-end;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:0 0 12px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+/* FIX 2026-11-23: the save bar used to stick at top:0, the same spot as the
+   sticky site header (z-index 50 vs the bar's 60), so it covered the logo
+   and nav. It now sticks BELOW the header — measured 139px tall on desktop
+   (1280px) and 184px on a phone (390px), so top clears it by 8px. */
+@media(max-width:640px){.dwc-sticky-save{top:192px}}
 .dwc-sticky-save-btn{font-size:13px;padding:7px 14px}
 /* Save-button stability (2026-11-22) — the editor card must NOT lift on hover. The global .card:hover{transform:translateY(-2px)} moved the whole editor card — sticky Save button included — out from under the cursor, and the .15s transition made it oscillate: hover -> card lifts 2px -> cursor leaves the button's edge -> hover drops -> card falls back -> hover again. Worst at high browser zoom on a big screen, where 2px CSS is 3-4 device px and the button is small. The glow stays; the movement goes. Scoped to the editor only — cards everywhere else keep their lift. */
 #dwc-account .card:hover{transform:none}

@@ -169,7 +169,7 @@ const CATALOG = [
    imgs:["images/trimui-smart-pro-black.jpg","images/trimui-smart-pro.jpg"],
    variations:[{label:"Fully decked out — everything included", price:110.00},{label:"Machine only — no case, no wrist strap", price:95.00},{label:"Machine only + pink case", price:105.00},{label:"Machine only + wrist strap", price:100.00}],
    desc:"Modded TSP (Trimui Smart Pro) — better than stock. CrossMix OS installed, fresh 128GB name-brand microSD (stock card replaced). Big 4.96-inch 720p screen, RGB-lit sticks, 5000mAh battery. Plays PS1, PSP, DS and more full speed, plus Morrowind, GTA and PC classics via PortMaster. Loaded with free ports and cool stuff. Fully decked out ($110) comes with everything — pink protective case + wrist strap included. Machine only ($95) is just the handheld — add the pink case for $10 or the wrist strap for $5. Modded to order — ready to play out of the box. (we do not condone piracy of any kind)"},
-  {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — 120Hz Android Handheld in All Its Glory", price:210.00, img:null,
+  {id:"cat-ambyrg", slug:"modded-ambyrg-rg476h", ebay:null, icon:"🎮", tag:"Handheld · Modded AmbyRG", name:"Modded AmbyRG — 120Hz Android Handheld in All Its Glory", price:210.00, img:null, badge:"🔥 Hot Seller!",
    imgs:["images/anbernic-rg476h-rgb.jpg","images/anbernic-rg476h.jpg","images/amby-rg476h-real.jpg"],
    variations:[{label:"Black", price:210.00},{label:"Indigo", price:210.00},{label:"Retro Gray", price:210.00}],
    desc:"A poor man’s Steam Deck — better than anything you’ll find in this country. Be one of the few who own a machine this powerful, modded to add even more functionality when it arrives. The ultimate fully moddable alternative to a Switch — cheaper, better features, and way more customization, for less cost overall, since all you need to pay for is the console and me modding it to your taste. See the real photo in the gallery — I use mine like a desktop, too. Immediate payment required. 12-day money-back guarantee. Modded AmbyRG in all its glory. Gorgeous 4.7-inch 120Hz touchscreen, RGB backlit sticks that glow blue, pink and cyan, Hall-effect sticks, 8GB RAM + 128GB storage, Android 13. Plays PS2, GameCube, 3DS, PSP and Dreamcast, plus Android apps and PC games via Winlator (Oblivion runs at low settings). Fresh name-brand microSD (stock card replaced), tuned OS and programs pre-installed to your taste. Modded to order — ready to play out of the box. Ordered a modded one? Message Rare Candy Reserve on Facebook and tell us how you want your console customized — OS, programs, setup, anything. We order your unit when you buy and mod it to your wants when it arrives in the mail, then ship it out to you. Please allow a little extra time. (we do not condone piracy of any kind)"},
@@ -761,6 +761,7 @@ function productCard(p){
     ${photoHTML(p,0)}
     ${galleryHint}
     ${videoHint}
+    ${p.badge ? `<p style="margin:10px 0 0"><span class="hot-badge">${p.badge}</span></p>` : ""}
     <div class="tag" style="margin-top:12px">${p.tag}</div>
     <h3>${p.name}</h3><p class="card-desc">${p.desc}</p>${piracyNoteHTML(p)}
     <p class="card-more"><a href="shop.html?item=${p.id}">Read more →</a></p>
@@ -812,6 +813,7 @@ function catalogCard(c){
     : "";
   return `<div class="card">${photo}
     ${videoHint}
+    ${c.badge ? `<p style="margin:10px 0 0"><span class="hot-badge">${c.badge}</span></p>` : ""}
     <div class="tag" style="margin-top:12px">${c.tag}</div>
     <h3><a href="shop.html?item=${c.id}" style="color:var(--ink);text-decoration:none">${c.name}</a></h3>
     ${c.desc ? `<p class="card-desc" style="color:var(--muted);font-size:14px">${c.desc}</p>${piracyNoteHTML(c)}<p class="card-more"><a href="shop.html?item=${c.id}">Read more →</a></p>` : ""}

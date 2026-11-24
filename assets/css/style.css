@@ -16,7 +16,7 @@ h1,h2,h3{line-height:1.2;margin:.4em 0}
 h2{font-size:clamp(24px,4vw,30px)}
 h3{font-size:21px}
 .grad-text{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
-.wrap{max-width:1080px;margin:0 auto;padding:0 18px}
+.wrap{max-width:1480px;margin:0 auto;padding:0 18px}
 .kicker{letter-spacing:.22em;text-transform:uppercase;font-size:12px;color:var(--muted);font-weight:800}
 .pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 12px;margin:4px;font-size:13px;color:var(--muted)}
 .pill b{color:var(--ink)}
@@ -41,6 +41,12 @@ nav.main a{color:var(--ink);text-decoration:none;padding:8px 11px;border-radius:
 nav.main a:hover{background:var(--panel2)}
 nav.main a.active{background:var(--grad);color:#0b0b14}
 .head-actions{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dwc-nav-toggle{display:none}
+@media (max-width:640px){
+  .dwc-nav-toggle{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:20px;cursor:pointer;flex:0 0 auto}
+  header.site nav.main{display:none}
+  header.site.nav-open nav.main{display:flex;flex-basis:100%;order:5}
+}
 .cart-btn{border:2px solid var(--cyan);background:transparent;color:var(--cyan);font-weight:800;border-radius:999px;padding:8px 14px;cursor:pointer;font-size:14px}
 .cart-btn:hover{background:var(--cyan);color:#0b0b14}
 /* Notifications bell (v3.8) — sits between Sign out and Cart in the header. */
@@ -72,11 +78,11 @@ nav.main a.active{background:var(--grad);color:#0b0b14}
 .aml-btn.large .aml-logo{font-size:22px}
 
 /* layout */
-main{padding:28px 0 60px}
+main{padding:20px 0 40px}
 .hero{padding:34px 0 10px;text-align:center}
 .hero h1{font-size:clamp(34px,6vw,58px);margin:.2em 0}
 .hero p.lede{font-size:18px;color:var(--muted);max-width:720px;margin:0 auto}
-section{margin-top:44px}
+section{margin-top:30px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px}
 /* Centered card grids — cards stay a consistent width and the last row centers
    instead of hanging left with a lone card. Use on any area with a bunch of
@@ -84,7 +90,7 @@ section{margin-top:44px}
 .grid.grid-centered{display:flex;flex-wrap:wrap;justify-content:center;gap:16px}
 .grid.grid-centered>.card{flex:0 1 260px}
 
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;transition:transform .15s,box-shadow .15s}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;transition:transform .15s,box-shadow .15s}
 .card:hover{transform:translateY(-2px);box-shadow:0 0 0 1px var(--violet),0 8px 30px rgba(124,77,255,.25)}
 .card h3{margin:.3em 0}
 .card p{color:var(--muted);font-size:14.5px}
@@ -93,6 +99,16 @@ section{margin-top:44px}
    across cards no matter how long the description is. */
 .grid .card{display:flex;flex-direction:column}
 .grid .card > .card-actions{margin-top:auto}
+/* Shop grids — cards hug their own content (2026-11-24): no equal-height
+   stretch, no button pinned to a stretched bottom. Each card ends when its
+   text ends, buttons right after, so the page is shorter and less gappy
+   (much worse on mobile). Applies to the shop featured + catalog grids
+   and the front-page product grid (same #productGrid id). */
+#productGrid,#catalogGrid{align-items:start}
+#productGrid .card > .card-actions,#catalogGrid .card > .card-actions,
+#productGrid .card > .dwc-actions,#catalogGrid .card > .dwc-actions{margin-top:10px}
+/* Hot Seller badge — bright pill shown above the tag on a listing card. */
+.hot-badge{display:inline-block;background:linear-gradient(90deg,#ff8a00,#ff2d55);color:#fff;font-weight:900;font-size:13px;letter-spacing:.04em;padding:5px 12px;border-radius:999px;box-shadow:0 0 14px rgba(255,138,0,.45)}
 /* Shop cards: short preview only (3 lines, ellipsis) so every card stays
    the same length and the buy buttons line up at the bottom. The full
    description + all photos live on the item detail page ("Read more"). */
@@ -220,7 +236,7 @@ footer.site{border-top:1px solid var(--line);padding:28px 0 40px;color:var(--mut
    one neat symmetrical line), but floored at a 44px tap target so
    they stay easy to tap: the shrink is in type/padding/width, never
    in height below a comfortable tap size. */
-.follow-row a{flex:1 1 120px;max-width:170px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:800;font-size:12.5px;color:var(--ink);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;text-align:center}
+.follow-row a{flex:1 1 120px;max-width:170px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;font-weight:800;font-size:12.5px;color:var(--ink);border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;text-align:center;white-space:nowrap}
 .stream-line{margin:10px 0 8px;font-weight:700;color:var(--ink);text-align:center}
 .follow-row a:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,229,255,.3)}
 .follow-row a.hot{border-color:var(--pink);background:linear-gradient(90deg,rgba(255,45,149,.22),rgba(0,229,255,.14))}
@@ -833,6 +849,7 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
    changes never rebuild it. */
 .tp-btn{position:fixed;right:16px;bottom:16px;width:58px;height:58px;border-radius:50%;border:0;background:#22c55e;color:#fff;cursor:pointer;z-index:9990;box-shadow:0 6px 24px rgba(0,0,0,.5),0 0 0 3px rgba(34,197,94,.35);display:flex;align-items:center;justify-content:center}
 .tp-btn:hover{background:#16a34a}
+@media (max-width:640px){.tp-btn{bottom:84px;right:12px;width:52px;height:52px}}
 .tp-phone{position:fixed;right:16px;bottom:16px;width:340px;max-width:calc(100vw - 24px);height:640px;max-height:calc(100vh - 32px);background:#0a0a12;border:1px solid #3a3a4a;border-radius:44px;padding:10px;z-index:9991;box-shadow:0 18px 60px rgba(0,0,0,.65)}
 .tp-screen{position:relative;width:100%;height:100%;border-radius:34px;overflow:hidden;display:flex;flex-direction:column;color:#fff}
 .tp-statuswrap{position:relative;height:34px;flex:0 0 auto}
@@ -1344,7 +1361,9 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-drawer-title{position:absolute;left:14px;bottom:10px;font-size:18px;font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.8)}
 .dwc-drawer-close{position:absolute;top:8px;right:8px;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);background:rgba(0,0,0,.55);color:#fff;font-size:16px;cursor:pointer}
 .dwc-drawer-body{flex:1;overflow-y:auto;padding:12px}
-.dwc-drawer-foot{flex-shrink:0;padding:10px 12px;border-top:1px solid var(--line)}
+.dwc-drawer-foot{flex-shrink:0;padding:10px 12px;border-top:1px solid var(--line);display:flex;gap:10px;align-items:flex-start}
+.dwc-drawer-foot .btn{flex-shrink:0}
+.dwc-drawer-foot span{flex:1;min-width:0}
 /* Page-format filtering (2026-11-23) — picking a page type shows only
    that type's settings; the rest hide until you pick another type.
    Social shows everything. Background, layout, music, and the rest of
@@ -1435,7 +1454,10 @@ img { max-width: 100%; height: auto; }
   .btn { padding: 10px 18px; font-size: 13.5px; min-height: 38px; }
   .btn.small { padding: 10px 16px; font-size: 13.5px; }
   .tunein-8bit { padding: 11px 20px; font-size: 14px; }
-  .card { padding: 16px; }
+  .card { padding: 12px; }
+  /* Wider content on phones too — less side padding so cards use the screen. */
+  .wrap{padding:0 10px}
+  main{padding:14px 0 30px}
   .dwc-myprofile { padding: 16px; }
   .dwc-layoutbox { padding: 14px; }
   .dwc-profile-card { margin: 14px 0; }
@@ -1840,7 +1862,7 @@ span.dwc-cassette-tape{cursor:default}
 .dwc-playing .dwc-cassette-reel{animation:dwcReel 1.2s linear infinite}
 .dwc-playing .dwc-reel-r{animation-duration:.8s}
 @keyframes dwcReel{to{transform:rotate(360deg)}}
-.dwc-cassette-label{flex:1;min-width:0;text-align:center;font-size:10px;font-weight:800;letter-spacing:.14em;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dwc-cassette-label{flex:1;min-width:0;text-align:center;font-size:9px;font-weight:800;letter-spacing:.08em;color:#fff;background:rgba(0,0,0,.55);border-radius:4px;padding:2px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dwc-cassette-bottom{display:flex;justify-content:center;gap:14px;margin-top:10px}
 .dwc-cassette-bottom i{width:7px;height:7px;border-radius:50%;background:rgba(0,0,0,.45);box-shadow:inset 0 1px 2px rgba(0,0,0,.7),0 1px 0 rgba(255,255,255,.2)}
 /* Vinyl — wooden player, top view; the record spins while it plays.

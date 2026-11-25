@@ -29,8 +29,23 @@ function shapeOverride(row) {
     photos: parseJsonArray(row.photos), options: parseJsonArray(row.options),
     video: row.video || null, stripe_link: row.stripe_link || null,
     shipping: (typeof row.shipping === "number" ? row.shipping : null),
+    // Sold flag (listing-sold-flag migration). Null when the column
+    // hasn't been added yet — the shop then leaves the hardcoded
+    // outOfStock value alone instead of wrongly clearing it.
+    out_of_stock: (typeof row.out_of_stock === "number" ? row.out_of_stock : null),
     updated_at: row.updated_at,
   };
+}
+
+// True when the shop_listing_overrides table has the out_of_stock
+// column (listing-sold-flag migration). The editor code goes live
+// before Chris runs the migration, so the save must not break over a
+// missing column — it just saves without the sold flag and says so.
+async function hasOutOfStockColumn(db) {
+  try {
+    const r = await db.prepare("PRAGMA table_info(shop_listing_overrides)").all();
+    return (r.results || []).some((c) => c && c.name === "out_of_stock");
+  } catch { return false; }
 }
 
 // Clean an options array from the editor into the stored shape:
@@ -65,7 +80,7 @@ function cleanPhotos(input) {
   const out = [];
   if (!Array.isArray(input)) return out;
   for (const u of input) {
-    if (out.length >= 3) break;
+    if (out.length >= 4) break;
     const s = String(u || "").trim();
     if (URL_RE.test(s)) out.push(s);
   }
@@ -355,15 +370,41 @@ export async function onRequestPost({ env, request }) {
     if (!ABSOLUTE_URL_RE.test(s)) return json({ ok: false, error: "Stripe link must be a valid https:// URL." });
     stripeLink = s;
   }
+  // Mark-sold flag (listing-sold-flag migration). 1 = sold out,
+  // 0 = for sale. Null when the editor didn't send one.
+  let outOfStock = null;
+  if (a.out_of_stock != null && a.out_of_stock !== "") {
+    const v = Number(a.out_of_stock);
+    if (Number.isFinite(v)) outOfStock = v ? 1 : 0;
+  }
+  // Rename: the editor sends original_id when the listing id was
+  // changed (e.g. a repurposed listing getting an id that matches its
+  // new name). The old override row is removed after the new one
+  // saves, so the old id doesn't linger as a second listing.
+  const originalId = String(a.original_id || "").trim().toLowerCase();
+  const isRename = ID_RE.test(originalId) && originalId !== id;
   // The row before this save: the auto-Stripe step compares against it
   // (same link + price changed = regenerate an auto link; a pasted link
   // is never touched). The save itself never depends on Stripe.
   const existing = await db.prepare("SELECT * FROM shop_listing_overrides WHERE id = ? LIMIT 1").bind(id).first();
-  await db.prepare(
-    `INSERT INTO shop_listing_overrides (id, name, price, description, photos, options, video, stripe_link, shipping, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, description=excluded.description, photos=excluded.photos, options=excluded.options, video=excluded.video, stripe_link=excluded.stripe_link, shipping=excluded.shipping, updated_at=excluded.updated_at`,
-  ).bind(id, name, Math.round(price * 100) / 100, description, JSON.stringify(photos), JSON.stringify(options), video, stripeLink, shipping, nowMs()).run();
+  const hasSoldCol = await hasOutOfStockColumn(db);
+  const soldUnsupported = outOfStock != null && !hasSoldCol;
+  if (hasSoldCol && outOfStock != null) {
+    await db.prepare(
+      `INSERT INTO shop_listing_overrides (id, name, price, description, photos, options, video, stripe_link, shipping, out_of_stock, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, description=excluded.description, photos=excluded.photos, options=excluded.options, video=excluded.video, stripe_link=excluded.stripe_link, shipping=excluded.shipping, out_of_stock=excluded.out_of_stock, updated_at=excluded.updated_at`,
+    ).bind(id, name, Math.round(price * 100) / 100, description, JSON.stringify(photos), JSON.stringify(options), video, stripeLink, shipping, outOfStock, nowMs()).run();
+  } else {
+    await db.prepare(
+      `INSERT INTO shop_listing_overrides (id, name, price, description, photos, options, video, stripe_link, shipping, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name=excluded.name, price=excluded.price, description=excluded.description, photos=excluded.photos, options=excluded.options, video=excluded.video, stripe_link=excluded.stripe_link, shipping=excluded.shipping, updated_at=excluded.updated_at`,
+    ).bind(id, name, Math.round(price * 100) / 100, description, JSON.stringify(photos), JSON.stringify(options), video, stripeLink, shipping, nowMs()).run();
+  }
+  if (isRename) {
+    await db.prepare("DELETE FROM shop_listing_overrides WHERE id = ?").bind(originalId).run();
+  }
   let stripeStatus = "kept", stripeMessage = "";
   try {
     const auto = await autoStripeForSave(env, {
@@ -380,5 +421,5 @@ export async function onRequestPost({ env, request }) {
     stripeMessage = "Stripe couldn't be reached — the listing saved, but no link was made. Try saving again or paste a link by hand.";
   }
   const row = await db.prepare("SELECT * FROM shop_listing_overrides WHERE id = ? LIMIT 1").bind(id).first();
-  return json({ ok: true, listing: row ? shapeOverride(row) : null, stripe_status: stripeStatus, stripe_message: stripeMessage });
+  return json({ ok: true, listing: row ? shapeOverride(row) : null, stripe_status: stripeStatus, stripe_message: stripeMessage, sold_unsupported: soldUnsupported });
 }

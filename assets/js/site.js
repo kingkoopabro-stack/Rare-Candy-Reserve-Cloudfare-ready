@@ -115,12 +115,18 @@ const CATALOG = [
   {id:"cat-spearow", slug:"spearow-psa10", ebay:null, icon:"🐦", tag:"Graded Card · PSA 10", name:"Spearow — Art Rare, PSA 10 GEM MT", price:40.00, img:null,
    imgs:["images/spearow-psa10-front.jpg"],
    desc:"Spearow, 2025 Pokémon M1L JP #074, Art Rare, Japanese. PSA GEM MT 10, cert 127913713."},
-  {id:"cat-mrmime", slug:"sabrinas-mr-mime", ebay:null, icon:"🎩", tag:"Graded Card · CGC 9", name:"Sabrina's Mr. Mime — CGC 9 MINT", price:null, img:null, outOfStock:true,
-   imgs:["images/sabrina-mr-mime-front.jpg"],
-   desc:"Sabrina's Mr. Mime, Pokémon (1999) Japanese, Gym 2: Challenge from the Darkness. CGC MINT 9, cert 6016734017."},
   {id:"cat-grovyle", slug:"grovyle-cgc9", ebay:null, icon:"🦎", tag:"Graded Card · CGC 9 · SOLD OUT", name:"Grovyle — Reverse Holo, CGC 9 MINT", price:null, img:null, outOfStock:true,
    imgs:["images/grovyle-cgc9-front.jpg"],
    desc:"Grovyle, Pokémon (2009), Arceus 39/99, Reverse Holo. Attacks Quick Attack / Cut, 80 HP. CGC MINT 9, cert 6098149057."},
+  /* Mega Greninja ex pair — Chaos Rising, raw / ungraded. Ultra Rare
+     100/086 is the secret-rare gold-line art; Double Rare 022/086 is
+     the regular art. Both ship in a top loader. */
+  {id:"cat-greninja-ultra", slug:"mega-greninja-ex-100-086", ebay:null, icon:"🐸", tag:"Raw Card · Ultra Rare", name:"Mega Greninja ex 100/086 — Ultra Rare, Chaos Rising", price:8.00, img:"images/mega-greninja-ex-pair.jpg", shipping_charge:4.00,
+   imgs:["images/mega-greninja-ex-pair.jpg","images/mega-greninja-ex-100-086.jpg"],
+   desc:"Mega Greninja ex, Chaos Rising 100/086, Ultra Rare (secret rare). 350 HP, Water, Stage 2, evolves from Frogadier. Ability: Mortal Shuriken. Attack: Ninja Spinner 120+. Raw / ungraded, near-mint. Ships in a top loader for protection. Free glow bracelet with this Pokémon card order."},
+  {id:"cat-greninja-double", slug:"mega-greninja-ex-022-086", ebay:null, icon:"🐸", tag:"Raw Card · Double Rare", name:"Mega Greninja ex 022/086 — Double Rare, Chaos Rising", price:3.50, img:"images/mega-greninja-ex-022-086.jpg", shipping_charge:4.00,
+   imgs:["images/mega-greninja-ex-022-086.jpg"],
+   desc:"Mega Greninja ex, Chaos Rising 022/086, Double Rare. 350 HP, Water, Stage 2, evolves from Frogadier. Ability: Mortal Shuriken. Attack: Ninja Spinner 120+. Raw / ungraded, near-mint. Ships in a top loader for protection. Free glow bracelet with this Pokémon card order."},
   /* Unpriced inventory (Drive photo map, section C) — assessment-based filler until Ash prices them. */
   {id:"cat-mewtwo-ex", slug:"mewtwo-ex-raw", ebay:null, icon:"🃏", tag:"Raw Card", name:"Mewtwo ex — XY Black Star Promo XY107, Raw (170 HP)", price:50.00, img:null,
    imgs:["images/mewtwo-ex-raw.jpg"],
@@ -336,19 +342,25 @@ function applyShopOverrides(){
       if(ov.name) target.name = ov.name;
       if(typeof ov.price === "number") target.price = ov.price;
       if(ov.description != null) target.desc = ov.description;
-      if(ov.photos && ov.photos.length) target.imgs = ov.photos.slice(0, 3);
+      if(ov.photos && ov.photos.length) target.imgs = ov.photos.slice(0, 4);
       if(ov.options) target.options = ov.options;
       if(ov.video !== undefined) target.video = ov.video || null;
       if(ov.stripe_link !== undefined) target.stripe = ov.stripe_link || null;
       if(typeof ov.shipping === "number") target.shipping_charge = ov.shipping;
+      // Mark-sold flag from the listing editor: an override can set it
+      // OR clear it (0 clears a hardcoded sold-out flag, so a
+      // repurposed listing stops showing "SOLD OUT"). Null means the
+      // migration hasn't run yet — leave the hardcoded value alone.
+      if(typeof ov.out_of_stock === "number") target.outOfStock = ov.out_of_stock === 1;
     } else {
       CATALOG.push({
         id: ov.id, slug: ov.id, icon: "🛍️", tag: "Shop listing",
         name: ov.name || ov.id, price: (typeof ov.price === "number" ? ov.price : 0),
         desc: ov.description || "",
-        imgs: (ov.photos && ov.photos.length ? ov.photos.slice(0, 3) : []),
+        imgs: (ov.photos && ov.photos.length ? ov.photos.slice(0, 4) : []),
         options: ov.options || null, video: ov.video || null,
         stripe: ov.stripe_link || null, ship: "+ shipping (by location)", shipping_charge: (typeof ov.shipping === "number" ? ov.shipping : null), ebay: null,
+        outOfStock: (ov.out_of_stock === 1),
       });
     }
   }

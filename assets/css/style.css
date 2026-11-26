@@ -1197,6 +1197,13 @@ footer.site{background:linear-gradient(180deg,transparent,rgba(124,77,255,.14) 7
 .dwc-member-col-main{flex:1 1 auto}
 .dwc-member-col-side{flex:0 0 300px}
 .dwc-member-cols-flip{flex-direction:row-reverse}
+/* Blocks below-columns (Puck flow mode, 2026-11-25): the main + side
+   columns under a blocks page sit side by side exactly like the
+   no-blocks 3-column grid — main flexes, side is 300px (the
+   .dwc-member-col-* rules above). Without this rule the two columns
+   stacked full-width, which is what made a blocks page read as a
+   long vertical list. */
+.dwc-blocks-below{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;margin-top:16px}
 /* The post feed scrolls in its own region — the page doesn't have to
    grow forever for a member with a hundred posts. */
 .dwc-member-feed-list{max-height:720px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
@@ -1330,7 +1337,7 @@ body.dwc-website-view .dwc-profile-card{display:none !important;}
 .dwc-preset-card{flex:1 1 180px;max-width:230px;}
 .dwc-preset-card .dwc-pill{width:100%;margin-top:2px;}
 @media (max-width: 960px) {
-  .dwc-member-cols{flex-direction:column}
+  .dwc-member-cols,.dwc-blocks-below{flex-direction:column}
   .dwc-member-col-info,.dwc-member-col-main,.dwc-member-col-side{flex:1 1 auto;width:100%}
   .dwc-member-col-main{order:1}
   .dwc-member-col-side{order:2}
@@ -2020,6 +2027,39 @@ span.dwc-cassette-tape{cursor:default}
 .dwc-block-stream iframe,.dwc-block-stream video{width:100%;aspect-ratio:16/9;border:0;border-radius:10px}
 .dwc-block-social .dwc-action-buttons{display:flex;flex-wrap:wrap;gap:6px}
 .dwc-block-chat{font-size:14px}
+/* Flow mode (Puck, 2026-11-25): blocks are a stacked document flow,
+   NOT an absolute canvas. The canvas must not be a centered 1080px
+   box (that left dead space on both sides at desktop width) and
+   blocks must not be absolutely positioned (they shrink-wrapped to
+   their content instead of filling the page). Scoped to
+   .dwc-blocks-flow only — legacy absolute pages are untouched. */
+.dwc-blocks-flow.dwc-blocks-canvas{position:static;max-width:none;margin:0;min-height:0;overflow:visible;border:0;background:transparent}
+.dwc-blocks-flow .dwc-block{position:static;width:100%;cursor:default}
+/* Flow video: capped at 960px and centered — the 16/9 box stays
+   full-width up to the cap, so the video is never a small frame in a
+   tall empty box and never stretched past its own size. */
+.dwc-blocks-flow .dwc-ytview{max-width:960px;margin:12px auto}
+.dwc-blocks-flow .dwc-ytview iframe{max-width:none}
+/* Mini players (Puck, 2026-11-25) — three small players for the
+   member's page sound. Fixed-size buttons, the name ellipsizes, the
+   <audio> is hidden, and nothing stretches: the bar and card fill
+   the block width, the chip is only as wide as it needs to be. */
+.dwc-miniplayer{box-sizing:border-box;max-width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+.dwc-miniplayer audio{display:none}
+.dwc-miniplayer-btn{flex:none;width:36px;height:36px;border-radius:50%;border:0;background:var(--grad);color:#fff;font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.dwc-miniplayer-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dwc-miniplayer-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.dwc-miniplayer-sub{font-size:12px;color:var(--muted);font-weight:400}
+.dwc-miniplayer-bar{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;min-height:52px}
+.dwc-miniplayer-card{display:flex;flex-direction:column;gap:10px;width:100%;padding:14px}
+/* An embed (Spotify/SoundCloud) is a fixed-height iframe, so a player
+   holding one always stacks — label on top, embed below — whatever
+   variant it is. A chip with an embed is a card for the moment. */
+.dwc-miniplayer-has-embed{display:flex;flex-direction:column;gap:10px;align-items:stretch;padding:12px}
+.dwc-miniplayer-chip{display:inline-flex;align-items:center;gap:8px;width:auto;padding:6px 14px 6px 6px;border-radius:999px}
+.dwc-miniplayer-chip .dwc-miniplayer-btn{width:28px;height:28px;font-size:12px}
+.dwc-miniplayer-empty{padding:10px 12px;color:var(--muted);font-size:13px}
+.dwc-miniplayer-embed iframe{width:100%;border:0;border-radius:10px;display:block}
 /* Editor chrome: top bar, tray, style panel, template picker. */
 .dwc-editor{display:flex;flex-direction:column;gap:10px}
 .dwc-editor-topbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 10px;background:var(--panel);border:1px solid var(--line);border-radius:12px}

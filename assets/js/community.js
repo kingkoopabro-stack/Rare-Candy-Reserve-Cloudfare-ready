@@ -5021,7 +5021,7 @@ function parseThemeClient(stored) {
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch (e) { return empty; }
   if (!obj || typeof obj !== "object") return empty;
   var hex = function (v) { return /^#[0-9a-fA-F]{6}$/.test(String(v || "").trim()) ? String(v).trim() : ""; };
-  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], page_blocks: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", ticker_source: "", hide_sections: [] };
+  var out = { bg_color: hex(obj.bg_color), bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", soundscape: "", player_skin: "", player_image_url: "", text_color: hex(obj.text_color), accent_color: hex(obj.accent_color), font: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], buttons_side: "", buttons_show: true, video_url: "", video_file_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], page_blocks: [], puck: null, page_layout: "", subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", ticker_source: "", hide_sections: [] };
   var img = String(obj.bg_image_url || "").trim().slice(0, 500);
   out.bg_image_url = /^https:\/\//i.test(img) ? img : "";
   var gif = String(obj.bg_gif_url || "").trim().slice(0, 500);
@@ -5250,7 +5250,9 @@ function parseThemeClient(stored) {
   // parseTheme exactly, so the form, the editor, and the live page can
   // never disagree. Up to 40 blocks; one bad block never kills the
   // others; per-type requirements drop only that row.
-  var BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
+  var BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat",
+    // Mini players (2026-11-25) — three small players for the member's page sound.
+    "minibar", "minicard", "minichip"];
   var pbs = Array.isArray(obj.page_blocks) ? obj.page_blocks : [];
   out.page_blocks = pbs.slice(0, 40).map(function (it) {
     if (!it || typeof it !== "object") return null;
@@ -5284,6 +5286,33 @@ function parseThemeClient(stored) {
     if (btype === "embed" && !burl) return null;
     return { id: bid, type: btype, x: bx, y: by, w: bw, h: bh, text: btext, url: burl, src: bsrc, color: bcolor, bg: bbg, font: bfont, size: bsize, opacity: bop, align: balign, bold: it.bold === true, italic: it.italic === true, underline: it.underline === true, label: blabel };
   }).filter(Boolean);
+  // Puck page editor (2026-11-25) — mirrors parseTheme in
+  // functions/api/_lib.js: structured editor data stored alongside
+  // page_blocks, plus the "flow" layout flag for the live renderer.
+  var PUCK_TYPES = ["Text", "Image", "Gif", "LinkButton", "VideoEmbed", "Divider", "Spacer", "LatestPosts", "PageComments", "Catalogue", "TourDates", "SocialLinks", "Stream",
+    // Mini players (2026-11-25).
+    "MiniPlayerBar", "MiniPlayerCard", "MiniPlayerChip"];
+  var puckOk = null;
+  if (obj.puck && typeof obj.puck === "object" && Array.isArray(obj.puck.content)) {
+    var pitems = obj.puck.content.slice(0, 40).map(function (it) {
+      if (!it || typeof it !== "object") return null;
+      var ptype = String(it.type || "");
+      if (PUCK_TYPES.indexOf(ptype) < 0) return null;
+      var props = (it.props && typeof it.props === "object") ? it.props : {};
+      var cleanProps = {};
+      for (var k in props) {
+        var v = props[k];
+        if (typeof v === "string") cleanProps[k] = String(v).slice(0, 2000);
+        else if (typeof v === "number" && isFinite(v)) cleanProps[k] = v;
+        else if (typeof v === "boolean") cleanProps[k] = v;
+      }
+      var pid = String(it.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
+      return { type: ptype, props: cleanProps, id: pid || undefined };
+    }).filter(Boolean);
+    puckOk = { content: pitems, root: { props: {} } };
+  }
+  out.puck = puckOk;
+  out.page_layout = (String(obj.page_layout || "") === "flow") ? "flow" : "";
   // §8.3: overlays supersede the standard button block unless the member
   // explicitly ticked "Show the buttons" (stored true, not the default).
   if (out.overlay_items.length && obj.buttons_show !== true) out.buttons_show = false;
@@ -7286,6 +7315,13 @@ function renderView() {
     var pel = document.getElementById(id);
     if (pel) pel.remove();
   });
+  // The Puck editor (route #/design) owns a React root — unmount
+  // it when navigating anywhere else, or its listeners outlive
+  // the page. (The editor itself unmounts before mounting a new
+  // root, so re-entering #/design is safe too.)
+  if (r.name !== "design" && window.PuckEditor && typeof window.PuckEditor.unmount === "function") {
+    try { window.PuckEditor.unmount(); } catch (e) {}
+  }
   // Website-mode chrome fade lives only on a website-mode member page —
   // take the body class down whenever we navigate anywhere else.
   // Same for the whole-page background fill (dwc-profile-bg): it lives
@@ -7648,7 +7684,7 @@ function renderListingForm(host, kind) {
   var kindLabel = kind === "sale" ? "for sale" : kind === "trade" ? "for trade" : "in the auction house";
   host.innerHTML =
     '<section class="card"><div class="tag">List an item ' + kindLabel + '</div><h3 style="margin-top:10px">Put something up ' + kindLabel + "</h3>" +
-    (p ? (p.payout_ready ? "" : '<p class="dwc-warn">You’re not payout-ready yet — link your bank once in the Payouts tab (Stripe Connect) before listing, or the listing will be blocked. You can still fill everything in now.</p>')
+    (p ? (p.payout_ready ? "" : '<p class="dwc-warn">You’re not payout-ready yet — <a href="#/payouts">link your bank once in the Payouts tab (Stripe Connect)</a> before listing. You can fill everything in now, but the List it button stays off until your bank is linked.</p>')
       : "<p>Listing needs an account + a linked bank — <button type=\"button\" class=\"dwc-linklike\" onclick=\"DWC.openSignup()\">create your account</button> first.</p>") +
     '<form onsubmit="DWC.submitListing(this, \'' + kind + '\'); return false;">' +
     '<label>Item title (3–120 characters)</label>' +
@@ -7696,7 +7732,11 @@ function renderListingForm(host, kind) {
     '<label><input type="checkbox" name="allow_comments" checked style="width:auto"> Allow comments on this listing</label>' +
     '<p style="color:var(--muted);font-size:13px">6% street cut on the item price only (shown on the listing) · buyer pays shipping · no mystery boxes or repacks without full disclosure · dropship means YOU fulfil the order · buyers pay by card on Stripe Checkout — captured at checkout, on its way to your linked bank (about 2 business days) · the operator and admins can remove listings that break the rules.</p>' +
     '<p class="dwc-form-err" data-err hidden></p>' +
-    '<p style="margin-top:14px"><button class="btn" type="submit">List it →</button></p>' +
+    // "List it" (2026-11-25): the button is OFF until the member is
+    // payout-ready — the old version let a click through to a server
+    // rejection that never showed (silent failure). No profile = off too.
+    '<p style="margin-top:14px"><button class="btn" type="submit"' + ((!p || !p.payout_ready) ? ' disabled' : '') + '>List it →</button>' +
+    ((!p || !p.payout_ready) ? ' <span style="color:var(--muted);font-size:13px">Link your bank in Payouts to turn this on.</span>' : '') + '</p>' +
     "</form></section>";
 }
 
@@ -8193,829 +8233,153 @@ async function viewPayouts(el) {
 }
 
 // =====================================================================
-// Drag-and-drop page editor — route #/design (2026-11-23, spec §3/§11)
-// Owner-only: edits the signed-in member's own page_blocks. Save
-// replaces ONLY page_blocks in the member's current theme (read via
-// parseThemeClient) and POSTs it to /api/profile — the same endpoint
-// and shape as saveProfile. The editor NEVER writes layout_css or any
-// other theme field. The Code panel (§7) is the one exception: it saves
-// bio + layout_css, exactly like Edit Profile does.
-// Canvas rendering REUSES pageBlocksHTML(blocks, m, mth) when it exists
-// (parallel agent, spec §2); until it lands, designFallbackBlocksHTML
-// renders the same classes/markup so the editor works standalone.
-// CSS CONTRACT (style panel / bottom sheet — agreed with the CSS pass):
-// on mobile the panel is VISIBLE by default in CSS. It slides away only
-// when JS adds .closed / .dwc-style-panel--closed (or hidden), and .open
-// forces it shown. So designSetStylePanel(false) runs on load and on
-// deselect, designSetStylePanel(true) when a block is selected. Never
-// leave the sheet open over the canvas with nothing selected.
-// §9 NATURAL-LANGUAGE HOOK (comment only — the helper is NOT built):
-// "put this link to the top left of the page where the green part of my
-// background shows and make opacity for the overlay and containers at
-// 88%" maps to: designAddBlock("link", 4, 4) [top-left = x≈4%, y≈4%];
-// sample the background image for its green region (never emit
-// background-position:undefined — the SpaceHey generator bug); then
-// designUpdateBlock(id, { opacity: 88 }) on the overlay/container
-// blocks (opacity is stored 10–100, rendered as opacity/100). A future
-// helper only needs to call those functions.
 // =====================================================================
-var designState = null; // live editor state (see viewDesignEditor)
-var designDrag = null; // active pointer drag/resize, or null
-var DESIGN_BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
-var DESIGN_SIGNS = [["", "— pick a sign —"], ["Aries", "♈ Aries"], ["Taurus", "♉ Taurus"], ["Gemini", "♊ Gemini"], ["Cancer", "♋ Cancer"], ["Leo", "♌ Leo"], ["Virgo", "♍ Virgo"], ["Libra", "♎ Libra"], ["Scorpio", "♏ Scorpio"], ["Sagittarius", "♐ Sagittarius"], ["Capricorn", "♑ Capricorn"], ["Aquarius", "♒ Aquarius"], ["Pisces", "♓ Pisces"]];
-// FIX 2026-11-23: tray now offers all 14 block types (was 7 — tour,
-// catalogue, postlist and chat were missing, so users could not add them).
-var DESIGN_TRAY = [["text", "📝 Text"], ["image", "🖼️ Image"], ["link", "🔗 Link / Button"], ["divider", "➖ Divider"], ["spacer", "↕️ Spacer"], ["gif", "🎞️ GIF"], ["embed", "🎵 Video / Music"], ["tour", "📅 Tour dates"], ["catalogue", "🗂️ Catalogue"], ["postlist", "📰 Latest posts"], ["chat", "💬 Page chat"]];
-function designBlockId() {
-  var chars = "abcdefghijklmnopqrstuvwxyz0123456789", s = "b";
-  for (var i = 0; i < 8; i++) s += chars.charAt(Math.floor(Math.random() * chars.length));
-  return s;
-}
-function designHttps(v) {
-  var s = String(v || "").trim().slice(0, 500);
-  return /^https:\/\//i.test(s) ? s : "";
-}
-function designHex(v) {
-  var s = String(v || "").trim();
-  return /^#[0-9a-fA-F]{6}$/.test(s) ? s : "";
-}
-function designNum(v, lo, hi, dflt) {
-  var n = parseInt(v, 10);
-  if (isNaN(n)) return dflt;
-  return Math.max(lo, Math.min(hi, n));
-}
-// Validate one block per spec §1; returns a clean block or null.
-function designCleanBlock(b) {
-  if (!b || typeof b !== "object") return null;
-  if (DESIGN_BLOCK_TYPES.indexOf(b.type) < 0) return null;
-  if (!/^[A-Za-z0-9_-]{1,12}$/.test(String(b.id || ""))) return null;
-  var o = { id: String(b.id), type: b.type };
-  o.x = designNum(b.x, 0, 100, 0); o.y = designNum(b.y, 0, 100, 0);
-  o.w = designNum(b.w, 5, 100, 30); o.h = designNum(b.h, 0, 100, 0);
-  var txt = String(b.text == null ? "" : b.text).replace(/[<>]/g, "").slice(0, 500);
-  if (b.type !== "text") txt = txt.replace(/[\r\n]+/g, " ");
-  o.text = txt;
-  o.url = designHttps(b.url); o.src = designHttps(b.src);
-  o.color = designHex(b.color); o.bg = designHex(b.bg);
-  o.font = themeFontCSS(b.font) ? String(b.font) : "";
-  o.size = (b.size === "" || b.size == null) ? "" : designNum(b.size, 8, 96, 18);
-  o.opacity = designNum(b.opacity, 10, 100, 100);
-  o.align = ["left", "center", "right"].indexOf(b.align) >= 0 ? b.align : "left";
-  o.bold = b.bold === true; o.italic = b.italic === true; o.underline = b.underline === true;
-  o.label = String(b.label == null ? "" : b.label).replace(/[<>]/g, "").slice(0, 40);
-  if (b.type === "text" && !o.text) return null;
-  if ((b.type === "image" || b.type === "gif") && !o.src) return null;
-  if ((b.type === "link" || b.type === "button") && (!o.label || !o.url)) return null;
-  if (b.type === "embed" && !o.url) return null;
-  return o;
-}
-function designBlockById(id) {
-  if (!designState) return null;
-  for (var i = 0; i < designState.blocks.length; i++) if (designState.blocks[i].id === id) return designState.blocks[i];
-  return null;
-}
-function designReadTheme() {
-  var raw = {};
-  try { raw = JSON.parse(state.profile.profile_theme || "{}") || {}; } catch (e) { raw = {}; }
-  if (!raw || typeof raw !== "object") raw = {};
-  return { raw: raw, parsed: parseThemeClient(state.profile.profile_theme) };
-}
-function designReadBlocks(t) {
-  var src = (t.parsed && Array.isArray(t.parsed.page_blocks)) ? t.parsed.page_blocks
-    : (Array.isArray(t.raw.page_blocks) ? t.raw.page_blocks : []);
-  return src.map(designCleanBlock).filter(Boolean).slice(0, 40);
-}
-function designB(type, x, y, w, h, extra) {
-  var b = { id: designBlockId(), type: type, x: x, y: y, w: w, h: h || 0, text: "", url: "", src: "", color: "", bg: "", font: "", size: "", opacity: 100, align: "left", bold: false, italic: false, underline: false, label: "" };
-  if (extra) Object.keys(extra).forEach(function (k) { b[k] = extra[k]; });
-  return b;
-}
-// Starter arrangements, order-wise like the SpaceHey/mmm.page
-// generators (§11): name heading, @handle, age/sign line, photo, links,
-// then the preset's own content. Nobody starts from a blank canvas.
-function designTemplateBlocks(id, fmt, p, th) {
-  var name = (p.chat_name || p.username || "Your name");
-  var handle = "@" + (p.username || "you");
-  var photo = p.avatar_url || "";
-  var bio = p.bio || "Write a little about yourself…";
-  var links = Array.isArray(p.my_links) ? p.my_links : [];
-  var link1 = links[0] || { label: "My shop", url: "https://rarecandyreserve.org" };
-  var link2 = links[1] || { label: "Instagram", url: "https://instagram.com" };
-  var head = [
-    designB("text", 5, 2, 90, 8, { text: name, size: 36, bold: true, align: "center" }),
-    designB("text", 5, 12, 90, 5, { text: handle, size: 18, align: "center" }),
-    designB("text", 5, 18, 90, 5, { text: "Age: — · ♈ Aries", size: 16, align: "center" })
-  ];
-  var photoB = photo ? [designB("image", 30, 25, 40, 24, { src: photo })] : [];
-  var bioB = [designB("text", 10, 52, 80, 10, { text: bio, size: 16, align: "center" })];
-  var linkBs = [
-    designB("link", 25, 65, 50, 7, { label: link1.label || "My shop", url: designHttps(link1.url) || "https://rarecandyreserve.org" }),
-    designB("link", 25, 74, 50, 7, { label: link2.label || "Instagram", url: designHttps(link2.url) || "https://instagram.com" })
-  ];
-  var socialB = [designB("social", 10, 84, 80, 8, {})];
-  if (id === "blank") return [];
-  if (id === "simple") return head.concat(photoB, bioB, linkBs, socialB);
-  if (id === "shop") return head.concat(photoB, bioB,
-    [designB("catalogue", 10, 65, 80, 8, {}), designB("postlist", 10, 76, 80, 10, {})], linkBs.slice(0, 1));
-  if (id === "band") return head.concat(photoB,
-    [designB("embed", 10, 52, 80, 30, { url: (th && th.video_url) || "" }), designB("tour", 10, 84, 80, 8, {})], linkBs);
-  // Preset starter ("preset"): the format's own arrangement.
-  if (fmt === "musician") return head.concat(photoB,
-    [designB("embed", 10, 52, 80, 30, { url: (th && th.video_url) || "" }), designB("tour", 10, 84, 80, 8, {})], linkBs);
-  if (fmt === "seller" || fmt === "merchant") return head.concat(photoB, bioB,
-    [designB("catalogue", 10, 65, 80, 8, {}), designB("postlist", 10, 76, 80, 10, {})], linkBs.slice(0, 1));
-  if (fmt === "blog") return head.concat(photoB, bioB, [designB("postlist", 10, 65, 80, 12, {})], linkBs.slice(0, 1));
-  if (fmt === "streamer") return [
-    designB("text", 5, 2, 90, 8, { text: name, size: 36, bold: true, align: "center" }),
-    designB("text", 5, 12, 90, 5, { text: handle + " · 🔴 LIVE when streaming", size: 18, align: "center" }),
-    designB("stream", 5, 20, 90, 38, { url: (th && th.video_url) || "" }),
-    designB("chat", 5, 60, 90, 12, {}),
-    designB("link", 5, 75, 42, 7, { label: "Follow on Twitch", url: "https://www.twitch.tv/" }),
-    designB("link", 53, 75, 42, 7, { label: "Follow on YouTube", url: "https://www.youtube.com/" }),
-    designB("text", 10, 85, 80, 8, { text: bio, size: 16, align: "center" })
-  ];
-  if (fmt === "creator") return head.concat(photoB,
-    [designB("embed", 10, 52, 80, 30, { url: (th && th.video_url) || "" }), designB("postlist", 10, 84, 80, 10, {})], linkBs.slice(0, 1));
-  if (fmt === "website") return head.concat(photoB, bioB, linkBs, [designB("postlist", 10, 84, 80, 10, {})]);
-  return head.concat(photoB, bioB, linkBs, socialB); // social + fallback
-}
-function designTemplates(fmt) {
-  var pf = null;
-  PAGE_FORMATS.forEach(function (f) { if (f.id === fmt) pf = f; });
-  return [
-    { id: "preset", name: "My preset starter — " + (pf ? pf.name : fmt) },
-    { id: "blank", name: "Blank — start empty" },
-    { id: "simple", name: "Simple profile" },
-    { id: "shop", name: "Shop front" },
-    { id: "band", name: "Band page" }
-  ];
-}
-// --- Social generator (§5) ---
-// Generator answers live in designState.gen; generating writes them as
-// gen-* blocks on the canvas, and dragging/editing those blocks back
-// updates the generator values (designSyncGeneratorFromBlocks).
-function designGenFromProfile(p, blocks) {
-  var g = { name: (p.chat_name || p.username || ""), age: "", sign: (p.birthsign || ""), handle: (p.username || ""), bio: (p.bio || ""), links: [], linkWords: "", linkUrl: "" };
-  (blocks || []).forEach(function (b) {
-    if (b.id === "gen-name") g.name = b.text || g.name;
-    if (b.id === "gen-handle") g.handle = String(b.text || "").replace(/^@/, "");
-    if (b.id === "gen-age") { var m = /(\d{1,3})/.exec(b.text || ""); if (m) g.age = m[1]; }
-    if (b.id === "gen-sign") { DESIGN_SIGNS.forEach(function (s) { if (s[0] && (b.text || "").indexOf(s[0]) >= 0) g.sign = s[0]; }); }
-    if (b.id === "gen-bio") g.bio = b.text || g.bio;
-  });
-  return g;
-}
-function designGenBlocks(g) {
-  var signTxt = "";
-  DESIGN_SIGNS.forEach(function (s) { if (s[0] === g.sign) signTxt = s[1]; });
-  var out = [
-    { id: "gen-name", type: "text", x: 5, y: 2, w: 90, h: 8, text: g.name || "Your name", url: "", src: "", color: "", bg: "", font: "", size: 36, opacity: 100, align: "center", bold: true, italic: false, underline: false, label: "" },
-    { id: "gen-handle", type: "text", x: 5, y: 12, w: 90, h: 5, text: "@" + (g.handle || "you"), url: "", src: "", color: "", bg: "", font: "", size: 18, opacity: 100, align: "center", bold: false, italic: false, underline: false, label: "" }
-  ];
-  if (g.age || g.sign) out.push({ id: "gen-age", type: "text", x: 5, y: 18, w: 90, h: 5, text: "Age: " + (g.age || "—") + (signTxt ? " · " + signTxt : ""), url: "", src: "", color: "", bg: "", font: "", size: 16, opacity: 100, align: "center", bold: false, italic: false, underline: false, label: "" });
-  else out.push({ id: "gen-sign", type: "text", x: 70, y: 2, w: 25, h: 8, text: signTxt || "", url: "", src: "", color: "", bg: "", font: "", size: 20, opacity: 100, align: "center", bold: false, italic: false, underline: false, label: "" });
-  if (g.bio) out.push({ id: "gen-bio", type: "text", x: 10, y: 52, w: 80, h: 10, text: g.bio, url: "", src: "", color: "", bg: "", font: "", size: 16, opacity: 100, align: "center", bold: false, italic: false, underline: false, label: "" });
-  (g.links || []).forEach(function (l, i) {
-    out.push({ id: "gen-link-" + i, type: "link", x: 25, y: 65 + i * 9, w: 50, h: 7, text: "", url: l.url, src: "", color: "", bg: "", font: "", size: "", opacity: 100, align: "left", bold: false, italic: false, underline: false, label: l.label });
-  });
-  return out.map(designCleanBlock).filter(Boolean);
-}
-function designSyncGeneratorFromBlocks() {
-  var st = designState; if (!st || st.fmt !== "social") return;
-  st.gen = designGenFromProfile(st.member, st.blocks);
-}
-function designLoadCreatorToggles() {
-  try { return JSON.parse(localStorage.getItem("dwc-design-creator-toggles") || "{}") || {}; } catch (e) { return {}; }
-}
-function designSaveCreatorToggles() {
-  try { localStorage.setItem("dwc-design-creator-toggles", JSON.stringify(designState.creatorToggles || {})); } catch (e) {}
-}
-
-// --- Entry + route view ---
+// Page editor — route #/design (Puck, 2026-11-25; replaces the custom
+// drag-and-drop designer, 2026-11-23, which never saved: it posted
+// profile_theme without a username, so the server rejected every save
+// with "Username needs 2–24 letters", and its preview rendered blocks
+// with absolute positions that overlapped and showed raw HTML).
+//
+// The editor is Puck (React, structured JSON) bundled locally into
+// assets/js/puck-editor.js — vendored, no runtime CDN. The bridge
+// below owns the route: it loads the bundle on demand, mounts it with
+// the member's current theme (stored Puck data, or page_blocks
+// converted up when the page predates Puck), and owns the save —
+// POST /api/profile with the username included, merging the new
+// page_blocks + puck data + page_layout:"flow" into the member's full
+// theme (the server replaces the whole theme, so a partial theme
+// would wipe the member's other theme fields).
+//
+// Converters live in the bundle (window.PuckEditor.blocksToPuck /
+// puckToBlocks) so the Puck data shape has one owner. The live page
+// renders page_blocks in flow mode (pageBlocksHTML, mth.page_layout
+// === "flow"); the editor renders the same blocks through Puck's
+// components, whose render functions mirror pageBlocksHTML's per-type
+// markup — that is the "one renderer" guarantee. Old pages without
+// puck data or page_layout keep rendering on the legacy absolute
+// canvas, untouched.
+//
+// NOTE: the old designer's §7 Code panel (bio + layout CSS) is gone
+// with it — that box already lives in Edit Profile > About Me
+// (Layout Converter), which is where members edit code.
+// =====================================================================
+var PUCK_EDITOR_VERSION = "v2"; // bump when assets/js/puck-editor.js is rebuilt
 function designOpenEditor() {
-  if (!state.profile) { location.hash = "#/"; render(); return; }
-  state.editingProfile = false; state.signupOpen = false;
   location.hash = "#/design";
-  render();
+}
+function puckLoadEditor() {
+  // Loads the Puck bundle on demand (only the #/design route needs
+  // React). Resolves true once window.PuckEditor exists.
+  if (window.PuckEditor && typeof window.PuckEditor.mount === "function") return Promise.resolve(true);
+  return new Promise(function (resolve) {
+    var s = document.createElement("script");
+    s.src = "assets/js/puck-editor.js?" + PUCK_EDITOR_VERSION;
+    s.onload = function () { resolve(!!(window.PuckEditor && typeof window.PuckEditor.mount === "function")); };
+    s.onerror = function () { resolve(false); };
+    document.head.appendChild(s);
+  });
+}
+// Presets (2026-11-25): a Puck preset is blocks + a Layout Store
+// look + setup (page format, sound, Top Friends count). Picking one
+// in the editor stores the pending preset here; the save merges it
+// into the full theme the same way the Layout Store applies a preset
+// (storeMergedTheme: the store look's theme, the member's structural
+// fields carried over, the preset's own setup on top), plus
+// layout_preset + layout_css so the hub label and the live page show
+// the preset that is actually live. Clears after a successful save;
+// a save with no preset picked changes nothing about the look.
+var pendingPuckPreset = null;
+function puckPresetTheme(preset) {
+  // The "preset:xxx" items are NOT in LAYOUT_STORE (that array holds
+  // only the "store:xxx" layouts) — layoutScrollFindItem builds them
+  // on the fly from LAYOUT_PRESETS. storeItemById("preset:neon")
+  // returns null, so it must not be used here.
+  var item = (typeof layoutScrollFindItem === "function") ? layoutScrollFindItem("preset:" + preset.storePreset) : null;
+  if (!item) return null;
+  var merged = storeMergedTheme(item);
+  Object.assign(merged, preset.theme || {});
+  return { theme: merged, layout_preset: item.id, layout_css: item.css };
 }
 async function viewDesignEditor(el) {
   if (!state.profile) { el.innerHTML = needProfileHTML(); return; }
   // The Edit Profile form must not render above the editor.
   state.editingProfile = false;
+  // Re-fetch the profile first (v3.20 pattern, same as editProfile) —
+  // the editor must be built from fresh saved settings, never from a
+  // stale in-memory copy, or blocks saved elsewhere would not show.
+  await refreshProfile();
   var p = state.profile;
-  var t = designReadTheme();
-  var fmt = pageFormatFor(t.parsed, p);
-  var blocks = designReadBlocks(t);
-  var seeded = false;
-  if (!blocks.length) { blocks = designTemplateBlocks("preset", fmt, p, t.parsed); seeded = true; }
-  var socialMode = null;
-  try { socialMode = localStorage.getItem("dwc-design-social-mode") || null; } catch (e) {}
-  designState = {
-    el: el, blocks: blocks, selectedId: null, undo: [], _liveUndo: false,
-    mode: (fmt === "social" && socialMode !== "drag") ? "generator" : "drag",
-    socialMode: socialMode, showChooser: (fmt === "social" && !socialMode),
-    fmt: fmt, member: p, theme: t.parsed, rawTheme: t.raw,
-    dirty: seeded, saving: false, savedMsg: seeded ? "Started from your preset's starter layout — move things around, then Save." : "",
-    pendingPlace: null, codeOpen: false, template: seeded ? "preset" : "",
-    gen: designGenFromProfile(p, blocks), creatorToggles: designLoadCreatorToggles()
-  };
-  designRender();
-  designSetStylePanel(false); // CSS contract: sheet starts CLOSED on phones
-  designFitCanvas();
-  // M12: the editor sits far down the community page — land the user at
-  // it on route entry instead of the top of a long page (on desktop this
-  // also fixes "Design my page doesn't take you to the editor").
-  try {
-    var top = el.getBoundingClientRect().top + window.scrollY - 150;
-    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
-  } catch (e) {}
-}
-// --- Style panel visibility (CSS contract — see header) ---
-function designSetStylePanel(open) {
-  var p = document.getElementById("dwc-design-style");
-  if (!p) return;
-  if (open) { p.classList.remove("closed"); p.classList.remove("dwc-style-panel--closed"); p.classList.add("open"); }
-  else { p.classList.remove("open"); p.classList.add("closed"); p.classList.add("dwc-style-panel--closed"); }
-}
-// --- Undo (in-memory, last 20) ---
-function designPushUndo() {
-  if (!designState) return;
-  designState.undo.push(JSON.stringify(designState.blocks));
-  if (designState.undo.length > 20) designState.undo.shift();
-  designState._liveUndo = true;
-}
-function designUndo() {
-  var st = designState; if (!st || !st.undo.length) return;
-  st.blocks = JSON.parse(st.undo.pop());
-  st.selectedId = null; st._liveUndo = false; st.dirty = true;
-  designSyncGeneratorFromBlocks();
-  designRender();
-  designSetStylePanel(false);
-}
-function designSelect(id) {
-  if (!designState) return;
-  designState.selectedId = id; designState._liveUndo = false;
-  designRenderPanel();
-  designSetStylePanel(true);
-  designRenderCanvas();
-}
-function designDeselect() {
-  if (!designState) return;
-  designState.selectedId = null; designState._liveUndo = false;
-  designRenderPanel();
-  designSetStylePanel(false); // CSS contract: sheet slides away
-  designRenderCanvas();
-}
-// --- Canvas ---
-function designCanvasBg(mth) {
-  var s = "";
-  if (mth.bg_image_url) s += "background-image:url('" + esc(mth.bg_image_url) + "');background-size:cover;background-position:center;";
-  else if (mth.bg_color) s += "background:" + esc(mth.bg_color) + ";";
-  if (mth.text_color) s += "color:" + esc(mth.text_color) + ";";
-  return s;
-}
-function designCanvasHTML() {
-  var st = designState, m = st.member, mth = st.theme;
-  var inner = "";
-  if (typeof pageBlocksHTML === "function") {
-    try { inner = pageBlocksHTML(st.blocks, m, mth) || ""; } catch (e) { inner = ""; }
-  }
-  if (!inner) inner = designFallbackBlocksHTML(st.blocks, m, mth);
-  var hits = st.blocks.map(function (b) { return designHitHTML(b); }).join("");
-  return '<div class="dwc-design-canvas" id="dwc-design-canvas" style="position:relative;max-width:1080px;margin:0 auto;min-height:400px;overflow:hidden;border-radius:10px;' + designCanvasBg(mth) + '" onclick="designCanvasClick(event)">' +
-    inner +
-    '<div class="dwc-design-overlay" style="position:absolute;inset:0">' + hits + "</div>" +
-    '<div id="dwc-design-drop" style="display:none;position:absolute;border:2px dashed #00e5ff;background:rgba(0,229,255,.12);pointer-events:none;z-index:5"></div>' +
-    "</div>";
-}
-// Fallback renderer — same classes/markup as spec §2 pageBlocksHTML.
-// Used only until pageBlocksHTML lands; never renders raw block HTML.
-function designFallbackBlocksHTML(blocks, m, mth) {
-  var html = blocks.map(function (b) { return designBlockHTML(b, m, mth); }).join("");
-  return '<div class="dwc-blocks-canvas" style="position:absolute;inset:0">' + html + "</div>";
-}
-function designBlockStyle(b) {
-  var s = "position:absolute;left:" + b.x + "%;top:" + b.y + "%;width:" + b.w + "%;";
-  if (b.h) s += "height:" + b.h + "%;";
-  s += "opacity:" + ((b.opacity == null ? 100 : b.opacity) / 100) + ";";
-  if (b.bg) s += "background:" + esc(b.bg) + ";";
-  if (b.color) s += "color:" + esc(b.color) + ";";
-  s += "font-family:" + (themeFontCSS(b.font) || "inherit") + ";";
-  s += "text-align:" + (b.align || "left") + ";";
-  if (b.bold) s += "font-weight:700;";
-  if (b.italic) s += "font-style:italic;";
-  if (b.underline) s += "text-decoration:underline;";
-  if (b.size) s += "font-size:" + b.size + "px;";
-  return s;
-}
-function designEmbedHTML(url) {
-  var yt = youtubeEmbedHTML(url);
-  if (yt) return yt;
-  var sp = (typeof spotifyEmbedUrl === "function") ? spotifyEmbedUrl(url) : "";
-  if (sp) return '<iframe src="' + esc(sp) + '" style="width:100%;height:152px;border:0" loading="lazy" title="Spotify player"></iframe>';
-  var sc = (typeof soundcloudEmbedUrl === "function") ? soundcloudEmbedUrl(url) : "";
-  if (sc) return '<iframe src="' + esc(sc) + '" style="width:100%;height:166px;border:0" loading="lazy" title="SoundCloud player"></iframe>';
-  if (url) return '<p><a href="' + esc(url) + '" target="_blank" rel="noopener">▶ Open the video / track ↗</a></p>';
-  return '<p style="color:var(--muted)">Add a video or music link in the panel →</p>';
-}
-function designBlockHTML(b, m, mth) {
-  var inner = "";
-  if (b.type === "text") inner = esc(b.text).replace(/\n/g, "<br>");
-  else if (b.type === "image" || b.type === "gif") inner = b.src ? '<img src="' + esc(b.src) + '" alt="" style="width:100%;height:100%;object-fit:contain;display:block">' : '<p style="color:var(--muted)">Add an image URL in the panel →</p>';
-  else if (b.type === "link" || b.type === "button") inner = '<a class="btn" href="' + esc(b.url) + '" target="_blank" rel="noopener">' + esc(b.label || b.text || "Link") + "</a>";
-  else if (b.type === "divider") inner = '<hr style="border:0;border-top:2px solid currentColor;margin:8px 0">';
-  else if (b.type === "spacer") inner = "";
-  else if (b.type === "embed") inner = designEmbedHTML(b.url);
-  else if (b.type === "stream") {
-    var tw = /twitch\.tv\/([A-Za-z0-9_]+)/i.exec(b.url || "");
-    if (tw) inner = '<iframe src="https://player.twitch.tv/?channel=' + esc(tw[1]) + '&parent=' + esc(location.hostname) + '&muted=true" style="width:100%;height:100%;min-height:220px;border:0" loading="lazy" title="Twitch stream" allowfullscreen></iframe>';
-    else inner = designEmbedHTML(b.url);
-    if (!b.url) inner = '<p style="color:var(--muted)">Your live stream goes here — paste your Twitch / YouTube link in the panel →</p>';
-  }
-  else if (b.type === "social") {
-    if (typeof profileActionsHTML === "function") { try { inner = profileActionsHTML(m, false, mth); } catch (e) { inner = ""; } }
-    if (!inner) inner = '<p><span class="btn">💬 Message me</span> <span class="btn">➕ Follow me</span> <span class="btn">⭐ Favorite</span> <span class="btn">👥 Group</span></p>';
-  }
-  else if (b.type === "tour") inner = (typeof tourDatesSectionHTML === "function") ? tourDatesSectionHTML(mth) : "<p>Tour dates show here.</p>";
-  else if (b.type === "catalogue") inner = '<p><a class="btn" href="#/market">🛍️ Catalogue / Shop →</a></p>';
-  else if (b.type === "postlist") inner = '<p style="color:var(--muted)">Your latest posts show here on your live page.</p>';
-  else if (b.type === "chat") inner = '<p style="color:var(--muted)">Page comments show here — visitors can leave a note, live refresh on.</p>';
-  return '<div class="dwc-block dwc-block-' + b.type + '" data-design-block="' + esc(b.id) + '" style="' + designBlockStyle(b) + '">' + inner + "</div>";
-}
-function designHitHTML(b) {
-  var st = designState, sel = st.selectedId === b.id;
-  var h = b.h ? "height:" + b.h + "%;" : "min-height:48px;";
-  var s = "position:absolute;left:" + b.x + "%;top:" + b.y + "%;width:" + b.w + "%;" + h + (sel ? "outline:2px solid #2f7bff;outline-offset:2px;z-index:4;" : "z-index:3;");
-  var out = '<div class="dwc-design-hit" data-design-hit="' + esc(b.id) + '" style="' + s + '" onpointerdown="designPointerDown(event,\'' + esc(b.id) + "',false)\">";
-  if (sel) {
-    out += '<span class="dwc-design-handle" title="Drag me to move (touch: drag this handle)" style="position:absolute;left:2px;top:2px;min-width:44px;min-height:44px;display:flex;align-items:center;justify-content:center;background:#2f7bff;color:#fff;border-radius:8px;cursor:grab;touch-action:none;font-size:20px" onpointerdown="designPointerDown(event,\'' + esc(b.id) + "',true);event.stopPropagation()\">⠿</span>";
-    [["nw", "left:-8px;top:-8px;cursor:nwse-resize"], ["ne", "right:-8px;top:-8px;cursor:nesw-resize"], ["sw", "left:-8px;bottom:-8px;cursor:nesw-resize"], ["se", "right:-8px;bottom:-8px;cursor:nwse-resize"]].forEach(function (c) {
-      out += '<span class="dwc-design-resize" style="position:absolute;' + c[1] + ';width:18px;height:18px;background:#fff;border:2px solid #2f7bff;border-radius:4px;touch-action:none" onpointerdown="designResizeDown(event,\'' + esc(b.id) + "','" + c[0] + "');event.stopPropagation()\"></span>";
-    });
-  }
-  return out + "</div>";
-}
-// --- Drag / resize (Pointer Events; snap 4%) ---
-function designSnap(v) { return Math.max(0, Math.min(100, Math.round(v / 4) * 4)); }
-function designCanvasRect() {
-  var cv = document.getElementById("dwc-design-canvas");
-  return cv ? cv.getBoundingClientRect() : { left: 0, top: 0, width: 1000, height: 600 };
-}
-function designPointerDown(e, id, fromHandle) {
-  if (!designState) return;
-  if (e.pointerType === "touch" && !fromHandle) { designSelect(id); return; } // tap selects; body-drag would fight scrolling
-  e.preventDefault();
-  designSelect(id);
-  var b = designBlockById(id); if (!b) return;
-  designPushUndo();
-  designDrag = { id: id, kind: "move", sx: e.clientX, sy: e.clientY, ox: b.x, oy: b.y, ow: b.w, oh: b.h, rect: designCanvasRect(), moved: false };
-  window.addEventListener("pointermove", designPointerMove);
-  window.addEventListener("pointerup", designPointerUp, { once: true });
-}
-function designResizeDown(e, id, corner) {
-  if (!designState) return;
-  e.preventDefault();
-  designSelect(id);
-  var b = designBlockById(id); if (!b) return;
-  designPushUndo();
-  designDrag = { id: id, kind: "resize", corner: corner, sx: e.clientX, sy: e.clientY, ox: b.x, oy: b.y, ow: b.w, oh: b.h, rect: designCanvasRect(), moved: false };
-  window.addEventListener("pointermove", designPointerMove);
-  window.addEventListener("pointerup", designPointerUp, { once: true });
-}
-function designPointerMove(e) {
-  var d = designDrag; if (!d || !designState) return;
-  var b = designBlockById(d.id); if (!b) return;
-  var dx = (e.clientX - d.sx) / d.rect.width * 100;
-  var dy = (e.clientY - d.sy) / d.rect.height * 100;
-  if (Math.abs(e.clientX - d.sx) + Math.abs(e.clientY - d.sy) > 6) d.moved = true;
-  if (!d.moved) return;
-  if (d.kind === "move") {
-    b.x = designSnap(Math.max(0, Math.min(100 - b.w, d.ox + dx)));
-    b.y = designSnap(Math.max(0, d.oy + dy));
-  } else {
-    var w = d.ow, h = d.oh, x = d.ox, y = d.oy;
-    if (d.corner.indexOf("e") >= 0) w = designSnap(d.ow + dx);
-    if (d.corner.indexOf("w") >= 0) { w = designSnap(d.ow - dx); x = designSnap(d.ox + dx); }
-    if (d.corner.indexOf("s") >= 0) h = designSnap(d.oh + dy);
-    if (d.corner.indexOf("n") >= 0) { h = designSnap(d.oh - dy); y = designSnap(d.oy + dy); }
-    b.w = Math.max(5, Math.min(100, w)); b.h = Math.max(4, Math.min(100, h));
-    if (d.corner.indexOf("w") >= 0) b.x = Math.max(0, Math.min(100 - b.w, x));
-    if (d.corner.indexOf("n") >= 0) b.y = Math.max(0, y);
-  }
-  var hit = document.querySelector('[data-design-hit="' + d.id + '"]');
-  if (hit) { hit.style.left = b.x + "%"; hit.style.top = b.y + "%"; hit.style.width = b.w + "%"; if (b.h) hit.style.height = b.h + "%"; }
-  var vis = document.querySelector('[data-design-block="' + d.id + '"]');
-  if (vis) { vis.style.left = b.x + "%"; vis.style.top = b.y + "%"; vis.style.width = b.w + "%"; if (b.h) vis.style.height = b.h + "%"; }
-  var drop = document.getElementById("dwc-design-drop");
-  if (drop) { drop.style.display = "block"; drop.style.left = b.x + "%"; drop.style.top = b.y + "%"; drop.style.width = b.w + "%"; drop.style.height = (b.h || 8) + "%"; }
-}
-function designPointerUp() {
-  window.removeEventListener("pointermove", designPointerMove);
-  var wasDrag = designDrag && designDrag.moved;
-  designDrag = null;
-  if (!designState) return;
-  var drop = document.getElementById("dwc-design-drop");
-  if (drop) drop.style.display = "none";
-  if (wasDrag) {
-    // Do NOT re-clean blocks here: an empty embed/stream slot is a
-    // valid work-in-progress (the member fills the URL in the panel)
-    // and must never vanish mid-session. Invalid rows are dropped
-    // only at save time (designSave), per spec §1.
-    designState.dirty = true;
-    designSyncGeneratorFromBlocks();
-    designRender();
-    designSetStylePanel(!!designState.selectedId);
-  }
-}
-function designCanvasClick(e) {
-  if (!designState) return;
-  if (e.target.closest && e.target.closest(".dwc-design-hit")) return; // hit handles it
-  var cv = document.getElementById("dwc-design-canvas");
-  var r = cv.getBoundingClientRect();
-  if (designState.pendingPlace) {
-    var type = designState.pendingPlace;
-    designState.pendingPlace = null;
-    var b = designNewBlock(type);
-    b.x = designSnap(Math.max(0, Math.min(100 - b.w, (e.clientX - r.left) / r.width * 100 - b.w / 2)));
-    b.y = designSnap(Math.max(0, (e.clientY - r.top) / r.height * 100 - 4));
-    designPushUndo();
-    designState.blocks.push(b);
-    designState.dirty = true;
-    designSelect(b.id);
-    designRender();
-    designSetStylePanel(true);
+  if (!p) { el.innerHTML = needProfileHTML(); return; }
+  el.innerHTML = '<section class="card"><h2 style="margin-top:0">🎨 Design my page</h2><p style="color:var(--muted)">Loading the editor…</p></section>';
+  var ok = await puckLoadEditor();
+  if (!ok || !window.PuckEditor) {
+    el.innerHTML = '<section class="card"><h2 style="margin-top:0">🎨 Design my page</h2><p>The editor didn’t load — check your connection and try again.</p><p><button type="button" class="btn" onclick="DWC.go(\'member/' + p.id + '\')">← Back to my page</button></p></section>';
     return;
   }
-  designDeselect();
-}
-// --- Tray / add ---
-function designNewBlock(type) {
-  var d = {
-    text: { w: 50, h: 0, text: "New text", size: 18, align: "center" },
-    image: { w: 40, h: 30, src: "" },
-    link: { w: 30, h: 7, label: "My link", url: "https://rarecandyreserve.org" },
-    divider: { w: 80, h: 2 },
-    spacer: { w: 80, h: 8 },
-    gif: { w: 40, h: 30, src: "" },
-    embed: { w: 80, h: 40, url: "" },
-    stream: { w: 90, h: 38, url: "" },
-    social: { w: 80, h: 8 }
-  }[type] || { w: 30, h: 8 };
-  var b = designB(type, 35, 40, d.w, d.h, d);
-  return b;
-}
-function designAddBlock(type) {
-  if (!designState) return;
-  designPushUndo();
-  var b = designNewBlock(type);
-  designState.blocks.push(b);
-  designState.dirty = true;
-  designSelect(b.id);
-  designRender();
-  designSetStylePanel(true);
-}
-function designArmPlace(type) {
-  if (!designState) return;
-  designState.pendingPlace = (designState.pendingPlace === type) ? null : type;
-  designRender();
-}
-// --- Style panel fields ---
-function designApplyField(b, field, el) {
-  if (field === "text" || field === "url" || field === "src" || field === "label") b[field] = String(el.value || "");
-  else if (field === "color" || field === "bg") b[field] = designHex(el.value);
-  else if (field === "font") b.font = themeFontCSS(el.value) ? el.value : "";
-  else if (field === "size" || field === "opacity" || field === "w") b[field] = designNum(el.value, field === "size" ? 8 : field === "opacity" ? 10 : 5, field === "size" ? 96 : 100, field === "size" ? 18 : field === "opacity" ? 100 : 30);
-  else if (field === "align") b.align = el;
-  else if (field === "bold" || field === "italic" || field === "underline") b[field] = !!el.checked;
-  if (field === "url") b.url = designHttps(b.url);
-  if (field === "src") b.src = designHttps(b.src);
-}
-function designLiveField(field, el) {
-  var st = designState; if (!st || !st.selectedId) return;
-  if (!st._liveUndo) designPushUndo();
-  var b = designBlockById(st.selectedId); if (!b) return;
-  designApplyField(b, field, el);
-  st.dirty = true;
-  designRenderCanvas();
-  designSyncGeneratorFromBlocks();
-}
-function designFieldChange(field, el) {
-  var st = designState; if (!st || !st.selectedId) return;
-  if (!st._liveUndo) designPushUndo();
-  var b = designBlockById(st.selectedId); if (!b) return;
-  designApplyField(b, field, el);
-  st.dirty = true; st._liveUndo = false;
-  designRenderCanvas();
-  designRenderPanel();
-  designSyncGeneratorFromBlocks();
-}
-function designSetAlign(a) {
-  var st = designState; if (!st || !st.selectedId) return;
-  designPushUndo();
-  var b = designBlockById(st.selectedId); if (!b) return;
-  b.align = a; st.dirty = true;
-  designRenderCanvas(); designRenderPanel();
-}
-function designToggleFmt(field) {
-  var st = designState; if (!st || !st.selectedId) return;
-  designPushUndo();
-  var b = designBlockById(st.selectedId); if (!b) return;
-  b[field] = !b[field]; st.dirty = true;
-  designRenderCanvas(); designRenderPanel();
-}
-function designDeleteSelected() {
-  var st = designState; if (!st || !st.selectedId) return;
-  designPushUndo();
-  st.blocks = st.blocks.filter(function (b) { return b.id !== st.selectedId; });
-  st.selectedId = null; st.dirty = true;
-  designSyncGeneratorFromBlocks();
-  designRender();
-  designSetStylePanel(false);
-}
-function designDuplicateSelected() {
-  var st = designState; if (!st || !st.selectedId) return;
-  var b = designBlockById(st.selectedId); if (!b) return;
-  designPushUndo();
-  var c = JSON.parse(JSON.stringify(b));
-  c.id = designBlockId(); c.x = designSnap(Math.min(100 - c.w, c.x + 4)); c.y = designSnap(c.y + 4);
-  st.blocks.push(c); st.dirty = true;
-  designSelect(c.id);
-  designRender();
-  designSetStylePanel(true);
-}
-function designMoveSelected(dir) { // dir +1 = bring forward, -1 = send backward
-  var st = designState; if (!st || !st.selectedId) return;
-  var i = -1;
-  st.blocks.forEach(function (b, k) { if (b.id === st.selectedId) i = k; });
-  var j = i + dir;
-  if (i < 0 || j < 0 || j >= st.blocks.length) return;
-  designPushUndo();
-  var t = st.blocks[i]; st.blocks[i] = st.blocks[j]; st.blocks[j] = t;
-  st.dirty = true;
-  designRenderCanvas(); designRenderPanel();
-}
-function designApplyTemplate(id) {
-  var st = designState; if (!st || !id) return;
-  if (st.blocks.length && id !== st.template) {
-    if (!window.confirm("Replace your current layout with this starter? Your current blocks will be replaced — Undo brings them back.")) { designRender(); return; }
-  }
-  designPushUndo();
-  st.blocks = designTemplateBlocks(id, st.fmt, st.member, st.theme);
-  st.template = id; st.selectedId = null; st.dirty = true;
-  designSyncGeneratorFromBlocks();
-  designRender();
-  designSetStylePanel(false);
-}
-function designChooseSocialMode(mode) {
-  var st = designState; if (!st) return;
-  try { localStorage.setItem("dwc-design-social-mode", mode); } catch (e) {}
-  st.socialMode = mode; st.showChooser = false; st.mode = mode;
-  designRender();
-  designSetStylePanel(false);
-}
-function designToggleCode() {
-  var st = designState; if (!st) return;
-  st.codeOpen = !st.codeOpen;
-  designRender();
-  designSetStylePanel(!!st.selectedId);
-}
-function designGenerate() {
-  var st = designState; if (!st) return;
-  designPushUndo();
-  var keep = st.blocks.filter(function (b) { return b.id.indexOf("gen-") !== 0; });
-  var gen = designGenBlocks(st.gen);
-  st.blocks = keep.concat(gen);
-  if (!keep.length) {
-    var starter = designTemplateBlocks("preset", st.fmt, st.member, st.theme);
-    st.blocks = starter.filter(function (b) { return b.id.indexOf("gen-") !== 0; }).concat(gen);
-  }
-  // No re-clean here: gen blocks are clean by construction, and an
-  // empty embed/stream slot must survive until save (see designPointerUp).
-  st.dirty = true; st.mode = "drag";
-  designRender();
-  designSetStylePanel(false);
-}
-function designAddGenLink() {
-  var st = designState; if (!st) return;
-  var lab = document.getElementById("dwc-design-gen-link-label");
-  var url = document.getElementById("dwc-design-gen-link-url");
-  if (!lab || !url) return;
-  var u = designHttps(url.value);
-  if (!lab.value.trim() || !u) { st.savedMsg = "Add a label and a full https:// link first."; designRender(); return; }
-  st.gen.links.push({ label: lab.value.trim().slice(0, 40), url: u });
-  st.savedMsg = "";
-  designRender();
-}
-function designRemoveGenLink(i) {
-  var st = designState; if (!st) return;
-  st.gen.links.splice(i, 1);
-  designRender();
-}
-function designAddGenHyperlink() {
-  var st = designState; if (!st) return;
-  var w = document.getElementById("dwc-design-gen-linkwords");
-  var u = document.getElementById("dwc-design-gen-linkurl");
-  if (!w || !u) return;
-  var url = designHttps(u.value);
-  if (!w.value.trim() || !url) { st.savedMsg = "Pick the words and a full https:// link first."; designRender(); return; }
-  st.gen.links.push({ label: w.value.trim().slice(0, 40), url: url });
-  st.savedMsg = "Added “" + w.value.trim() + "” as a link button under your bio — it becomes a block on the canvas.";
-  designRender();
-}
-function designSetCreatorToggle(key, on) {
-  var st = designState; if (!st) return;
-  st.creatorToggles[key] = !!on;
-  designSaveCreatorToggles();
-  designRenderPanel();
-}
-async function designSave() {
-  var st = designState; if (!st || st.saving) return;
-  st.saving = true; designRender();
-  var merged = Object.assign({}, st.rawTheme, st.theme);
-  var before = st.blocks.length;
-  merged.page_blocks = st.blocks.map(designCleanBlock).filter(Boolean).slice(0, 40);
-  var dropped = before - merged.page_blocks.length;
-  var data = await apiPost("/profile", { device_id: deviceId(), profile_theme: JSON.stringify(merged) });
-  st.saving = false;
-  if (data && data.ok) {
-    st.dirty = false; st.savedMsg = "saved";
-    if (dropped > 0) st.savedMsg = "saved-note:" + dropped + " empty video/stream block" + (dropped === 1 ? " was" : "s were") + " left out — paste a link in the panel to keep " + (dropped === 1 ? "it" : "them") + ".";
-    st.rawTheme = merged;
-    state.profile.profile_theme = JSON.stringify(merged);
-  } else {
-    // A failed save never wipes the editor state — blocks stay put.
-    st.savedMsg = "error:" + ((data && data.error) || "Couldn't save — check your connection. Your layout is still here.");
-  }
-  designRender();
-  designSetStylePanel(!!st.selectedId);
-}
-async function designSaveCode() {
-  var st = designState; if (!st) return;
-  var ta = document.getElementById("dwc-design-aboutme");
-  if (!ta) return;
-  var split = (typeof aboutMeSplit === "function") ? aboutMeSplit(ta.value) : { css: "", bio: "" };
-  var data = await apiPost("/profile", { device_id: deviceId(), bio: String(split.bio || "").slice(0, 500), layout_css: String(split.css || "").slice(0, 8000) });
-  if (data && data.ok) {
-    state.profile.bio = split.bio || "";
-    state.profile.layout_css = split.css || "";
-    st.savedMsg = "Code saved — your bio + <style> block are live on your page.";
-  } else {
-    st.savedMsg = "error:" + ((data && data.error) || "Couldn't save the code — it is still here in the box.");
-  }
-  designRender();
-  designSetStylePanel(!!st.selectedId);
-}
-function designFitCanvas() {
-  if (typeof pageBlocksHTML === "function") return; // the real renderer sets its own height
-  var cv = document.getElementById("dwc-design-canvas");
-  if (!cv || !designState) return;
-  var w = cv.offsetWidth || 1000, mb = 0;
-  designState.blocks.forEach(function (b) { mb = Math.max(mb, b.y + (b.h || 8)); });
-  cv.style.height = Math.max(400, mb / 100 * w) + "px";
-}
-function designRenderCanvas() {
-  var w = document.getElementById("dwc-design-canvas-wrap");
-  if (!w) return;
-  w.innerHTML = designCanvasHTML();
-  designFitCanvas();
-}
-function designRenderPanel() {
-  var p = document.getElementById("dwc-design-style");
-  if (!p) return;
-  p.innerHTML = designStylePanelHTML();
-}
-
-// --- Render ---
-function designRender() {
-  var st = designState; if (!st || !st.el) return;
-  var el = st.el;
-  var pf = null;
-  PAGE_FORMATS.forEach(function (f) { if (f.id === st.fmt) pf = f; });
-  var sel = st.selectedId ? designBlockById(st.selectedId) : null;
-  var saved = "";
-  if (st.savedMsg === "saved") saved = '<p style="margin:8px 0 0;color:var(--green)">Saved ✓ — <a href="#/member/' + st.member.id + '">view your page →</a></p>';
-  else if (st.savedMsg && st.savedMsg.indexOf("saved-note:") === 0) saved = '<p style="margin:8px 0 0;color:var(--green)">Saved ✓ — <a href="#/member/' + st.member.id + '">view your page →</a></p><p style="margin:4px 0 0;color:var(--muted)">' + esc(st.savedMsg.slice(11)) + "</p>";
-  else if (st.savedMsg && st.savedMsg.indexOf("error:") === 0) saved = '<p style="margin:8px 0 0;color:#ff5a5a">' + esc(st.savedMsg.slice(6)) + "</p>";
-  else if (st.savedMsg) saved = '<p style="margin:8px 0 0;color:var(--muted)">' + esc(st.savedMsg) + "</p>";
-  var html = '<section class="card dwc-design" id="dwc-design" style="padding:12px">' +
-    '<div class="dwc-design-topbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px">' +
-    '<button type="button" class="btn ghost small" onclick="DWC.editProfile()">← Back to Edit Profile</button>' +
-    '<strong style="font-size:17px">' + (pf ? esc(pf.icon + " " + pf.name) : esc(st.fmt)) + '</strong>' +
-    '<label style="font-size:13px;color:var(--muted)">Template <select onchange="designApplyTemplate(this.value)" style="min-height:44px">' +
-    designTemplates(st.fmt).map(function (t) { return '<option value="' + t.id + '"' + (st.template === t.id ? " selected" : "") + ">" + esc(t.name) + "</option>"; }).join("") +
-    "</select></label>" +
-    (st.fmt === "social"
-      ? '<span role="group" aria-label="Social mode"><button type="button" class="btn small' + (st.mode === "generator" ? "" : " ghost") + '" onclick="designChooseSocialMode(\'generator\')">✨ Generator</button> <button type="button" class="btn small' + (st.mode === "drag" ? "" : " ghost") + '" onclick="designChooseSocialMode(\'drag\')">🖱️ Drag &amp; drop</button></span>'
-      : "") +
-    '<button type="button" class="btn small ghost" onclick="designToggleCode()" aria-pressed="' + st.codeOpen + '">&lt;/&gt; Code</button>' +
-    '<button type="button" class="btn small ghost" onclick="designUndo()" ' + (st.undo.length ? "" : "disabled") + '>↩ Undo</button>' +
-    '<button type="button" class="btn small" onclick="designSave()" ' + (st.saving ? "disabled" : "") + '>' + (st.saving ? "Saving…" : "💾 Save") + "</button>" +
-    (st.dirty ? '<span style="color:var(--amber,#ffb020);font-size:13px">● Unsaved changes</span>' : "") +
-    "</div>" + saved;
-  if (st.showChooser) html += designChooserHTML();
-  if (st.fmt === "social" && st.mode === "generator" && !st.showChooser) html += designGeneratorHTML();
-  html += '<div class="dwc-design-main" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' +
-    '<div class="dwc-design-tray" style="flex:0 0 150px;display:flex;flex-direction:column;gap:8px">' +
-    '<strong style="font-size:14px">Add a block</strong>' +
-    DESIGN_TRAY.concat(st.fmt === "streamer" ? [["stream", "🎮 Stream"]] : []).concat(st.fmt === "social" ? [["social", "👥 Social buttons"]] : []).map(function (t) {
-      return '<button type="button" class="btn small' + (st.pendingPlace === t[0] ? "" : " ghost") + '" style="min-height:44px;text-align:left" onclick="designAddBlock(\'' + t[0] + '\')" title="Tap to add to the middle — or long list: tap \'Place\' then tap the canvas"> ' + t[1] + "</button>" +
-        '<button type="button" class="dwc-linklike" style="font-size:12px;text-align:left" onclick="designArmPlace(\'' + t[0] + '\')">' + (st.pendingPlace === t[0] ? "Tap the canvas where it goes… (tap again to cancel)" : "Place it myself ↓") + "</button>";
-    }).join("") +
-    '<p style="margin:4px 0 0;color:var(--muted);font-size:12px">Tip: tap a block to add it to the middle, then drag it. On a phone, drag by the ⠿ handle.</p>' +
-    "</div>" +
-    '<div class="dwc-design-canvas-col" style="flex:1 1 420px;min-width:280px">' +
-    '<div id="dwc-design-canvas-wrap">' + designCanvasHTML() + "</div>" +
-    '<p style="margin:6px 0 0;color:var(--muted);font-size:13px">Tap a block to pick it up — drag it where you want it, pinch the corners to resize it on desktop. It looks here exactly like it looks on your page.</p>' +
-    "</div>" +
-    '<div id="dwc-design-style" class="dwc-design-style closed dwc-style-panel--closed" style="flex:0 0 260px;min-width:240px">' + designStylePanelHTML() + "</div>" +
-    "</div>";
-  html += designPresetPanelHTML();
-  if (st.codeOpen) html += designCodePanelHTML();
-  html += "</section>";
-  el.innerHTML = html;
-  designFitCanvas();
-  designSetStylePanel(!!sel);
-}
-function designChooserHTML() {
-  return '<div class="dwc-design-chooser" style="display:flex;gap:12px;flex-wrap:wrap;margin:0 0 12px">' +
-    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer;color:var(--ink)" onclick="designChooseSocialMode(\'generator\')"><strong style="font-size:16px">✨ Generator — answer a few questions, get a finished profile</strong><br><span style="color:var(--muted);font-size:13px">Name, age, sign, handle, links — done in a minute. You can still drag everything around after.</span></button>' +
-    '<button type="button" class="card" style="flex:1 1 220px;text-align:left;padding:14px;cursor:pointer;color:var(--ink)" onclick="designChooseSocialMode(\'drag\')"><strong style="font-size:16px">🖱️ Drag &amp; drop — place everything yourself on the live preview</strong><br><span style="color:var(--muted);font-size:13px">Start from your preset\'s arranged page and move things wherever you like.</span></button>' +
-    "</div>";
-}
-function designGeneratorHTML() {
-  var st = designState, g = st.gen;
-  var opts = DESIGN_SIGNS.map(function (s) { return '<option value="' + esc(s[0]) + '"' + (g.sign === s[0] ? " selected" : "") + ">" + esc(s[1]) + "</option>"; }).join("");
-  var links = (g.links || []).map(function (l, i) {
-    return '<p style="margin:4px 0">🔗 ' + esc(l.label) + ' → ' + esc(l.url) + ' <button type="button" class="dwc-linklike" onclick="designRemoveGenLink(' + i + ')">Remove</button></p>';
-  }).join("");
-  return '<div class="card dwc-design-generator" style="margin:0 0 12px;padding:14px">' +
-    "<h3 style=\"margin:0 0 4px\">✨ Profile generator</h3>" +
-    '<p style="margin:0 0 10px;color:var(--muted);font-size:13px">Answer a few questions — we build the page. Switch to Drag &amp; drop any time up top; anything you drag stays.</p>' +
-    '<label>Name (big heading)<input id="dwc-design-gen-name" maxlength="60" value="' + esc(g.name) + '" oninput="designState.gen.name=this.value" style="width:100%;min-height:44px"></label>' +
-    '<div style="display:flex;gap:10px;flex-wrap:wrap"><label style="flex:1">Age (number)<input id="dwc-design-gen-age" type="number" min="13" max="120" value="' + esc(g.age) + '" oninput="designState.gen.age=this.value" style="width:100%;min-height:44px"></label>' +
-    '<label style="flex:1">Birth sign <span style="color:var(--muted);font-size:12px">(badge next to your name)</span><select id="dwc-design-gen-sign" onchange="designState.gen.sign=this.value" style="width:100%;min-height:44px">' + opts + "</select></label></div>" +
-    '<label>Online handle / alias<input id="dwc-design-gen-handle" maxlength="40" value="' + esc(g.handle) + '" oninput="designState.gen.handle=this.value.replace(/^@/,\'\')" style="width:100%;min-height:44px" placeholder="@name under your name"></label>' +
-    '<label>About you<textarea id="dwc-design-gen-bio" rows="3" maxlength="500" oninput="designState.gen.bio=this.value" style="width:100%">' + esc(g.bio) + "</textarea></label>" +
-    "<h4 style=\"margin:10px 0 4px\">Add a link</h4>" + links +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dwc-design-gen-link-label" maxlength="40" placeholder="Label — e.g. My shop" style="flex:1;min-height:44px"><input id="dwc-design-gen-link-url" placeholder="https://…" style="flex:2;min-height:44px"><button type="button" class="btn small" onclick="designAddGenLink()">+ Add link</button></div>' +
-    "<h4 style=\"margin:10px 0 4px\">Make text a hyperlink</h4>" +
-    '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Pick words from your About text and attach a link — they become a link button under your bio.</p>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><input id="dwc-design-gen-linkwords" maxlength="40" placeholder="Words — e.g. message me" style="flex:1;min-height:44px"><input id="dwc-design-gen-linkurl" placeholder="https://…" style="flex:2;min-height:44px"><button type="button" class="btn small" onclick="designAddGenHyperlink()">Link those words</button></div>' +
-    '<p style="margin:12px 0 0"><button type="button" class="btn" onclick="designGenerate()">✨ Generate my page</button> <span style="color:var(--muted);font-size:13px">Puts your answers on the canvas as blocks you can drag.</span></p>' +
-    "</div>";
-}
-function designStylePanelHTML() {
-  var st = designState; if (!st) return "";
-  var b = st.selectedId ? designBlockById(st.selectedId) : null;
-  if (!b) return '<div class="card" style="padding:12px"><strong>Nothing picked</strong><p style="margin:6px 0 0;color:var(--muted);font-size:13px">Tap a block on your page to change it — text, colours, size, links.</p></div>';
-  var h = '<div class="card" style="padding:12px"><div style="display:flex;justify-content:space-between;align-items:center"><strong>' + esc(b.type) + ' block</strong><button type="button" class="dwc-linklike" onclick="designDeselect()" aria-label="Close panel">✕</button></div>';
-  if (b.type === "text") h += '<label>Text<textarea rows="3" maxlength="500" oninput="designLiveField(\'text\',this)" onchange="designState._liveUndo=false" style="width:100%">' + esc(b.text) + "</textarea></label>";
-  if (b.type === "link" || b.type === "button") h += '<label>Button words<input maxlength="40" value="' + esc(b.label) + '" oninput="designLiveField(\'label\',this)" onchange="designState._liveUndo=false" style="width:100%;min-height:44px"></label>';
-  if (b.type === "link" || b.type === "button" || b.type === "embed" || b.type === "stream") h += '<label>' + (b.type === "stream" ? "Stream link (Twitch / YouTube)" : b.type === "embed" ? "Video / music link" : "Link URL (https://)") + '<input value="' + esc(b.url) + '" oninput="designLiveField(\'url\',this)" onchange="designState._liveUndo=false" placeholder="https://…" style="width:100%;min-height:44px"></label>';
-  if (b.type === "image" || b.type === "gif") h += '<label>Image URL (https://)<input value="' + esc(b.src) + '" oninput="designLiveField(\'src\',this)" onchange="designState._liveUndo=false" placeholder="https://…" style="width:100%;min-height:44px"></label>';
-  if (b.type === "stream") h += '<p style="margin:6px 0;color:var(--muted);font-size:13px">Drag the corners to resize the video, or use Width below. Follow-me buttons are link blocks — add them from the tray.</p>';
-  if ((b.type === "embed" || b.type === "stream") && !b.url) h += '<p style="margin:6px 0;color:var(--amber,#ffb020);font-size:13px">Paste a link above to keep this block — an empty video block doesn’t save.</p>';
-  h += '<div style="display:flex;gap:10px;flex-wrap:wrap"><label>Text colour<input type="color" value="' + (b.color || "#000000") + '" onchange="designFieldChange(\'color\',this)" style="width:56px;height:44px;padding:2px"></label>' +
-    '<label>Background<input type="color" value="' + (b.bg || "#ffffff") + '" onchange="designFieldChange(\'bg\',this)" style="width:56px;height:44px;padding:2px"></label></div>';
-  h += '<label>Font<select onchange="designFieldChange(\'font\',this)" style="width:100%;min-height:44px">' + THEME_FONTS.map(function (f) { return '<option value="' + esc(f.id) + '"' + (b.font === f.id ? " selected" : "") + ">" + esc(f.name) + "</option>"; }).join("") + "</select></label>";
-  h += '<label>Text size — ' + (b.size || 18) + 'px<input type="range" min="8" max="96" value="' + (b.size || 18) + '" oninput="designLiveField(\'size\',this)" onchange="designState._liveUndo=false" style="width:100%;min-height:44px"></label>';
-  h += '<label>Width — ' + b.w + '%<input type="range" min="5" max="100" step="4" value="' + b.w + '" oninput="designLiveField(\'w\',this)" onchange="designState._liveUndo=false" style="width:100%;min-height:44px"></label>';
-  h += '<label>See-through (opacity) — ' + (b.opacity == null ? 100 : b.opacity) + '%<input type="range" min="10" max="100" value="' + (b.opacity == null ? 100 : b.opacity) + '" oninput="designLiveField(\'opacity\',this)" onchange="designState._liveUndo=false" style="width:100%;min-height:44px"></label>';
-  h += '<div role="group" aria-label="Alignment" style="display:flex;gap:6px;margin:8px 0">' +
-    [["left", "⬅ Left"], ["center", "↔ Centre"], ["right", "Right ➡"]].map(function (a) { return '<button type="button" class="btn small' + (b.align === a[0] ? "" : " ghost") + '" style="min-height:44px;flex:1" onclick="designSetAlign(\'' + a[0] + '\')">' + a[1] + "</button>"; }).join("") + "</div>";
-  h += '<div style="display:flex;gap:6px;margin:8px 0">' +
-    [["bold", "B"], ["italic", "I"], ["underline", "U"]].map(function (f) { return '<button type="button" class="btn small' + (b[f[0]] ? "" : " ghost") + '" style="min-height:44px;flex:1" onclick="designToggleFmt(\'' + f[0] + '\')" aria-pressed="' + !!b[f[0]] + '"><strong>' + f[1] + "</strong></button>"; }).join("") + "</div>";
-  h += '<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn small" onclick="designDuplicateSelected()">⧉ Duplicate</button>' +
-    '<button type="button" class="btn small ghost" onclick="designMoveSelected(1)">⬆ Bring forward</button>' +
-    '<button type="button" class="btn small ghost" onclick="designMoveSelected(-1)">⬇ Send backward</button>' +
-    '<button type="button" class="btn small ghost" onclick="designDeleteSelected()" style="color:#ff5a5a">🗑 Delete</button></div>';
-  return h + "</div>";
-}
-function designPresetPanelHTML() {
-  var st = designState; if (!st) return "";
-  var pf = null;
-  PAGE_FORMATS.forEach(function (f) { if (f.id === st.fmt) pf = f; });
-  var h = '<div class="card" style="margin-top:12px;padding:12px"><h3 style="margin:0 0 4px">Preset — ' + esc(pf ? pf.name : st.fmt) + "</h3>" +
-    '<p style="margin:0;color:var(--muted);font-size:13px">' + esc(pf ? pf.desc : "") + "</p>";
-  if (st.fmt === "social") h += '<p style="margin:6px 0 0;color:var(--muted);font-size:12px">(yourspace styled)</p><p style="margin:6px 0 0;font-size:13px">Only Social pages get the four action buttons — Message me / Follow me / Favorite / Group — as a <strong>social</strong> block. Drag it wherever you like.</p>';
-  if (st.fmt === "creator") {
-    var t = st.creatorToggles || {};
-    h += "<h4 style=\"margin:12px 0 4px\">Creator options</h4>" +
-      '<label style="display:block;min-height:44px"><input type="checkbox" style="width:auto"' + (t.ppv ? " checked" : "") + ' onchange="designSetCreatorToggle(\'ppv\',this.checked)"> Allow Pay per view posts</label>' +
-      '<p style="margin:0 0 6px;color:var(--muted);font-size:13px">Toggle + display only — pay-per-view billing is NOT built yet, so this only marks posts as pay-per-view for now. Never presented as working billing.</p>' +
-      '<label style="display:block;min-height:44px"><input type="checkbox" style="width:auto"' + (t.blur ? " checked" : "") + ' onchange="designSetCreatorToggle(\'blur\',this.checked)"> Allow blur to non subscribers</label>' +
-      '<p style="margin:0;color:var(--muted);font-size:13px">When ON, the post composer shows a “blur this post to non subscribers” option per post. (Saved on this device for now — the composer reads this setting in its own update; see the code comment in designSetCreatorToggle.)</p>';
-  }
-  return h + "</div>";
-}
-function designCodePanelHTML() {
-  var st = designState;
-  var val = (typeof aboutMeValue === "function") ? aboutMeValue(st.member) : "";
-  return '<div class="card" style="margin-top:12px;padding:12px"><h3 style="margin:0 0 4px">&lt;/&gt; Code — practice &amp; fine details</h3>' +
-    '<p style="margin:0 0 8px;color:var(--muted);font-size:13px">The same merged About Me box from Edit Profile — your words + your &lt;style&gt; block, one box. Optional, off by default; most people never open it. The Layout Converter lives in Edit Profile, next to this box.</p>' +
-    '<textarea id="dwc-design-aboutme" rows="12" maxlength="8500" style="width:100%">' + esc(val) + "</textarea>" +
-    '<p style="margin:8px 0 0"><button type="button" class="btn small" onclick="designSaveCode()">💾 Save this code</button> <button type="button" class="btn ghost small" onclick="DWC.editProfile()">Open the full editor (Layout Converter) →</button> <span style="color:var(--muted);font-size:13px">Saving here only touches your bio + layout CSS — never your blocks.</span></p>' +
-    "</div>";
+  var t = parseThemeClient(p.profile_theme || "");
+  // (2026-11-25) the old designer seeded an empty page from the
+  // preset's starter layout. Puck offers the preset layouts instead
+  // (src/presets.js): the editor opens the picker by itself on an
+  // empty page, and a "🎨 Layouts" button re-opens it any time. A
+  // page that already has blocks keeps them (converted up to Puck
+  // data on open).
+  el.innerHTML = '<div id="dwc-puck-editor" style="height:calc(100vh - 120px);min-height:560px"></div>';
+  var host = document.getElementById("dwc-puck-editor");
+  try {
+    var top = el.getBoundingClientRect().top + window.scrollY - 120;
+    window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+  } catch (e) {}
+  window.PuckEditor.mount(host, {
+    puckData: (t && t.puck) || null,
+    pageBlocks: (t && t.page_blocks) || [],
+    resolveGifUrl: (typeof resolveGifUrl === "function") ? resolveGifUrl : null,
+    fontCSS: (typeof themeFontCSS === "function") ? themeFontCSS : null,
+    memberUrl: "#/member/" + p.id,
+    // The member's page sound for the mini players (the editor only
+    // ever edits your own page, so is_mine is true here — an upload
+    // waiting for approval still plays for you in the editor).
+    audio: miniPlayerAudioInfo(t, Object.assign({}, p, { is_mine: true })),
+    onPreset: function (preset) {
+      var applied = puckPresetTheme(preset);
+      if (!applied) return null;
+      pendingPuckPreset = applied;
+      return miniPlayerAudioInfo(applied.theme, Object.assign({}, p, { is_mine: true }));
+    },
+    onExit: function () { try { window.PuckEditor.unmount(); } catch (e) {} go("member/" + p.id); },
+    onSave: async function (puckData, blocks, dropped) {
+      // Merge into the FULL current theme — the server replaces the
+      // whole profile_theme, so sending only the blocks would wipe
+      // the member's background, colours, soundscape, and the rest.
+      // A preset picked in this session merges on top (its look +
+      // setup + layout_preset/layout_css); without one, the look is
+      // untouched.
+      var current = parseThemeClient(state.profile.profile_theme || "");
+      var merged = Object.assign({}, current, { page_blocks: blocks, puck: puckData, page_layout: "flow" });
+      var presetPayload = {};
+      if (pendingPuckPreset) {
+        merged = Object.assign({}, current, pendingPuckPreset.theme, { page_blocks: blocks, puck: puckData, page_layout: "flow" });
+        presetPayload = { layout_preset: pendingPuckPreset.layout_preset, layout_css: pendingPuckPreset.layout_css };
+      }
+      var data = await apiPost("/profile", Object.assign({
+        device_id: deviceId(),
+        username: state.profile.username,
+        profile_theme: JSON.stringify(merged),
+      }, presetPayload));
+      if (data && data.ok) {
+        pendingPuckPreset = null;
+        // Refresh the stored theme from the server's own echo (the
+        // parsed theme it just stored) so the form, the editor, and
+        // the live page can never disagree about what saved. Only
+        // the theme string is replaced — the rest of state.profile
+        // (badges, unlocks, etc.) stays as the client loaded it.
+        if (data.profile && data.profile.profile_theme) state.profile.profile_theme = JSON.stringify(data.profile.profile_theme);
+        else state.profile.profile_theme = JSON.stringify(merged);
+        setNotice("Page saved ✓" + (dropped > 0 ? " — " + dropped + " empty block" + (dropped === 1 ? "" : "s") + " left out." : ""));
+        return { ok: true };
+      }
+      return { ok: false, error: (data && data.error) || "Couldn't save — check your connection. Your layout is still here." };
+    },
+  });
 }
 
 // ---------- Members ----------
@@ -9887,8 +9251,68 @@ function vibeTickerHTML(m, th) {
 // (custom_page_html stays the only raw-HTML path, already sanitized
 // elsewhere). Embeds reuse the helpers already in this file —
 // youtubeEmbedHTML for YouTube, musicEmbedHTML for Spotify / SoundCloud.
+// Mini players (2026-11-25) — three small players for a member's
+// page sound. The sound resolves exactly the way audioSectionHTML
+// resolves it (soundscape file / uploaded track / Spotify /
+// SoundCloud / Steady Wave / nothing), so a mini player and the full
+// audio section can never disagree. Returns {kind, label, src,
+// embedUrl, height, desc, loop} — kind "file" plays a plain <audio>,
+// "embed" is a Spotify/SoundCloud iframe, "radio" is Steady Wave,
+// "pending" is an upload waiting for approval, "none" is no sound
+// picked. The Puck editor gets the same object from the bridge, so
+// its mini players show the same sound as the live page.
+function miniPlayerAudioInfo(th, m) {
+  var pick = (th && th.soundscape) || ((m && m.show_vnr_player) ? "radio" : "");
+  if (pick === "radio") return { kind: "radio", label: "Steady Wave", src: VNR_STREAM_URL, loop: false, desc: "Steady Wave · live" };
+  if (pick === "spotify") {
+    var sp = parseSpotifyUrl(th.spotify_url || "");
+    if (!sp) return { kind: "none" };
+    return { kind: "embed", label: "Spotify", embedUrl: spotifyEmbedUrl(th.spotify_url || ""), height: 152 };
+  }
+  if (pick === "soundcloud") {
+    var sc = soundcloudEmbedUrl(th.soundcloud_url || "", true);
+    if (!sc) return { kind: "none" };
+    return { kind: "embed", label: "SoundCloud", embedUrl: sc, height: 166 };
+  }
+  if (pick === "upload") {
+    var u = (th && th.music_file_url) || "";
+    if (!u) return { kind: "none" };
+    // Same rule as audioSectionHTML: an upload only plays for
+    // visitors once an operator approves it; the owner hears it
+    // while it is pending.
+    if (!(th.music_file_approved || (m && m.is_mine))) return { kind: "pending", label: "My track" };
+    return { kind: "file", label: "My track", src: u, loop: false };
+  }
+  var scp = soundscapeById(pick);
+  if (scp) return { kind: "file", label: scp.name, src: scp.file, loop: true, desc: scp.desc };
+  return { kind: "none" };
+}
+// The live mini player for one variant ("bar" | "card" | "chip").
+// Mirrors the Puck MiniPlayer views (src/players.js): same shapes,
+// same classes, same sound. File/radio audio plays through a hidden
+// <audio> + a play/pause button (DWC.toggleMiniPlayer); embeds are
+// the provider iframe; no sound renders a small hint, never a dead
+// empty box.
+function miniPlayerHTML(mth, m, variant) {
+  var info = miniPlayerAudioInfo(mth, m);
+  var cls = "dwc-miniplayer dwc-miniplayer-" + variant;
+  if (info.kind === "none") return '<div class="' + cls + ' dwc-miniplayer-empty">🎵 No sound picked yet — pick one in Edit Profile › My page sound.</div>';
+  if (info.kind === "pending") return '<div class="' + cls + ' dwc-miniplayer-empty">⏳ ' + esc(info.label) + ' — waiting for approval, then it plays here.</div>';
+  if (info.kind === "embed") {
+    var sub = variant === "card" ? '<span class="dwc-miniplayer-sub">' + esc(info.label) + ' · plays on your page</span>' : "";
+    return '<div class="' + cls + ' dwc-miniplayer-has-embed"><span class="dwc-miniplayer-text"><span class="dwc-miniplayer-name">' + esc(info.label) + '</span>' + sub + '</span>' +
+      '<div class="dwc-miniplayer-embed"><iframe src="' + esc(info.embedUrl) + '" height="' + (info.height || 152) + '" title="' + esc(info.label) + '" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"></iframe></div></div>';
+  }
+  var uid = "dwc-mini-" + (++_audioN);
+  var btnSize = variant === "card" ? ' style="width:44px;height:44px"' : variant === "chip" ? ' style="width:28px;height:28px;font-size:12px"' : "";
+  var subLine = variant === "card" ? '<span class="dwc-miniplayer-sub">' + esc(info.desc || (info.kind === "radio" ? "Steady Wave · live" : "Plays on your page")) + '</span>' : "";
+  return '<div class="' + cls + '"><button type="button" class="dwc-miniplayer-btn"' + btnSize + ' onclick="DWC.toggleMiniPlayer(\'' + uid + '\', this)" aria-label="Play or pause ' + esc(info.label) + '">▶</button>' +
+    '<span class="dwc-miniplayer-text"><span class="dwc-miniplayer-name">' + esc(info.label) + '</span>' + subLine + '</span>' +
+    '<audio id="' + uid + '" src="' + esc(info.src) + '"' + (info.loop ? " loop" : "") + ' preload="none" onpause="DWC.miniPlayerPaused(this)"></audio></div>';
+}
+
 // Twitch embeds reuse the player.twitch.tv iframe pattern already in
-// this file (designBlockHTML's stream branch) — same markup in both
+// this file (the Puck Stream component) — same markup in both
 // renderers, so the editor canvas and the live page agree.
 // Canvas height (NEATNESS RULE): min-height 400px plus a padding-bottom
 // derived from the tallest block (max y+h, in the same percent units as
@@ -9896,7 +9320,9 @@ function vibeTickerHTML(m, th) {
 // block and never leaves a huge empty gap.
 function pageBlocksHTML(blocks, m, mth) {
   if (!Array.isArray(blocks) || !blocks.length) return "";
-  var KNOWN = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
+  var KNOWN = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat",
+    // Mini players (2026-11-25) — three small players for the member's page sound.
+    "minibar", "minicard", "minichip"];
   var hexRe = /^#[0-9a-fA-F]{6}$/;
   var isHttps = function (u) { return /^https:\/\//i.test(String(u || "").trim()); };
   var clampNum = function (v, dflt, lo, hi) { var n = parseFloat(v); if (isNaN(n)) return dflt; return Math.max(lo, Math.min(hi, n)); };
@@ -9992,7 +9418,7 @@ function pageBlocksHTML(blocks, m, mth) {
       else {
         var tw = surl.match(/twitch\.tv\/([A-Za-z0-9_]{2,})/i);
         // Live Twitch feed — the player.twitch.tv iframe pattern already
-        // in this file (designBlockHTML's stream branch), reused verbatim
+        // in this file (the Puck Stream component), reused verbatim
         // so the editor canvas and the live page render identically.
         if (tw) inner = '<iframe src="https://player.twitch.tv/?channel=' + esc(tw[1]) + '&parent=' + esc(typeof location !== "undefined" ? location.hostname : "") + '&muted=true" style="width:100%;height:100%;min-height:220px;border:0" loading="lazy" title="Twitch stream" allowfullscreen></iframe>';
         else inner = '<p style="margin:0"><a class="btn" href="' + esc(surl.slice(0, 500)) + '"' + linkAttrs(surl) + ">▶ Watch the stream ↗</a></p>";
@@ -10010,8 +9436,24 @@ function pageBlocksHTML(blocks, m, mth) {
       // viewMember) fills this copy; viewMember drops the column copy
       // when a chat block exists, keeping the ids unique on the page.
       else { seenChat = true; inner = '<section class="card dwc-side-comments" id="dwc-page-comments"><h3 style="margin-top:0">💬 Page comments</h3><div id="dwc-page-comments-list"><p style="color:var(--muted)">Loading comments…</p></div><div id="dwc-page-comments-form"></div></section>'; }
+    } else if (type === "minibar") {
+      inner = miniPlayerHTML(mth, m, "bar");
+    } else if (type === "minicard") {
+      inner = miniPlayerHTML(mth, m, "card");
+    } else if (type === "minichip") {
+      inner = miniPlayerHTML(mth, m, "chip");
     }
     if (inner === null) return;
+    if (mth && mth.page_layout === "flow") {
+      // Puck flow layout (2026-11-25): blocks stack in document order —
+      // no absolute positioning, so nothing can overlap and the editor
+      // preview and the live page render the same stack. The per-type
+      // `inner` markup above is shared by both modes: one renderer.
+      var fstyle = "margin:0 0 14px;opacity:" + op;
+      if (type === "spacer") fstyle += ";height:24px";
+      out.push('<div class="dwc-block dwc-block-' + type + '" style="' + fstyle + '">' + inner + "</div>");
+      return;
+    }
     tallest = Math.max(tallest, y + (h > 0 ? h : 10));
     var wstyle = "left:" + x + "%;top:" + y + "%;width:" + w + "%;opacity:" + op;
     if (type === "spacer") wstyle += ";height:" + (h > 0 ? h + "%" : "24px");
@@ -10019,6 +9461,7 @@ function pageBlocksHTML(blocks, m, mth) {
     out.push('<div class="dwc-block dwc-block-' + type + '" style="' + wstyle + '">' + inner + "</div>");
   });
   if (!out.length) return "";
+  if (mth && mth.page_layout === "flow") return '<div class="dwc-blocks-canvas dwc-blocks-flow">' + out.join("") + "</div>";
   var tallPx = Math.round(tallest * 6);
   var padBottom = tallPx > 400 ? (tallPx - 400 + 24) : 24;
   return '<div class="dwc-blocks-canvas" style="position:relative;min-height:400px;padding-bottom:' + padBottom + 'px">' + out.join("") + "</div>";
@@ -13898,7 +13341,18 @@ window.DWC = {
       verification_summary: check ? (check.summary || "") : "",
     };
     var data = await apiPost("/listings", body);
-    if (!data || !data.ok) return formErr(form, (data && data.error) || "Couldn't list that.");
+    if (!data || !data.ok) {
+      // (2026-11-25) the old code only wrote the inline error, which a
+      // re-render could wipe before the member ever saw it — the
+      // failure looked silent. Show it three ways: inline, as a
+      // persistent top notice, and scrolled into view.
+      var msg = (data && data.error) || "Couldn't list that.";
+      formErr(form, msg);
+      setNotice("Listing blocked: " + msg);
+      var errEl = form.querySelector("[data-err]");
+      if (errEl && errEl.scrollIntoView) errEl.scrollIntoView({ block: "center" });
+      return false;
+    }
     state.listingCheck = null;
     listingPhotoFit = {};
     setNotice("Listed — it's live in the " + (kind === "sale" ? "Flea Market" : kind === "trade" ? "Up for Trade" : "Auction House") + "." + (anyShrunk ? " Photos were resized to fit." : ""));
@@ -17552,6 +17006,32 @@ window.DWC = {
     box.classList.remove("dwc-playing");
     box.querySelectorAll(".dwc-player-btn,.dwc-player-badge").forEach(function (b) { b.textContent = "▶"; });
   },
+  // Mini players (2026-11-25) — the same play/pause shape as
+  // toggleSoundscape, scoped to .dwc-miniplayer / .dwc-miniplayer-btn
+  // (the mini player box is not a .dwc-player, so the soundscape
+  // toggle's button lookup would be a no-op here). Works for any
+  // <audio> by id: soundscape files, uploaded tracks, Steady Wave.
+  toggleMiniPlayer: function (uid, el) {
+    var a = document.getElementById(uid);
+    if (!a) return;
+    var box = el.closest ? el.closest(".dwc-miniplayer") : null;
+    if (a.paused) {
+      var pr = a.play();
+      if (pr && pr.catch) pr.catch(function () {});
+      if (box) box.classList.add("dwc-playing");
+      el.textContent = "⏸";
+    } else {
+      a.pause();
+      if (box) box.classList.remove("dwc-playing");
+      el.textContent = "▶";
+    }
+  },
+  miniPlayerPaused: function (a) {
+    var box = a.closest ? a.closest(".dwc-miniplayer") : null;
+    if (!box) return;
+    box.classList.remove("dwc-playing");
+    box.querySelectorAll(".dwc-miniplayer-btn").forEach(function (b) { b.textContent = "▶"; });
+  },
   vizStart: function (a) {
     if (a._viz) { if (a._viz.ctx.state === "suspended") a._viz.ctx.resume(); DWC.vizDraw(a); return; }
     try {
@@ -19917,36 +19397,10 @@ async function init() {
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
 else init();
 
-// FIX 2026-11-23 — the editor was dead because this file is wrapped in an
-// IIFE, so design* lives in the IIFE's scope, NOT the global scope — but
-// the editor's HTML calls them from inline onclick/onpointerdown handlers,
-// which run in global scope. Every click therefore threw a silent
-// ReferenceError and nothing happened (add/select/drag/save/template,
-// and the "Design my page" button too). Expose the handlers on window;
-// they still close over the IIFE's designState, so no state is leaked.
+// The "Design my page" button calls designOpenEditor from inline
+// onclick handlers (global scope), so it is exposed on window;
+// the rest of the editor lives in the Puck bundle (2026-11-25).
 window.designOpenEditor = designOpenEditor;
-window.designAddBlock = designAddBlock;
-window.designArmPlace = designArmPlace;
-window.designCanvasClick = designCanvasClick;
-window.designPointerDown = designPointerDown;
-window.designResizeDown = designResizeDown;
-window.designUndo = designUndo;
-window.designSave = designSave;
-window.designToggleCode = designToggleCode;
-window.designSaveCode = designSaveCode;
-window.designChooseSocialMode = designChooseSocialMode;
-window.designLiveField = designLiveField;
-window.designSetAlign = designSetAlign;
-window.designToggleFmt = designToggleFmt;
-window.designGenerate = designGenerate;
-window.designAddGenLink = designAddGenLink;
-window.designAddGenHyperlink = designAddGenHyperlink;
-window.designRemoveGenLink = designRemoveGenLink;
-window.designMoveSelected = designMoveSelected;
-window.designDuplicateSelected = designDuplicateSelected;
-window.designDeleteSelected = designDeleteSelected;
-window.designDeselect = designDeselect;
-window.designSetCreatorToggle = designSetCreatorToggle;
 
 })();
 

@@ -134,7 +134,16 @@ export async function onRequestPost({ env, request }) {
     return json({ ok: true, error: null, avatar_url: imageUrl(row.blob_key), avatar_visibility: coerced ? "members" : (row.visibility || "public"), visibility_coerced: coerced });
   }
 
-  const username = String(a.username || "").trim();
+  // Username (2026-11-25, Puck editor fix): partial saves — the page
+  // designer, the code saver, any future editor — post only the fields
+  // they change, so an omitted username on an UPDATE keeps the member's
+  // existing username instead of failing with the "Username needs 2–24"
+  // error (that error is what silently broke every designer save: the
+  // designer posted profile_theme only, the server rejected the whole
+  // save, and the blocks never persisted). New signups still need a
+  // username in the request.
+  let username = String(a.username || "").trim();
+  if (!username && existing) username = existing.username || "";
   if (username.length < 2 || username.length > 24 || !USERNAME_RE.test(username)) {
     return fail("Username needs 2–24 letters, numbers, _ . or - only.");
   }
@@ -231,6 +240,17 @@ export async function onRequestPost({ env, request }) {
   // accept them here. The client picker never lists store ids, so
   // nobody can claim a priced layout by typing its id in Edit Profile.
   const LAYOUT_PRESETS = ["", "classic", "neon", "midnight", "candy", "afterdark", "creatorgold", "candyshop", "arcade", "ocean", "custom",
+    // The Layout Store's built-in presets (2026-11-25, Puck presets):
+    // the client sends them as "preset:<id>" (storeItemById wraps
+    // each LAYOUT_PRESETS item that way, and the hub label reads the
+    // stored id back through storeLayoutName). Before this, the
+    // server only listed the bare ids, so every "preset:xxx" apply
+    // was silently ignored — the look saved (theme + layout_css) but
+    // the preset label never updated, which is how a stale label
+    // like "Horror Lover" could stick after the look had changed.
+    // These nine are the free built-in presets; the priced layouts
+    // are the "store:xxx" ids below, unchanged.
+    "preset:classic", "preset:neon", "preset:midnight", "preset:candy", "preset:afterdark", "preset:creatorgold", "preset:candyshop", "preset:arcade", "preset:ocean",
     "store:rainy-night", "store:clean-professional", "store:facebook-style",
     "store:instagram-style", "store:80s-arcade", "store:kitsune-shrine",
     "store:horror-lover", "store:stardust-diner", "store:deep-forest",
@@ -594,78 +614,91 @@ export async function onRequestPost({ env, request }) {
   let v2Pending = false;
   let v3Pending = false;
   if (existing) {
-    // Operator edits never touch payout method/handle (excluded above)
-    // — dropping the two columns from the SET list, so a blanked
-    // operator form can never wipe the member's payouts.
-    const sets = operatorEdit
-      ? ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets]
-      : ["username = ?", "chat_name = ?", "occupation = ?", "bio = ?", "payout_method = ?", "payout_handle = ?", "updated_at = ?", ...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets];
-    const vals = operatorEdit
-      ? [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 500), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals]
-      : [username, str(a.chat_name, 24), str(a.occupation, 60), str(a.bio, 500), str(pm, 40), str(a.payout_handle, 80), now, ...v2Vals, ...v3Vals, ...v36Vals, ...v37Vals, ...v39Vals, ...v40Vals];
+    // Partial saves (2026-11-25, Puck editor fix): the designer posts
+    // only device_id + profile_theme. The old code wrote chat_name /
+    // occupation / bio / payout_method / payout_handle as "" on every
+    // save, so a designer save that had succeeded would have WIPED the
+    // member's bio, occupation, and payouts. Only fields actually
+    // present in the request are written now; the full Edit Profile
+    // form sends everything, so its replace-everything behaviour is
+    // unchanged. Operator edits still never touch payout fields.
+    const sets = ["username = ?", "updated_at = ?"];
+    const vals = [username, now];
+    const addSet = (set, val) => { sets.push(set); vals.push(val); };
+    if (typeof a.chat_name === "string") addSet("chat_name = ?", str(a.chat_name, 24));
+    if (typeof a.occupation === "string") addSet("occupation = ?", str(a.occupation, 60));
+    if (typeof a.bio === "string") addSet("bio = ?", str(a.bio, 500));
+    if (!operatorEdit) {
+      if (typeof a.payout_method === "string") addSet("payout_method = ?", str(pm, 40));
+      if (typeof a.payout_handle === "string") addSet("payout_handle = ?", str(a.payout_handle, 80));
+    }
+    for (let i = 0; i < v2Sets.length; i++) addSet(v2Sets[i], v2Vals[i]);
+    for (let i = 0; i < v3Sets.length; i++) addSet(v3Sets[i], v3Vals[i]);
+    for (let i = 0; i < v36Sets.length; i++) addSet(v36Sets[i], v36Vals[i]);
+    for (let i = 0; i < v37Sets.length; i++) addSet(v37Sets[i], v37Vals[i]);
+    for (let i = 0; i < v39Sets.length; i++) addSet(v39Sets[i], v39Vals[i]);
+    for (let i = 0; i < v40Sets.length; i++) addSet(v40Sets[i], v40Vals[i]);
     if (!operatorEdit && !existing.full_name && String(a.full_name || "").trim()) { sets.push("full_name = ?"); vals.push(String(a.full_name).trim().slice(0, 80)); }
     if (!operatorEdit && a.birthday) { sets.push("birthday = ?"); vals.push(a.birthday); }
     if (!operatorEdit && a.terms_agreed && !existing.terms_agreed_at) { sets.push("terms_agreed_at = ?"); vals.push(now); }
     if (avatarKey !== undefined) { sets.push("avatar_blob_key = ?"); vals.push(avatarKey); }
     vals.push(existing.id);
-    try {
-      await db.prepare(`UPDATE profiles SET ${sets.join(", ")} WHERE id = ?`).bind(...vals).run();
-    } catch (e) {
-      // A migration column doesn't exist yet — retry without the new
-      // columns so an edit never breaks. Drop one tier at a time: first
-      // just v3.6, then v3 + v3.6, then v2 + v3 + v3.6. The client is
-      // told via v2_pending / v3_pending / v36_pending.
-      if (/no such column|no column named/i.test(String((e && e.message) || e))) {
-        const without = (dropSets) => {
-          const keep = [];
-          const keepVals = [];
-          for (let i = 0; i < sets.length; i++) {
-            if (dropSets.includes(sets[i])) continue;
-            keep.push(sets[i]);
-            keepVals.push(vals[i]);
+    // Surgical retry (2026-11-25, replaces the old tier-drop cascade):
+    // a migration column that doesn't exist yet ("no such column: X")
+    // drops ONLY that column's SET entries, then retries — one missing
+    // column (e.g. shop_name before its migration runs) no longer
+    // silently wipes the whole tier (seller_types, profile_theme, and
+    // the designer's blocks with it). The client is still told which
+    // areas didn't stick via v2_pending / v3_pending / v36_pending.
+    const tierOf = new Map();
+    for (const s of v2Sets) tierOf.set(s, "v2");
+    for (const s of v3Sets) tierOf.set(s, "v3");
+    for (const s of v36Sets) tierOf.set(s, "v36");
+    for (const s of v37Sets) tierOf.set(s, "v37");
+    for (const s of v39Sets) tierOf.set(s, "v39");
+    for (const s of v40Sets) tierOf.set(s, "v40");
+    const droppedTiers = new Set();
+    let curSets = sets;
+    let curVals = vals;
+    let saved = false;
+    let lastErr = null;
+    for (let attempt = 0; attempt < 16 && !saved; attempt++) {
+      try {
+        await db.prepare(`UPDATE profiles SET ${curSets.join(", ")} WHERE id = ?`).bind(...curVals).run();
+        saved = true;
+      } catch (e) {
+        lastErr = e;
+        const m = /no such column:?\s*(?:[\w]+\.)?([\w]+)/i.exec(String((e && e.message) || e));
+        if (!m) throw e;
+        const col = m[1];
+        const dropIdx = [];
+        for (let i = 0; i < curSets.length; i++) {
+          if (curSets[i].startsWith(col + " = ?") || curSets[i].startsWith(col + "=")) dropIdx.push(i);
+        }
+        if (!dropIdx.length) throw e;
+        const nextSets = [];
+        const nextVals = [];
+        for (let i = 0; i < curSets.length; i++) {
+          if (dropIdx.indexOf(i) !== -1) {
+            const t = tierOf.get(curSets[i]);
+            if (t) droppedTiers.add(t);
+            continue;
           }
-          keepVals.push(existing.id);
-          return { keep, keepVals };
-        };
-        const tryDrop = async (dropSets) => {
-          const r = without(dropSets);
-          await db.prepare(`UPDATE profiles SET ${r.keep.join(", ")} WHERE id = ?`).bind(...r.keepVals).run();
-        };
-        let done = false;
-        if (v40Sets.length) {
-          try { await tryDrop(v40Sets); v40Pending = true; done = true; }
-          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
+          nextSets.push(curSets[i]);
+          nextVals.push(curVals[i]);
         }
-        if (!done && v39Sets.length) {
-          try { await tryDrop([...v39Sets, ...v40Sets]); v39Pending = true; v40Pending = true; done = true; }
-          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
-        }
-        if (!done && v37Sets.length) {
-          try { await tryDrop([...v37Sets, ...v39Sets, ...v40Sets]); v37Pending = true; v39Pending = true; v40Pending = true; done = true; }
-          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
-        }
-        if (!done && v36Sets.length) {
-          try { await tryDrop([...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets]); v36Pending = true; v37Pending = true; v39Pending = true; v40Pending = true; done = true; }
-          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
-        }
-        if (!done && v3Sets.length) {
-          try { await tryDrop([...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets]); v3Pending = true; v36Pending = true; v37Pending = true; v39Pending = true; v40Pending = true; done = true; }
-          catch (e2) { if (!/no such column|no column named/i.test(String((e2 && e2.message) || e2))) throw e2; }
-        }
-        if (!done && v2Sets.length) {
-          const r2 = without([...v2Sets, ...v3Sets, ...v36Sets, ...v37Sets, ...v39Sets, ...v40Sets]);
-          await db.prepare(`UPDATE profiles SET ${r2.keep.join(", ")} WHERE id = ?`).bind(...r2.keepVals).run();
-          v2Pending = true;
-          if (v3Sets.length) v3Pending = true;
-          if (v36Sets.length) v36Pending = true;
-          if (v37Sets.length) v37Pending = true;
-          if (v39Sets.length) v39Pending = true;
-          if (v40Sets.length) v40Pending = true;
-          done = true;
-        }
-        if (!done) throw e;
-      } else { throw e; }
+        nextVals.push(existing.id);
+        curSets = nextSets;
+        curVals = nextVals;
+      }
     }
+    if (!saved) throw lastErr;
+    v2Pending = droppedTiers.has("v2");
+    v3Pending = droppedTiers.has("v3");
+    v36Pending = droppedTiers.has("v36");
+    v37Pending = droppedTiers.has("v37");
+    v39Pending = droppedTiers.has("v39");
+    v40Pending = droppedTiers.has("v40");
     row = await db.prepare("SELECT * FROM profiles WHERE id = ? LIMIT 1").bind(existing.id).first();
     // v3.23 (2026-11-22) — one email: a new/changed contact_email on an
     // edit also becomes the pending recovery email, so the single

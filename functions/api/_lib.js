@@ -945,6 +945,14 @@ export function shapeProfile(row) {
     seller_open_to: row.seller_open_to ?? "",
     seller_price_min_cents: row.seller_price_min_cents ?? 0,
     seller_price_max_cents: row.seller_price_max_cents ?? 0,
+    // Member shops — the member's shop/brand name + tagline. These were
+    // missing from the OWN-profile shape (only shapeMember carried
+    // them), so after saving, the Edit Profile form reloaded the
+    // profile and the fields came back empty — the "shop name doesn't
+    // save" audit bug, even when the row itself saved fine. Public by
+    // design, same as the seller card fields above.
+    shop_name: row.shop_name ?? "",
+    shop_tagline: row.shop_tagline ?? "",
     buyer_types: parsePrefs(row.buyer_types),
     buyer_tags: parsePrefs(row.buyer_tags),
     buyer_budget_max_cents: row.buyer_budget_max_cents ?? 0,
@@ -2047,7 +2055,7 @@ export function parseSoundCloudUrl(str) {
   return "https://soundcloud.com/" + m[1] + "/" + m[3];
 }
 export function parseTheme(stored) {
-  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [], page_blocks: [] };
+  const empty = { bg_color: "", bg_image_url: "", bg_gif_url: "", bg_gif_size: "small", gif_block_url: "", gif_block_position: "", gif_block_size: "", gif_block_align: "center", soundscape: "", player_skin: "", player_image_url: "", spotify_url: "", soundcloud_url: "", music_file_url: "", music_ip_rights: false, music_file_approved: false, tour_dates: [], subscribe_fee: 0, subscribe_paypal_url: "", subscribe_stripe_url: "", blue_pics_visibility: "", text_color: "", accent_color: "", font: "", name_font: "", glow: false, glow_color: "", outline_color: "", vibe: "", button_style: "", button_css: "", effects: [], bg_preset: "", comment_border_color: "", pic_size: "", pic_position: "", pic_frame: "", blood_color: "", gb_mode: "", gb_colors: [], display_badges: [], buttons_side: "", buttons_show: true, button_size: "", buttons_visible: null, pro_button_side: "", pro_button_color: "", video_url: "", video_file_url: "", video_size: "", video_align: "", cover_size: "", cover_name: "", ticker_source: "", hide_sections: [], topfriends_count: 8, topfriends_side: "", feed_privacy: "public", divider: "", divider_color: "", divider_unlocks: [], website_buttons: false, custom_page_html: "", page_opacity: "", page_format: "", header_border_width: "", header_radius: "", header_border_color: "", header_crop: "", hide_avatar: false, header_links_pos: "", links_side: "", links_stack: "", links_top: "", header_side: "", buttons_order: [], reveal_sections: [], page_blocks: [], puck: null, page_layout: "" };
   if (!stored) return empty;
   let obj;
   try { obj = typeof stored === "string" ? JSON.parse(stored) : stored; } catch { return empty; }
@@ -2338,7 +2346,10 @@ export function parseTheme(stored) {
   // others; per-type requirements (text needs text, image/gif need an
   // https src, link/button need a label + https url, embed needs an
   // https url) drop only that row.
-  var BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat"];
+  var BLOCK_TYPES = ["text", "image", "link", "button", "divider", "spacer", "gif", "embed", "tour", "catalogue", "postlist", "stream", "social", "chat",
+    // Mini players (2026-11-25) — no per-type requirement: they play
+    // the member's page sound, so they need no text or URL.
+    "minibar", "minicard", "minichip"];
   var pbs = Array.isArray(obj.page_blocks) ? obj.page_blocks : [];
   out.page_blocks = pbs.slice(0, 40).map(function (it) {
     if (!it || typeof it !== "object") return null;
@@ -2372,6 +2383,40 @@ export function parseTheme(stored) {
     if (btype === "embed" && !burl) return null;
     return { id: bid, type: btype, x: bx, y: by, w: bw, h: bh, text: btext, url: burl, src: bsrc, color: bcolor, bg: bbg, font: bfont, size: bsize, opacity: bop, align: balign, bold: it.bold === true, italic: it.italic === true, underline: it.underline === true, label: blabel };
   }).filter(Boolean);
+  // Puck page editor (2026-11-25) — structured block data for the
+  // drag-and-drop editor. Stored alongside page_blocks (which the live
+  // renderer still reads); the editor is the source of truth for it.
+  // Validated lightly here: an object with a content array of at most
+  // 40 items, each {type, props} with a known component id. Anything
+  // else stores as null, never as attacker-controlled markup — the
+  // live page renders page_blocks, never raw puck data.
+  var PUCK_TYPES = ["Text", "Image", "Gif", "LinkButton", "VideoEmbed", "Divider", "Spacer", "LatestPosts", "PageComments", "Catalogue", "TourDates", "SocialLinks", "Stream",
+    // Mini players (2026-11-25).
+    "MiniPlayerBar", "MiniPlayerCard", "MiniPlayerChip"];
+  var puckOk = null;
+  if (obj.puck && typeof obj.puck === "object" && Array.isArray(obj.puck.content)) {
+    var pitems = obj.puck.content.slice(0, 40).map(function (it) {
+      if (!it || typeof it !== "object") return null;
+      var ptype = String(it.type || "");
+      if (PUCK_TYPES.indexOf(ptype) < 0) return null;
+      var props = (it.props && typeof it.props === "object") ? it.props : {};
+      var cleanProps = {};
+      for (var k in props) {
+        var v = props[k];
+        if (typeof v === "string") cleanProps[k] = String(v).slice(0, 2000);
+        else if (typeof v === "number" && isFinite(v)) cleanProps[k] = v;
+        else if (typeof v === "boolean") cleanProps[k] = v;
+      }
+      var pid = String(it.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24);
+      return { type: ptype, props: cleanProps, id: pid || undefined };
+    }).filter(Boolean);
+    puckOk = { content: pitems, root: { props: {} } };
+  }
+  out.puck = puckOk;
+  // Puck flow layout (2026-11-25) — "flow" renders page_blocks stacked
+  // in document order (no absolute positioning, no overlap); anything
+  // else is the legacy absolute canvas.
+  out.page_layout = (String(obj.page_layout || "") === "flow") ? "flow" : "";
   // Padding presets (2026-11-23) — bounded, never free numbers.
   var padOk = function (v) { return ["", "none", "tight", "roomy"].indexOf(String(v || "")) >= 0 ? String(v || "") : ""; };
   out.pad_page = padOk(obj.pad_page);
@@ -2393,7 +2438,7 @@ export function parseTheme(stored) {
 // to store ("" when nothing is set).
 export function cleanTheme(input) {
   const t = parseTheme(input);
-  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !t.music_file_url && !t.music_ip_rights && !t.music_file_approved && !(t.tour_dates && t.tour_dates.length) && !t.subscribe_fee && !t.subscribe_paypal_url && !t.subscribe_stripe_url && t.blue_pics_visibility === "" && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !(t.page_blocks && t.page_blocks.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length)) return "";
+  if (!t.bg_color && !t.bg_image_url && !t.bg_gif_url && !t.gif_block_url && t.gif_block_position === "" && t.gif_block_size === "" && t.gif_block_align === "center" && !t.text_color && !t.accent_color && !t.font && !t.name_font && !t.glow && !t.glow_color && !t.outline_color && !t.vibe && !t.button_style && !t.button_css && !(t.effects && t.effects.length) && !t.bg_preset && !t.comment_border_color && !t.pic_size && !t.pic_position && !t.pic_frame && !t.blood_color && !t.gb_mode && !(t.gb_colors && t.gb_colors.length) && !(t.display_badges && t.display_badges.length) && t.buttons_side === "" && t.buttons_show !== false && t.button_size === "" && t.buttons_visible === null && t.pro_button_side === "" && !t.pro_button_color && !t.video_url && !t.video_file_url && t.video_size === "" && t.video_align === "" && t.cover_size === "" && t.cover_name === "" && t.ticker_source === "" && !(t.hide_sections && t.hide_sections.length) && !(t.section_order && t.section_order.join(",") !== SECTION_ORDER_IDS.join(",")) && t.topfriends_count === 8 && t.topfriends_side === "" && t.feed_privacy === "public" && !t.divider && !t.divider_color && !(t.divider_unlocks && t.divider_unlocks.length) && !t.website_buttons && !t.custom_page_html && !t.soundscape && !t.player_skin && !t.player_image_url && !t.spotify_url && !t.soundcloud_url && !t.music_file_url && !t.music_ip_rights && !t.music_file_approved && !(t.tour_dates && t.tour_dates.length) && !t.subscribe_fee && !t.subscribe_paypal_url && !t.subscribe_stripe_url && t.blue_pics_visibility === "" && !(t.font_fx && (t.font_fx.all.effect || t.font_fx.name.effect || t.font_fx.comments.effect || t.font_fx.bio.effect)) && !(t.overlay_items && t.overlay_items.length) && !(t.page_blocks && t.page_blocks.length) && !t.pad_page && !t.pad_cards && !t.pad_header && !t.bio_size && !t.bio_color && !t.bio_underline && t.header_fit === "cover" && t.header_ratio === "auto" && t.header_use_default !== false && !t.page_image_fit && !t.page_format && !t.header_border_width && !t.header_radius && !t.header_border_color && !t.header_crop && !t.hide_avatar && !t.header_links_pos && !t.links_side && !t.links_stack && !t.links_top && !t.header_side && !(t.buttons_order && t.buttons_order.length) && !(t.reveal_sections && t.reveal_sections.length) && !t.puck && t.page_layout === "") return "";
   return JSON.stringify(t);
 }
 // Profile action buttons (v3.6) — one JSON blob describing the button

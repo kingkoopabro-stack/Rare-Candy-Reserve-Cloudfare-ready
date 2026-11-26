@@ -3736,8 +3736,15 @@ function profileFormHTML(p) {
   // v3.2 theme pickers — parsed + validated (hex colors, https image,
   // allowlisted font); all empty unless the member opted in.
   var th = parseThemeClient(p && p.profile_theme);
-  return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Edit your profile") + '">' +
-    "<h3 style=\"margin-top:0\">" + (isNew ? "Create your account — it’s free" : "Edit your profile") + "</h3>" +
+  return '<section class="card" aria-label="' + (isNew ? "Create your account" : "Profile Editor") + '">' +
+    (isNew ? "<h3 style=\"margin-top:0\">Create your account — it’s free</h3>" :
+    // Profile Editor header (2026-11-26): the neon RCR logo centred on
+    // top, "Profile Editor" underneath in bold white with a black
+    // outline so it reads on the dark page. The logo is a transparent
+    // WebP (images/rare-candy-reserve-logo-neon.webp, resized from the
+    // 4500px master) — no white box behind it. Replaces the old
+    // "Edit your profile" heading entirely.
+    '<div style="text-align:center;margin:2px 0 14px"><img src="/images/rare-candy-reserve-logo-neon.webp" alt="Rare Candy Reserve" style="max-width:420px;width:92%;height:auto;display:block;margin:0 auto"><div style="font-family:\'Arial Black\',Arial,sans-serif;font-weight:900;font-size:30px;letter-spacing:2px;line-height:1.1;color:#fff;-webkit-text-stroke:1.5px #000;text-shadow:2px 0 0 #000,-2px 0 0 #000,0 2px 0 #000,0 -2px 0 #000,2px 2px 0 #000,-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000;margin-top:2px">Profile Editor</div></div>') +
     '<form class="dwc-mode-' + (p && p.website_mode ? "website" : "myspace") + ' dwc-fmt-' + pageFormatFor(th, p) + '" onsubmit="DWC.saveProfile(this); return false;" oninput="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()" onchange="DWC.profileFormDirty();DWC.refreshLayoutPreviewSoon()">' +
     (isNew ? "" :
     // First-run orientation banner (2026-11-23) — only when the member
@@ -8263,7 +8270,7 @@ async function viewPayouts(el) {
 // with it — that box already lives in Edit Profile > About Me
 // (Layout Converter), which is where members edit code.
 // =====================================================================
-var PUCK_EDITOR_VERSION = "v4"; // bump when assets/js/puck-editor.js is rebuilt
+var PUCK_EDITOR_VERSION = "v6"; // bump when assets/js/puck-editor.js is rebuilt
 function designOpenEditor() {
   location.hash = "#/design";
 }
@@ -8338,7 +8345,184 @@ async function viewDesignEditor(el) {
     try { migratedData = window.PuckEditor.legacyToPuck(p, t); } catch (e) { migratedData = null; }
   }
   var isMigrated = !!(migratedData && Array.isArray(migratedData.content) && migratedData.content.length > 0);
-  el.innerHTML = '<div id="dwc-puck-editor" style="height:calc(100vh - 120px);min-height:560px"></div>';
+  // Page order (Chris, 2026-11-26): basic info first, then the
+  // banner/look settings in a collapsed expandable area, then the
+  // drag-and-drop block editor, then the coding area last. The easy
+  // stuff shows first; the code is furthest down. The three small
+  // sections save through their own partial POSTs to /api/profile —
+  // the server only writes the fields actually present, so none of
+  // them can wipe the blocks or the theme (same partial-save contract
+  // as the Puck Publish below).
+  var infoHTML =
+    '<section class="card" id="dwc-design-info" style="margin-bottom:14px">' +
+    '<h2 style="margin:0 0 4px;font-size:17px">👤 Profile info</h2>' +
+    '<p style="margin:0 0 12px;font-size:13px;color:var(--muted)">The basics first — these show at the top of your page. Save them here, then design your blocks below.</p>' +
+    '<div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">' +
+    '<div style="flex:0 0 auto;text-align:center">' +
+    '<div id="dwc-design-avatar-wrap">' +
+    (p.avatar_url
+      ? '<img id="dwc-design-avatar-img" src="' + esc(p.avatar_url) + '" alt="Your profile picture" style="width:84px;height:84px;object-fit:cover;border-radius:50%;border:2px solid var(--line,#ddd);display:block">'
+      : '<div style="width:84px;height:84px;border-radius:50%;border:2px dashed var(--line,#ddd);display:flex;align-items:center;justify-content:center;font-size:36px">👤</div>') +
+    '</div>' +
+    '<label class="btn ghost small" style="margin-top:8px;cursor:pointer;display:inline-block">Change picture<input id="dwc-design-avatar" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none"></label>' +
+    '<div id="dwc-design-avatar-note" style="font-size:12px;color:var(--muted);margin-top:6px;max-width:170px"></div>' +
+    '</div>' +
+    '<div style="flex:1 1 260px;display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<label style="font-size:13px">Name — your @username<input id="dwc-design-username" maxlength="24" value="' + esc(p.username || "") + '" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;font-size:14px"></label>' +
+    '<label style="font-size:13px">Age — date of birth<input id="dwc-design-birthday" type="date" value="' + esc(p.birthday || "") + '" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;font-size:14px"></label>' +
+    '<label style="font-size:13px;grid-column:1/-1">Occupation<input id="dwc-design-occupation" maxlength="60" value="' + esc(p.occupation || "") + '" placeholder="What do you do?" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;font-size:14px"></label>' +
+    '</div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap"><button type="button" class="btn" id="dwc-design-info-save">Save info</button><span id="dwc-design-info-note" style="font-size:13px;color:var(--muted)"></span></div>' +
+    '<p style="margin:8px 0 0;font-size:12px;color:var(--muted)">Only the month and day of your birthday are ever shown publicly, never the year. Your full name is never shown publicly.</p>' +
+    '</section>';
+  var lookHTML =
+    '<details class="card" id="dwc-design-look" style="margin-bottom:14px">' +
+    '<summary style="cursor:pointer;font-size:16px;font-weight:600;padding:2px 0">🎨 Banner &amp; look <span style="font-weight:400;font-size:13px;color:var(--muted)">— fonts and cover picture (tap to open)</span></summary>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">' +
+    '<label style="font-size:13px">Page text font<select id="dwc-design-font" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;font-size:14px">' +
+    THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (((t && t.font) || "") === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>'; }).join("") +
+    '</select></label>' +
+    '<label style="font-size:13px">Name font — your display name<select id="dwc-design-name-font" style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 9px;border:1px solid #ccc;border-radius:8px;font-size:14px">' +
+    THEME_FONTS.map(function (f) { return '<option value="' + f.id + '"' + (((t && t.name_font) || "") === f.id ? " selected" : "") + '>' + esc(f.name) + '</option>'; }).join("") +
+    '</select></label>' +
+    '</div>' +
+    '<div style="margin-top:12px">' +
+    '<div style="font-size:13px;margin-bottom:6px">Banner / cover picture</div>' +
+    '<div id="dwc-design-banner-preview" style="margin-bottom:8px">' +
+    (p.banner_url
+      ? '<img src="' + esc(p.banner_url) + '" alt="Current banner" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;display:block">'
+      : '<p style="margin:0;font-size:13px;color:var(--muted)">No banner yet — your name shows at the top instead.</p>') +
+    '</div>' +
+    '<label class="btn ghost small" style="cursor:pointer;display:inline-block">Choose a banner picture<input id="dwc-design-banner" type="file" accept="image/jpeg,image/png,image/webp,image/gif" style="display:none"></label>' +
+    '<span id="dwc-design-banner-note" style="font-size:12px;color:var(--muted);margin-left:8px"></span>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap"><button type="button" class="btn" id="dwc-design-look-save">Save look</button><span id="dwc-design-look-note" style="font-size:13px;color:var(--muted)"></span></div>' +
+    '</details>';
+  var codeHTML =
+    '<section class="card" id="dwc-design-code" style="margin-top:14px">' +
+    '<h2 style="margin:0 0 4px;font-size:17px">💻 Code — custom page CSS</h2>' +
+    '<p style="margin:0 0 10px;font-size:13px;color:var(--muted)">The advanced bit, last for a reason — extra CSS for your page, on top of the look above. Your bio lives in Edit Profile &gt; About Me.</p>' +
+    '<textarea id="dwc-design-css" rows="8" maxlength="8000" spellcheck="false" placeholder="/* Your custom CSS here — e.g. .dwc-myprofile h2 { color: #ff2d95; } */" style="display:block;width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid #ccc;border-radius:8px;font-size:13px;font-family:monospace;white-space:pre">' + esc(p.layout_css || "") + '</textarea>' +
+    '<div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><button type="button" class="btn" id="dwc-design-code-save">Save code</button><span id="dwc-design-code-note" style="font-size:13px;color:var(--muted)"></span></div>' +
+    '</section>';
+  el.innerHTML = infoHTML + lookHTML + '<div id="dwc-puck-editor" style="height:calc(100vh - 120px);min-height:560px"></div>' + codeHTML;
+  // Wire the three small sections (each its own partial save).
+  (function wireDesignSections() {
+    var infoAvatar = null; // shrunk {dataBase64, mimeType} waiting to save
+    var lookBanner = null; // same, for the banner
+    var avatarInput = document.getElementById("dwc-design-avatar");
+    var avatarNote = document.getElementById("dwc-design-avatar-note");
+    var avatarWrap = document.getElementById("dwc-design-avatar-wrap");
+    var setAvatarThumb = function (src) {
+      if (!avatarWrap) return;
+      avatarWrap.innerHTML = src
+        ? '<img id="dwc-design-avatar-img" src="' + esc(src) + '" alt="Your profile picture" style="width:84px;height:84px;object-fit:cover;border-radius:50%;border:2px solid var(--line,#ddd);display:block">'
+        : '<div style="width:84px;height:84px;border-radius:50%;border:2px dashed var(--line,#ddd);display:flex;align-items:center;justify-content:center;font-size:36px">👤</div>';
+    };
+    if (avatarInput) avatarInput.addEventListener("change", async function () {
+      var f = avatarInput.files && avatarInput.files[0];
+      if (!f) { infoAvatar = null; if (avatarNote) avatarNote.textContent = ""; return; }
+      if (avatarNote) { avatarNote.textContent = "Shrinking…"; avatarNote.style.color = "var(--muted)"; }
+      var r = await shrinkAvatarImage(f);
+      if (!r) { infoAvatar = null; if (avatarNote) avatarNote.textContent = ""; return; }
+      if (r.error) { infoAvatar = null; if (avatarNote) { avatarNote.textContent = r.error; avatarNote.style.color = "var(--amber)"; } return; }
+      infoAvatar = { dataBase64: r.dataBase64, mimeType: r.mimeType };
+      if (avatarNote) { avatarNote.textContent = "Picked ✓ — hit Save info."; avatarNote.style.color = "var(--green)"; }
+      if (r.dataBase64) setAvatarThumb("data:" + (r.mimeType || "image/jpeg") + ";base64," + r.dataBase64);
+    });
+    var infoSave = document.getElementById("dwc-design-info-save");
+    var infoNote = document.getElementById("dwc-design-info-note");
+    if (infoSave) infoSave.addEventListener("click", async function () {
+      var uname = document.getElementById("dwc-design-username");
+      var bday = document.getElementById("dwc-design-birthday");
+      var occ = document.getElementById("dwc-design-occupation");
+      var body = {
+        device_id: deviceId(),
+        username: uname ? String(uname.value || "").trim() : "",
+        occupation: occ ? String(occ.value || "").trim() : "",
+        birthday: (bday && bday.value) ? bday.value : null,
+      };
+      if (infoAvatar) body.avatar = infoAvatar;
+      if (infoNote) { infoNote.textContent = "Saving…"; infoNote.style.color = "var(--muted)"; }
+      infoSave.disabled = true;
+      var data = await apiPost("/profile", body);
+      infoSave.disabled = false;
+      if (!data || !data.ok) {
+        if (infoNote) { infoNote.textContent = (data && data.error) || "Couldn't save — check your connection."; infoNote.style.color = "var(--red, #c00)"; }
+        return;
+      }
+      if (data.profile) state.profile = data.profile;
+      infoAvatar = null;
+      if (avatarInput) avatarInput.value = "";
+      if (avatarNote) avatarNote.textContent = "";
+      if (data.profile && data.profile.avatar_url) setAvatarThumb(data.profile.avatar_url);
+      if (infoNote) { infoNote.textContent = "Saved ✓" + (data.avatar_error ? " — picture didn't stick: " + data.avatar_error : ""); infoNote.style.color = "var(--green)"; }
+    });
+    var bannerInput = document.getElementById("dwc-design-banner");
+    var bannerNote = document.getElementById("dwc-design-banner-note");
+    var bannerPreview = document.getElementById("dwc-design-banner-preview");
+    if (bannerInput) bannerInput.addEventListener("change", async function () {
+      var f = bannerInput.files && bannerInput.files[0];
+      if (!f) { lookBanner = null; if (bannerNote) bannerNote.textContent = ""; return; }
+      if (bannerNote) { bannerNote.textContent = "Shrinking…"; bannerNote.style.color = "var(--muted)"; }
+      var r = await shrinkAvatarImage(f);
+      if (!r) { lookBanner = null; if (bannerNote) bannerNote.textContent = ""; return; }
+      if (r.error) { lookBanner = null; if (bannerNote) { bannerNote.textContent = r.error; bannerNote.style.color = "var(--amber)"; } return; }
+      lookBanner = { dataBase64: r.dataBase64, mimeType: r.mimeType };
+      if (bannerNote) { bannerNote.textContent = "Picked ✓ — hit Save look."; bannerNote.style.color = "var(--green)"; }
+      if (bannerPreview && r.dataBase64) bannerPreview.innerHTML = '<img src="data:' + (r.mimeType || "image/jpeg") + ';base64,' + r.dataBase64 + '" alt="New banner" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;display:block">';
+    });
+    var lookSave = document.getElementById("dwc-design-look-save");
+    var lookNote = document.getElementById("dwc-design-look-note");
+    if (lookSave) lookSave.addEventListener("click", async function () {
+      var fontSel = document.getElementById("dwc-design-font");
+      var nameFontSel = document.getElementById("dwc-design-name-font");
+      // Merge the fonts into the CURRENT theme (same pattern as the
+      // Puck Publish) so the blocks and the rest of the look survive.
+      var current = parseThemeClient(state.profile.profile_theme || "");
+      var merged = Object.assign({}, current, {
+        font: fontSel ? fontSel.value : (current.font || ""),
+        name_font: nameFontSel ? nameFontSel.value : (current.name_font || ""),
+      });
+      var body = {
+        device_id: deviceId(),
+        username: state.profile.username,
+        profile_theme: JSON.stringify(merged),
+      };
+      if (lookBanner) body.banner = lookBanner;
+      if (lookNote) { lookNote.textContent = "Saving…"; lookNote.style.color = "var(--muted)"; }
+      lookSave.disabled = true;
+      var data = await apiPost("/profile", body);
+      lookSave.disabled = false;
+      if (!data || !data.ok) {
+        if (lookNote) { lookNote.textContent = (data && data.error) || "Couldn't save — check your connection."; lookNote.style.color = "var(--red, #c00)"; }
+        return;
+      }
+      if (data.profile) state.profile = data.profile;
+      lookBanner = null;
+      if (bannerInput) bannerInput.value = "";
+      if (bannerNote) bannerNote.textContent = "";
+      if (bannerPreview && data.profile && data.profile.banner_url) bannerPreview.innerHTML = '<img src="' + esc(data.profile.banner_url) + '" alt="Current banner" style="width:100%;max-height:140px;object-fit:cover;border-radius:10px;display:block">';
+      if (lookNote) { lookNote.textContent = "Saved ✓" + (data.banner_error ? " — banner didn't stick: " + data.banner_error : ""); lookNote.style.color = "var(--green)"; }
+    });
+    var codeSave = document.getElementById("dwc-design-code-save");
+    var codeNote = document.getElementById("dwc-design-code-note");
+    if (codeSave) codeSave.addEventListener("click", async function () {
+      var cssEl = document.getElementById("dwc-design-css");
+      var css = cssEl ? cssEl.value : "";
+      if (codeNote) { codeNote.textContent = "Saving…"; codeNote.style.color = "var(--muted)"; }
+      codeSave.disabled = true;
+      var data = await apiPost("/profile", { device_id: deviceId(), username: state.profile.username, layout_css: css });
+      codeSave.disabled = false;
+      if (!data || !data.ok) {
+        if (codeNote) { codeNote.textContent = (data && data.error) || "Couldn't save — check your connection."; codeNote.style.color = "var(--red, #c00)"; }
+        return;
+      }
+      if (data.profile) state.profile = data.profile;
+      if (codeNote) { codeNote.textContent = "Saved ✓"; codeNote.style.color = "var(--green)"; }
+    });
+  })();
   var host = document.getElementById("dwc-puck-editor");
   try {
     var top = el.getBoundingClientRect().top + window.scrollY - 120;
@@ -8349,6 +8533,7 @@ async function viewDesignEditor(el) {
     pageBlocks: (t && t.page_blocks) || [],
     migrated: isMigrated,
     resolveGifUrl: (typeof resolveGifUrl === "function") ? resolveGifUrl : null,
+    gifLibrary: (typeof GIFS !== "undefined") ? GIFS : [],
     fontCSS: (typeof themeFontCSS === "function") ? themeFontCSS : null,
     memberUrl: "#/member/" + p.id,
     // The member's page sound for the mini players (the editor only
@@ -9351,6 +9536,7 @@ function pageBlocksHTML(blocks, m, mth) {
   };
   var linkAttrs = function (u) { return isOffsite(u) ? ' target="_blank" rel="noopener"' : ""; };
   var seenPostlist = false, seenChat = false, seenCatalogue = false;
+  var isFlow = !!(mth && mth.page_layout === "flow");
   var tallest = 0;
   var out = [];
   blocks.slice(0, 40).forEach(function (b) {
@@ -9383,20 +9569,38 @@ function pageBlocksHTML(blocks, m, mth) {
       inner = '<div style="' + tstyle + '">' + esc(b.text) + "</div>";
     } else if (type === "image") {
       if (!isHttps(b.src)) return;
-      inner = '<img src="' + esc(String(b.src).trim().slice(0, 500)) + '" alt="' + esc(b.text || b.label || "Image") + '" loading="lazy" style="max-width:100%;height:auto;display:block">';
+      // Flow mode mirrors the Puck Image render: width % of the
+      // column + align. Absolute mode keeps the old markup — the
+      // outer div already sizes it by w there.
+      var ial = (b.align === "center" || b.align === "right") ? b.align : "left";
+      var iw = clampNum(b.w, 100, 10, 100);
+      inner = isFlow
+        ? '<div style="text-align:' + ial + '"><img src="' + esc(String(b.src).trim().slice(0, 500)) + '" alt="' + esc(b.text || b.label || "Image") + '" loading="lazy" style="width:' + iw + '%;max-width:100%;height:auto;display:inline-block"></div>'
+        : '<img src="' + esc(String(b.src).trim().slice(0, 500)) + '" alt="' + esc(b.text || b.label || "Image") + '" loading="lazy" style="max-width:100%;height:auto;display:block">';
     } else if (type === "gif") {
       var gurl = resolveGifUrl(b.src || "");
       if (!gurl) return;
-      inner = '<img src="' + esc(gurl) + '" alt="' + esc(b.text || b.label || "GIF") + '" loading="lazy" style="max-width:100%;height:auto;display:block">';
+      var gal = (b.align === "center" || b.align === "right") ? b.align : "left";
+      var gw = clampNum(b.w, 100, 10, 100);
+      inner = isFlow
+        ? '<div style="text-align:' + gal + '"><img src="' + esc(gurl) + '" alt="' + esc(b.text || b.label || "GIF") + '" loading="lazy" style="width:' + gw + '%;max-width:100%;height:auto;display:inline-block"></div>'
+        : '<img src="' + esc(gurl) + '" alt="' + esc(b.text || b.label || "GIF") + '" loading="lazy" style="max-width:100%;height:auto;display:block">';
     } else if (type === "link" || type === "button") {
       var label = String(b.label || b.text || "").trim();
       if (!label || !isHttps(b.url)) return;
       var href = esc(String(b.url).trim().slice(0, 500));
-      inner = type === "button"
-        ? '<a class="btn" href="' + href + '"' + linkAttrs(b.url) + ">" + esc(label) + "</a>"
-        : '<a href="' + href + '"' + linkAttrs(b.url) + ">" + esc(label) + "</a>";
+      var lal = (b.align === "center" || b.align === "right") ? b.align : "left";
+      var lw = clampNum(b.w, 100, 10, 100);
+      var aStyle = isFlow ? ' style="display:inline-block;max-width:' + lw + '%"' : "";
+      var aTag = type === "button"
+        ? '<a class="btn" href="' + href + '"' + linkAttrs(b.url) + aStyle + ">" + esc(label) + "</a>"
+        : '<a href="' + href + '"' + linkAttrs(b.url) + aStyle + ">" + esc(label) + "</a>";
+      inner = isFlow ? '<div style="text-align:' + lal + '">' + aTag + "</div>" : aTag;
     } else if (type === "divider") {
-      inner = '<hr style="border:none;border-top:2px solid ' + hexOr(b.color, "#888888") + ';margin:8px 0">';
+      var dw = clampNum(b.w, 100, 10, 100);
+      inner = isFlow
+        ? '<hr style="border:none;border-top:2px solid ' + hexOr(b.color, "#888888") + ';margin:8px auto;width:' + dw + '%">'
+        : '<hr style="border:none;border-top:2px solid ' + hexOr(b.color, "#888888") + ';margin:8px 0">';
     } else if (type === "spacer") {
       inner = "";
     } else if (type === "embed") {
@@ -9406,6 +9610,13 @@ function pageBlocksHTML(blocks, m, mth) {
       else if (parseSpotifyUrl(eurl)) inner = musicEmbedHTML({ soundscape: "spotify", spotify_url: eurl }, true);
       else if (parseSoundCloudUrl(eurl)) inner = musicEmbedHTML({ soundscape: "soundcloud", soundcloud_url: eurl }, true);
       else inner = '<p style="margin:0"><a class="btn" href="' + esc(eurl.slice(0, 500)) + '"' + linkAttrs(eurl) + ">🔗 Open link ↗</a></p>";
+      // Flow mode mirrors the Puck VideoEmbed render: the embed sits
+      // in a width-% inline box aligned by the block's align.
+      if (isFlow && inner) {
+        var eal = (b.align === "center" || b.align === "right") ? b.align : "left";
+        var ew = clampNum(b.w, 100, 10, 100);
+        inner = '<div style="text-align:' + eal + '"><div style="display:inline-block;width:' + ew + '%;max-width:100%;text-align:left;vertical-align:top">' + inner + "</div></div>";
+      }
     } else if (type === "tour") {
       inner = tourDatesSectionHTML(mth) || '<p style="color:var(--muted)">No tour dates yet.</p>';
     } else if (type === "catalogue") {
@@ -12805,6 +13016,12 @@ window.DWC = {
       // Build 5 — an operator edit names the member whose page saved.
       setNotice((state.adminEditingMemberId ? "Saved @" + data.profile.username + "’s page." : (isNew ? "Welcome to Heart Rise, @" + data.profile.username + " — you're on." : "Profile saved.")) + avatarNote + bannerNote + videoNote + musicNote + pwNote + recNote);
     }
+    // The save went through — clear the unsaved-changes state on the
+    // form that's on screen right now, so "Profile saved." never sits
+    // next to a stale "Unsaved changes" label. (The rebuild below
+    // normally resets these too, but if it throws or anything re-marks
+    // the form during it, the explicit clear still holds.)
+    DWC.profileFormClean();
     if (state.signupStep) {
       // Stepped signup — stay in the flow: advance one step and
       // re-render only the account area. No full render(), no jump to
@@ -12832,6 +13049,10 @@ window.DWC = {
       // and the page never jumps to the feed.
       state.editingProfile = true;
       renderAccount();
+      // The rebuild starts clean, but anything that re-marks the form
+      // dirty while it initialises (preview, pickers) would leave the
+      // label up after a good save — clear it again, last.
+      DWC.profileFormClean();
     }
     await refreshStats();
     if (window.RCRloader) window.RCRloader.hide();
@@ -15880,6 +16101,18 @@ window.DWC = {
     // Visibility, not hidden: the span keeps its space in the row, so the
     // Save button never jumps left when "Unsaved changes" appears.
     if (sticky) sticky.style.visibility = "visible";
+  },
+  // Inverse of profileFormDirty: a successful save clears the
+  // unsaved-changes state (label + warning) so the page reads as saved.
+  // The form rebuild after a save normally resets these by rebuilding
+  // the HTML, but if the rebuild is skipped or anything re-marks the
+  // form dirty during it, the indicators would stick around after a
+  // "Profile saved." banner — so the save clears them explicitly.
+  profileFormClean: function () {
+    var note = $("dwc-unsaved-note");
+    if (note) note.hidden = true;
+    var sticky = $("dwc-sticky-dirty");
+    if (sticky) sticky.style.visibility = "hidden";
   },
   // ---------- v3.10 Taffy profile builder ----------
   // Plain-words profile setup: keyword/phrase matching over the known

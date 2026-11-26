@@ -8263,7 +8263,7 @@ async function viewPayouts(el) {
 // with it — that box already lives in Edit Profile > About Me
 // (Layout Converter), which is where members edit code.
 // =====================================================================
-var PUCK_EDITOR_VERSION = "v2"; // bump when assets/js/puck-editor.js is rebuilt
+var PUCK_EDITOR_VERSION = "v4"; // bump when assets/js/puck-editor.js is rebuilt
 function designOpenEditor() {
   location.hash = "#/design";
 }
@@ -8323,6 +8323,21 @@ async function viewDesignEditor(el) {
   // empty page, and a "🎨 Layouts" button re-opens it any time. A
   // page that already has blocks keeps them (converted up to Puck
   // data on open).
+  // Legacy migration (2026-11-25): a member whose page predates Puck
+  // has no puck data and no page_blocks, so the editor would open
+  // empty — but their content lives in the legacy profile fields
+  // (About details, What I sell, soundscape) that flow mode hides on
+  // the live page. Convert those fields into blocks for the editor
+  // ONLY (window.PuckEditor.legacyToPuck, src/convert.js): nothing
+  // is saved until the member hits Publish, and a page that already
+  // has blocks or Puck data is never migrated — real blocks win.
+  var hasPuck = !!(t && t.puck && Array.isArray(t.puck.content) && t.puck.content.length > 0);
+  var hasBlocks = !!(t && Array.isArray(t.page_blocks) && t.page_blocks.length > 0);
+  var migratedData = null;
+  if (!hasPuck && !hasBlocks && window.PuckEditor && typeof window.PuckEditor.legacyToPuck === "function") {
+    try { migratedData = window.PuckEditor.legacyToPuck(p, t); } catch (e) { migratedData = null; }
+  }
+  var isMigrated = !!(migratedData && Array.isArray(migratedData.content) && migratedData.content.length > 0);
   el.innerHTML = '<div id="dwc-puck-editor" style="height:calc(100vh - 120px);min-height:560px"></div>';
   var host = document.getElementById("dwc-puck-editor");
   try {
@@ -8330,8 +8345,9 @@ async function viewDesignEditor(el) {
     window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
   } catch (e) {}
   window.PuckEditor.mount(host, {
-    puckData: (t && t.puck) || null,
+    puckData: isMigrated ? migratedData : ((t && t.puck) || null),
     pageBlocks: (t && t.page_blocks) || [],
+    migrated: isMigrated,
     resolveGifUrl: (typeof resolveGifUrl === "function") ? resolveGifUrl : null,
     fontCSS: (typeof themeFontCSS === "function") ? themeFontCSS : null,
     memberUrl: "#/member/" + p.id,
